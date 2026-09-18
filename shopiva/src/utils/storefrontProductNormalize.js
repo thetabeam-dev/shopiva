@@ -39,11 +39,14 @@ function normalizeFromProductAndInventory(product, inv) {
   const images = Array.isArray(product.images)
     ? product.images.filter((x) => typeof x === 'string' && x.trim()).map((x) => String(x).trim())
     : [];
+  const shopIdRaw = product.shop_id ?? product.shopId;
+  const shopIdNum = Number(shopIdRaw);
   const base = {
     id: String(product.id ?? ''),
     name: String(product.name ?? product.title ?? 'Product').trim() || 'Product',
     description: typeof product.description === 'string' ? product.description : '',
     images,
+    ...(Number.isFinite(shopIdNum) && shopIdNum > 0 ? { shop_id: shopIdNum } : {}),
   };
 
   if (!inv.length) {

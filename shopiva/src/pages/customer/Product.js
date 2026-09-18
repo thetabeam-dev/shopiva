@@ -23,7 +23,8 @@ import ShopPolicyViewerModal from '../../components/ShopPolicyViewerModal';
 import ProductVariantCardPicker from '../../components/ProductVariantCardPicker';
 import ProductReviewsSection from '../../components/ProductReviewsSection';
 import RatingRow from '../../components/RatingRow';
-import { getStorefrontProduct } from '../../api/storefront';
+import { getStorefrontProduct, getStorefrontShopDelivery } from '../../api/storefront';
+import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
 import {
   formatAttributeLabel,
   isVariantPurchasable,
@@ -85,6 +86,11 @@ export default function ProductScreen({ route, navigation }) {
   /** Vendors publish delivery policy only; opened from the ⋮ menu. */
   const [deliveryPolicyModalVisible, setDeliveryPolicyModalVisible] =
     useState(false);
+  const [deliveryInfo, setDeliveryInfo] = useState(
+    /** @type {ReturnType<typeof normalizeShopDelivery>} */ (null),
+  );
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [deliveryError, setDeliveryError] = useState('');
   /** Resolved variant when all attribute axes are chosen (null until complete + in stock). */
   const [selectedVariant, setSelectedVariant] = useState(
     /** @type {Record<string, unknown> | null} */ (null),
@@ -109,6 +115,13 @@ export default function ProductScreen({ route, navigation }) {
   */
 
   const shopName = vendor?.name?.trim() || 'Shop';
+  const resolvedShopId = useMemo(() => {
+    return (
+      parseShopId(shopId) ||
+      parseShopId(detailProduct?.shop_id) ||
+      parseShopId(routeProduct?.shop_id)
+    );
+  }, [shopId, detailProduct?.shop_id, routeProduct?.shop_id]);
   const productIdParam =
     routeProductId ?? routeProduct?.id ?? routeProduct?.key;
   const hasNumericProductId = useMemo(() => {
@@ -293,6 +306,42 @@ export default function ProductScreen({ route, navigation }) {
     () => extractCustomerPolicySections(shopPolicies),
     [shopPolicies],
   );
+
+  useEffect(() => {
+    if (!resolvedShopId) {
+      setDeliveryInfo(null);
+      setDeliveryLoading(false);
+      setDeliveryError('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setDeliveryLoading(true);
+      setDeliveryError('');
+      try {
+        const raw = await getStorefrontShopDelivery(resolvedShopId);
+        if (cancelled) return;
+        setDeliveryInfo(normalizeShopDelivery(raw));
+      } catch (e) {
+        if (!cancelled) {
+          setDeliveryInfo(null);
+          setDeliveryError(
+            e instanceof Error ? e.message : 'Could not load delivery details.',
+          );
+        }
+      } finally {
+        if (!cancelled) setDeliveryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedShopId]);
+
+  const openDeliveryPolicyModal = useCallback(() => {
+    setOverflowMenuOpen(false);
+    setDeliveryPolicyModalVisible(true);
+  }, []);
 
   const selectedInventoryId = useMemo(() => {
     if (!d) return null;
@@ -668,7 +717,7 @@ export default function ProductScreen({ route, navigation }) {
       image: imageUri,
       unitPrice: checkoutUnitPrice,
       qty,
-      shop_id: shopId,
+      shop_id: resolvedShopId ?? shopId,
       productId: product.id,
       inventoryId: selectedInventoryId ?? undefined,
       variantLabel: variantSummaryText || undefined,
@@ -688,6 +737,7 @@ export default function ProductScreen({ route, navigation }) {
     title,
     checkoutUnitPrice,
     qty,
+    resolvedShopId,
     shopId,
     product.id,
     selectedInventoryId,
@@ -1018,10 +1068,15 @@ export default function ProductScreen({ route, navigation }) {
       <ShopPolicyViewerModal
         visible={deliveryPolicyModalVisible}
         onClose={() => setDeliveryPolicyModalVisible(false)}
-        title={`${shopName} — Delivery policy`}
+        title="Delivery details"
         clauses={policySections.delivery}
-        emptyMessage="This vendor has not published a delivery policy on Shopiva yet."
-      />
+        locations={deliveryInfo?.locations}
+        deliveryMethod={deliveryInfo?.method}
+        loading={deliveryLoading}
+        emptyMessage={
+          deliveryError ||
+          'This vendor has not set delivery locations on Shopiva yet.'
+        }
       <ShopOverflowMenu
         visible={overflowMenuOpen}
         onClose={() => setOverflowMenuOpen(false)}
@@ -1032,10 +1087,7 @@ export default function ProductScreen({ route, navigation }) {
           (typeof product?.uri === 'string' ? product.uri.trim() : '')
         }
         fallbackLetter={title.charAt(0).toUpperCase() || 'P'}
-        onDeliveryPolicy={() => {
-          setOverflowMenuOpen(false);
-          setDeliveryPolicyModalVisible(true);
-        }}
+        onDeliveryPolicy={openDeliveryPolicyModal}
         onVisitShop={() => {
           setOverflowMenuOpen(false);
           navigation.navigate('vendor', { vendor, category });
