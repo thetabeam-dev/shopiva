@@ -1076,7 +1076,7 @@ export default function ProductScreen({ route, navigation }) {
         emptyMessage={
           deliveryError ||
           'This vendor has not set delivery locations on Shopiva yet.'
-        }
+        } />
       <ShopOverflowMenu
         visible={overflowMenuOpen}
         onClose={() => setOverflowMenuOpen(false)}

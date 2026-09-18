@@ -17,11 +17,13 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import RatingRow from '../../components/RatingRow';
+import ShopPolicyViewerModal from '../../components/ShopPolicyViewerModal';
 import { buildMvpCategoryFilters, formatMvpCategoryLabel } from '../../utils/mvpCategory';
 import { selectCategoryTree } from '../../../redux/categoriesSlice';
-import { getStorefrontProducts, getStorefrontShop } from '../../api/storefront';
+import { getStorefrontProducts, getStorefrontShop, getStorefrontShopDelivery } from '../../api/storefront';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
+import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
 
 const { width: WINDOW_W, height: WINDOW_H } = Dimensions.get('window');
 const BROWN = '#00926e';
@@ -228,7 +230,22 @@ export default function VendorShopScreen({ route, navigation }) {
   const [apiProducts, setApiProducts] = useState(/** @type {ReturnType<typeof mapStorefrontProductToTile>[]} */ ([]));
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState('');
+  const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [deliveryInfo, setDeliveryInfo] = useState(
+    /** @type {ReturnType<typeof normalizeShopDelivery>} */ (null),
+  );
+  const [deliveryError, setDeliveryError] = useState('');
   const slug = String(vendor?.slug ?? '').trim();
+
+  const resolvedShopId = useMemo(
+    () =>
+      parseShopId(shopMeta?.id) ||
+      parseShopId(shopMeta?.shop_id) ||
+      parseShopId(vendor?.id) ||
+      parseShopId(vendor?.shop_id),
+    [shopMeta?.id, shopMeta?.shop_id, vendor?.id, vendor?.shop_id],
+  );
 
   const categoryTree = useSelector(selectCategoryTree);
 
@@ -339,6 +356,54 @@ export default function VendorShopScreen({ route, navigation }) {
     setFollowing((f) => !f);
   }, []);
 
+  const openDeliveryDetails = useCallback(async () => {
+    setDeliveryModalVisible(true);
+    if (!resolvedShopId) {
+      setDeliveryInfo(null);
+      setDeliveryError('This shop cannot load delivery details (missing id).');
+      return;
+    }
+    if (deliveryInfo?.shopId === resolvedShopId && !deliveryError) {
+      return;
+    }
+    setDeliveryLoading(true);
+    setDeliveryError('');
+    try {
+      const raw = await getStorefrontShopDelivery(resolvedShopId);
+      setDeliveryInfo(normalizeShopDelivery(raw));
+    } catch (e) {
+      setDeliveryInfo(null);
+      setDeliveryError(
+        e instanceof Error ? e.message : 'Could not load delivery details.',
+      );
+    } finally {
+      setDeliveryLoading(false);
+    }
+  }, [resolvedShopId, deliveryInfo, deliveryError]);
+
+  const deliveryHeaderActions = (
+    <>
+      <TouchableOpacity
+        style={[styles.circleBrown, styles.heroIconGap]}
+        onPress={() => navigation.navigate('Cart')}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Open cart"
+      >
+        <Icon name="cart-outline" size={20} color="#000000" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.circleBrown, styles.heroIconGap]}
+        onPress={openDeliveryDetails}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Delivery details"
+      >
+        <Icon name="car-outline" size={20} color="#000000" />
+      </TouchableOpacity>
+    </>
+  );
+
   const openFilterModal = useCallback(() => {
     const m = { ...filters };
     if (m.type && !m.subCategory) m.type = null;
@@ -408,15 +473,7 @@ export default function VendorShopScreen({ route, navigation }) {
                   <TouchableOpacity style={styles.followPill} onPress={onFollow} activeOpacity={0.88}>
                     <Text style={styles.followPillText}>{following ? 'Following' : 'Follow'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.circleBrown, styles.heroIconGap]}
-                    onPress={() => navigation.navigate('Cart')}
-                    activeOpacity={0.85}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open cart"
-                  >
-                    <Icon name="cart-outline" size={20} color="#000000" />
-                  </TouchableOpacity>
+                  {deliveryHeaderActions}
                   <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
                     <Icon name="share-outline" size={20} color="#000000" />
                   </TouchableOpacity>
@@ -446,15 +503,7 @@ export default function VendorShopScreen({ route, navigation }) {
                   {/* <TouchableOpacity style={styles.followPill} onPress={onFollow} activeOpacity={0.88}>
                     <Text style={styles.followPillText}>{following ? 'Following' : 'Follow'}</Text>
                   </TouchableOpacity> */}
-                  <TouchableOpacity
-                    style={[styles.circleBrown, styles.heroIconGap]}
-                    onPress={() => navigation.navigate('Cart')}
-                    activeOpacity={0.85}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open cart"
-                  >
-                    <Icon name="cart-outline" size={20} color="#000000" />
-                  </TouchableOpacity>
+                  {deliveryHeaderActions}
                   <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
                     <Icon name="share-outline" size={20} color="#000000" />
                   </TouchableOpacity>
@@ -582,6 +631,19 @@ export default function VendorShopScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+      <ShopPolicyViewerModal
+        visible={deliveryModalVisible}
+        onClose={() => setDeliveryModalVisible(false)}
+        title="Delivery details"
+        clauses={[]}
+        locations={deliveryInfo?.locations}
+        deliveryMethod={deliveryInfo?.method}
+        loading={deliveryLoading}
+        emptyMessage={
+          deliveryError ||
+          'This vendor has not set delivery locations on Shopiva yet.'
+        }
+      />
     </View>
   );
 }
