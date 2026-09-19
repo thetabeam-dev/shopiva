@@ -209,6 +209,7 @@ export function buildStorefrontProductDetail(
 
   const base = {
     id: String(product.id),
+    shop_id: product.shop_id,
     name: String(product.name ?? "").trim() || "Product",
     description: typeof product.description === "string" ? product.description : "",
     images,

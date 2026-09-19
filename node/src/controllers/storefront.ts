@@ -3,6 +3,7 @@ import {
   GetStorefrontShopBySlugService,
   GetStorefrontProductsByShopIdService,
   GetStorefrontProductService,
+  GetStorefrontShopDeliveryService,
 } from "../services/business/storefront.js";
 
 export async function GetStorefrontShopController(req: Request, res: Response): Promise<void> {
@@ -79,5 +80,23 @@ export async function GetStorefrontProductController(req: Request, res: Response
       return;
     }
     res.status(400).json({ error: msg });
+  }
+}
+
+export async function GetStorefrontShopDeliveryController(req: Request, res: Response): Promise<void> {
+  try {
+    const shopId = parseInt(req.params.shopId ?? "", 10);
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      res.status(400).json({ error: "Invalid shop id" });
+      return;
+    }
+    const data = await GetStorefrontShopDeliveryService(shopId);
+    if (!data) {
+      res.status(404).json({ error: "Shop not found" });
+      return;
+    }
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
 }

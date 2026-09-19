@@ -125,7 +125,7 @@ export function ShopOverflowMenu({
               />
               <Text style={styles.rowLabel}>Visit shop</Text>
             </TouchableOpacity>
-            {typeof onViewShopPolicy === 'function' ? (
+            {/* {typeof onViewShopPolicy === 'function' ? (
               <>
                 <View style={styles.rowSep} />
                 <TouchableOpacity
@@ -142,7 +142,7 @@ export function ShopOverflowMenu({
                   <Text style={styles.rowLabel}>View shop policy</Text>
                 </TouchableOpacity>
               </>
-            ) : null}
+            ) : null} */}
             {typeof onDeliveryPolicy === 'function' ? (
               <>
                 <View style={styles.rowSep} />
@@ -157,7 +157,7 @@ export function ShopOverflowMenu({
                     color="#202124"
                     style={styles.rowIcon}
                   />
-                  <Text style={styles.rowLabel}>Delivery policy</Text>
+                  <Text style={styles.rowLabel}>Delivery details</Text>
                 </TouchableOpacity>
               </>
             ) : null}

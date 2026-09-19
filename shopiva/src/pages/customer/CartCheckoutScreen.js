@@ -18,7 +18,8 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../../context/ProfileContext';
-import { fetchBuyerCart } from '../../api/buyer';
+import { fetchBuyerCart, fetchBuyerCartProductShopId } from '../../api/buyer';
+import { getStorefrontShopDelivery } from '../../api/storefront';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
 import {
@@ -26,15 +27,23 @@ import {
   requestLocationPermission,
   reverseGeocodeToPlace,
 } from '../../utils/deviceLocation';
+import SelectDeliveryLocationModal from '../../components/SelectDeliveryLocationModal';
+import {
+  computeMultiItemShippingFee,
+  mergeCheckoutDeliveryLocations,
+  normalizeShopDelivery,
+  parseShopId,
+} from '../../utils/vendorDelivery';
 
 const PRIMARY = '#00926e';
+const BRAND = '#0D4F3C';
 const PAGE_BG = '#F2F2F3';
 const CARD_BG = '#FFFFFF';
 const BORDER = '#E0E0E0';
 const MUTED = '#757575';
 const ERROR = '#C62828';
 const ERROR_BG = '#FFEBEE';
-const EXPRESS_SHIPPING = 1000;
+const PALE_GREEN = '#EEF6F2';
 
 /**
  * @param {string} email
@@ -76,7 +85,7 @@ function normalizeCheckoutLine(row, index = 0) {
   const inventoryId = Number(r.inventoryId ?? r.inventory_id);
   const productIdRaw = r.productId ?? r.product_id;
   const productId = Number(productIdRaw);
-  const shop_id = r.shop_id
+  const shop_id = parseShopId(r.shop_id ?? r.shopId);
   const variantFromLabel = typeof r.variantLabel === 'string' ? r.variantLabel.trim() : '';
   const variantFromSku = r.sku != null && String(r.sku).trim() ? String(r.sku).trim() : '';
   const variantLabel = variantFromLabel || variantFromSku;
@@ -142,7 +151,7 @@ export default function CartCheckoutScreen({ navigation }) {
 
   const [cartLoading, setCartLoading] = useState(true);
   const [checkoutLines, setCheckoutLines] = useState(
-    /** @type {Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string; cartItemId?: number; inventoryId?: number; productId?: number }>} */ ([]),
+    /** @type {Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string; shop_id?: number | null; cartItemId?: number; inventoryId?: number; productId?: number }>} */ ([]),
   );
 
   const [fullName, setFullName] = useState('');
@@ -152,7 +161,12 @@ export default function CartCheckoutScreen({ navigation }) {
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   const [country, setCountry] = useState('Nigeria');
-  const [delivery, setDelivery] = useState(('standard'));
+  const [selectedDeliveryKey, setSelectedDeliveryKey] = useState(/** @type {string | null} */ (null));
+  const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [shopDeliveries, setShopDeliveries] = useState(
+    /** @type {Map<number, NonNullable<ReturnType<typeof normalizeShopDelivery>>>} */ (new Map()),
+  );
   const [isLocating, setIsLocating] = useState(false);
 
   const [touchedSubmit, setTouchedSubmit] = useState(false);
@@ -203,12 +217,30 @@ export default function CartCheckoutScreen({ navigation }) {
                   sku: row.sku,
                   inventoryId: row.inventoryId ?? row.inventory_id,
                   productId: row.productId ?? row.product_id,
+                  shop_id: row.shop_id ?? row.shopId,
                 },
                 i,
               );
             })
             .filter((x) => x != null);
-          if (!cancelled) setCheckoutLines(/** @type {typeof checkoutLines} */ (mapped));
+
+          const withShops = await Promise.all(
+            mapped.map(async (line) => {
+              if (line.shop_id || !line.productId) return line;
+              try {
+                const res = await fetchBuyerCartProductShopId(line.productId);
+                const sid = parseShopId(
+                  res && typeof res === 'object'
+                    ? /** @type {Record<string, unknown>} */ (res).shop_id
+                    : null,
+                );
+                return sid ? { ...line, shop_id: sid } : line;
+              } catch {
+                return line;
+              }
+            }),
+          );
+          if (!cancelled) setCheckoutLines(/** @type {typeof checkoutLines} */ (withShops));
         } catch {
           if (!cancelled) setCheckoutLines([]);
         } finally {
@@ -236,10 +268,84 @@ export default function CartCheckoutScreen({ navigation }) {
     [checkoutLines],
   );
 
-  const shippingCost = delivery === 'express' ? EXPRESS_SHIPPING : 0;
-  const shippingLabel = delivery === 'express' ? formatNaira(EXPRESS_SHIPPING) : 'Free';
+  const deliveryLocations = useMemo(() => {
+    /** @type {Map<number, number>} */
+    const qtyByShop = new Map();
+    for (const line of checkoutLines) {
+      const sid = parseShopId(line.shop_id);
+      if (!sid) continue;
+      qtyByShop.set(sid, (qtyByShop.get(sid) || 0) + Math.max(1, line.qty || 1));
+    }
+    const shops = [];
+    for (const [shopId, itemCount] of qtyByShop.entries()) {
+      const delivery = shopDeliveries.get(shopId) || null;
+      if (!delivery) continue;
+      shops.push({ shopId, itemCount, delivery });
+    }
+    return mergeCheckoutDeliveryLocations(shops);
+  }, [checkoutLines, shopDeliveries]);
+
+  const selectedDelivery = useMemo(
+    () => deliveryLocations.find((loc) => loc.key === selectedDeliveryKey) || null,
+    [deliveryLocations, selectedDeliveryKey],
+  );
+
+  const shippingCost = selectedDelivery
+    ? Number(selectedDelivery.checkoutFee) || 0
+    : 0;
+  const shippingLabel = selectedDelivery
+    ? formatNaira(shippingCost)
+    : deliveryLocations.length
+      ? 'Select location'
+      : '—';
   const escrowCharge = 200;
   const total = Math.max(0, subtotal + shippingCost + escrowCharge);
+
+  useEffect(() => {
+    const shopIds = [
+      ...new Set(
+        checkoutLines
+          .map((l) => parseShopId(l.shop_id))
+          .filter((id) => id != null),
+      ),
+    ];
+    if (!shopIds.length) {
+      setShopDeliveries(new Map());
+      setDeliveryLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setDeliveryLoading(true);
+      /** @type {Map<number, NonNullable<ReturnType<typeof normalizeShopDelivery>>>} */
+      const next = new Map();
+      await Promise.all(
+        shopIds.map(async (shopId) => {
+          try {
+            const raw = await getStorefrontShopDelivery(shopId);
+            const normalized = normalizeShopDelivery(raw);
+            if (normalized) next.set(shopId, normalized);
+          } catch {
+            /* shop without zones */
+          }
+        }),
+      );
+      if (!cancelled) {
+        setShopDeliveries(next);
+        setDeliveryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutLines]);
+
+  useEffect(() => {
+    if (!selectedDeliveryKey) return;
+    if (!deliveryLocations.some((loc) => loc.key === selectedDeliveryKey)) {
+      setSelectedDeliveryKey(null);
+    }
+  }, [deliveryLocations, selectedDeliveryKey]);
 
   const errors = useMemo(() => {
     const e = /** @type {Record<string, string>} */ ({});
@@ -251,9 +357,13 @@ export default function CartCheckoutScreen({ navigation }) {
     if (!street.trim()) e.street = 'Street address is required.';
     else if (!isValidStreet(street)) e.street = 'Enter a complete street address.';
     if (!city.trim()) e.city = 'Enter your city.';
-    // if (!zip.trim()) e.zip = 'Enter a ZIP or postal code.';
+    if (deliveryLocations.length > 0 && !selectedDelivery) {
+      e.delivery = 'Select a delivery location.';
+    } else if (!deliveryLoading && checkoutLines.length > 0 && deliveryLocations.length === 0) {
+      e.delivery = 'These vendors do not share a common delivery location.';
+    }
     return e;
-  }, [fullName, email, phone, street, city]);
+  }, [fullName, email, phone, street, city, deliveryLocations, selectedDelivery, deliveryLoading, checkoutLines.length]);
 
   const showErrors = touchedSubmit;
   const hasBlockingErrors = Object.keys(errors).length > 0;
@@ -346,12 +456,15 @@ export default function CartCheckoutScreen({ navigation }) {
     /** Paystack `amount` for NGN is in kobo (smallest unit). */
     const amountKobo = Math.max(100, Math.round(Number(total) * 100));
     const reference = `shopiva_cart_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const firstLine = checkoutLines[0];
 
     const shippingSummary = `${street.trim()}, ${city.trim()}, ${zip.trim()}, ${country}`;
     const uid = Number(user?.id);
     if (!Number.isFinite(uid) || uid <= 0) {
       setFormBanner('You must be signed in to pay.');
+      return;
+    }
+    if (deliveryLocations.length > 0 && !selectedDelivery) {
+      setFormBanner('Please select a delivery location before paying.');
       return;
     }
 
@@ -360,84 +473,84 @@ export default function CartCheckoutScreen({ navigation }) {
      * Each line: `{ inventory_id, quantity, productId?, variant? }` — inventory_id is required for cart SKUs;
      * productId is optional cross-check for `webhookOrderFromPaystack`.
      */
-    const paystackItems = checkoutLines.map((line) => {
-      /** @type {Record<string, unknown>} */
-      const item = {
-        inventory_id: line.inventoryId,
-        quantity: line.qty,
-      };
-      if (line.productId != null) item.productId = line.productId;
-      if (line.variantLabel) item.variant = line.variantLabel;
-      return item;
-    });
+    const shippingMethod = selectedDelivery
+      ? `vendor_delivery:${selectedDelivery.name}`
+      : 'vendor_delivery';
 
-    const shippingAddress = {
-      fullName: fullName.trim(),
-      email: customerEmail,
-      phone: phone.trim(),
-      street: street.trim(),
-      city: city.trim(),
-      zip: zip.trim(),
-      country,
-      delivery,
-      summary: shippingSummary,
-    };
+    /** @type {Map<number, number>} */
+    const feeByShop = new Map();
+    if (selectedDelivery?.perShop?.length) {
+      for (const shopFee of selectedDelivery.perShop) {
+        feeByShop.set(
+          shopFee.shopId,
+          computeMultiItemShippingFee(
+            shopFee.itemCount,
+            shopFee.fee,
+            shopFee.discountPercent,
+          ),
+        );
+      }
+    }
+
+    const shopCount = Object.keys(
+      checkoutLines.reduce((acc, line) => {
+        const sid = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
+        acc[sid] = true;
+        return acc;
+      }, /** @type {Record<string, boolean>} */ ({})),
+    ).length;
 
     // Group items by shop_id to create orders array
     const ordersByShop = checkoutLines.reduce((acc, line) => {
-      // Use shop_id from checkoutLines or default to a generic shop
-      const shopId = line.shop_id || 'default-shop';
-      console.log(line);
-      
+      const shopId = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
       if (!acc[shopId]) {
         acc[shopId] = [];
       }
-      
       acc[shopId].push({
         item_id: String(line.productId),
         unit: line.qty,
         unit_price: line.unitPrice,
         total: line.unitPrice * line.qty,
-        cart_id: line.cartItemId
+        cart_id: line.cartItemId,
       });
-      
       return acc;
-    }, {});
+    }, /** @type {Record<string, Array<{ item_id: string; unit: number; unit_price: number; total: number; cart_id?: number }>>} */ ({}));
 
     // Build orders array with proper structure
     const ordersArray = Object.entries(ordersByShop).map(([shopId, items]) => {
       const orderSubtotal = items.reduce((sum, item) => sum + item.total, 0);
-      
+      const numericShopId = Number(shopId);
+      let shopShipping = 0;
+      if (Number.isFinite(numericShopId) && feeByShop.has(numericShopId)) {
+        shopShipping = feeByShop.get(numericShopId) || 0;
+      } else if (shopCount === 1) {
+        shopShipping = shippingCost;
+      }
+
       return {
         shop_id: shopId,
-        shipping_fee: shippingCost,
-        shipping_method: delivery,
+        shipping_fee: shopShipping,
+        shipping_method: shippingMethod,
         subtotal: orderSubtotal,
         items,
       };
     });
 
-    console.log("ordersArray: ", ordersArray);
-
-    const pricingBreakdown = {
-      currency: 'NGN',
-      totalNaira: total,
-      totalKobo: amountKobo,
-      subtotalNaira: subtotal,
-      shippingNaira: shippingCost,
-    };
-
     setIsPaying(true);
     setFormBanner('');
     popup.checkout({
       email: customerEmail,
-      amount: amountKobo/100,
+      amount: amountKobo / 100,
       reference,
       metadata: {
         customer_id: String(uid),
         shipping_address: street.trim(),
+        shipping_city: city.trim(),
+        shipping_summary: shippingSummary,
+        delivery_location: selectedDelivery?.name || '',
+        delivery_location_key: selectedDelivery?.key || '',
         tax: 0,
-        orders: ordersArray
+        orders: ordersArray,
       },
       onSuccess: (res) => {
         setIsPaying(false);
@@ -487,7 +600,8 @@ export default function CartCheckoutScreen({ navigation }) {
     email,
     total,
     checkoutLines,
-    delivery,
+    selectedDelivery,
+    deliveryLocations.length,
     shippingCost,
     street,
     city,
@@ -511,12 +625,33 @@ export default function CartCheckoutScreen({ navigation }) {
       showBottomToast('Please fill in all required fields.');
       return;
     }
+    if (deliveryLocations.length > 0 && !selectedDelivery) {
+      setDeliveryModalVisible(true);
+      showBottomToast('Select a delivery location to continue.');
+      return;
+    }
     if (hasBlockingErrors) {
       setFormBanner('Please complete all fields correctly before continuing.');
       return;
     }
     setOrderSummaryOpen(true);
-  }, [subtotal, hasEmptyRequiredFields, hasBlockingErrors, showBottomToast]);
+  }, [
+    subtotal,
+    hasEmptyRequiredFields,
+    hasBlockingErrors,
+    showBottomToast,
+    deliveryLocations.length,
+    selectedDelivery,
+  ]);
+
+  const onConfirmDeliveryLocation = useCallback(() => {
+    if (!selectedDeliveryKey) return;
+    const loc = deliveryLocations.find((l) => l.key === selectedDeliveryKey);
+    if (loc?.name && !city.trim()) {
+      setCity(loc.name);
+    }
+    setDeliveryModalVisible(false);
+  }, [selectedDeliveryKey, deliveryLocations, city]);
 
   const continueToPayment = useCallback(() => {
     setOrderSummaryOpen(false);
@@ -658,31 +793,48 @@ export default function CartCheckoutScreen({ navigation }) {
               </View>
 
               <View style={styles.card}>
-                <Text style={styles.sectionHeading}>Delivery options</Text>
+                <Text style={styles.sectionHeading}>Delivery location</Text>
+                <Text style={styles.deliveryHint}>
+                  Choose where this order should be delivered. The fee is based on the vendor&apos;s shipping zones.
+                </Text>
                 <Pressable
-                  onPress={() => setDelivery('standard')}
-                  style={[styles.deliveryCard, delivery === 'standard' ? styles.deliveryCardSelected : styles.deliveryCardIdle]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: delivery === 'standard' }}
+                  onPress={() => setDeliveryModalVisible(true)}
+                  style={[
+                    styles.deliveryCard,
+                    selectedDelivery ? styles.deliveryCardSelected : styles.deliveryCardIdle,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select delivery location"
                 >
-                  <View style={styles.deliveryTextCol}>
-                    <Text style={styles.deliveryTitle}>Standard shipping</Text>
-                    <Text style={styles.deliverySub}>Delivered in 5–7 days</Text>
+                  <View style={styles.deliveryIconWrap}>
+                    <Icon name="car-outline" size={22} color={BRAND} />
                   </View>
-                  <Text style={styles.deliveryPrice}>Free</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setDelivery('express')}
-                  style={[styles.deliveryCard, delivery === 'express' ? styles.deliveryCardSelected : styles.deliveryCardIdle]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: delivery === 'express' }}
-                >
                   <View style={styles.deliveryTextCol}>
-                    <Text style={styles.deliveryTitle}>Express shipping</Text>
-                    <Text style={styles.deliverySub}>Delivered in 2–3 days</Text>
+                    <Text style={styles.deliveryTitle}>
+                      {selectedDelivery
+                        ? `Delivery to ${selectedDelivery.name}`
+                        : deliveryLoading
+                          ? 'Loading locations…'
+                          : 'Select delivery location'}
+                    </Text>
+                    <Text style={styles.deliverySub}>
+                      {selectedDelivery
+                        ? 'Vendor delivery · fee added at checkout'
+                        : deliveryLocations.length
+                          ? `${deliveryLocations.length} state${deliveryLocations.length === 1 ? '' : 's'} available`
+                          : 'No shared delivery locations for this cart'}
+                    </Text>
                   </View>
-                  <Text style={styles.deliveryPrice}>{formatNaira(EXPRESS_SHIPPING)}</Text>
+                  <View style={styles.deliveryRight}>
+                    <Text style={styles.deliveryPrice}>
+                      {selectedDelivery ? formatNaira(shippingCost) : '—'}
+                    </Text>
+                    <Icon name="chevron-forward" size={18} color="#8A9194" />
+                  </View>
                 </Pressable>
+                {showErrors && errors.delivery ? (
+                  <Text style={styles.errorText}>{errors.delivery}</Text>
+                ) : null}
               </View>
 
               {/* <Text style={styles.sectionHeading}>Payment method</Text> */}
@@ -778,6 +930,17 @@ export default function CartCheckoutScreen({ navigation }) {
             </View>
           </View>
         </Modal>
+        <SelectDeliveryLocationModal
+          visible={deliveryModalVisible}
+          onClose={() => setDeliveryModalVisible(false)}
+          locations={deliveryLocations}
+          selectedKey={selectedDeliveryKey}
+          onSelect={setSelectedDeliveryKey}
+          onContinue={onConfirmDeliveryLocation}
+          loading={deliveryLoading}
+          continueLabel="Confirm location"
+          emptyMessage="These vendors have not set overlapping delivery locations yet."
+        />
         {bottomToast ? (
           <View pointerEvents="none" style={[styles.toastWrap, { bottom: Math.max(insets.bottom, 14) + 84 }]}>
             <View style={styles.toastBox}>
@@ -973,24 +1136,43 @@ const styles = StyleSheet.create({
   deliveryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 6,
+    gap: 10,
   },
   deliveryCardSelected: {
-    borderColor: PRIMARY,
-    backgroundColor: 'rgba(0, 146, 110, 0.06)',
+    borderColor: BRAND,
+    backgroundColor: PALE_GREEN,
   },
   deliveryCardIdle: {
     borderColor: BORDER,
     backgroundColor: CARD_BG,
   },
-  deliveryTextCol: { flex: 1, paddingRight: 12 },
-  deliveryTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
-  deliverySub: { fontSize: 13, color: MUTED, marginTop: 4 },
-  deliveryPrice: { fontSize: 16, fontWeight: '700', color: '#111' },
+  deliveryIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PALE_GREEN,
+  },
+  deliveryTextCol: { flex: 1, paddingRight: 8 },
+  deliveryTitle: { fontSize: 15, fontWeight: '700', color: '#111' },
+  deliverySub: { fontSize: 12, color: MUTED, marginTop: 3, lineHeight: 17 },
+  deliveryRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  deliveryPrice: { fontSize: 15, fontWeight: '800', color: BRAND },
+  deliveryHint: {
+    fontSize: 13,
+    color: MUTED,
+    lineHeight: 18,
+    marginBottom: 12,
+    marginTop: -4,
+  },
   payRow: {
     backgroundColor: CARD_BG,
     borderRadius: 10,

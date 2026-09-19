@@ -21,10 +21,12 @@ import {
   getVendorsOnMapByCategory,
   getStorefrontProducts,
   getStorefrontShop,
+  getStorefrontShopDelivery,
 } from '../../api';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import { extractCustomerPolicySections } from '../../utils/shopPoliciesForCustomer';
+import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
 import { useSelector } from 'react-redux';
 import {
   selectCategoriesError,
@@ -597,6 +599,12 @@ export default function VendorScreen({ route, navigation }) {
     /** @type {{ title: string; content: string }[]} */ ([]),
   );
   const [vendorPolicyEmptyMessage, setVendorPolicyEmptyMessage] = useState('');
+  const [vendorDeliveryLocations, setVendorDeliveryLocations] = useState(
+    /** @type {{ name: string; fee?: number }[]} */ ([]),
+  );
+  const [vendorDeliveryMethod, setVendorDeliveryMethod] = useState(
+    /** @type {{ title?: string; description?: string } | undefined} */ (undefined),
+  );
 
   useEffect(() => {
     if (!visibleCategories.length) {
@@ -759,6 +767,8 @@ export default function VendorScreen({ route, navigation }) {
     }
     setVendorPolicyTitle(`${shopLabel} — Shop policies`);
     setVendorPolicyClauses([]);
+    setVendorDeliveryLocations([]);
+    setVendorDeliveryMethod(undefined);
     setVendorPolicyEmptyMessage('');
     setVendorPolicyLoading(true);
     setVendorPolicyModalVisible(true);
@@ -785,6 +795,46 @@ export default function VendorScreen({ route, navigation }) {
       setVendorPolicyClauses([]);
       setVendorPolicyEmptyMessage(
         e instanceof Error ? e.message : 'Could not load shop policies.',
+      );
+    } finally {
+      setVendorPolicyLoading(false);
+    }
+  }, [menuVendor, closeVendorMenu]);
+
+  const openVendorDeliveryPolicy = useCallback(async () => {
+    const v = menuVendor;
+    if (!v || typeof v !== 'object') return;
+    const row = /** @type {Record<string, unknown>} */ (v);
+    const shopId = parseShopId(row.id ?? row.shop_id ?? row.shopId);
+    const shopLabel = String(row.name ?? 'Shop').trim() || 'Shop';
+    closeVendorMenu();
+    if (!shopId) {
+      Alert.alert('Shopiva', 'This shop cannot load delivery details (missing id).');
+      return;
+    }
+    setVendorPolicyTitle('Delivery details');
+    setVendorPolicyClauses([]);
+    setVendorDeliveryLocations([]);
+    setVendorDeliveryMethod(undefined);
+    setVendorPolicyEmptyMessage('');
+    setVendorPolicyLoading(true);
+    setVendorPolicyModalVisible(true);
+    try {
+      const raw = await getStorefrontShopDelivery(shopId);
+      const delivery = normalizeShopDelivery(raw);
+      setVendorDeliveryLocations(delivery?.locations || []);
+      setVendorDeliveryMethod(delivery?.method);
+      setVendorPolicyEmptyMessage(
+        delivery?.locations?.length
+          ? ''
+          : `${shopLabel} has not set delivery locations on Shopiva yet.`,
+      );
+    } catch (e) {
+      setVendorDeliveryLocations([]);
+      setVendorPolicyEmptyMessage(
+        e instanceof Error
+          ? e.message
+          : 'Could not load delivery details.',
       );
     } finally {
       setVendorPolicyLoading(false);
@@ -859,6 +909,7 @@ export default function VendorScreen({ route, navigation }) {
       //   Alert.alert('Report shop', 'Thanks for the report. Our team will review it.');
       // }}
       onViewShopPolicy={openVendorShopPolicy}
+      onDeliveryPolicy={openVendorDeliveryPolicy}
     />
   );
 
@@ -872,6 +923,8 @@ export default function VendorScreen({ route, navigation }) {
       }}
       title={vendorPolicyTitle}
       clauses={vendorPolicyClauses}
+      locations={vendorDeliveryLocations}
+      deliveryMethod={vendorDeliveryMethod}
       emptyMessage={vendorPolicyEmptyMessage}
     />
   );
