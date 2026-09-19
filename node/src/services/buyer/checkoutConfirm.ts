@@ -180,7 +180,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
   const ship = Math.max(0, Number(shippingNaira) || 0);
   const metadataOrders = metadataOrdersFromVerifyData(d);
 
-  let subtotalNaira = 200;
+  let subtotalNaira = 200; //Escrow Fee
   for (const line of lines) {
     subtotalNaira += Number(line.quantity) * Number(line.unit_price);
   }
