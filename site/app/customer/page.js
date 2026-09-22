@@ -20,7 +20,7 @@ import "./styles/s.css"
 import Select from "react-select";
 import mvp_data from "../../json/mvp_category.json";
 import locationIcon from "../../svgs/target-3-svgrepo-com.svg";
-import logo from "../../images/Shopiva.png";
+import logo from "../../images/Deedyte.png";
 import {
   stateKeyFromNominatimData,
   haversineKm,
@@ -96,7 +96,7 @@ async function reverseGeocodeAddress(lat, lon) {
     const res = await fetch(url, {
       headers: {
         Accept: "application/json",
-        "User-Agent": "ShopivaCustomerMap/1.0 (contact: support@shopiva.com)",
+        "User-Agent": "DeedyteCustomerMap/1.0 (contact: support@deedyte.com)",
       },
     });
     if (!res.ok) throw new Error("Geocode request failed");
@@ -396,7 +396,7 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (buyerStateNormalized) {
-      sessionStorage.setItem("shopiva_buyer_state", buyerStateNormalized);
+      sessionStorage.setItem("deedyte_buyer_state", buyerStateNormalized);
     }
   }, [buyerStateNormalized]);
 

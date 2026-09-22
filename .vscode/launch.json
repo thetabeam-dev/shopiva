@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Run iOS",
-            "cwd": "/${workspaceFolder}/shopiva",
+            "cwd": "/${workspaceFolder}/deedyte",
             "type": "reactnative",
             "request": "launch",
             "platform": "ios",

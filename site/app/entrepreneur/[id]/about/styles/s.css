@@ -7,18 +7,18 @@
     
     }
 
-    #shopiva-about-head{
+    #deedyte-about-head{
         display: flex;
         flex-direction: column;
         height: auto;
     }
 
-    #shopiva-about-head div{
+    #deedyte-about-head div{
         width: 100%;
         padding: 10px;
     }
 
-    #shopiva-about-head div img{
+    #deedyte-about-head div img{
         height: 100%;
         width: 100%;
     }
@@ -77,7 +77,7 @@
         padding: 10px;
     }
 
-    .shopiva-story-cnt{
+    .deedyte-story-cnt{
         display: flex;
         height: auto;
         padding: 20px;
@@ -85,7 +85,7 @@
     }
 
 
-    .shopiva-story-cnt div{
+    .deedyte-story-cnt div{
         height: 100%;
         width: 100%;
         /* padding: 40px 40px; */
@@ -106,16 +106,16 @@
         margin: 10px 0px;
     }
 
-    .shopiva-story-cnt{
+    .deedyte-story-cnt{
         display: flex;
         height: auto;
     }
-    .shopiva-story-img-cnt img{
+    .deedyte-story-img-cnt img{
         width: 100%;
     }
 
 
-    .shopiva-story-text-cnt{
+    .deedyte-story-text-cnt{
         width: 100%;
     }
 

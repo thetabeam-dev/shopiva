@@ -8,7 +8,7 @@ import "./styles/s.css";
 // import "./styles/m.css";
 // import "./styles/l.css";
 import "./styles/xxl.css";
-import logo_img from "../../../images/Shopiva.png";
+import logo_img from "../../../images/Deedyte.png";
 
 const NAME_MAX = 255;
 const SLUG_MAX = 255;
@@ -28,7 +28,7 @@ const DEFAULT_LOCATION = {
 async function reverseGeocode(lat, lon) {
   const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&format=json`;
   const res = await fetch(url, {
-    headers: { Accept: "application/json", "User-Agent": "Shopiva-Vendor-App/1.0" },
+    headers: { Accept: "application/json", "User-Agent": "Deedyte-Vendor-App/1.0" },
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -279,10 +279,10 @@ export default function ShopCreate() {
     return (
       <div className="shop-cnt">
         <div className="left">
-          <img src={logo_img.src} alt="Shopiva" style={{ height: 50, width: 50 }} />
+          <img src={logo_img.src} alt="Deedyte" style={{ height: 50, width: 50 }} />
           <h2 className="shop-header">Create your shop</h2>
           <p className="shop-body">
-            Sign in or sign up as a vendor to create your shop and start selling on Shopiva.
+            Sign in or sign up as a vendor to create your shop and start selling on Deedyte.
           </p>
         </div>
         <div className="right">
@@ -304,7 +304,7 @@ export default function ShopCreate() {
   return (
     <div className="shop-cnt">
       <div className="left">
-        <img src={logo_img.src} alt="Shopiva" style={{ height: 50, width: 50 }} />
+        <img src={logo_img.src} alt="Deedyte" style={{ height: 50, width: 50 }} />
         <h2 className="shop-header">Create your shop</h2>
         <p className="shop-body">
           Give your store a name and a short URL. You can add more details and verification later.
@@ -324,7 +324,7 @@ export default function ShopCreate() {
             {screenWidth > 0 && screenWidth <= 480 ? (
               <img
                 src={logo_img.src}
-                alt="Shopiva"
+                alt="Deedyte"
                 width={50}
                 height={50}
                 style={{ height: 50, width: 50, flexShrink: 0 }}
@@ -368,7 +368,7 @@ export default function ShopCreate() {
               maxLength={SLUG_MAX}
               aria-invalid={!!errors.slug}
             />
-            <span className="shop-hint">shopiva.com/customer/store/{slug || "your-url"}</span>
+            <span className="shop-hint">deedyte.com/customer/store/{slug || "your-url"}</span>
             {errors.slug && (
               <span className="shop-err" role="alert">
                 {errors.slug}

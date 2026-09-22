@@ -11,7 +11,7 @@ import {
   buyerStateMatchesVendorState,
 } from "../geoUtils";
 
-import logo from "../../../images/Shopiva.png";
+import logo from "../../../images/Deedyte.png";
 
 function ExploreArrowIcon() {
   return (

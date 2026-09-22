@@ -23,7 +23,7 @@ export default function Head() {
     <section style={{ flexDirection: "column" }}>
       <h1>Privacy Policy</h1>
       <br />
-      <h5>How Shopiva handles your data</h5>
+      <h5>How Deedyte handles your data</h5>
     </section>
   );
 }

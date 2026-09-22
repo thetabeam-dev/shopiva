@@ -30,7 +30,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Default sender
-export const defaultFrom = `"${EMAIL_FROM_NAME || "Shopiva"}" <${EMAIL_FROM || EMAIL_USER}>`;
+export const defaultFrom = `"${EMAIL_FROM_NAME || "Deedyte"}" <${EMAIL_FROM || EMAIL_USER}>`;
 
 // Verify connection on startup
 export async function verifyEmailConnection(): Promise<boolean> {

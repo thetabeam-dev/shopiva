@@ -155,8 +155,8 @@ export interface ShopPolicies {
   "name": "Fabian Tech Store",
   "slug": "fabian-tech-store",
   "description": "A verified shop selling brand-new tech accessories and gadgets.",
-  "logo": "https://cdn.shopiva.com/shops/fabian-tech-store/logo.png",
-  "banner": "https://cdn.shopiva.com/shops/fabian-tech-store/banner.jpg",
+  "logo": "https://cdn.deedyte.com/shops/fabian-tech-store/logo.png",
+  "banner": "https://cdn.deedyte.com/shops/fabian-tech-store/banner.jpg",
   "category": "Electronics",
   "tags": ["tech", "gadgets", "accessories", "electronics"],
   "contactEmail": "support@fabiantechstore.com",
@@ -189,9 +189,9 @@ export interface ShopPolicies {
   "status": "active",
 
   "verificationDocuments": {
-    "governmentId": "https://cdn.shopiva.com/docs/gov-id.pdf",
+    "governmentId": "https://cdn.deedyte.com/docs/gov-id.pdf",
     "businessRegistration": null,
-    "utilityBill": "https://cdn.shopiva.com/docs/utility-bill.pdf",
+    "utilityBill": "https://cdn.deedyte.com/docs/utility-bill.pdf",
     "submittedAt": "2025-01-10T09:30:00.000Z",
     "verifiedAt": "2025-01-12T14:45:00.000Z"
   },

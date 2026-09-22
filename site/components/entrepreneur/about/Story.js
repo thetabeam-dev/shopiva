@@ -1,7 +1,7 @@
 /**
  * About Page Story Component
  * 
- * Displays the Shopiva origin story and company history.
+ * Displays the Deedyte origin story and company history.
  * 
  * @module components/entrepreneur/about/Story
  */
@@ -23,15 +23,15 @@ export default function Story() {
     <section>
       <br />
 
-      <h2 style={{ fontWeight: "400" }}>Shopiva story</h2>
+      <h2 style={{ fontWeight: "400" }}>Deedyte story</h2>
 
-      <div className="shopiva-story-cnt" style={{ height: "auto" }}>
+      <div className="deedyte-story-cnt" style={{ height: "auto" }}>
         {/* Story Image */}
-        <div className="shopiva-story-img-cnt">
+        <div className="deedyte-story-img-cnt">
           <img
             src={plus_image.src}
             style={{ height: "100%", borderRadius: "10px" }}
-            alt="Shopiva story"
+            alt="Deedyte story"
           />
         </div>
 
@@ -45,11 +45,11 @@ export default function Story() {
           }}
         >
           <div
-            className="shopiva-story-text-cnt"
+            className="deedyte-story-text-cnt"
             style={{ height: "auto", padding: "0" }}
           >
             <h3 style={{ marginBottom: "20px", fontWeight: "400" }}>
-              Shopiva was created in SE Nigeria.
+              Deedyte was created in SE Nigeria.
             </h3>
 
             <p
@@ -66,19 +66,19 @@ export default function Story() {
               sell online with ease. At that time, none of the existing
               e-commerce solutions offered the control and flexibility we needed
               to truly empower our community—so we decided to build our own.
-              That&apos;s how Shopiva was born: a user-friendly, all-in-one
+              That&apos;s how Deedyte was born: a user-friendly, all-in-one
               solution that caters to sellers&apos; needs, from inventory
               management to secure transactions, giving them the freedom to
               focus on what they do best.
               <br />
               <br />
-              Today, Shopiva has grown beyond just serving buyers; it has
+              Today, Deedyte has grown beyond just serving buyers; it has
               become the go-to platform for businesses of all sizes. Whether
               you&apos;re an online seller, running a physical retail store, or
-              making sales on-the-go, Shopiva equips you with powerful tools to
+              making sales on-the-go, Deedyte equips you with powerful tools to
               manage, expand, and simplify your business. We&apos;re proud to
               support entrepreneurs across Nigeria as they build successful
-              businesses on their own terms with Shopiva by their side.
+              businesses on their own terms with Deedyte by their side.
             </p>
           </div>
         </div>

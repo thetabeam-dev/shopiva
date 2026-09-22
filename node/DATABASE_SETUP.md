@@ -34,7 +34,7 @@ If you're using Docker for PostgreSQL:
 ```bash
 docker start <postgres-container-name>
 # Or if you need to create one:
-docker run --name shopiva-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=shopiva -p 5432:5432 -d postgres
+docker run --name deedyte-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=deedyte -p 5432:5432 -d postgres
 ```
 
 ### Option 4: Manual Start (if installed but not as service)
@@ -67,7 +67,7 @@ Before running migrations, create the database:
 
 1. In pgAdmin, right-click on "Databases"
 2. Select "Create" → "Database"
-3. Name it `shopiva` (or update `DB_NAME` in `.env`)
+3. Name it `deedyte` (or update `DB_NAME` in `.env`)
 4. Click "Save"
 
 ## Update .env File
@@ -79,7 +79,7 @@ DB_USER=postgres
 DB_PASSWORD=your_actual_password
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=shopiva
+DB_NAME=deedyte
 ```
 
 ## Run Migrations
@@ -96,7 +96,7 @@ npm run migrate
 ### Error: ECONNREFUSED
 - **Solution:** PostgreSQL is not running. Start it using one of the options above.
 
-### Error: database "shopiva" does not exist
+### Error: database "deedyte" does not exist
 - **Solution:** Create the database in pgAdmin first (see "Create Database" section above).
 
 ### Error: password authentication failed

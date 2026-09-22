@@ -4,12 +4,12 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Shopiva API',
+      title: 'Deedyte API',
       version: '1.0.0',
-      description: 'API documentation for Shopiva e-commerce platform',
+      description: 'API documentation for Deedyte e-commerce platform',
       contact: {
         name: 'Akpulu Chinedu Fabian',
-        email: 'support@shopiva.com'
+        email: 'support@deedyte.com'
       },
       license: {
         name: 'ISC',
@@ -22,7 +22,7 @@ const options: swaggerJsdoc.Options = {
         description: 'Development server'
       },
       {
-        url: 'https://api.shopiva.com',
+        url: 'https://api.deedyte.com',
         description: 'Production server'
       }
     ],

@@ -257,7 +257,7 @@ export default function ProfileFloater() {
 {/* 
         <li onClick={handleHirePartner} style={{ cursor: "pointer" }}>
           <span></span>
-          <span>Hire a Shopiva Partner</span>
+          <span>Hire a Deedyte Partner</span>
         </li> */}
 
         <hr />

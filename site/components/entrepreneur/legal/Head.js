@@ -23,7 +23,7 @@ export default function Head() {
     <section>
       <h1>Legal</h1>
       <br />
-      <h5>Here are some important things to know about using Shopiva</h5>
+      <h5>Here are some important things to know about using Deedyte</h5>
     </section>
   );
 }

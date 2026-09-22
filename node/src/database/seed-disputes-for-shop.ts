@@ -25,7 +25,7 @@
  *                          When "local": ignores DATABASE_URL and uses
  *                          LOCAL_DATABASE_URL if set, otherwise falls back to
  *                          DB_USER/DB_PASSWORD/DB_HOST/DB_PORT/DB_NAME
- *                          (defaults: postgres:postgres@localhost:5432/shopiva).
+ *                          (defaults: postgres:postgres@localhost:5432/deedyte).
  *   LOCAL_DATABASE_URL     full connection string used only when
  *                          SEED_TARGET=local (overrides DB_* vars).
  */
@@ -65,7 +65,7 @@ function poolFromEnv(target: SeedTarget): { pool: Pool; describe: string } {
       password: process.env.DB_PASSWORD || process.env.PGPASSWORD || "postgres",
       host: process.env.DB_HOST || process.env.PGHOST || "localhost",
       port: parseInt(process.env.DB_PORT || process.env.PGPORT || "5432", 10),
-      database: (process.env.DB_NAME || process.env.PGDATABASE || "shopiva").trim(),
+      database: (process.env.DB_NAME || process.env.PGDATABASE || "deedyte").trim(),
     };
     return {
       pool: new Pool(cfg),

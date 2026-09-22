@@ -13,7 +13,7 @@ import "./style.css";
 
 // Assets
 import bell_svg from "../../../svgs/notification-svgrepo-com (3).svg";
-import logo from "../../../images/Shopiva.png"
+import logo from "../../../images/Deedyte.png"
 // Utilities
 import { handleFloater } from "../../../reusables/anitmation";
 
@@ -110,7 +110,7 @@ export default function Header() {
         }} alt="" />
         &nbsp;
         {/* &nbsp; */}
-        {/* <h5 style={{margin: "0px"}}>Shopiva</h5> */}
+        {/* <h5 style={{margin: "0px"}}>Deedyte</h5> */}
       </section>
 
       {/* Search Section */}

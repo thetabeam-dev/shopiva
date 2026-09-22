@@ -25,7 +25,7 @@ function loadEnv(): void {
 
 const NEW_VENDORS = 15;
 const TOTAL_PRODUCTS = 200;
-const DEMO_EMAIL_DOMAIN = "seed-vendor.shopiva.local";
+const DEMO_EMAIL_DOMAIN = "seed-vendor.deedyte.local";
 const DEFAULT_PASSWORD = "SeedVendor123!";
 
 /** Real Lagos-area coordinates (lat, lng) — varied neighborhoods */

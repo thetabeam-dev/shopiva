@@ -17,7 +17,7 @@ export default function Sitemap() {
 
 
         <section>
-            <h1>Shopiva Sitemap</h1>
+            <h1>Deedyte Sitemap</h1>
         </section>
         <section>
             {/* <h1>Sitemap</h1> */}
@@ -104,7 +104,7 @@ export default function Sitemap() {
                         'Legal',
                         'Print on Demand',
                         'Stay Open',
-                        'Shopiva store examples'
+                        'Deedyte store examples'
                     ].map((item, index) => <div key={index} className='sitemap-list'>{item}</div>)
 
                 }
@@ -145,8 +145,8 @@ export default function Sitemap() {
                 
                 {
                     [
-                        'Shopiva Help Center',
-                        'Contact Shopiva',
+                        'Deedyte Help Center',
+                        'Contact Deedyte',
                         'API documentation',
                         'Theme support'
                     ].map((item, index) => <div key={index} className='sitemap-list'>{item}</div>)
@@ -169,11 +169,11 @@ export default function Sitemap() {
                 {
                     [
                         'Charge',
-                        'Shopiva discounts',
-                        'Shopiva forms',
-                        'Shopiva forms',
+                        'Deedyte discounts',
+                        'Deedyte forms',
+                        'Deedyte forms',
                         'Inbox',
-                        'Shopiva Magic',
+                        'Deedyte Magic',
                         'Automations',
                         'Automations',
                         'Marketing automation tools',
@@ -185,7 +185,7 @@ export default function Sitemap() {
         </section>
 
         <section>
-            <h1>Shopiva By Topic</h1>
+            <h1>Deedyte By Topic</h1>
         </section>
         <section>
             <div id='sitemap-list-cnt'>
@@ -231,22 +231,22 @@ export default function Sitemap() {
                 
                 {
                     [
-                        'Compare Shopiva',
-                        'Shopiva VS Jiji',
-                        'Shopiva VS Jumia',
-                        'Shopiva VS Konga',
-                        'Shopiva VS Prestashop',
-                        'Shopiva VS Ti-Mart',
-                        'Shopiva VS Udalla',
-                        'Shopiva VS Omnibiz Retail',
-                        'Shopiva VS Q-Shop'
+                        'Compare Deedyte',
+                        'Deedyte VS Jiji',
+                        'Deedyte VS Jumia',
+                        'Deedyte VS Konga',
+                        'Deedyte VS Prestashop',
+                        'Deedyte VS Ti-Mart',
+                        'Deedyte VS Udalla',
+                        'Deedyte VS Omnibiz Retail',
+                        'Deedyte VS Q-Shop'
                     ].map((item, index) => <div key={index} className='sitemap-list'>{item}</div>)
                 }
             </div>
 
 
             <div id='sitemap-list-cnt'>
-                <span className='sitemap-list-head'><>Shopiva</></span>
+                <span className='sitemap-list-head'><>Deedyte</></span>
                 
                 {
                     [

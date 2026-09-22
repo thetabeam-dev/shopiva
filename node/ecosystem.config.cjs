@@ -4,7 +4,7 @@ require('dotenv').config();
 module.exports = {
   apps: [
     {
-      name: 'shopiva-backend',
+      name: 'deedyte-backend',
       script: 'dist/index.js',
       interpreter: '/root/.bun/bin/bun',
       autorestart: true,

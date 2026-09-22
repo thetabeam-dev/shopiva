@@ -58,13 +58,13 @@
         padding: 10px;
     }
 
-    .shopiva-story-cnt{
+    .deedyte-story-cnt{
         display: flex;
         height: auto;
     }
 
 
-    .shopiva-story-cnt div{
+    .deedyte-story-cnt div{
         height: 100%;
         width: 50%;
         padding: 40px 40px;
@@ -84,11 +84,11 @@
         margin: 10px 0px;
     }
 
-    .shopiva-story-cnt{
+    .deedyte-story-cnt{
         display: flex;
         height: auto;
     }
-    .shopiva-story-img-cnt img{
+    .deedyte-story-img-cnt img{
         width: 80%;
     }
 
@@ -114,7 +114,7 @@
     }
 
 
-    .shopiva-story-text-cnt{
+    .deedyte-story-text-cnt{
         width: 100%;
     }
 

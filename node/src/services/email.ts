@@ -53,7 +53,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
     return sendEmail({
         to: data.email,
-        subject: "Welcome to Shopiva! 🎉",
+        subject: "Welcome to Deedyte! 🎉",
         html: welcomeTemplate(data)
     });
 }
@@ -67,7 +67,7 @@ export async function sendPasswordResetEmail(
 ): Promise<boolean> {
     return sendEmail({
         to: email,
-        subject: "Reset Your Password - Shopiva",
+        subject: "Reset Your Password - Deedyte",
         html: passwordResetTemplate(data)
     });
 }
@@ -81,7 +81,7 @@ export async function sendVerificationEmail(
 ): Promise<boolean> {
     return sendEmail({
         to: email,
-        subject: "Verify Your Email - Shopiva",
+        subject: "Verify Your Email - Deedyte",
         html: verificationTemplate(data)
     });
 }
@@ -95,7 +95,7 @@ export async function sendOrderConfirmationEmail(
 ): Promise<boolean> {
     return sendEmail({
         to: email,
-        subject: `Order Confirmed #${data.orderId} - Shopiva`,
+        subject: `Order Confirmed #${data.orderId} - Deedyte`,
         html: orderConfirmationTemplate(data)
     });
 }

@@ -148,7 +148,7 @@ export async function UploadShopVerificationDocumentController(req: Request, res
     const b64 = file.buffer.toString("base64");
     const dataUri = `data:${mime};base64,${b64}`;
     const uploaded = await cloudinary.uploader.upload(dataUri, {
-      folder: "shopiva/verification",
+      folder: "deedyte/verification",
       resource_type: "auto",
     });
 

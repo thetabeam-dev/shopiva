@@ -386,7 +386,7 @@ vendor scoring
 dispute investigations
 escrow operations
 join all of it as a file
-Shopiva Order Management Events Documentation
+Deedyte Order Management Events Documentation
 Order Management Events
 
 This document defines the lifecycle events used in the order management system.

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import "../../styles/xxl.css";
-import logo_img from "../../../../images/Shopiva.png";
+import logo_img from "../../../../images/Deedyte.png";
 
 const ROLES = { entrepreneur: "entrepreneur", customer: "customer" };
 
@@ -73,7 +73,7 @@ export default function ConfirmEmailPage() {
           alignItems: "flex-start"
         }}>
           <section style={{ marginLeft: "0px", flexDirection: "row", display: "flex", alignItems: "flex-start", justifyContent: "flex-start", width: "100%"}}>
-            <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="Shopiva" />
+            <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="Deedyte" />
             &nbsp;
             &nbsp;
             <h2 style={{ margin: "16px 0 8px", fontSize: "1.25rem", color: "#333" }}>Reset password</h2>

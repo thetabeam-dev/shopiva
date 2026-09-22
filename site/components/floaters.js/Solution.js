@@ -52,8 +52,8 @@ const SOLUTION_SECTIONS = [
     items: [
       { title: "Market your business.", subtitle: "Reach & retain customers" },
       { title: "Market across social.", subtitle: "Social media integrations" },
-      { title: "Chat with customers.", subtitle: "Shopiva Inbox" },
-      { title: "Nurture customers.", subtitle: "Shopiva Email" },
+      { title: "Chat with customers.", subtitle: "Deedyte Inbox" },
+      { title: "Nurture customers.", subtitle: "Deedyte Email" },
       { title: "Know your audience.", subtitle: "Gain customer insights" },
     ],
   },
@@ -65,7 +65,7 @@ const SOLUTION_SECTIONS = [
       { title: "Manage your business.", subtitle: "Track sales, orders & analytics" },
       { title: "Measure your performance.", subtitle: "Analytics and Reporting" },
       { title: "Manage your stock & orders.", subtitle: "Inventory & order management" },
-      { title: "Automate your business.", subtitle: "Shopiva Flow" },
+      { title: "Automate your business.", subtitle: "Deedyte Flow" },
     ],
   },
 ];

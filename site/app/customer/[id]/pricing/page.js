@@ -47,7 +47,7 @@ export default function Pricing() {
 
             <br />
 
-            <small>Try Shopiva free, no credit card required. By entering your email, you agree to receive marketing emails from Shopiva.</small>
+            <small>Try Deedyte free, no credit card required. By entering your email, you agree to receive marketing emails from Deedyte.</small>
         </section>
 
         <section>
@@ -338,7 +338,7 @@ export default function Pricing() {
                     </div>
 
                     <h5 style={{textAlign: 'left', paddingLeft: '5px', width: '100%'}}>World&apos;s best checkout</h5>
-                    <div style={{marginBottom: '10px'}}>Shopiva checkout converts 15% better on average than other commerce platforms.</div>
+                    <div style={{marginBottom: '10px'}}>Deedyte checkout converts 15% better on average than other commerce platforms.</div>
                     
                 </li>
 
@@ -349,7 +349,7 @@ export default function Pricing() {
                     </div>
 
                     <h5 style={{textAlign: 'left', paddingLeft: '5px', width: '100%'}}>In-person selling</h5>
-                    <div style={{marginBottom: '10px'}}>Sell in person and keep inventory in sync with online sales—all with Shopiva POS.</div>
+                    <div style={{marginBottom: '10px'}}>Sell in person and keep inventory in sync with online sales—all with Deedyte POS.</div>
                     
                 </li>
 
@@ -511,13 +511,13 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>What is Shopiva and how does it work?</span>
+                                <span style={{color: '#fff', width: '90%'}}>What is Deedyte and how does it work?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
                             </div>
                             <div style={{color: '#fff', textAlign: 'left'}}>
-                                Shopiva is an E-commerce platform created to improve the E-commerce eco-system 
+                                Deedyte is an E-commerce platform created to improve the E-commerce eco-system 
                             </div>
                             <hr/>
                             
@@ -526,7 +526,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>How much does Shopiva cost?</span>
+                                <span style={{color: '#fff', width: '90%'}}>How much does Deedyte cost?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -596,7 +596,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>In what countries can I use Shopiva?</span>
+                                <span style={{color: '#fff', width: '90%'}}>In what countries can I use Deedyte?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -610,7 +610,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>Is Shopiva PCI Compliant or PCI Certified?</span>
+                                <span style={{color: '#fff', width: '90%'}}>Is Deedyte PCI Compliant or PCI Certified?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -697,7 +697,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>I&apos;m looking to switch to Shopiva. How do I get my data over?</span>
+                                <span style={{color: '#fff', width: '90%'}}>I&apos;m looking to switch to Deedyte. How do I get my data over?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -711,7 +711,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>Can I use my own domain name with Shopiva?</span>
+                                <span style={{color: '#fff', width: '90%'}}>Can I use my own domain name with Deedyte?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -761,7 +761,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>What is Shopiva POS?</span>
+                                <span style={{color: '#fff', width: '90%'}}>What is Deedyte POS?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -775,7 +775,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>What kinds of businesses use Shopiva POS?</span>
+                                <span style={{color: '#fff', width: '90%'}}>What kinds of businesses use Deedyte POS?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -789,7 +789,7 @@ export default function Pricing() {
                         <li id='faq-sub-list-title'>
                         
                             <div style={{height: 'auto', width: '100%', fontSize: 'large', fontWeight: '500', textAlign: 'left'}}>
-                                <span style={{color: '#fff', width: '90%'}}>Does my online store integrate with Shopiva POS?</span>
+                                <span style={{color: '#fff', width: '90%'}}>Does my online store integrate with Deedyte POS?</span>
                                 <span>
                                     <img src={plus_svg.src} className='faq-svg' alt="" />
                                 </span>
@@ -814,7 +814,7 @@ export default function Pricing() {
             <br />
 
             <h4>Whether you&apos;re building a website, managing inventory, or responding to customers,
-            <br />you can do it all with Shopiva.</h4>
+            <br />you can do it all with Deedyte.</h4>
 
             <br />
             <div className="input-cnt">
@@ -824,7 +824,7 @@ export default function Pricing() {
 
             <br />
 
-            <small style={{textAlign: 'center'}}>Try Shopiva free, no credit card required. By entering your email, you agree to receive marketing emails from Shopiva.</small>
+            <small style={{textAlign: 'center'}}>Try Deedyte free, no credit card required. By entering your email, you agree to receive marketing emails from Deedyte.</small>
             
         </section>
         

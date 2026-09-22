@@ -24,7 +24,7 @@ import "../../app/entrepreneur/[id]/styles/xxl.css";
 // Assets
 import menu_img from "../../svgs/menu-alt-2-svgrepo-com.svg";
 import close_img from "../../svgs/close-square-svgrepo-com.svg";
-import logo_img from "../../images/Shopiva.png";
+import logo_img from "../../images/Deedyte.png";
 import bitcoin_svg from "../../svgs/coin-vector-svgrepo-com.svg";
 import ui_svg from "../../svgs/interface-ui-check-box-checkbox-todo-list-svgrepo-com.svg";
 import globe_svg from "../../svgs/global-svgrepo-com.svg";
@@ -275,7 +275,7 @@ export default function EntrepreneurFreeLayout({ children }) {
             padding: "10px",
           }}
         >
-          Dream big, build fast, and grow far on Shopiva.
+          Dream big, build fast, and grow far on Deedyte.
         </h4>
       </div>
     </div>
@@ -367,7 +367,7 @@ export default function EntrepreneurFreeLayout({ children }) {
           <img
             src={logo_img.src}
             style={{ borderRadius: "10px" }}
-            alt="Shopiva logo"
+            alt="Deedyte logo"
           />
           &nbsp;
         </section>
@@ -423,13 +423,13 @@ export default function EntrepreneurFreeLayout({ children }) {
             <img
               src={logo_img.src}
               style={{ height: "50px", width: "50px", borderRadius: "10px" }}
-              alt="Shopiva logo"
+              alt="Deedyte logo"
             />
           </div>
 
-          {/* Shopiva Links */}
+          {/* Deedyte Links */}
           <div>
-            <h6>Shopiva</h6>
+            <h6>Deedyte</h6>
             <ul>
               <li
                 onClick={() => (window.location.href = "/entrepreneur/ng/about")}
@@ -463,16 +463,16 @@ export default function EntrepreneurFreeLayout({ children }) {
                 Help Center
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/shopiva-academy")}
+                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-academy")}
                 style={{ fontSize: "small" }}
               >
-                Shopiva Academy
+                Deedyte Academy
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/shopiva-community")}
+                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-community")}
                 style={{ fontSize: "small" }}
               >
-                Shopiva Community
+                Deedyte Community
               </li>
             </ul>
           </div> */}
@@ -482,10 +482,10 @@ export default function EntrepreneurFreeLayout({ children }) {
             <h6>Developers</h6>
             <ul>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/shopiva.dev")}
+                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte.dev")}
                 style={{ fontSize: "small" }}
               >
-                Shopiva.dev
+                Deedyte.dev
               </li>
               <li
                 onClick={() => (window.location.href = "/entrepreneur/ng/api-doc")}
@@ -507,10 +507,10 @@ export default function EntrepreneurFreeLayout({ children }) {
                 Shop
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/shopiva-plus")}
+                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-plus")}
                 style={{ fontSize: "small" }}
               >
-                Shopiva Plus
+                Deedyte Plus
               </li>
             </ul>
           </div>
@@ -571,7 +571,7 @@ export default function EntrepreneurFreeLayout({ children }) {
               <li
                 onClick={() =>
                   window.open(
-                    "https://x.com/Shopiva_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
+                    "https://x.com/Deedyte_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
                   )
                 }
               >
@@ -604,7 +604,7 @@ export default function EntrepreneurFreeLayout({ children }) {
               </li>
               <li
                 onClick={() =>
-                  window.open("https://youtube.com/@shopiva?si=Euobslo-XoWD0Kqc")
+                  window.open("https://youtube.com/@deedyte?si=Euobslo-XoWD0Kqc")
                 }
               >
                 <i

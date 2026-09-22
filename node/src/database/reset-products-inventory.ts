@@ -98,7 +98,7 @@ async function main(): Promise<void> {
         "Seeded product after reset.",
         "fashion",
         "clothing",
-        "Shopiva Sample",
+        "Deedyte Sample",
         [],
         [],
         [],

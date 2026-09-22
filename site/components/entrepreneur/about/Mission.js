@@ -1,7 +1,7 @@
 /**
  * About Page Mission Component
  * 
- * Displays Shopiva's mission statement.
+ * Displays Deedyte's mission statement.
  * 
  * @module components/entrepreneur/about/Mission
  */

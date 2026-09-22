@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Users module manages user accounts, authentication, and profile management for the Shopiva platform. Users can have different roles (customer, entrepreneur, admin) and access various features based on their role.
+The Users module manages user accounts, authentication, and profile management for the Deedyte platform. Users can have different roles (customer, entrepreneur, admin) and access various features based on their role.
 
 ---
 

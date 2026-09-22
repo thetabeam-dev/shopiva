@@ -291,7 +291,7 @@ export default function CheckoutPage() {
         key: PAYSTACK_PUBLIC_KEY,
         email,
         amount: amountKobo,
-        ref: `shopiva-co-${Date.now()}`,
+        ref: `deedyte-co-${Date.now()}`,
         metadata: {
           custom_fields: [
             {

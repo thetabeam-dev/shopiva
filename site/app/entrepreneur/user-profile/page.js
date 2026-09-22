@@ -114,7 +114,7 @@ export default function UserProfile() {
     <div className="up-page">
       <header className="up-header shadow-sm">
         <section>
-          <span className="up-header__brand">Shopiva</span>
+          <span className="up-header__brand">Deedyte</span>
         </section>
         <section>
           <span className="up-avatar" aria-hidden>
@@ -609,7 +609,7 @@ function Genenral({ profile, profileLoading, onProfileRefresh }) {
             <div className="up-help">
               <p>
                 <small>
-                  This is the timezone for your Shopiva account. To set the timezone for your Shopify admin, use
+                  This is the timezone for your Deedyte account. To set the timezone for your Shopify admin, use
                   Settings → General in Shopify.
                 </small>
               </p>
