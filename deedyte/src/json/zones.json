@@ -1,0 +1,56 @@
+{
+  "north central": [
+    "Benue",
+    "Kogi",
+    "Kwara",
+    "Nasarawa",
+    "Niger",
+    "Plateau",
+    "Abuja (FCT)"
+  ],
+
+  "north east": [
+    "Adamawa",
+    "Bauchi",
+    "Borno",
+    "Gombe",
+    "Taraba",
+    "Yobe"
+  ],
+
+  "north west": [
+    "Jigawa",
+    "Kaduna",
+    "Kano",
+    "Katsina",
+    "Kebbi",
+    "Sokoto",
+    "Zamfara"
+  ],
+
+  "south south": [
+    "Akwa Ibom",
+    "Bayelsa",
+    "Cross River",
+    "Delta",
+    "Edo",
+    "Rivers"
+  ],
+
+  "south east": [
+    "Abia",
+    "Anambra",
+    "Ebonyi",
+    "Enugu",
+    "Imo"
+  ],
+
+  "south west": [
+    "Ekiti",
+    "Lagos",
+    "Ogun",
+    "Ondo",
+    "Osun",
+    "Oyo"
+  ]
+}

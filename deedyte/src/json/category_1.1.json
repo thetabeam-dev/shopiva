@@ -1,0 +1,260 @@
+{
+    "apparel & accessories": {
+        "male": [
+            "t-shirts",
+            "polo shirts",
+            "shorts",
+            "jerseys",
+            "trousers",
+            "socks",
+            "underwear",
+            "belts",
+            "caps & hats",
+            "sunglasses",
+            "ties & bowties",
+            "wallets"
+        ],
+        "female": [
+            "t-shirts",
+            "polo shirts",
+            "shorts",
+            "jerseys",
+            "trousers",
+            "socks",
+            "underwear",
+            "skirts",
+            "gowns",
+            "belts",
+            "caps & hats",
+            "sunglasses",
+            "scarves",
+            "hair accessories",
+            "hair clips",
+            "hair bands",
+            "purses & wallets"
+        ]
+    },
+    "beauty": {
+        "perfume & fragrance": [
+            "perfumes & eau de parfum",
+            "colognes & eau de toilette",
+            "body mists & sprays",
+            "fragrance gift sets"
+        ],
+        "hair extensions & wigs": [
+            "human hair wigs",
+            "synthetic wigs",
+            "clip-in hair extensions",
+            "hair bundles & closures",
+            "wig caps & adhesives"
+        ],
+        "makeup & tools": [
+            "foundations & concealers",
+            "lipsticks & lip glosses",
+            "eyeshadow palettes",
+            "makeup brushes & blenders",
+            "setting sprays & powders"
+        ],
+        "skin care": [
+            "facial cleansers",
+            "moisturizers & creams",
+            "face serums & oils",
+            "sunscreens",
+            "face masks & scrubs"
+        ],
+        "eyelash beauty & tools": [
+            "false eyelashes",
+            "eyelash extensions",
+            "eyelash glues & adhesives",
+            "eyelash curlers",
+            "tweezers & applicators"
+        ],
+        "nail supplies": [
+            "nail polishes & gels",
+            "press-on nails",
+            "nail drills & UV lamps",
+            "manicure & pedicure sets",
+            "nail files & buffers"
+        ]
+    },
+    "jewelry & watches & eyewear": {
+        "male": [
+            "necklaces & chains",
+            "rings",
+            "earrings",
+            "bracelets & wristbands",
+            "pendants",
+            "brooches",
+            "body jewelry",
+            "beads",
+            "wristwatches",
+            "eyeglasses"
+        ],
+        "female": [
+            "necklaces & chains",
+            "rings",
+            "earrings",
+            "bracelets & wristbands",
+            "anklets",
+            "pendants",
+            "brooches",
+            "body jewelry",
+            "beads",
+            "wristwatches",
+            "eyeglasses"
+        ]
+    },
+    "shoes & accessories": {
+        "female": [
+            "heels",
+            "flats",
+            "sandals",
+            "boots",
+            "sneakers",
+            "slides",
+            "wedges",
+            "slippers"
+        ],
+        "male": [
+            "sneakers",
+            "loafers",
+            "boots",
+            "sandals",
+            "slides",
+            "formal shoes",
+            "slippers"
+        ]
+    },
+    "home appliances": {
+        "small appliances": [
+            "blenders",
+            "deep fryers",
+            "juicers",
+            "air fryers",
+            "rice cookers",
+            "toasters & ovens",
+            "microwaves",
+            "vacuum cleaners",
+            "kettles",
+            "yam pounders",
+            "irons",
+            "hand fans",
+            "electric cookware",
+            "electric drink mixers",
+            "food processors",
+            "coffee makers",
+            "electric pressure cookers"
+        ],
+        "large appliances": [
+            "washing machines",
+            "refrigerators",
+            "freezers",
+            "air conditioners",
+            "heaters",
+            "fans",
+            "air purifiers",
+            "water dispensers",
+            "generators & inverters"
+        ]
+    },
+    "lights & lighting": {
+        "portable lights": [
+            "torches & flashlights",
+            "headlamps",
+            "lanterns",
+            "camping torches"
+        ],
+        "indoor lights": [
+            "ceiling lights",
+            "wall lights",
+            "lamps"
+        ],
+        "outdoor lights": [
+            "security & floodlights",
+            "solar path lights",
+            "patio string lights"
+        ],
+        "lighting bulbs & tubes": [
+            "energy saving bulbs",
+            "fluorescent bulbs",
+            "incandescent bulbs",
+            "LED bulbs",
+            "smart bulbs",
+            "compact fluorescent bulbs",
+            "halogen bulbs"
+        ]
+    },
+    "kitchenware & cookware": {
+        "cookware": [
+            "pots & pans",
+            "frying pans",
+            "saucepans",
+            "baking sheets"
+        ],
+        "kitchen utensils": [
+            "spatulas & ladles",
+            "knives & cutlery",
+            "cutting boards",
+            "measuring cups & spoons"
+        ],
+        "tableware & dinnerware": [
+            "plates & bowls",
+            "glassware & mugs",
+            "forks, spoons & knives",
+            "serving dishes"
+        ]
+    },
+    "storage & organizations": {
+        "food storage": [
+            "plastic containers",
+            "glass jars",
+            "lunch boxes",
+            "ziplock bags"
+        ],
+        "home organization": [
+            "clothes hangers",
+            "storage baskets",
+            "shoe racks",
+            "closet organizers"
+        ],
+        "shelving & racks": [
+            "spice racks",
+            "dish rack drainers",
+            "floating wall shelves"
+        ]
+    },
+    "electronics": {
+        "electronic accessories": [
+            "charging cables",
+            "power banks",
+            "phone cases",
+            "memory cards",
+            "headphones & earphones",
+            "speakers"
+        ],
+        "smart home devices": [
+            "smart speakers",
+            "security cameras",
+            "smart plugs"
+        ]
+    },
+    "toiletries": {
+        "hair care": [
+            "shampoos",
+            "conditioners",
+            "hair oils & serums"
+        ],
+        "skin & body care": [
+            "body washes & shower gels",
+            "bar soaps",
+            "body lotions",
+            "deodorants"
+        ],
+        "oral care": [
+            "toothbrushes",
+            "toothpastes",
+            "mouthwashes",
+            "dental floss"
+        ]
+    }
+}
