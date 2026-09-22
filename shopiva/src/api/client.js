@@ -18,8 +18,8 @@ export async function apiFetchAuth(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
   /** Lets the API scope responses if a route supports dual identity (same account, buyer vs seller context). */
-  if (!headers['X-Shopiva-App-Role'] && !headers['x-shopiva-app-role']) {
-    headers['X-Shopiva-App-Role'] = appRole === 'vendor' ? 'vendor' : 'customer';
+  if (!headers['X-Deedyte-App-Role'] && !headers['x-deedyte-app-role']) {
+    headers['X-Deedyte-App-Role'] = appRole === 'vendor' ? 'vendor' : 'customer';
   }
   const res = await apiFetch(path, { ...options, headers });
   if (token && res.status === 401) {
@@ -68,8 +68,8 @@ export async function apiFetchAuthMultipart(path, options = {}) {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  if (!headers['X-Shopiva-App-Role'] && !headers['x-shopiva-app-role']) {
-    headers['X-Shopiva-App-Role'] = appRole === 'vendor' ? 'vendor' : 'customer';
+  if (!headers['X-Deedyte-App-Role'] && !headers['x-deedyte-app-role']) {
+    headers['X-Deedyte-App-Role'] = appRole === 'vendor' ? 'vendor' : 'customer';
   }
   const base = getApiBaseUrl();
   const normalized = path.startsWith('/') ? path : `/${path}`;

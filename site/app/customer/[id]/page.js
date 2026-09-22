@@ -72,9 +72,9 @@ const HOW_IT_WORKS_STEPS = [
 ];
 
 /**
- * Why Shopiva features
+ * Why Deedyte features
  */
-const WHY_SHOPIVA_FEATURES = [
+const WHY_DEEDYTE_FEATURES = [
   {
     image: Bank,
     title: "Secure Payment Processing",
@@ -164,7 +164,7 @@ export default function Dashboard() {
   );
 
   /**
-   * Renders a why-shopiva feature card
+   * Renders a why-deedyte feature card
    * @param {Object} feature - Feature data
    * @param {number} index - Feature index
    * @returns {JSX.Element} Feature card
@@ -230,8 +230,8 @@ export default function Dashboard() {
 
             <div>
               <p className="theme">
-                Shopiva is your pocket mall! Whether you are unready to shop in
-                physical stores, use Shopiva to order from the closest vendor at
+                Deedyte is your pocket mall! Whether you are unready to shop in
+                physical stores, use Deedyte to order from the closest vendor at
                 your locations and get delivery at your doorstep in minutes.
               </p>
 
@@ -264,17 +264,17 @@ export default function Dashboard() {
 
       {/* How It Works Section */}
       <section id="about">
-        <h1>How Shopiva Works</h1>
+        <h1>How Deedyte Works</h1>
         <div className="about-card-cnt">
           {HOW_IT_WORKS_STEPS.map(renderHowItWorksStep)}
         </div>
       </section>
 
-      {/* Why Shopiva Section */}
+      {/* Why Deedyte Section */}
       <section id="why-section">
-        <h1>Why Shopiva?</h1>
+        <h1>Why Deedyte?</h1>
         <div className="why-cnt">
-          {WHY_SHOPIVA_FEATURES.map(renderWhyFeature)}
+          {WHY_DEEDYTE_FEATURES.map(renderWhyFeature)}
         </div>
       </section>
     </>

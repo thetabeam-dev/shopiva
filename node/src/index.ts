@@ -78,7 +78,7 @@ app.use(passport.initialize());
 
 /** Quick check that the RN app can reach this host (same base URL as API + OAuth). */
 app.get("/health", (_req, res) => {
-  res.status(200).json({ ok: true, service: "shopiva-api" });
+  res.status(200).json({ ok: true, service: "deedyte-api" });
 });
 
 app.get("/config/app-version", (req, res) => {
@@ -163,7 +163,7 @@ app.use(
   swaggerUi.setup(swaggerSpec, {
     explorer: true,
     customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "Shopiva API Documentation",
+    customSiteTitle: "Deedyte API Documentation",
   }),
 );
 
@@ -246,7 +246,7 @@ const server = app.listen(process.env.PORT, () => {
         const {status, message} = await (await paystack.initiateTransfer({
           amount: Number((payout.net_amount)),
           recipient: shop_payout_accounts.provider_recipient_id,
-          reason: `Shopiva Payout for Order #${payout.order_id}`,
+          reason: `Deedyte Payout for Order #${payout.order_id}`,
           reference: ref,
         })) as any;
 

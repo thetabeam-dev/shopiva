@@ -1656,7 +1656,7 @@ function VendorCancelReturn({ data }) {
                     </Text>
                     <Text style={styles.processingSectionSubtitle}>
                         Tell the vendor why you cannot complete this return.
-                        They may receive a refund according to Shopiva policy.
+                        They may receive a refund according to Deedyte policy.
                     </Text>
                 </View>
 

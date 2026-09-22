@@ -303,7 +303,7 @@ export default function OnboardingProfileScreen({ navigation }) {
           {submitting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryBtnText}>Continue to Shopiva</Text>
+            <Text style={styles.primaryBtnText}>Continue to Deedyte</Text>
           )}
         </TouchableOpacity>
 

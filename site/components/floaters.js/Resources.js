@@ -2,7 +2,7 @@
  * Resources Floater Component
  * 
  * Displays resource categories and help content in a mega menu.
- * Shows Help & Support, About Shopiva, and Popular Topics sections.
+ * Shows Help & Support, About Deedyte, and Popular Topics sections.
  * 
  * @module components/floaters/Resources
  */
@@ -27,15 +27,15 @@ const RESOURCE_SECTIONS = [
       { title: "Help and support.", subtitle: "Get 24/7 support" },
       { title: "How-to guides.", subtitle: "Read in-depth business guides" },
       { title: "Business courses.", subtitle: "Learn from proven experts" },
-      { title: "Shopiva blog.", subtitle: "Business strategy tips" },
+      { title: "Deedyte blog.", subtitle: "Business strategy tips" },
     ],
   },
   {
     id: "about",
-    title: "About Shopiva",
+    title: "About Deedyte",
     icon: sell_svg,
     items: [
-      { title: "What is Shopiva?", subtitle: "How our commerce platform works" },
+      { title: "What is Deedyte?", subtitle: "How our commerce platform works" },
       { title: "Founder stories.", subtitle: "Learn from successful merchants" },
     ],
   },

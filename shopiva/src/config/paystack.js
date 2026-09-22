@@ -37,6 +37,6 @@ export function warnIfPaystackLiveInDev() {
   if (!isPaystackLiveMode()) return;
   warnedLiveInDev = true;
   console.warn(
-    '[Shopiva] PAYSTACK_PUBLIC_KEY is LIVE (pk_live_). For Pistachio / integration testing use TEST keys: Paystack Dashboard → toggle **Test** → copy **pk_test_** into `.env`, then restart Metro with `--reset-cache`.',
+    '[Deedyte] PAYSTACK_PUBLIC_KEY is LIVE (pk_live_). For Pistachio / integration testing use TEST keys: Paystack Dashboard → toggle **Test** → copy **pk_test_** into `.env`, then restart Metro with `--reset-cache`.',
   );
 }

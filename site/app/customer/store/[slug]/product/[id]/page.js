@@ -457,7 +457,7 @@ export default function ProductDetail() {
       config: {
         email,
         amount: buyNowAmountKobo,
-        reference: `shopiva-pdp-${productId}-${Date.now()}`,
+        reference: `deedyte-pdp-${productId}-${Date.now()}`,
         firstname,
         lastname,
         metadata: {

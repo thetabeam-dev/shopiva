@@ -16,7 +16,7 @@ import PaymentSuccessScreen from '../../pages/customer/PaymentSuccessScreen';
 import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
 
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
-const SHOPIVA_LOGO = require('../../assets/Shopiva.png');
+const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
 const CartStack = createNativeStackNavigator();
 
 const cartOpt = {

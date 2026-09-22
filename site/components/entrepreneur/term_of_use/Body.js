@@ -19,7 +19,7 @@ import React, { useRef } from "react";
 const TABLE_OF_CONTENTS = [
   { id: "introduction", label: "Introduction" },
   { id: "account-activation", label: "Account Activation" },
-  { id: "shopiva-rights", label: "Shopiva Rights" },
+  { id: "deedyte-rights", label: "Deedyte Rights" },
   { id: "your-responsibility", label: "Your Responsibilities" },
   { id: "payment-of-fees-and-taxes", label: "Payment Of Fees And Taxes" },
   { id: "confidentiality", label: "Confidentiality" },
@@ -36,7 +36,7 @@ const TABLE_OF_CONTENTS = [
 const TERMS_SECTIONS = [
   {
     id: "introduction",
-    text: "Shopiva is the trading name for U-Commerce subsidiary company. Shopiva operates an E-commerce platform consisting of a website and mobile app (marketplace) together payment infrastructure for sale and purchase of consumer products and services in its allocated territory.",
+    text: "Deedyte is the trading name for U-Commerce subsidiary company. Deedyte operates an E-commerce platform consisting of a website and mobile app (marketplace) together payment infrastructure for sale and purchase of consumer products and services in its allocated territory.",
     highlights: [
       {
         text: "These general terms and conditions shall apply to buyers and sellers on the marketplace and shall govern your use of the marketplace and related services.",
@@ -58,20 +58,20 @@ const TERMS_SECTIONS = [
   },
   {
     id: "account-activation",
-    text: "Use of the Shopiva Website is available only to persons who can form legally binding contracts under Nigerian governing laws. If you are a minor i.e. under the age of 18 years, you shall not register as a member of Shopiva and shall not transact or use Shopiva website. As a minor if you wish to use or transact on Shopiva, such use or transaction may be made by your legal guardian or parents who have registered as users of Shopiva. Shopiva reserves the right to terminate your membership and refuse to provide you with access to Shopiva if it is brought to Shopiva Online Shopping Limited's notice or if it is discovered that you are under the age of 18 years.",
+    text: "Use of the Deedyte Website is available only to persons who can form legally binding contracts under Nigerian governing laws. If you are a minor i.e. under the age of 18 years, you shall not register as a member of Deedyte and shall not transact or use Deedyte website. As a minor if you wish to use or transact on Deedyte, such use or transaction may be made by your legal guardian or parents who have registered as users of Deedyte. Deedyte reserves the right to terminate your membership and refuse to provide you with access to Deedyte if it is brought to Deedyte Online Shopping Limited's notice or if it is discovered that you are under the age of 18 years.",
     highlights: [
       {
-        text: "If you use Shopiva, you shall be responsible for",
+        text: "If you use Deedyte, you shall be responsible for",
         list: [
           "Maintaining the confidentiality of your User ID and Password and",
           "You shall be responsible for all activities that occur under your User ID and Password.",
-          "You agree that if you provide any information that is untrue, inaccurate, not current or incomplete that Shopiva has reasonable grounds to suspect that such information is untrue, inaccurate, not current or incomplete, or not in accordance with this Terms of Use, Shopiva has the right to indefinitely suspend or terminate or block access of your membership with Shopiva and refuse to provide you with access to the Website.",
+          "You agree that if you provide any information that is untrue, inaccurate, not current or incomplete that Deedyte has reasonable grounds to suspect that such information is untrue, inaccurate, not current or incomplete, or not in accordance with this Terms of Use, Deedyte has the right to indefinitely suspend or terminate or block access of your membership with Deedyte and refuse to provide you with access to the Website.",
         ],
       },
     ],
   },
   {
-    id: "shopiva-rights",
+    id: "deedyte-rights",
     text: "",
     highlights: [
       {
@@ -79,15 +79,15 @@ const TERMS_SECTIONS = [
         list: [],
       },
       {
-        text: "Shopiva does not pre-screen Materials and it is in our sole discretion to refuse or remove any Materials from any part of the Services, including if we determine in our sole discretion that the goods or services that you offer through the Services, or the Materials uploaded or posted to the Services, violate our AUP or these Terms of Service.",
+        text: "Deedyte does not pre-screen Materials and it is in our sole discretion to refuse or remove any Materials from any part of the Services, including if we determine in our sole discretion that the goods or services that you offer through the Services, or the Materials uploaded or posted to the Services, violate our AUP or these Terms of Service.",
         list: [],
       },
       {
-        text: "Verbal or written abuse of any kind (including threats of abuse or retribution) of any Shopiva employee, member, or officer will result in immediate Account termination.",
+        text: "Verbal or written abuse of any kind (including threats of abuse or retribution) of any Deedyte employee, member, or officer will result in immediate Account termination.",
         list: [],
       },
       {
-        text: "We reserve the right to provide our Services to your competitors and make no promise of exclusivity. You further acknowledge and agree that Shopiva employees and contractors may also be Shopiva customers or merchants and that they may compete with you, although they may not use your Confidential Information in doing so.",
+        text: "We reserve the right to provide our Services to your competitors and make no promise of exclusivity. You further acknowledge and agree that Deedyte employees and contractors may also be Deedyte customers or merchants and that they may compete with you, although they may not use your Confidential Information in doing so.",
         list: [],
       },
       {
@@ -95,7 +95,7 @@ const TERMS_SECTIONS = [
         list: [],
       },
       {
-        text: "Shopiva reserves the right to determine, in our sole discretion, rightful Account ownership and transfer an Account to the rightful Store Owner. If we are unable to reasonably determine the rightful Store Owner, without prejudice to our other rights and remedies, Shopiva reserves the right to temporarily suspend or disable an Account until resolution has been determined between the disputing parties.",
+        text: "Deedyte reserves the right to determine, in our sole discretion, rightful Account ownership and transfer an Account to the rightful Store Owner. If we are unable to reasonably determine the rightful Store Owner, without prejudice to our other rights and remedies, Deedyte reserves the right to temporarily suspend or disable an Account until resolution has been determined between the disputing parties.",
         list: [],
       },
     ],
@@ -105,7 +105,7 @@ const TERMS_SECTIONS = [
     text: "",
     highlights: [
       {
-        text: "You acknowledge and agree to provide public-facing contact information, a refund policy and order fulfilment timelines on your Shopiva Store.",
+        text: "You acknowledge and agree to provide public-facing contact information, a refund policy and order fulfilment timelines on your Deedyte Store.",
         list: [],
       },
       {
@@ -117,15 +117,15 @@ const TERMS_SECTIONS = [
         list: [],
       },
       {
-        text: "You may not use the Shopiva Services for any illegal or unauthorized purpose nor may you, in the use of the Service, violate any laws in your jurisdiction.",
+        text: "You may not use the Deedyte Services for any illegal or unauthorized purpose nor may you, in the use of the Service, violate any laws in your jurisdiction.",
         list: [],
       },
       {
-        text: "The API Terms govern your access to and use of the Shopiva API. You are solely responsible for the activity that occurs using your API Credentials and for keeping your API Credentials secure.",
+        text: "The API Terms govern your access to and use of the Deedyte API. You are solely responsible for the activity that occurs using your API Credentials and for keeping your API Credentials secure.",
         list: [],
       },
       {
-        text: "You agree to use Shopiva Checkout for any sales associated with your online store.",
+        text: "You agree to use Deedyte Checkout for any sales associated with your online store.",
         list: [],
       },
     ],
@@ -155,7 +155,7 @@ const TERMS_SECTIONS = [
         list: [],
       },
       {
-        text: "You are responsible for all applicable Taxes that arise from or as a result of your subscription to or purchase of Shopiva's products and services.",
+        text: "You are responsible for all applicable Taxes that arise from or as a result of your subscription to or purchase of Deedyte's products and services.",
         list: [],
       },
     ],
@@ -179,7 +179,7 @@ const TERMS_SECTIONS = [
     text: "",
     highlights: [
       {
-        text: "You expressly understand and agree that, to the extent permitted by applicable laws, Shopiva and its suppliers will not be liable for any direct, indirect, incidental, special, consequential or exemplary damages.",
+        text: "You expressly understand and agree that, to the extent permitted by applicable laws, Deedyte and its suppliers will not be liable for any direct, indirect, incidental, special, consequential or exemplary damages.",
         list: [],
       },
       {
@@ -191,7 +191,7 @@ const TERMS_SECTIONS = [
         list: [],
       },
       {
-        text: "Shopiva does not warrant that the Services will be uninterrupted, timely, secure, or error-free.",
+        text: "Deedyte does not warrant that the Services will be uninterrupted, timely, secure, or error-free.",
         list: [],
       },
     ],
@@ -203,16 +203,16 @@ const TERMS_SECTIONS = [
       {
         text: "Your Materials",
         list: [
-          "We do not claim ownership of the Materials you provide to Shopiva; however, we do require a license to those Materials.",
-          "If you owned the Materials before providing them to Shopiva then they remain yours, subject to any rights or licenses granted in the Terms of Service.",
-          "You agree that Shopiva can, at any time, review and delete any or all of the Materials submitted to the Services.",
+          "We do not claim ownership of the Materials you provide to Deedyte; however, we do require a license to those Materials.",
+          "If you owned the Materials before providing them to Deedyte then they remain yours, subject to any rights or licenses granted in the Terms of Service.",
+          "You agree that Deedyte can, at any time, review and delete any or all of the Materials submitted to the Services.",
         ],
       },
       {
-        text: "Shopiva Intellectual Property",
+        text: "Deedyte Intellectual Property",
         list: [
-          "You agree that you may not use any trademarks, logos, or service marks of Shopiva unless authorized in writing.",
-          "You agree not to purchase, register, or use search engine keywords, trademarks, email addresses, social media names, or domain names that use or include Shopiva or Shopiva Trademarks.",
+          "You agree that you may not use any trademarks, logos, or service marks of Deedyte unless authorized in writing.",
+          "You agree not to purchase, register, or use search engine keywords, trademarks, email addresses, social media names, or domain names that use or include Deedyte or Deedyte Trademarks.",
         ],
       },
     ],
@@ -222,7 +222,7 @@ const TERMS_SECTIONS = [
     text: "",
     highlights: [
       {
-        text: "Shopiva is firmly committed to protecting the privacy of your personal information and the personal information of your customers. By using the Service, you acknowledge and agree that Shopiva's collection, usage and disclosure of this personal information is governed by our Privacy Policy.",
+        text: "Deedyte is firmly committed to protecting the privacy of your personal information and the personal information of your customers. By using the Service, you acknowledge and agree that Deedyte's collection, usage and disclosure of this personal information is governed by our Privacy Policy.",
         list: [],
       },
     ],
@@ -254,7 +254,7 @@ const TERMS_SECTIONS = [
         list: [],
       },
       {
-        text: "You may cancel your Account and terminate the Terms of Service at any time by contacting Shopiva Support.",
+        text: "You may cancel your Account and terminate the Terms of Service at any time by contacting Deedyte Support.",
         list: [],
       },
       {
@@ -264,10 +264,10 @@ const TERMS_SECTIONS = [
       {
         text: "Upon termination of the Services by either party for any reason:",
         list: [
-          "Shopiva will cease providing you with the Services and you will no longer be able to access your Account;",
+          "Deedyte will cease providing you with the Services and you will no longer be able to access your Account;",
           "unless otherwise provided, you will not be entitled to any refunds of any Fees;",
-          "any outstanding balance owed to Shopiva will immediately become due and payable in full; and",
-          "your Shopiva Store will be taken offline.",
+          "any outstanding balance owed to Deedyte will immediately become due and payable in full; and",
+          "your Deedyte Store will be taken offline.",
         ],
       },
     ],

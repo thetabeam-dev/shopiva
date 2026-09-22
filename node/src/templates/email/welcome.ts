@@ -7,9 +7,9 @@ import { baseTemplate } from "./base.js";
 
 export function welcomeTemplate(data: WelcomeEmailData): string {
     const content = `
-        <h2>Welcome to Shopiva, ${data.fname}! 🎉</h2>
+        <h2>Welcome to Deedyte, ${data.fname}! 🎉</h2>
         <p>We're thrilled to have you on board. Your account has been created successfully.</p>
-        <p>With Shopiva, you can:</p>
+        <p>With Deedyte, you can:</p>
         <ul style="color: #4b5563; padding-left: 20px;">
             <li>Discover amazing products from trusted sellers</li>
             <li>Enjoy secure and fast checkout</li>
@@ -25,6 +25,6 @@ export function welcomeTemplate(data: WelcomeEmailData): string {
         </p>
     `;
 
-    return baseTemplate(content, `Welcome to Shopiva, ${data.fname}!`);
+    return baseTemplate(content, `Welcome to Deedyte, ${data.fname}!`);
 }
 

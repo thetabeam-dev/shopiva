@@ -143,7 +143,7 @@ const BuyNowPaystackButton = forwardRef(function BuyNowPaystackButton(
         return;
       }
       const total = Math.max(1, Math.round(Number(price) * qty));
-      const reference = `shopiva_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const reference = `deedyte_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       const unitPriceLabel = formatNaira(Number(price));
 
       popup.checkout({

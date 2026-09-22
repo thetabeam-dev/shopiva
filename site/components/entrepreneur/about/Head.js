@@ -21,13 +21,13 @@ import ui_image from "../../../images/about-hero-small-2a2faf4cb65f77ff8a7957d0f
  */
 export default function Head() {
   return (
-    <section id="shopiva-about-head">
+    <section id="deedyte-about-head">
       {/* Text Content */}
       <div>
-        <h3 style={{ fontWeight: "400" }}>About Shopiva</h3>
+        <h3 style={{ fontWeight: "400" }}>About Deedyte</h3>
 
         <h2 style={{ fontWeight: "400" }}>
-          Shopiva makes e-commerce enjoyable and better.
+          Deedyte makes e-commerce enjoyable and better.
         </h2>
         
         <br />
@@ -54,7 +54,7 @@ export default function Head() {
         <img
           src={ui_image.src}
           style={{ height: "100%", width: "100%", borderRadius: "10px" }}
-          alt="About Shopiva hero"
+          alt="About Deedyte hero"
         />
       </div>
     </section>

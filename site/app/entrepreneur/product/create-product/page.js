@@ -291,7 +291,7 @@ export default function CreateProduct() {
           }
 
           const rows =
-            specs.variants ?? specs.shopiva_variants ?? specs.saved_variants
+            specs.variants ?? specs.deedyte_variants ?? specs.saved_variants
           if (Array.isArray(rows) && rows.length > 0) {
             setVariant(rows.map((r) => ({ ...r })))
           } else {

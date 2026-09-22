@@ -762,7 +762,7 @@ export default function VendorScreen({ route, navigation }) {
     const shopLabel = String(row.name ?? 'Shop').trim() || 'Shop';
     closeVendorMenu();
     if (!slug) {
-      Alert.alert('Shopiva', 'This shop cannot load policies (missing link).');
+      Alert.alert('Deedyte', 'This shop cannot load policies (missing link).');
       return;
     }
     setVendorPolicyTitle(`${shopLabel} — Shop policies`);
@@ -789,7 +789,7 @@ export default function VendorScreen({ route, navigation }) {
       setVendorPolicyEmptyMessage(
         clauses.length
           ? ''
-          : 'This shop has not published shop policies on Shopiva yet.',
+          : 'This shop has not published shop policies on Deedyte yet.',
       );
     } catch (e) {
       setVendorPolicyClauses([]);
@@ -896,7 +896,7 @@ export default function VendorScreen({ route, navigation }) {
       onFollow={() => {
         closeVendorMenu();
         Alert.alert(
-          'Shopiva',
+          'Deedyte',
           'Following shops will be available in a future update.',
         );
       }}

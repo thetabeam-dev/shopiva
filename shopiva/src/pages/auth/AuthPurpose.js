@@ -32,7 +32,7 @@ export default function AuthPurposeScreen({ navigation }) {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>How will you use Shopiva?</Text>
+        <Text style={styles.title}>How will you use Deedyte?</Text>
         <Text style={styles.sub}>
           Choose your path. Vendor access requires sign in, while customer browsing can continue as guest.
         </Text>

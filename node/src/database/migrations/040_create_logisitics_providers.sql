@@ -26,7 +26,7 @@ CREATE TABLE logistics_providers (
     supports_interstate BOOLEAN NOT NULL DEFAULT TRUE,
     supports_international BOOLEAN NOT NULL DEFAULT FALSE,
 
-    -- Whether Shopiva currently allows this provider
+    -- Whether Deedyte currently allows this provider
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

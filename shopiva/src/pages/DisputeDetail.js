@@ -329,10 +329,10 @@ export default function DisputeDetailScreen() {
     Alert.alert('Submit response', 'Vendor response form will open here when connected.');
   };
 
-  /** Platform / Shopiva support (Material Icons `support-agent` — closest to “customer care” in this bundle). */
+  /** Platform / Deedyte support (Material Icons `support-agent` — closest to “customer care” in this bundle). */
   const onContactSupport = () => {
     closeActions();
-    Alert.alert('Contact support', 'Shopiva support will open here when connected.');
+    Alert.alert('Contact support', 'Deedyte support will open here when connected.');
   };
 
   const onWithdraw = () => {

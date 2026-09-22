@@ -12,7 +12,7 @@ export async function requestLocationPermission() {
         {
           title: 'Location permission',
           message:
-            'Shopiva uses your location once to fill your address. You can edit the fields or type them manually if you prefer.',
+            'Deedyte uses your location once to fill your address. You can edit the fields or type them manually if you prefer.',
           buttonPositive: 'Allow',
           buttonNegative: 'Deny',
           buttonNeutral: 'Cancel',
@@ -140,7 +140,7 @@ async function reverseGeocodeNominatim(latitude, longitude) {
   const res = await fetch(url, {
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'Shopiva/1.0 (device-location; contact: app-support@shopiva.local)',
+      'User-Agent': 'Deedyte/1.0 (device-location; contact: app-support@deedyte.local)',
     },
   });
   if (!res.ok) {

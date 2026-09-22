@@ -71,7 +71,7 @@ export default function PaymentSuccessScreen({ navigation, route }) {
   const parentTabNav = navigation.getParent();
   const receiptText = useMemo(() => {
     const lines = [
-      'SHOPIVA PAYMENT RECEIPT',
+      'DEEDYTE PAYMENT RECEIPT',
       '',
       `Status: Paid`,
       `Reference: ${reference || 'N/A'}`,
@@ -141,7 +141,7 @@ export default function PaymentSuccessScreen({ navigation, route }) {
   const onShareReceipt = async () => {
     try {
       await Share.share({
-        title: 'Shopiva payment receipt',
+        title: 'Deedyte payment receipt',
         message: receiptText,
       });
     } catch (e) {

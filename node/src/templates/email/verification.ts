@@ -19,7 +19,7 @@ export function verificationTemplate(data: VerificationEmailData): string {
         ` : ""}
         <hr class="divider">
         <p style="font-size: 14px; color: #6b7280;">
-            This code will expire in 15 minutes. If you didn't create an account with Shopiva, 
+            This code will expire in 15 minutes. If you didn't create an account with Deedyte, 
             please ignore this email.
         </p>
     `;

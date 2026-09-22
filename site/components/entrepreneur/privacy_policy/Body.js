@@ -28,7 +28,7 @@ const TABLE_OF_CONTENTS = [
   "Additional Services",
   "Privacy and Data Protection",
   "Refund & Returns",
-  "Shopiva Contracting Party",
+  "Deedyte Contracting Party",
   "Terms and Termination",
   "Modification",
   "General Condition",

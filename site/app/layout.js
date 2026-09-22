@@ -1,7 +1,7 @@
 /**
  * Root Layout Component
  *
- * This is the main layout component for the Shopiva application.
+ * This is the main layout component for the Deedyte application.
  * It handles:
  * - Global styles and metadata
  * - External script and stylesheet loading
@@ -17,7 +17,7 @@ import App from "./App";
 import "./globals.css";
 
 export const metadata = {
-  title: "Shopiva",
+  title: "Deedyte",
   description: "Enjoy Seamless Shopping From The Comfort Of Your Home",
 };
 

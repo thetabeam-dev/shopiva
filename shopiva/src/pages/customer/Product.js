@@ -1075,7 +1075,7 @@ export default function ProductScreen({ route, navigation }) {
         loading={deliveryLoading}
         emptyMessage={
           deliveryError ||
-          'This vendor has not set delivery locations on Shopiva yet.'
+          'This vendor has not set delivery locations on Deedyte yet.'
         } />
       <ShopOverflowMenu
         visible={overflowMenuOpen}
@@ -1095,7 +1095,7 @@ export default function ProductScreen({ route, navigation }) {
         onFollow={() => {
           setOverflowMenuOpen(false);
           Alert.alert(
-            'Shopiva',
+            'Deedyte',
             'Following shops will be available in a future update.',
           );
         }}

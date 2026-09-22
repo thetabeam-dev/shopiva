@@ -35,7 +35,7 @@ function NavigationTree() {
 
   const handleOAuthUrl = useCallback(
     async (url) => {
-      if (!url || !String(url).includes('shopiva://oauth')) {
+      if (!url || !String(url).includes('deedyte://oauth')) {
         return;
       }
       const parsed = parseOAuthCallbackUrl(String(url));

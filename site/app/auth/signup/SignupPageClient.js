@@ -12,7 +12,7 @@ import "react-phone-number-input/style.css";
 import gg_svg from "../../../svgs/google-color-svgrepo-com (1).svg";
 import a_svg from "../../../svgs/apple-logo-svgrepo-com.svg";
 import fb_svg from "../../../svgs/facebook-svgrepo-com (1).svg";
-import logo_img from "../../../images/Shopiva.png";
+import logo_img from "../../../images/Deedyte.png";
 
 import { entrepreneur_overlay_setup } from "../../../reusables/overlay";
 import { setNewCookie } from "../../actions/auth-cookies";
@@ -210,7 +210,7 @@ export default function AuthSignupPage() {
       <div className="form-cnt">
         <section>
           <section style={{ marginLeft: "0px", marginBottom: "10px", flexDirection: "row", display: "flex", alignItems: "flex-start" }}>
-            <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="Shopiva" />
+            <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="Deedyte" />
           </section>
           <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#666" }}>
             Sign up as {role === ROLES.entrepreneur ? "Entrepreneur" : "Customer"}

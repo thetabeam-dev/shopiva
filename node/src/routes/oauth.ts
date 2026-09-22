@@ -5,7 +5,7 @@ import { finalizeOAuthSession } from "../services/user.js";
 export const OAuthRouter = Router();
 
 function appRedirectBase(): string {
-    return process.env.OAUTH_APP_REDIRECT_URI ?? "shopiva://oauth";
+    return process.env.OAUTH_APP_REDIRECT_URI ?? "deedyte://oauth";
 }
 
 function redirectWithToken(res: import("express").Response, token: string): void {

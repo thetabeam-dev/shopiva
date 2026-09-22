@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Shopiva"
+rootProject.name = "Deedyte"
 include(":app")
