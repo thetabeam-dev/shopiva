@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteAccount } from '../api/user';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../context/ProfileContext';
-import { clearAllShopivaStorage } from '../auth/session';
+import { clearAllDeedyteStorage } from '../auth/session';
 import { disconnectChatSocket } from '../socket/chatSocket';
 import { navigate } from '../navigation';
 import { runOAuthInPopup } from '../auth/oauthInApp';
@@ -120,7 +120,7 @@ export default function DeleteAccountScreen() {
       // no-op
     }
     try {
-      await clearAllShopivaStorage();
+      await clearAllDeedyteStorage();
     } catch {
       // no-op
     }

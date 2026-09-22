@@ -21,7 +21,7 @@ import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
 import { HomeStackCartIconButton } from '../../components/HomeStackCartButton';
 
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
-const SHOPIVA_LOGO = require('../../assets/Shopiva.png');
+const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
 // import { setUserAuthTo } from '../../redux/...';
 const HomeStack = createNativeStackNavigator();
 

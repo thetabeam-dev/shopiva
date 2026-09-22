@@ -27,6 +27,6 @@ export function passwordResetTemplate(data: PasswordResetEmailData): string {
         </p>
     `;
 
-    return baseTemplate(content, "Reset your Shopiva password");
+    return baseTemplate(content, "Reset your Deedyte password");
 }
 

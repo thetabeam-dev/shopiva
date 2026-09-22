@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DISABLE_AUTH_STORAGE } from './devAuth';
 
-const KEY_TOKEN = '@shopiva/auth_token';
-const KEY_USER = '@shopiva/auth_user';
-const KEY_ACTIVE_ROLE = '@shopiva/active_role';
-const KEY_TOKEN_EXPIRES_AT = '@shopiva/auth_token_expires_at';
-const KEY_PREAUTH_CHOICE = '@shopiva/preauth_choice';
+const KEY_TOKEN = '@deedyte/auth_token';
+const KEY_USER = '@deedyte/auth_user';
+const KEY_ACTIVE_ROLE = '@deedyte/active_role';
+const KEY_TOKEN_EXPIRES_AT = '@deedyte/auth_token_expires_at';
+const KEY_PREAUTH_CHOICE = '@deedyte/preauth_choice';
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** In-memory fallback when {@link DISABLE_AUTH_STORAGE} is true */
@@ -150,7 +150,7 @@ export async function getStoredActiveRole() {
 
 /**
  * Stores the one-time pre-auth choice (customer/vendor) shown before login.
- * This intentionally survives sign-out; reset via clearAllShopivaStorage.
+ * This intentionally survives sign-out; reset via clearAllDeedyteStorage.
  * @param {'customer' | 'vendor'} choice
  */
 export async function savePreAuthChoice(choice) {
@@ -185,10 +185,10 @@ export async function clearSession() {
 }
 
 /**
- * Deletes **all** persisted keys prefixed with `@shopiva` (auth + anything else you add later)
+ * Deletes **all** persisted keys prefixed with `@deedyte` (auth + anything else you add later)
  * and clears in-memory auth. Use for a completely fresh local state.
  */
-export async function clearAllShopivaStorage() {
+export async function clearAllDeedyteStorage() {
   memoryToken = null;
   memoryUser = null;
   memoryActiveRole = null;
@@ -196,7 +196,7 @@ export async function clearAllShopivaStorage() {
   memoryPreAuthChoice = null;
   try {
     const keys = await AsyncStorage.getAllKeys();
-    const ours = keys.filter((k) => typeof k === 'string' && k.startsWith('@shopiva'));
+    const ours = keys.filter((k) => typeof k === 'string' && k.startsWith('@deedyte'));
     if (ours.length > 0) {
       await AsyncStorage.multiRemove(ours);
     }

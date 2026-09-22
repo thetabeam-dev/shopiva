@@ -96,10 +96,10 @@ export default function CustomerShellHeader() {
     <div
       className={`customer-shell-header${isCustomerHome ? " customer-shell-header--home" : ""}`}
       role="banner"
-      aria-label="Shopiva"
+      aria-label="Deedyte"
     >
       <Link href="/customer" className="customer-shell-header__logo">
-        Shopiva
+        Deedyte
       </Link>
       <div className="customer-shell-header__tools">
         <Link href="/customer/store/cart" className="customer-shell-header__icon" aria-label="Cart">

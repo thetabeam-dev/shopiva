@@ -3,8 +3,8 @@ import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { DISABLE_AUTH_STORAGE } from './devAuth';
 import { getOAuthStartUrl, parseOAuthCallbackUrl, oauthErrorMessage } from '../api/oauth';
 
-/** Must match server `OAUTH_APP_REDIRECT_URI` (default `shopiva://oauth`). */
-export const OAUTH_REDIRECT_URI = 'shopiva://oauth';
+/** Must match server `OAUTH_APP_REDIRECT_URI` (default `deedyte://oauth`). */
+export const OAUTH_REDIRECT_URI = 'deedyte://oauth';
 
 /**
  * True when the native module is linked. If false, `InAppBrowser.isAvailable` will crash
@@ -16,7 +16,7 @@ function hasNativeInAppBrowser() {
 
 /**
  * Runs OAuth in Custom Tabs / ASWebAuthenticationSession when native code is present.
- * Otherwise opens the auth URL with Linking — complete sign-in via `shopiva://oauth` deep link (see `navigations/index.js`).
+ * Otherwise opens the auth URL with Linking — complete sign-in via `deedyte://oauth` deep link (see `navigations/index.js`).
  * @param {'google' | 'facebook' | 'apple'} provider
  * @returns {Promise<{ ok: true, token: string } | { ok: false, cancelled?: boolean, external?: boolean, message?: string }>}
  */

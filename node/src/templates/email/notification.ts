@@ -17,7 +17,7 @@ export function notificationTemplate(data: NotificationEmailData): string {
         ` : ""}
         <hr class="divider">
         <p style="font-size: 14px; color: #6b7280;">
-            This is an automated notification from Shopiva.
+            This is an automated notification from Deedyte.
         </p>
     `;
 

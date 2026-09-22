@@ -26,7 +26,7 @@ function markPaystackNativeUnavailable(reason) {
   CachedPaystackProvider = null;
   if (__DEV__) {
     console.warn(
-      '[Shopiva] Paystack checkout is disabled: react-native-webview is not linked in this native build. From the app root run `cd ios && pod install`, then clean-rebuild the iOS app (Xcode: Product → Clean Build Folder). Reloading Metro alone does not install native modules.',
+      '[Deedyte] Paystack checkout is disabled: react-native-webview is not linked in this native build. From the app root run `cd ios && pod install`, then clean-rebuild the iOS app (Xcode: Product → Clean Build Folder). Reloading Metro alone does not install native modules.',
       reason,
     );
   }

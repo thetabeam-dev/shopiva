@@ -2,12 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /** @typedef {'customer' | 'vendor'} ChatRoleScope */
 
-const LEGACY_KEY = '@shopiva/last_opened_chat_room_id';
+const LEGACY_KEY = '@deedyte/last_opened_chat_room_id';
 
 const keyForScope = (/** @type {ChatRoleScope} */ scope) =>
   scope === 'vendor'
-    ? '@shopiva/last_opened_chat_room_vendor'
-    : '@shopiva/last_opened_chat_room_customer';
+    ? '@deedyte/last_opened_chat_room_vendor'
+    : '@deedyte/last_opened_chat_room_customer';
 
 /**
  * Last-opened chat room id for this app mode only (isolates buyer vs seller UI state).

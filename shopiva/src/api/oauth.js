@@ -7,7 +7,7 @@ const START_PATHS = {
 };
 
 /**
- * Opens in the system browser / Safari — server redirects back to `shopiva://oauth?token=...`.
+ * Opens in the system browser / Safari — server redirects back to `deedyte://oauth?token=...`.
  * @param {'google' | 'facebook' | 'apple'} provider
  */
 export function getOAuthStartUrl(provider) {
@@ -27,7 +27,7 @@ export function parseOAuthCallbackUrl(url) {
   if (!url || typeof url !== 'string') {
     return null;
   }
-  if (!url.includes('shopiva://oauth')) {
+  if (!url.includes('deedyte://oauth')) {
     return null;
   }
   try {

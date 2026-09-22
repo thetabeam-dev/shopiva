@@ -8,7 +8,7 @@ import "./styles/s.css";
 import "./styles/m.css";
 import "./styles/l.css";
 import "./styles/xxl.css";
-import logo_img from "../../../images/Shopiva.png";
+import logo_img from "../../../images/Deedyte.png";
 
 const NIGERIAN_NATIONAL_LENGTH = 10; // digits only (e.g. 8012345678)
 const E164_PREFIX = "+234";
@@ -133,16 +133,16 @@ export default function WaitList() {
           </h2>
           <br />
           <small className="wait-list-body">
-            Join the Shopiva Vendor Waitlist to be among the first sellers on our upcoming marketplace. 
+            Join the Deedyte Vendor Waitlist to be among the first sellers on our upcoming marketplace. 
             <br />Get early access to create your shop, list your products, and start preparing your store before the official launch.
           </small>
           <small className="foot-text">
-            Sign up now to secure your spot and start preparing your store on Shopiva.
+            Sign up now to secure your spot and start preparing your store on Deedyte.
           </small>
         </div>
         <div className="right">
           <form onSubmit={handleSubmit} noValidate>
-            <h4 style={{color: "#005c45"}}><b>Shopiva Wait List</b></h4>
+            <h4 style={{color: "#005c45"}}><b>Deedyte Wait List</b></h4>
             <br />
             <div className="wait-list-form-row">
               <div className="input-cnt" style={{ width: "45%" }}>

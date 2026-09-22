@@ -103,7 +103,7 @@ function buildDisplayMessage(
   body: string,
   data: Record<string, string>
 ) {
-  const safeTitle = String(title || "Shopiva");
+  const safeTitle = String(title || "Deedyte");
   const safeBody = String(body || "");
 
   return {
@@ -173,7 +173,7 @@ export async function sendFcmForActivities(
       code: error.code || error.errorInfo?.code,
       hint:
         error.code === "messaging/third-party-auth-error"
-          ? "FCM server auth is fine; this usually means missing/invalid APNs (.p8) for iOS or Web Push certificates in Firebase Console → Project settings → Cloud Messaging. Also confirm the device token belongs to project shopiva-f66b6."
+          ? "FCM server auth is fine; this usually means missing/invalid APNs (.p8) for iOS or Web Push certificates in Firebase Console → Project settings → Cloud Messaging. Also confirm the device token belongs to project deedyte-f66b6."
           : undefined,
     };
   }

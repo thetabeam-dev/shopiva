@@ -10,14 +10,14 @@ import DeviceInfo from "react-native-device-info";
 export const API_DEFAULT_PORT = '3456';
 
 /**
- * Live Shopiva API on Render. Used unless overridden via {@link setApiBaseUrlOverride}
+ * Live Deedyte API on Render. Used unless overridden via {@link setApiBaseUrlOverride}
  * for local development.
  */
 // export const DEFAULT_API_BASE_URL = 'http://192.168.1.3:3456';
 // export const DEFAULT_API_BASE_URL = 'http://172.20.10.4:3456';
 
-export const DEFAULT_API_BASE_URL = 'https://shopiva-4okj.onrender.com'; //Staging url
-// export const DEFAULT_API_BASE_URL = 'https://shopiva-1.onrender.com'; //Production url
+export const DEFAULT_API_BASE_URL = 'https://deedyte-4okj.onrender.com'; //Staging url
+// export const DEFAULT_API_BASE_URL = 'https://deedyte-1.onrender.com'; //Production url
 
 /**
  * Optional full base URL override (e.g. local dev or staging):
@@ -36,7 +36,7 @@ export function getApiBaseUrlOverride() {
 }
 
 /**
- * Base URL for the Shopiva Node API.
+ * Base URL for the Deedyte Node API.
  *
  * Default: {@link DEFAULT_API_BASE_URL} (the live Render deployment).
  * Override for local dev with {@link setApiBaseUrlOverride}, e.g.

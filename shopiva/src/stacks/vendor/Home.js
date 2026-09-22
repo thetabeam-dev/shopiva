@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import HomeScreen from "../../pages/vendor/Home"
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
-const SHOPIVA_LOGO = require('../../assets/Shopiva.png');
+const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
 // import { set_connect_modal } from '../../redux/modal/connect';
 // import { setUserAuthTo } from '../../redux/...';
 // import HomeStackCartIconButton from "../../components/HomeStackCartButton"
@@ -48,7 +48,7 @@ export function VendorHomeStackScreen(){
 
               //   <View style={styles.homeHeaderLogoCnt}>
               //     <Image
-              //       source={SHOPIVA_LOGO}
+              //       source={DEEDYTE_LOGO}
               //       style={styles.homeHeaderLogo}
               //       resizeMode="contain"
               //       accessibilityIgnoresInvertColors

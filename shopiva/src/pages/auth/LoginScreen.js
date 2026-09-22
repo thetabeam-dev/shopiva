@@ -108,11 +108,11 @@ export default function LoginScreen({ navigation, route }) {
         <View style={styles.logoBlock}>
           <View style={styles.logoMark}>
             <Image
-              source={require('../../assets/Shopiva.png')}
+              source={require('../../assets/Deedyte.png')}
               style={{ height: 50, width: 50 }}
             />
           </View>
-          <Text style={styles.brand}>Shopiva</Text>
+          <Text style={styles.brand}>Deedyte</Text>
         </View>
 
         {/* <TouchableOpacity

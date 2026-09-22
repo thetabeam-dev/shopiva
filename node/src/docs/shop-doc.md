@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Shops module manages virtual storefronts for entrepreneurs on the Shopiva platform. Shops enable vendors to sell products, manage policies, handle payments, and receive reviews from customers.
+The Shops module manages virtual storefronts for entrepreneurs on the Deedyte platform. Shops enable vendors to sell products, manage policies, handle payments, and receive reviews from customers.
 
 ---
 
@@ -331,8 +331,8 @@ Updates an existing shop's information.
   "name": "Fabian Tech Store",
   "slug": "fabian-tech-store",
   "description": "A verified shop selling brand-new tech accessories.",
-  "logo": "https://cdn.shopiva.com/shops/logo.png",
-  "banner": "https://cdn.shopiva.com/shops/banner.jpg",
+  "logo": "https://cdn.deedyte.com/shops/logo.png",
+  "banner": "https://cdn.deedyte.com/shops/banner.jpg",
   "category": "Electronics",
   "tags": ["tech", "gadgets", "accessories"],
   "contactEmail": "support@fabiantechstore.com",

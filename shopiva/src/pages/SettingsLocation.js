@@ -44,7 +44,7 @@ async function reverseGeocodeNominatim(lat, lon, signal) {
     signal,
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'Shopiva/1.0 (location-settings; contact: app-support@shopiva.local)',
+      'User-Agent': 'Deedyte/1.0 (location-settings; contact: app-support@deedyte.local)',
     },
   });
   if (!res.ok) throw new Error(`Geocode failed (${res.status})`);

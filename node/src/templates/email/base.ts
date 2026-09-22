@@ -12,7 +12,7 @@ export function baseTemplate(content: string, previewText?: string): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Shopiva</title>
+    <title>Deedyte</title>
     ${previewText ? `<span style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${previewText}</span>` : ""}
     <style>
         body {
@@ -98,13 +98,13 @@ export function baseTemplate(content: string, previewText?: string): string {
 <body>
     <div class="container">
         <div class="header">
-            <h1>Shopiva</h1>
+            <h1>Deedyte</h1>
         </div>
         <div class="content">
             ${content}
         </div>
         <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} Shopiva. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Deedyte. All rights reserved.</p>
             <p>
                 <a href="#">Privacy Policy</a> | 
                 <a href="#">Terms of Service</a> | 

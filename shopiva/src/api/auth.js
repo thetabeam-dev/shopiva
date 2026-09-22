@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
 /**
- * Matches Shopiva Express (`shopiva/node`): `/user/signin`, `/user/signup`.
+ * Matches Deedyte Express (`deedyte/node`): `/user/signin`, `/user/signup`.
  * Responses: `{ token, user?, message?, error? }`.
  */
 
@@ -13,9 +13,9 @@ import { Alert } from 'react-native';
 function cannotReachApiMessage() {
   const base = getApiBaseUrl();
   if (base === DEFAULT_API_BASE_URL) {
-    return `Cannot reach the Shopiva API at ${base}. Check your internet connection and try again — Render free instances may take ~30s to wake up.`;
+    return `Cannot reach the Deedyte API at ${base}. Check your internet connection and try again — Render free instances may take ~30s to wake up.`;
   }
-  return `Cannot reach the API at ${base}. Make sure the Node server (shopiva/node) is running and reachable from your device.`;
+  return `Cannot reach the API at ${base}. Make sure the Node server (deedyte/node) is running and reachable from your device.`;
 }
 
 /**

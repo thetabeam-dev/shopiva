@@ -113,7 +113,7 @@ export default function UserProfile() {
     <div className="up-page">
       <header className="up-header shadow-sm">
         <section>
-          <span className="up-header__brand">Shopiva</span>
+          <span className="up-header__brand">Deedyte</span>
         </section>
         <section>
           <span className="up-avatar" aria-hidden>
@@ -510,7 +510,7 @@ function Genenral({ profile, profileLoading, onProfileRefresh }) {
         <section className="up-section-intro">
           <h2 className="up-section-intro__title">Preferred language</h2>
           <p className="up-section-intro__text">
-            This is the language we use for your signed-in experience on Shopiva (account pages and emails where
+            This is the language we use for your signed-in experience on Deedyte (account pages and emails where
             applicable).
           </p>
         </section>

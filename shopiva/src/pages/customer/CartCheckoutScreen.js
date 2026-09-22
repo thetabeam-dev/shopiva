@@ -345,7 +345,7 @@ export default function CartCheckoutScreen({ navigation }) {
     }
     /** Paystack `amount` for NGN is in kobo (smallest unit). */
     const amountKobo = Math.max(100, Math.round(Number(total) * 100));
-    const reference = `shopiva_cart_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const reference = `deedyte_cart_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const firstLine = checkoutLines[0];
 
     const shippingSummary = `${street.trim()}, ${city.trim()}, ${zip.trim()}, ${country}`;

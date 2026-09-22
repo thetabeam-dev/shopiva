@@ -15,8 +15,8 @@ export function MessagePolicyViolationModal({ visible, onDismiss, variant = 'sin
 
   const isSplit = variant === 'split';
   const bodyText = isSplit
-    ? 'Sharing contact details across multiple messages is against platform policy. This activity has been detected and blocked. Keeping conversations on Shopiva protects buyers and sellers and keeps orders traceable.'
-    : 'Sharing personal contact details or links to chat outside Shopiva is against our policy. This helps protect both buyers and sellers from fraud and keeps your order and payments traceable on the platform.';
+    ? 'Sharing contact details across multiple messages is against platform policy. This activity has been detected and blocked. Keeping conversations on Deedyte protects buyers and sellers and keeps orders traceable.'
+    : 'Sharing personal contact details or links to chat outside Deedyte is against our policy. This helps protect both buyers and sellers from fraud and keeps your order and payments traceable on the platform.';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss} statusBarTranslucent>

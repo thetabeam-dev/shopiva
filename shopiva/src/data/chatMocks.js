@@ -23,7 +23,7 @@ export const MOCK_CHATS = [
   },
   {
     id: 'c3',
-    name: 'Shopiva Support',
+    name: 'Deedyte Support',
     lastMessage: 'Thanks for contacting us! Is your issue resolved?',
     lastAtLabel: 'Mon',
     unreadCount: 1,

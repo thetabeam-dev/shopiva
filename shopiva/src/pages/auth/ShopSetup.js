@@ -242,7 +242,7 @@ export default function ShopSetupScreen() {
       >
         <Text style={styles.sheetTitle}>Set up your shop</Text>
         <Text style={styles.sheetSub}>
-          Register your shop to start selling on Shopiva.
+          Register your shop to start selling on Deedyte.
         </Text>
 
         {!isAuthenticated ? (

@@ -125,7 +125,7 @@ function buildOrderInboxHref({ customerId, orderId, shopId }) {
 }
 
 function workspaceStorageKey(shopId, orderId) {
-  return `shopiva_vendor_order_workspace_v1_${shopId}_${orderId}`
+  return `deedyte_vendor_order_workspace_v1_${shopId}_${orderId}`
 }
 
 function newId() {
@@ -385,7 +385,7 @@ export default function VendorOrderDetailPage() {
           {
             headers: {
               Accept: "application/json",
-              "User-Agent": "ShopivaVendorOrderMap/1.0 (https://shopiva.com)",
+              "User-Agent": "DeedyteVendorOrderMap/1.0 (https://deedyte.com)",
             },
           }
         )
@@ -1038,7 +1038,7 @@ export default function VendorOrderDetailPage() {
                   </h2>
                   <p className="vendor-order-customer-name">{order?.customer ?? "Anonymous buyer"}</p>
                   <p className="vendor-order-customer-meta">
-                    Shopiva keeps buyers anonymous on this side. You do not receive email, phone, or the buyer’s real
+                    Deedyte keeps buyers anonymous on this side. You do not receive email, phone, or the buyer’s real
                     name—only what you need to ship below.
                   </p>
                 </section>

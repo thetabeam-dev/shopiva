@@ -24,7 +24,7 @@ import "../../app/entrepreneur/[id]/styles/xxl.css";
 // Assets
 import menu_img from "../../svgs/menu-alt-2-svgrepo-com.svg";
 import close_img from "../../svgs/close-square-svgrepo-com.svg";
-import logo_img from "../../images/Shopiva.png";
+import logo_img from "../../images/Deedyte.png";
 
 // Components
 import Solution from "../../components/floaters.js/Solution";
@@ -218,7 +218,7 @@ export default function CustomerFreeLayout({ children }) {
         >
           &nbsp;
           <h3 style={{ color: "rgba(0, 146, 110, 1)", fontWeight: "1000" }}>
-            Shopiva
+            Deedyte
           </h3>
         </section>
 
@@ -270,12 +270,12 @@ export default function CustomerFreeLayout({ children }) {
               <img
                 src={logo_img.src}
                 style={{ height: "100px", width: "100px", borderRadius: "10px" }}
-                alt="Shopiva logo"
+                alt="Deedyte logo"
               />
             </div>
             <br />
             <div>
-              <h6 style={{ margin: "0" }}>shopiva@shopiva.net</h6>
+              <h6 style={{ margin: "0" }}>deedyte@deedyte.net</h6>
             </div>
           </div>
 
@@ -290,16 +290,16 @@ export default function CustomerFreeLayout({ children }) {
                 Help Center
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/shopiva-academy")}
+                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-academy")}
                 style={{ fontSize: "small" }}
               >
-                Shopiva Academy
+                Deedyte Academy
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/shopiva-community")}
+                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-community")}
                 style={{ fontSize: "small" }}
               >
-                Shopiva Community
+                Deedyte Community
               </li>
             </ul>
           </div>
@@ -335,7 +335,7 @@ export default function CustomerFreeLayout({ children }) {
               <li
                 onClick={() =>
                   window.open(
-                    "https://x.com/Shopiva_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
+                    "https://x.com/Deedyte_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
                   )
                 }
               >
@@ -368,7 +368,7 @@ export default function CustomerFreeLayout({ children }) {
               </li>
               <li
                 onClick={() =>
-                  window.open("https://youtube.com/@shopiva?si=Euobslo-XoWD0Kqc")
+                  window.open("https://youtube.com/@deedyte?si=Euobslo-XoWD0Kqc")
                 }
               >
                 <i

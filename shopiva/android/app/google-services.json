@@ -1,15 +1,15 @@
 {
   "project_info": {
     "project_number": "679915600515",
-    "project_id": "shopiva-f66b6",
-    "storage_bucket": "shopiva-f66b6.firebasestorage.app"
+    "project_id": "deedyte-f66b6",
+    "storage_bucket": "deedyte-f66b6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
         "mobilesdk_app_id": "1:679915600515:android:7803e4f331f050c8d679b6",
         "android_client_info": {
-          "package_name": "com.thetabeam.shopiva"
+          "package_name": "com.thetabeam.deedyte"
         }
       },
       "oauth_client": [],

@@ -1723,7 +1723,7 @@ function VendorCancelOrder({ data }) {
               <Text style={styles.processingSectionTitle}>Cancel order</Text>
               <Text style={styles.processingSectionSubtitle}>
                 Tell the customer why you cannot complete this order. They may
-                receive a refund according to Shopiva policy.
+                receive a refund according to Deedyte policy.
               </Text>
             </View>
 

@@ -1020,7 +1020,7 @@ export default function ProductScreen({ route, navigation }) {
         onClose={() => setDeliveryPolicyModalVisible(false)}
         title={`${shopName} — Delivery policy`}
         clauses={policySections.delivery}
-        emptyMessage="This vendor has not published a delivery policy on Shopiva yet."
+        emptyMessage="This vendor has not published a delivery policy on Deedyte yet."
       />
       <ShopOverflowMenu
         visible={overflowMenuOpen}
@@ -1043,7 +1043,7 @@ export default function ProductScreen({ route, navigation }) {
         onFollow={() => {
           setOverflowMenuOpen(false);
           Alert.alert(
-            'Shopiva',
+            'Deedyte',
             'Following shops will be available in a future update.',
           );
         }}

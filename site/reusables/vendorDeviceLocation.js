@@ -9,7 +9,7 @@ export async function reverseGeocodeNominatim(lat, lon) {
   const res = await fetch(url, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "Shopiva-Vendor-App/1.0",
+      "User-Agent": "Deedyte-Vendor-App/1.0",
     },
   });
   if (!res.ok) return null;

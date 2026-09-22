@@ -175,7 +175,7 @@ export function parseFcmMessage(remoteMessage) {
   const title =
     remoteMessage?.notification?.title ||
     (typeof data.title === 'string' ? data.title : '') ||
-    'Shopiva';
+    'Deedyte';
   const body =
     remoteMessage?.notification?.body ||
     (typeof data.body === 'string' ? data.body : '') ||
@@ -238,7 +238,7 @@ export function handleForegroundMessage(remoteMessage) {
 
   if (!parsed.title && !parsed.body) return;
 
-  Alert.alert(parsed.title || 'Shopiva', parsed.body || '', [
+  Alert.alert(parsed.title || 'Deedyte', parsed.body || '', [
     { text: 'Dismiss', style: 'cancel' },
     {
       text: 'Open',
@@ -309,7 +309,7 @@ export async function requestPermission() {
       console.log('APNs Token:', apnsToken);
       if (!apnsToken) {
         console.warn(
-          '[fcm] No APNs token yet. Use a real device, enable Push Notifications capability, and confirm Bundle ID matches Firebase (com.thetabeam.shopiva).',
+          '[fcm] No APNs token yet. Use a real device, enable Push Notifications capability, and confirm Bundle ID matches Firebase (com.thetabeam.deedyte).',
         );
         return null;
       }

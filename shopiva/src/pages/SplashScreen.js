@@ -1,7 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import { useEffect } from "react";
 import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
-// import "../assets/Shopiva.png"
+// import "../assets/Deedyte.png"
 
 
 const w = Dimensions.get("screen").width;
@@ -33,11 +33,11 @@ export function SplashScreen(){
                         height: 60,
                         width: 60,
                         marginBottom: 20
-                    }} source={require("../assets/Shopiva.png")} />
+                    }} source={require("../assets/Deedyte.png")} />
                     <Text style={{
                         fontSize: 25
                     }}>
-                        Shopiva
+                        Deedyte
                     </Text>
                 </View>
 

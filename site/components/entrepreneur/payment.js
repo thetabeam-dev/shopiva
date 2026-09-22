@@ -40,7 +40,7 @@ const DEFAULT_CURRENCY = "NGN";
 export function generateReference() {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
-  return `shopiva_${timestamp}_${random}`;
+  return `deedyte_${timestamp}_${random}`;
 }
 
 /**
@@ -114,7 +114,7 @@ export function PaystackButton({
         {
           display_name: "Platform",
           variable_name: "platform",
-          value: "Shopiva",
+          value: "Deedyte",
         },
         ...Object.entries(metadata).map(([key, value]) => ({
           display_name: key,

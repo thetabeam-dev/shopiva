@@ -1,7 +1,7 @@
 /**
  * Redux Store Configuration
  * 
- * Central store configuration for the Shopiva application.
+ * Central store configuration for the Deedyte application.
  * Combines all reducers and exports the configured store.
  * 
  * @module redux/store

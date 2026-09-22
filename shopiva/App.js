@@ -3,7 +3,7 @@ import { Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, V
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WIPE_STORAGE_ON_LAUNCH } from './src/auth/devAuth';
-import { clearAllShopivaStorage } from './src/auth/session';
+import { clearAllDeedyteStorage } from './src/auth/session';
 import { getPaystackPublicKey, isPaystackConfigured, warnIfPaystackLiveInDev } from './src/config/paystack';
 import { getPaystackProvider } from './src/paystack/paystackNativeGate';
 import NavigationHandler from './src/navigation/index';
@@ -23,7 +23,7 @@ function App() {
 
   useEffect(() => {
     if (WIPE_STORAGE_ON_LAUNCH) {
-      void clearAllShopivaStorage();
+      void clearAllDeedyteStorage();
     }
     warnIfPaystackLiveInDev();
   }, []);
@@ -157,7 +157,7 @@ function App() {
                 marginBottom: 20,
               }}
             >
-              Your app is outdated. Install the latest version to keep using Shopiva.
+              Your app is outdated. Install the latest version to keep using Deedyte.
             </Text>
             <TouchableOpacity
               onPress={openStore}

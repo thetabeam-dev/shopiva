@@ -55,7 +55,7 @@ function parseSpecifications(raw) {
 
 /** @param {Record<string, unknown>} specs */
 function variantCountFromSpecs(specs) {
-  const v = specs.variants ?? specs.shopiva_variants ?? specs.saved_variants;
+  const v = specs.variants ?? specs.deedyte_variants ?? specs.saved_variants;
   return Array.isArray(v) ? v.length : 0;
 }
 

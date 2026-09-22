@@ -17,8 +17,8 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your-app-password
-EMAIL_FROM=noreply@shopiva.com
-EMAIL_FROM_NAME=Shopiva
+EMAIL_FROM=noreply@deedyte.com
+EMAIL_FROM_NAME=Deedyte
 ```
 
 ### 2. Gmail Setup (if using Gmail)
@@ -91,7 +91,7 @@ await sendWelcomeEmail({
 await sendVerificationEmail("john@example.com", {
     fname: "John",
     verificationCode: "123456",
-    verificationLink: "https://shopiva.com/verify?code=123456" // optional
+    verificationLink: "https://deedyte.com/verify?code=123456" // optional
 });
 ```
 
@@ -100,7 +100,7 @@ await sendVerificationEmail("john@example.com", {
 ```typescript
 await sendPasswordResetEmail("john@example.com", {
     fname: "John",
-    resetLink: "https://shopiva.com/reset?token=abc123",
+    resetLink: "https://deedyte.com/reset?token=abc123",
     expiresIn: "1 hour"
 });
 ```
@@ -128,7 +128,7 @@ await sendNotificationEmail("john@example.com", {
     fname: "John",
     title: "Your order has shipped!",
     message: "Great news! Your order #12345 is on its way.",
-    actionUrl: "https://shopiva.com/track/12345",  // optional
+    actionUrl: "https://deedyte.com/track/12345",  // optional
     actionText: "Track Order"                       // optional
 });
 ```

@@ -213,7 +213,7 @@ export default function ProfileScreen() {
             title="Privacy policy"
             right={<Icon name="chevron-forward" size={20} color={BLACK} />}
             onPress={() => {
-              Linking.openURL('https://shopiva-gccey4ohn-thetabeam.vercel.app/entrepreneur/ng/privacy-policy').catch(() => {
+              Linking.openURL('https://deedyte-gccey4ohn-thetabeam.vercel.app/entrepreneur/ng/privacy-policy').catch(() => {
                 Alert.alert('Could not open link', 'Unable to open privacy policy.');
               });
             }}
