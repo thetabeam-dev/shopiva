@@ -14,7 +14,7 @@ const AUTH_URL = "/api/user/authorization";
 
 const PAYSTACK_PUBLIC_KEY =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) ||
-  "pk_live_13343a7bd4deeebc644070871efcdf8fdcf280f7";
+  "pk_test_9d54d1840154258f2371f52ac12b73e19b25dad";
 
 function isValidEmail(s) {
   const t = String(s || "").trim();
@@ -504,7 +504,7 @@ export default function ProductDetail() {
           </button>
         </div>
 
-        <span style={{flexDirection: "row", alignItems: "center", justifyContent: "space-between", display: "flex"}}>
+        <span style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", display: "flex" }}>
           <Link href="/customer/store/cart" className="customer-shell-header__icon" aria-label="Cart">
             <CartIcon />
           </Link>
@@ -514,7 +514,7 @@ export default function ProductDetail() {
             aria-label="Account">
             <ProfileIcon />
           </Link>
-         </span>
+        </span>
       </header>
 
       <div
@@ -716,8 +716,8 @@ export default function ProductDetail() {
             <div className="pdp-buybox__prices">
               <span className="pdp-buybox__compare">
                 {selectedInv &&
-                selectedInv.compare_at_price != null &&
-                Number(selectedInv.compare_at_price) >
+                  selectedInv.compare_at_price != null &&
+                  Number(selectedInv.compare_at_price) >
                   Number(selectedInv.price ?? 0)
                   ? formatNgn(selectedInv.compare_at_price)
                   : ""}
@@ -748,15 +748,15 @@ export default function ProductDetail() {
           </div>
 
           <div>
-              <label htmlFor=""><b>Description:</b></label>
-              {product?.description ? (
-                <div
-                  className="pdp-buybox__desc pdp-buybox__desc--html"
-                  dangerouslySetInnerHTML={{ __html: product.description }}
-                />
-              ) : (
-                <p className="pdp-buybox__desc">—</p>
-              )}
+            <label htmlFor=""><b>Description:</b></label>
+            {product?.description ? (
+              <div
+                className="pdp-buybox__desc pdp-buybox__desc--html"
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+            ) : (
+              <p className="pdp-buybox__desc">—</p>
+            )}
           </div>
 
           <div className="pdp-option">
@@ -800,35 +800,35 @@ export default function ProductDetail() {
             <div className="pdp-sizes" role="list">
               {inventory.length > 0
                 ? inventory.map((inv) => (
-                    <button
-                      key={inv.id}
-                      type="button"
-                      role="listitem"
-                      className={
-                        inv.id === selectedInv?.id
-                          ? "pdp-size is-selected"
-                          : "pdp-size"
-                      }
-                      aria-pressed={inv.id === selectedInv?.id}
-                      onClick={() => setSelectedInvId(inv.id)}
-                    >
-                      {inv.sku || "—"}
-                    </button>
-                  ))
+                  <button
+                    key={inv.id}
+                    type="button"
+                    role="listitem"
+                    className={
+                      inv.id === selectedInv?.id
+                        ? "pdp-size is-selected"
+                        : "pdp-size"
+                    }
+                    aria-pressed={inv.id === selectedInv?.id}
+                    onClick={() => setSelectedInvId(inv.id)}
+                  >
+                    {inv.sku || "—"}
+                  </button>
+                ))
                 : SIZES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      role="listitem"
-                      className={
-                        s === selectedSize ? "pdp-size is-selected" : "pdp-size"
-                      }
-                      aria-pressed={s === selectedSize}
-                      onClick={() => setSelectedSize(s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
+                  <button
+                    key={s}
+                    type="button"
+                    role="listitem"
+                    className={
+                      s === selectedSize ? "pdp-size is-selected" : "pdp-size"
+                    }
+                    aria-pressed={s === selectedSize}
+                    onClick={() => setSelectedSize(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -884,8 +884,8 @@ export default function ProductDetail() {
               <span className="pdp-payment-badge">PayPal</span>
             </div>
           </div> */}
-        
-        {/* 
+
+          {/* 
           <div className="pdp-returns">
             <h2 className="pdp-returns__title">Easy returns</h2>
             <ul className="pdp-returns__list">

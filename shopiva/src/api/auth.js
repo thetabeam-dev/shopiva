@@ -120,10 +120,10 @@ export async function loginWithPassword(emailOrUsername, password) {
   if (!login || !pwd) {
     return { ok: false, message: 'Enter email or username and password.' };
   }
-  const fcmToken = await getMessaging().getToken();
+  // const fcmToken = await getMessaging().getToken();
   // Alert.alert(fcmToken)
   // console.log('Device FCM Token:', token);
-  await AsyncStorage.setItem("fcm", (fcmToken));
+  // await AsyncStorage.setItem("fcm", (fcmToken));
 
   /** Backend `/user/signin` expects `{ email, password }` (email sign-in only). */
   const res = await apiFetchSafe('/user/signin', {
@@ -131,7 +131,7 @@ export async function loginWithPassword(emailOrUsername, password) {
     body: JSON.stringify({
       email: login,
       password: pwd,
-      fcmToken
+      // fcmToken
     }),
   });
 

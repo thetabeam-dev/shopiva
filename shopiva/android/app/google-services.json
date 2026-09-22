@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "679915600515",
-    "project_id": "deedyte-f66b6",
-    "storage_bucket": "deedyte-f66b6.firebasestorage.app"
+    "project_number": "170339526025",
+    "project_id": "deedyte",
+    "storage_bucket": "deedyte.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:679915600515:android:7803e4f331f050c8d679b6",
+        "mobilesdk_app_id": "1:170339526025:android:ad878edcec45df5555ed58",
         "android_client_info": {
           "package_name": "com.thetabeam.deedyte"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyACkDbJTR5yjoLb9virw14psg7Hh28w22U"
+          "current_key": "AIzaSyAOKxhFGonkeXxWpOKAkNi1CR0J0CvgS1A"
         }
       ],
       "services": {

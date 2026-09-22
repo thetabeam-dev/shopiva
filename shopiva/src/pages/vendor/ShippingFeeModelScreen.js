@@ -142,7 +142,6 @@ export default function ShippingFeeModelScreen({ navigation, route }) {
 
         <ShippingPreviewCard lines={previewLines} />
       </ScrollView>
-
       <View
         style={{
           position: 'absolute',
@@ -167,6 +166,7 @@ export default function ShippingFeeModelScreen({ navigation, route }) {
           <Text style={sharedStyles.primaryBtnText}>Setup Model</Text>
         </TouchableOpacity>
       </View>
+
     </View>
   );
 }

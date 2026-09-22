@@ -9,7 +9,7 @@ const AUTH_URL = "/api/user/authorization";
 
 const PAYSTACK_PUBLIC_KEY =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) ||
-  "pk_live_13343a7bd4deeebc644070871efcdf8fdcf280f7";
+  "pk_test_9d54d1840154258f2371f52ac12b73e19b25dad";
 
 
 function isValidEmail(s) {

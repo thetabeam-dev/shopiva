@@ -339,12 +339,12 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   return (
     <>
     {
-      Platform.OS === 'andorid' &&
+      Platform.OS === 'android' &&
       <SafeAreaView style={styles.flex} edges={['top', 'left', 'right', 'bottom']}>
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.bottom}
+          behavior={Platform.OS == 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS == 'ios' ? 90 : insets.bottom}
         >
           <View style={styles.flex}>
             <FlatList

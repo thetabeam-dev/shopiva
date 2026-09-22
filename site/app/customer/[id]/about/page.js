@@ -16,13 +16,22 @@ import Head from '../../../../components/entrepreneur/about/Head'
 import Story from '../../../../components/entrepreneur/about/Story'
 import Mission from '../../../../components/entrepreneur/about/Mission'
 import Commitment from '../../../../components/entrepreneur/about/Commitment'
-export default function About() { 
+export default function About() {
 
-    useEffect(() => {
-        document.body.style.background='#00b688'
-        document.body.querySelector('main').style.background='#00b688'
-        document.querySelector('header').style.height='70px'
-    }, [])
+  useEffect(() => {
+    document.body.classList.add('about-bg')
+    const main = document.body.querySelector('main')
+    if (main) main.classList.add('about-main-bg')
+    const header = document.querySelector('header')
+    if (header) header.classList.add('about-header')
+    return () => {
+      document.body.classList.remove('about-bg')
+      const main = document.body.querySelector('main')
+      if (main) main.classList.remove('about-main-bg')
+      const header = document.querySelector('header')
+      if (header) header.classList.remove('about-header')
+    }
+  }, [])
   return (
     <>
       <div className="pricing-cnt">
@@ -30,7 +39,7 @@ export default function About() {
         <Head />
 
         <Story />
-       
+
         <Mission />
 
         <Commitment />
