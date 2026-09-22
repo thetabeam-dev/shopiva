@@ -24,6 +24,9 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+workspace 'deedyte'
+project 'deedyte.xcodeproj'
+
 target 'deedyte' do
   config = use_native_modules!
 

@@ -1,4 +1,4 @@
-package com.thetabeam.deedyte
+package com.thetabeam.shopiva
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

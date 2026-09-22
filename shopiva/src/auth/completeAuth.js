@@ -1,1 +1,0 @@
-export { completeAuthAndGoHome } from './authBridge';

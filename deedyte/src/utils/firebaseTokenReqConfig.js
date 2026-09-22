@@ -309,7 +309,7 @@ export async function requestPermission() {
       console.log('APNs Token:', apnsToken);
       if (!apnsToken) {
         console.warn(
-          '[fcm] No APNs token yet. Use a real device, enable Push Notifications capability, and confirm Bundle ID matches Firebase (com.thetabeam.deedyte).',
+          '[fcm] No APNs token yet. Use a real device, enable Push Notifications capability, and confirm Bundle ID matches Firebase (com.thetabeam.shopiva).',
         );
         return null;
       }
