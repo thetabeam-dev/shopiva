@@ -42,8 +42,14 @@ export function getCookie(name) {
  * @param {string} pathname - e.g. /entrepreneur/shop
  */
 export function requiresAuth(pathname) {
-  const pathParts = pathname.split("/").filter(Boolean);
+  if (!pathname || typeof pathname !== "string") return false;
+  const path = pathname.split("?")[0].replace(/\/+$/, "") || "/";
+  // Require auth only for entrepreneur routes
+  if (!path.startsWith("/entrepreneur")) return false;
+
+  const pathParts = path.split("/").filter(Boolean);
   const lastPart = pathParts[pathParts.length - 1];
+  // Still allow public pages under entrepreneur (e.g. /entrepreneur/auth/login)
   return !PUBLIC_PAGES.includes(lastPart);
 }
 
