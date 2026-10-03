@@ -27,6 +27,7 @@ export default function SignUpScreen({ navigation, route }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [oauthBusy, setOauthBusy] = useState(false);
   const nameOk = name.trim().length >= 2;
@@ -193,15 +194,34 @@ export default function SignUpScreen({ navigation, route }) {
         </View>
 
         <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={[styles.input, styles.inputSingle]}
-          placeholder="Enter Your Password"
-          placeholderTextColor={AUTH.textMuted}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          editable={!submitting && !oauthBusy}
-        />
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter Your Password"
+            placeholderTextColor={AUTH.textMuted}
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+            editable={!submitting && !oauthBusy}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="newPassword"
+          />
+          <TouchableOpacity
+            style={styles.eyeBtn}
+            onPress={() => setShowPassword((prev) => !prev)}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            disabled={submitting || oauthBusy}
+          >
+            <Icon
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={22}
+              color={AUTH.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={[styles.primaryBtn, (submitting || oauthBusy) && styles.primaryBtnDisabled]}
@@ -302,9 +322,6 @@ const styles = StyleSheet.create({
     color: AUTH.text,
     backgroundColor: AUTH.inputBg,
   },
-  inputSingle: {
-    paddingRight: 18,
-  },
   checkCircle: {
     position: 'absolute',
     right: 12,
@@ -312,6 +329,14 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 10,
     backgroundColor: AUTH.successCheck,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 12,
+    height: 44,
+    width: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },

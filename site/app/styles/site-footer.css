@@ -1,0 +1,465 @@
+/**
+ * Global site footer styles
+ *
+ * Single source of truth for Customer Free + Entrepreneur Free marketing footers.
+ * Scoped to `.site-footer` so page UI footers (disputes, cart, etc.) are untouched.
+ *
+ * Breakpoints:
+ * 1. Mobile  — max-width: 480px
+ * 2. Tablet  — 481px–760px
+ * 3. iPad    — 761px–1200px
+ * 4. Desktop — min-width: 1201px
+ */
+
+/* ============================================================================
+   BASE (shared across breakpoints)
+   ============================================================================ */
+
+
+
+ul {
+  position: relative;
+
+}
+
+ul li{
+  width: fit-content;
+}
+
+.site-footer {
+  box-sizing: border-box;
+  height: fit-content;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 200;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 25px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  background-color: #003c2d;
+  color: #fff;
+  overflow-x: hidden;
+}
+
+.footer-brand div:nth-child(2) {
+  height: fit-content;
+}
+
+.site-footer *,
+.site-footer *::before,
+.site-footer *::after {
+  box-sizing: border-box;
+}
+
+.site-footer .footer-banner {
+  height: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  padding: 20px;
+}
+
+.site-footer .footer-main {
+  height: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 24px 32px;
+  padding: 20px;
+  color: #fff;
+}
+
+.site-footer .footer-brand {
+  height: fit-content;
+  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: #fff;
+}
+
+.site-footer .footer-logo-row {
+  display: flex;
+  flex-direction: row;
+  width: fit-content;
+  align-items: flex-end;
+}
+
+.site-footer .footer-logo {
+  height: 100px;
+  width: 100px;
+  max-width: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+  display: block;
+}
+
+.site-footer .footer-contact {
+  margin: 0;
+  color: #fff;
+}
+
+.site-footer .footer-contact-spacer {
+  display: block;
+  height: 1em;
+}
+
+.site-footer .footer-column {
+  height: auto;
+  width: auto;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: #fff;
+}
+
+.site-footer .footer-heading {
+  margin: 0 0 0.5em;
+  font-size: 4vh;
+  color: #fff;
+}
+
+.site-footer .footer-links {
+  margin: 0;
+  background-color: transparent;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.site-footer .footer-link {
+  text-align: left;
+  justify-content: flex-start;
+  padding: 0;
+  margin: 0;
+  font-size: small;
+  color: #fff;
+  align-items: flex-start;
+  cursor: pointer;
+  list-style: none;
+}
+
+.site-footer .footer-divider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  margin: 0;
+  opacity: 1;
+}
+
+.site-footer .footer-bottom,
+.site-footer .copywright {
+  height: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px;
+}
+
+.site-footer .footer-copyright {
+  height: 50px;
+  width: fit-content;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+  color: #fff;
+}
+
+.site-footer .footer-copyright small {
+  color: #fff;
+}
+
+.site-footer .footer-social {
+  height: 50px;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.site-footer .footer-social-list {
+  margin: 0;
+  padding: 0;
+  height: fit-content;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  list-style: none;
+}
+
+.site-footer .footer-social-item {
+  text-align: left;
+  justify-content: flex-start;
+  padding: 0;
+  margin: 0 10px;
+  font-size: medium;
+  color: #fff;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.site-footer .footer-social-item:last-child {
+  margin-right: 0;
+}
+
+.site-footer .footer-social-icon {
+  display: flex;
+  height: 100%;
+  position: relative;
+  align-items: center;
+  color: #fff;
+}
+
+/* ============================================================================
+   1. MOBILE — max-width: 480px
+   ============================================================================ */
+
+@media screen and (max-width: 480px) {
+  .site-footer {
+    padding: 10px 16px;
+  }
+
+  .site-footer .footer-banner {
+    padding: 12px 8px;
+  }
+
+  .site-footer .footer-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 28px;
+    padding: 16px 8px;
+  }
+
+  .site-footer .footer-brand,
+  .site-footer .footer-column {
+    width: 100%;
+  }
+
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+
+
+  .site-footer .footer-logo {
+    height: 88px;
+    width: 88px;
+  }
+
+  .site-footer .footer-heading {
+    font-size: 3.2vh;
+  }
+
+  .site-footer .footer-bottom,
+  .site-footer .copywright {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .site-footer .footer-copyright {
+    width: fit-content;
+    height: auto;
+    min-height: 40px;
+  }
+
+  .site-footer .footer-social {
+    width: fit-content;
+    height: auto;
+    min-height: 40px;
+    justify-content: flex-start;
+  }
+
+  .site-footer .footer-social-list {
+    justify-content: flex-start;
+  }
+
+  .site-footer .footer-social-item {
+    margin: 0 12px 0 0;
+    font-size: medium;
+  }
+}
+
+/* ============================================================================
+   2. TABLET — 481px–760px
+   ============================================================================ */
+
+@media screen and (min-width: 481px) and (max-width: 760px) {
+  .site-footer {
+    padding: 10px 20px;
+  }
+
+  .site-footer .footer-main {
+    justify-content: space-between;
+    gap: 20px 16px;
+    padding: 20px 12px;
+  }
+
+  .site-footer .footer-brand {
+    width: 100%;
+  }
+
+  .site-footer .footer-column {
+    width: calc(50% - 12px);
+    min-width: 140px;
+    margin: 0;
+  }
+
+  .site-footer .footer-logo {
+    height: 90px;
+    width: 90px;
+  }
+
+  .site-footer .footer-heading {
+    font-size: 3.4vh;
+  }
+
+  .site-footer .footer-bottom,
+  .site-footer .copywright {
+    padding: 0 5px;
+  }
+
+  .site-footer .footer-copyright {
+    width: 70%;
+  }
+
+  .site-footer .footer-social {
+    width: 30%;
+  }
+
+  .site-footer .footer-social-item {
+    margin: 0 10px;
+    font-size: small;
+  }
+}
+
+/* ============================================================================
+   3. iPAD — 761px–1200px
+   ============================================================================ */
+
+@media screen and (min-width: 761px) and (max-width: 1200px) {
+  .site-footer {
+    padding: 10px 25px;
+  }
+
+  .site-footer .footer-main {
+    flex-wrap: wrap;
+    gap: 24px 40px;
+    padding: 20px;
+  }
+
+  .site-footer .footer-brand {
+    width: auto;
+    min-width: 160px;
+  }
+
+  .site-footer .footer-column {
+    width: auto;
+    min-width: 140px;
+  }
+
+  .site-footer .footer-logo {
+    height: 100px;
+    width: 100px;
+  }
+
+  .site-footer .footer-heading {
+    font-size: 3.6vh;
+  }
+
+  .site-footer .footer-bottom,
+  .site-footer .copywright {
+    padding: 0 20px;
+  }
+
+  .site-footer .footer-copyright {
+    width: 40%;
+  }
+
+  .site-footer .footer-social {
+    width: 30%;
+    margin-left: auto;
+  }
+
+  .site-footer .footer-social-item {
+    margin: 0 10px;
+    font-size: medium;
+  }
+}
+
+/* ============================================================================
+   4. LAPTOP / DESKTOP — min-width: 1201px
+   ============================================================================ */
+
+@media screen and (min-width: 1201px) {
+  .site-footer {
+    padding: 10px 25px;
+  }
+
+  .site-footer .footer-main {
+    flex-wrap: wrap;
+    gap: 24px 48px;
+    padding: 20px;
+  }
+
+  .site-footer .footer-brand {
+    width: auto;
+  }
+
+  .site-footer .footer-column {
+    width: auto;
+  }
+
+  .site-footer .footer-logo {
+    height: 100px;
+    width: 100px;
+  }
+
+  .site-footer .footer-heading {
+    font-size: 4vh;
+  }
+
+  .site-footer .footer-bottom,
+  .site-footer .copywright {
+    padding: 0 20px;
+  }
+
+  .site-footer .footer-copyright {
+    width: 40%;
+  }
+
+  .site-footer .footer-social {
+    width: 30%;
+    margin-left: auto;
+  }
+
+  .site-footer .footer-social-item {
+    margin: 0 10px;
+    font-size: medium;
+  }
+}

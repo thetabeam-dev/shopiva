@@ -11,7 +11,10 @@
  * 6. Entrepreneur Dashboard
  * 7. Overlay & Modal Styles
  * 8. Responsive Styles
+ * 9. Site Footer (imported)
  */
+
+@import "./styles/site-footer.css";
 
 /* ============================================================================
    1. CSS VARIABLES

@@ -9,7 +9,7 @@
 
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 
 // Styles
 import "./global.css";
@@ -37,11 +37,10 @@ import BikeSvg from "../svgs/bike.svg";
 /** Video source for hero section */
 const HERO_VIDEO_SRC = "/customer.mp4";
 
-/** App Store download links */
+/** App Store download badge images (served from /public/badges) */
 const APP_STORE_LINKS = {
-  ios: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Download_on_the_App_Store_Badge.svg/1200px-Download_on_the_App_Store_Badge.svg.png",
-  android:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Google_Play_Store_badge_EN.svg/1200px-Google_Play_Store_badge_EN.svg.png",
+  ios: "/svgs/app_store.svg",
+  android: "/svgs/play_store.svg",
 };
 
 /** App screenshot URL */
@@ -111,35 +110,58 @@ const WHY_DEEDYTE_FEATURES = [
  * @returns {JSX.Element} The dashboard page
  */
 export default function Dashboard() {
+  const heroVideoRef = useRef(null);
+
   // ============================================================================
   // EFFECTS
   // ============================================================================
 
   /**
-   * Handles header background change on scroll
+   * Mobile Safari often needs muted + playsInline + an explicit play() call.
+   * Also retry on first user gesture / tab focus when autoplay is blocked.
    */
   useEffect(() => {
-    const handleScroll = () => {
-      const mainElem = document.querySelector("main");
-      const headerElem = document.querySelector(".header");
+    const video = heroVideoRef.current;
+    if (!video) return;
 
-      if (!mainElem || !headerElem) return;
+    let cancelled = false;
 
-      const topSpace = mainElem.getBoundingClientRect().top;
+    const armMutedInline = () => {
+      video.muted = true;
+      video.defaultMuted = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "true");
+      video.playsInline = true;
+    };
 
-      if (topSpace <= -762) {
-        headerElem.style.background = "#fff";
-        headerElem.classList.add("shadow-sm");
-      } else {
-        headerElem.style.background = "transparent";
-        headerElem.classList.remove("shadow-sm");
+    const tryPlay = () => {
+      if (cancelled || !video.paused) return;
+      armMutedInline();
+      const playPromise = video.play();
+      if (playPromise?.catch) {
+        playPromise.catch(() => {});
       }
     };
 
-    document.body.addEventListener("scroll", handleScroll);
+    armMutedInline();
+    tryPlay();
+
+    video.addEventListener("loadedmetadata", tryPlay);
+    video.addEventListener("loadeddata", tryPlay);
+    video.addEventListener("canplay", tryPlay);
+    document.addEventListener("touchstart", tryPlay, { passive: true });
+    document.addEventListener("click", tryPlay);
+    document.addEventListener("visibilitychange", tryPlay);
 
     return () => {
-      document.body.removeEventListener("scroll", handleScroll);
+      cancelled = true;
+      video.removeEventListener("loadedmetadata", tryPlay);
+      video.removeEventListener("loadeddata", tryPlay);
+      video.removeEventListener("canplay", tryPlay);
+      document.removeEventListener("touchstart", tryPlay);
+      document.removeEventListener("click", tryPlay);
+      document.removeEventListener("visibilitychange", tryPlay);
     };
   }, []);
 
@@ -190,19 +212,17 @@ export default function Dashboard() {
         {/* Video Background */}
         <div className="video-bg">
           <video
+            ref={heroVideoRef}
             autoPlay
             loop
             muted
             playsInline
-            src={HERO_VIDEO_SRC}
-            style={{
-              height: "100vh",
-              width: "100%",
-              objectFit: "cover",
-            }}
-          >
-            <source src={HERO_VIDEO_SRC} type="video/mp4" />
-          </video>
+            preload="auto"
+            controls={false}
+            disablePictureInPicture
+            src={`${HERO_VIDEO_SRC}?v=faststart`}
+            aria-hidden
+          />
         </div>
 
         {/* Phone Emulator */}
@@ -242,19 +262,43 @@ export default function Dashboard() {
 
               {/* Download Buttons */}
               <div className="download_btn">
-                <button>
+                <button style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#fff',
+                  borderRadius: '10px',
+                  height: '100%',
+                  color: '#00926E'
+                }} onClick={e => window.location.href = 'https://apps.apple.com/ng/app/deedyte/id6792328397DeeDyte'}>
                   <img
                     src={APP_STORE_LINKS.ios}
                     alt="App Store"
-                    style={{ height: "100%", width: "100%" }}
+                    style={{ height: "45px", width: "45px" }}
                   />
+                  &nbsp;
+                  &nbsp;
+
+                  <b>App Store</b>
                 </button>
-                <button>
+                <button style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#fff',
+                  height: '100%',
+                  borderRadius: '10px',
+                  color: '#00926E'
+
+                }}>
                   <img
                     src={APP_STORE_LINKS.android}
                     alt="Google Play"
-                    style={{ height: "100%", width: "100%" }}
+                    style={{ height: "45px", width: "45px" }}
                   />
+                  &nbsp;
+                  &nbsp;
+                  <b>Play Store</b>
                 </button>
               </div>
             </div>

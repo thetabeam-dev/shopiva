@@ -1,13 +1,34 @@
-import { useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ShippingSetupRequiredModal from '../../components/ShippingSetupRequiredModal';
+import { useProfile } from '../../context/ProfileContext';
+import {
+  getVendorShippingCreateGate,
+  navigateToShopShippingSetup,
+  resolvePrimaryShopId,
+} from '../../utils/vendorShippingGate';
 
 /**
  * Entry for the Products tab: nested destinations + create product.
  */
 export default function CatalogScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { user } = useProfile();
+  const [shippingModalVisible, setShippingModalVisible] = useState(false);
+  const [shippingGateBusy, setShippingGateBusy] = useState(false);
+  const [shippingGate, setShippingGate] = useState({
+    hasFeeModel: false,
+    hasZones: false,
+  });
 
   const goCatalog = useCallback(() => {
     navigation.navigate('ProductList');
@@ -17,20 +38,66 @@ export default function CatalogScreen({ navigation }) {
     navigation.navigate('Inventory');
   }, [navigation]);
 
-  const goCreate = useCallback(() => {
-    navigation.navigate('AddProduct');
+  const goCreate = useCallback(async () => {
+    const uid = user?.id;
+    if (!uid) {
+      Alert.alert('Sign in required', 'Sign in as a vendor to create products.');
+      return;
+    }
+
+    setShippingGateBusy(true);
+    setShippingModalVisible(true);
+    try {
+      const shopId = await resolvePrimaryShopId(uid);
+      if (!shopId) {
+        setShippingModalVisible(false);
+        Alert.alert('No shop', 'Create a shop in settings before adding products.');
+        return;
+      }
+
+      const gate = await getVendorShippingCreateGate(shopId, uid);
+      if (gate.ready) {
+        setShippingModalVisible(false);
+        navigation.navigate('AddProduct');
+        return;
+      }
+
+      setShippingGate({
+        hasFeeModel: gate.hasFeeModel,
+        hasZones: gate.hasZones,
+      });
+    } catch (e) {
+      setShippingModalVisible(false);
+      Alert.alert(
+        'Could not verify shipping setup',
+        e instanceof Error ? e.message : 'Try again in a moment.',
+      );
+    } finally {
+      setShippingGateBusy(false);
+    }
+  }, [navigation, user?.id]);
+
+  const goShippingSetup = useCallback(() => {
+    setShippingModalVisible(false);
+    navigateToShopShippingSetup(navigation);
   }, [navigation]);
 
-  const goShipping = useCallback(() => {
-    navigation.navigate('Shipping');
-  }, [navigation]);
+  const closeShippingModal = useCallback(() => {
+    if (shippingGateBusy) return;
+    setShippingModalVisible(false);
+  }, [shippingGateBusy]);
 
   return (
     <View style={[styles.root, { paddingTop: 15 }]}>
-  
-      <TouchableOpacity style={styles.createPrimary} onPress={goCreate} activeOpacity={0.88}>
+      <TouchableOpacity
+        style={styles.createPrimary}
+        onPress={goCreate}
+        activeOpacity={0.88}
+      >
         <Icon name="add-circle" size={22} color="#FFFFFF" />
-        <Text style={[styles.createPrimaryText, styles.createPrimaryTextSpacing]}>Create new product</Text>
+        <Text style={[styles.createPrimaryText, styles.createPrimaryTextSpacing]}>
+          Create new product
+        </Text>
       </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>Go to</Text>
@@ -60,7 +127,11 @@ export default function CatalogScreen({ navigation }) {
           <Icon name="chevron-forward" size={22} color="#9CA3AF" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionRow} onPress={goShipping} activeOpacity={0.85}>
+        {/* <TouchableOpacity
+          style={styles.optionRow}
+          onPress={goShippingSetup}
+          activeOpacity={0.85}
+        >
           <View style={[styles.optionIcon, styles.optionIconBrand]}>
             <Icon name="car-outline" size={22} color="#00926e" />
           </View>
@@ -69,8 +140,17 @@ export default function CatalogScreen({ navigation }) {
             <Text style={styles.optionDesc}>Fee model, discounts, and delivery zones</Text>
           </View>
           <Icon name="chevron-forward" size={22} color="#9CA3AF" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </ScrollView>
+
+      <ShippingSetupRequiredModal
+        visible={shippingModalVisible}
+        busy={shippingGateBusy}
+        hasFeeModel={shippingGate.hasFeeModel}
+        hasZones={shippingGate.hasZones}
+        onClose={closeShippingModal}
+        onGoToSetup={goShippingSetup}
+      />
     </View>
   );
 }
@@ -80,18 +160,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F4F5F7',
     paddingHorizontal: 10,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#111111',
-  },
-  sub: {
-    marginTop: 8,
-    fontSize: 15,
-    color: '#6B7280',
-    lineHeight: 22,
-    marginBottom: 20,
   },
   createPrimary: {
     flexDirection: 'row',

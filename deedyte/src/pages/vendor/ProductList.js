@@ -18,8 +18,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchOwnerShops } from '../../api/shop';
 import { deleteProduct, getProducts } from '../../api/product';
+import ShippingSetupRequiredModal from '../../components/ShippingSetupRequiredModal';
 import { useProfile } from '../../context/ProfileContext';
 import { getProductImageUri } from '../../utils/productImageUtils';
+import {
+  getVendorShippingCreateGate,
+  navigateToShopShippingSetup,
+} from '../../utils/vendorShippingGate';
 
 const BRAND = '#00926e';
 const BG = '#F0F1F4';
@@ -137,6 +142,12 @@ export default function VendorProductListScreen() {
     /** @type {ReturnType<typeof mapApiProductToRow> | null} */ (null),
   );
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [shippingModalVisible, setShippingModalVisible] = useState(false);
+  const [shippingGateBusy, setShippingGateBusy] = useState(false);
+  const [shippingGate, setShippingGate] = useState({
+    hasFeeModel: false,
+    hasZones: false,
+  });
 
   /** MVP: always bind to the first shop in the owner list (no multi-shop UI). */
   useEffect(() => {
@@ -222,13 +233,46 @@ export default function VendorProductListScreen() {
     loadProducts({ silent: true }).catch(() => {});
   }, [loadProducts]);
 
-  const onAddProduct = useCallback(() => {
-    if (!mvpShopId) {
+  const onAddProduct = useCallback(async () => {
+    const uid = user?.id;
+    if (!mvpShopId || !uid) {
       Alert.alert('No shop', 'Create a shop in settings before adding products.');
       return;
     }
-    navigation.navigate('AddProduct');
-  }, [navigation, mvpShopId]);
+
+    setShippingGateBusy(true);
+    setShippingModalVisible(true);
+    try {
+      const gate = await getVendorShippingCreateGate(mvpShopId, uid);
+      if (gate.ready) {
+        setShippingModalVisible(false);
+        navigation.navigate('AddProduct');
+        return;
+      }
+      setShippingGate({
+        hasFeeModel: gate.hasFeeModel,
+        hasZones: gate.hasZones,
+      });
+    } catch (e) {
+      setShippingModalVisible(false);
+      Alert.alert(
+        'Could not verify shipping setup',
+        e instanceof Error ? e.message : 'Try again in a moment.',
+      );
+    } finally {
+      setShippingGateBusy(false);
+    }
+  }, [navigation, mvpShopId, user?.id]);
+
+  const goShippingSetup = useCallback(() => {
+    setShippingModalVisible(false);
+    navigateToShopShippingSetup(navigation);
+  }, [navigation]);
+
+  const closeShippingModal = useCallback(() => {
+    if (shippingGateBusy) return;
+    setShippingModalVisible(false);
+  }, [shippingGateBusy]);
 
   const closeProductActions = useCallback(() => {
     setActionSheetProduct(null);
@@ -472,6 +516,15 @@ export default function VendorProductListScreen() {
           </View>
         </View>
       </Modal>
+
+      <ShippingSetupRequiredModal
+        visible={shippingModalVisible}
+        busy={shippingGateBusy}
+        hasFeeModel={shippingGate.hasFeeModel}
+        hasZones={shippingGate.hasZones}
+        onClose={closeShippingModal}
+        onGoToSetup={goShippingSetup}
+      />
     </View>
   );
 }

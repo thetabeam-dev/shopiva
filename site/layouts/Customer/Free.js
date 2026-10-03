@@ -13,13 +13,17 @@
 // IMPORTS
 // ============================================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 
 // Styles
 import "../../app/entrepreneur/[id]/global.css";
-import "../../app/entrepreneur/[id]/styles/xxl.css";
+import "../../app/styles/s.css";
+import "../../app/styles/m.css";
+import "../../app/styles/l.css";
+import "../../app/styles/xl.css";
+import "../../app/styles/xxl.css";
 
 // Assets
 import menu_img from "../../svgs/menu-alt-2-svgrepo-com.svg";
@@ -78,6 +82,10 @@ export default function CustomerFreeLayout({ children }) {
   const [resourcesMenu, setResourcesMenu] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [screenWidth, setScreenWidth] = useState(0);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
+
+  const layoutRef = useRef(null);
+  const headerRef = useRef(null);
 
   // ============================================================================
   // EFFECTS
@@ -102,15 +110,81 @@ export default function CustomerFreeLayout({ children }) {
     setScreenWidth(window.innerWidth);
   }, []);
 
-  // Set body styles on mount
+  // Match page chrome to footer; lock scroll to the Free layout shell
   useEffect(() => {
-    document.body.style.background = "#fff";
-    
-    const mainElement = document.body.querySelector("main");
-    if (mainElement) {
-      mainElement.style.background = "#fff";
-    }
+    const prevHtmlBg = document.documentElement.style.background;
+    const prevBodyBg = document.body.style.background;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.background = "#003c2d";
+    document.body.style.background = "#003c2d";
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.background = prevHtmlBg;
+      document.body.style.background = prevBodyBg;
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
   }, []);
+
+  /**
+   * Solid white header after the hero leaves the top of the Free layout scroller.
+   */
+  useEffect(() => {
+    const layout = layoutRef.current;
+    const header = headerRef.current;
+    if (!layout || !header) return;
+
+    let frameId = 0;
+
+    const syncHeader = () => {
+      const hero = layout.querySelector(".hero-section");
+      let pastHero = true;
+
+      if (hero) {
+        pastHero = hero.getBoundingClientRect().bottom <= header.offsetHeight + 1;
+      } else {
+        pastHero = layout.scrollTop > 8;
+      }
+
+      setHeaderScrolled(pastHero);
+    };
+
+    const onScroll = () => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(syncHeader);
+    };
+
+    syncHeader();
+    layout.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    let observer = null;
+    const hero = layout.querySelector(".hero-section");
+    if (hero && typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          setHeaderScrolled(!entry.isIntersecting);
+        },
+        {
+          root: layout,
+          threshold: 0,
+          rootMargin: `-${Math.max(header.offsetHeight, 60)}px 0px 0px 0px`,
+        }
+      );
+      observer.observe(hero);
+    }
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      layout.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (observer) observer.disconnect();
+    };
+  }, [pathname]);
 
   // ============================================================================
   // EVENT HANDLERS
@@ -192,41 +266,23 @@ export default function CustomerFreeLayout({ children }) {
   // ============================================================================
   
   return (
-    <>
+    <div ref={layoutRef} className="customer-free-layout">
       {/* Header */}
       <div
-        className="header"
-        style={{
-          position: "absolute",
-          top: "0",
-          left: "0",
-          zIndex: "10000",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
+        ref={headerRef}
+        className={`header${headerScrolled ? " header--scrolled" : ""}`}
       >
         {/* Logo Section */}
-        <section
-          id="header-logo-cnt"
-          style={{
-            flexDirection: "row",
-            width: "fit-content",
-            display: "flex",
-            alignItems: "flex-end",
-          }}
-        >
+        <section id="header-logo-cnt">
           &nbsp;
-          <h3 style={{ color: "rgba(0, 146, 110, 1)", fontWeight: "1000" }}>
-            Deedyte
-          </h3>
+          <h3>DeeDyte</h3>
         </section>
 
         {/* Desktop Navigation */}
         {screenWidth > DESKTOP_NAV_BREAKPOINT && renderDesktopNav()}
 
         {/* Auth Buttons */}
-        <section style={{ margin: "0px 25px 0px 0px" }}>
+        <section className="header-auth">
           <ul>
             {loggedIn && (
               <li onClick={() => window.open("/entrepreneur/ng")}>Log in</li>
@@ -242,74 +298,61 @@ export default function CustomerFreeLayout({ children }) {
       </div>
 
       {/* Main Content */}
-      <main style={{ overflow: "auto", height: "auto", position: "relative" }}>
+      <main className="customer-free-main">
         {children}
       </main>
 
       {/* Footer */}
-      <footer>
-        <section></section>
+      <footer className="site-footer">
+        <section className="footer-banner" aria-hidden="true" />
 
-        <section>
+        <section className="footer-main">
           {/* Logo and Contact */}
-          <div
-            style={{
-              flexDirection: "column",
-              display: "flex",
-              alignItems: "flex-start",
-              height: "100%",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "flex-end",
-              }}
-            >
+          <div className="footer-brand">
+            <div className="footer-logo-row">
               <img
+                className="footer-logo"
                 src={logo_img.src}
-                style={{ height: "100px", width: "100px", borderRadius: "10px" }}
                 alt="Deedyte logo"
               />
             </div>
-            <br />
+            <span className="footer-contact-spacer" aria-hidden="true" />
             <div>
-              <h6 style={{ margin: "0" }}>admin@deedyte.com</h6>
+              <h6 className="footer-contact">admin@deedyte.com</h6>
             </div>
           </div>
 
           {/* Support & Legal Links */}
-          <div>
-            <h6 style={{ fontSize: "4vh" }}>Support</h6>
-            <ul>
+          <div className="footer-column">
+            <h6 className="footer-heading">Support</h6>
+            <ul className="footer-links">
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/contact")}
-                style={{ fontSize: "small" }}
               >
                 Contact
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/about")}
-                style={{ fontSize: "small" }}
               >
                 About
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/terms-of-use")}
-                style={{ fontSize: "small" }}
               >
                 Terms Of Service
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/privacy-policy")}
-                style={{ fontSize: "small" }}
               >
                 Privacy Policy
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/legal")}
-                style={{ fontSize: "small" }}
               >
                 Legal
               </li>
@@ -317,86 +360,58 @@ export default function CustomerFreeLayout({ children }) {
           </div>
         </section>
 
-        <hr />
+        <hr className="footer-divider" />
 
         {/* Copyright & Social Links */}
-        <section className="copywright">
-          <div style={{ height: "50px", alignItems: "center" }}>
+        <section className="footer-bottom copywright">
+          <div className="footer-copyright">
             <small>&#169; Copyright {new Date().getFullYear()}</small>
           </div>
 
-          <div style={{ height: "50px" }}>
-            <ul style={{ height: "100%", margin: "0", padding: "0" }}>
+          <div className="footer-social">
+            <ul className="footer-social-list">
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open(
                     "https://www.facebook.com/profile.php?id=61566898641430"
                   )
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-facebook fa-lg"
-                ></i>
+                <i className="fa-brands fa-facebook fa-lg footer-social-icon" />
               </li>
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open(
                     "https://x.com/Deedyte_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
                   )
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-twitter fa-lg"
-                ></i>
+                <i className="fa-brands fa-twitter fa-lg footer-social-icon" />
               </li>
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open(
                     "https://whatsapp.com/channel/0029VacobY6LY6d7M19cx90O"
                   )
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-whatsapp fa-lg"
-                ></i>
+                <i className="fa-brands fa-whatsapp fa-lg footer-social-icon" />
               </li>
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open("https://youtube.com/@deedyte?si=Euobslo-XoWD0Kqc")
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-youtube fa-lg"
-                ></i>
+                <i className="fa-brands fa-youtube fa-lg footer-social-icon" />
               </li>
             </ul>
           </div>
         </section>
       </footer>
-    </>
+    </div>
   );
 }

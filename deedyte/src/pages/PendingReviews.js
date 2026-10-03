@@ -107,6 +107,7 @@ export default function PendingReviewsScreen() {
             productId: item?.productId,
             product_id: item?.productId,
             productName: item?.productName,
+            productImage: item?.productImage,
           })
         }
       />

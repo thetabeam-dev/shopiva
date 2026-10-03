@@ -407,51 +407,46 @@ export default function EntrepreneurFreeLayout({ children }) {
       </main>
 
       {/* Footer */}
-      <footer>
-        <section></section>
+      <footer className="site-footer">
+        <section className="footer-banner" aria-hidden="true" />
 
-        <section>
+        <section className="footer-main">
           {/* Logo */}
-          <div
-            style={{
-              flexDirection: "row",
-              display: "flex",
-              alignItems: "flex-end",
-              height: "100%",
-            }}
-          >
-            <img
-              src={logo_img.src}
-              style={{ height: "50px", width: "50px", borderRadius: "10px" }}
-              alt="Deedyte logo"
-            />
+          <div className="footer-brand">
+            <div className="footer-logo-row">
+              <img
+                className="footer-logo"
+                src={logo_img.src}
+                alt="Deedyte logo"
+              />
+            </div>
           </div>
 
           {/* Deedyte Links */}
-          <div>
-            <h6>Deedyte</h6>
-            <ul>
+          <div className="footer-column">
+            <h6 className="footer-heading">Deedyte</h6>
+            <ul className="footer-links">
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/about")}
-                style={{ fontSize: "small" }}
               >
                 About
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/contact")}
-                style={{ fontSize: "small" }}
               >
                 Contact
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/investors")}
-                style={{ fontSize: "small" }}
               >
                 Investors
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/affiliates")}
-                style={{ fontSize: "small" }}
               >
                 Affiliates
               </li>
@@ -459,24 +454,24 @@ export default function EntrepreneurFreeLayout({ children }) {
           </div>
 
           {/* Support Links */}
-          {/* <div>
-            <h6>Support</h6>
-            <ul>
+          {/* <div className="footer-column">
+            <h6 className="footer-heading">Support</h6>
+            <ul className="footer-links">
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/")}
-                style={{ fontSize: "small" }}
               >
                 Help Center
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-academy")}
-                style={{ fontSize: "small" }}
               >
                 Deedyte Academy
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-community")}
-                style={{ fontSize: "small" }}
               >
                 Deedyte Community
               </li>
@@ -484,18 +479,18 @@ export default function EntrepreneurFreeLayout({ children }) {
           </div> */}
 
           {/* Developer Links */}
-          {/* <div>
-            <h6>Developers</h6>
-            <ul>
+          {/* <div className="footer-column">
+            <h6 className="footer-heading">Developers</h6>
+            <ul className="footer-links">
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/deedyte.dev")}
-                style={{ fontSize: "small" }}
               >
                 Deedyte.dev
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/api-doc")}
-                style={{ fontSize: "small" }}
               >
                 API Documentation
               </li>
@@ -503,18 +498,18 @@ export default function EntrepreneurFreeLayout({ children }) {
           </div> */}
 
           {/* Product Links */}
-          <div>
-            <h6>Products</h6>
-            <ul>
+          <div className="footer-column">
+            <h6 className="footer-heading">Products</h6>
+            <ul className="footer-links">
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/shop")}
-                style={{ fontSize: "small" }}
               >
                 Shop
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-plus")}
-                style={{ fontSize: "small" }}
               >
                 Deedyte Plus
               </li>
@@ -522,30 +517,30 @@ export default function EntrepreneurFreeLayout({ children }) {
           </div>
 
           {/* Other Links */}
-          <div>
-            <h6>Others</h6>
-            <ul>
+          <div className="footer-column">
+            <h6 className="footer-heading">Others</h6>
+            <ul className="footer-links">
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/sitemap")}
-                style={{ fontSize: "small" }}
               >
                 Sitemap
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/terms-of-use")}
-                style={{ fontSize: "small" }}
               >
                 Terms Of Service
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/privacy-policy")}
-                style={{ fontSize: "small" }}
               >
                 Privacy Policy
               </li>
               <li
+                className="footer-link"
                 onClick={() => (window.location.href = "/legal")}
-                style={{ fontSize: "small" }}
               >
                 Legal
               </li>
@@ -553,81 +548,53 @@ export default function EntrepreneurFreeLayout({ children }) {
           </div>
         </section>
 
-        <hr />
+        <hr className="footer-divider" />
 
         {/* Copyright & Social Links */}
-        <section className="copywright">
-          <div style={{ height: "50px", alignItems: "center" }}>
+        <section className="footer-bottom copywright">
+          <div className="footer-copyright">
             <small>&#169; Copyright {new Date().getFullYear()}</small>
           </div>
 
-          <div style={{ height: "50px" }}>
-            <ul style={{ height: "100%", margin: "0", padding: "0" }}>
+          <div className="footer-social">
+            <ul className="footer-social-list">
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open(
                     "https://www.facebook.com/profile.php?id=61566898641430"
                   )
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-facebook fa-lg"
-                ></i>
+                <i className="fa-brands fa-facebook fa-lg footer-social-icon" />
               </li>
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open(
                     "https://x.com/Deedyte_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
                   )
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-twitter fa-lg"
-                ></i>
+                <i className="fa-brands fa-twitter fa-lg footer-social-icon" />
               </li>
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open(
                     "https://whatsapp.com/channel/0029VacobY6LY6d7M19cx90O"
                   )
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-whatsapp fa-lg"
-                ></i>
+                <i className="fa-brands fa-whatsapp fa-lg footer-social-icon" />
               </li>
               <li
+                className="footer-social-item"
                 onClick={() =>
                   window.open("https://youtube.com/@deedyte?si=Euobslo-XoWD0Kqc")
                 }
               >
-                <i
-                  style={{
-                    display: "flex",
-                    height: "100%",
-                    position: "relative",
-                    alignItems: "center",
-                  }}
-                  className="fa-brands fa-youtube fa-lg"
-                ></i>
+                <i className="fa-brands fa-youtube fa-lg footer-social-icon" />
               </li>
             </ul>
           </div>
