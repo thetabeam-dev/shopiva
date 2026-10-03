@@ -43,6 +43,15 @@ const USER_ROLES = {
 /** Auth page identifiers (also used for /auth/* unified auth) */
 const AUTH_PAGES = ["signup", "login", "wait-list", "shop", "password-recovery"];
 
+/** Shared legal / company info pages (global; not role-scoped) */
+const PUBLIC_INFO_PATHS = [
+  "/privacy-policy",
+  "/terms-of-use",
+  "/about",
+  "/legal",
+  "/contact",
+];
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -59,6 +68,16 @@ function roleFromPathSegments(pathname) {
   if (segments.includes("entrepreneur")) return USER_ROLES.ENTREPRENEUR;
   if (segments.includes("customer")) return USER_ROLES.CUSTOMER;
   return null;
+}
+
+/**
+ * Global informational/legal pages shared by entrepreneurs and customers.
+ * @param {string} pathname
+ * @returns {boolean}
+ */
+function isPublicInfoPage(pathname) {
+  const path = (pathname || "").split("?")[0];
+  return PUBLIC_INFO_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
 /**
@@ -104,6 +123,17 @@ const isFreeLayout = (pathname) => {
  */
 export default function App({ session, children }) {
   const pathname = usePathname();
+
+  // One authoritative shell for shared legal/company pages
+  if (isPublicInfoPage(pathname)) {
+    return (
+      <SessionProvider session={session}>
+        <Provider store={store}>
+          <EntrepreneurFreeLayout>{children}</EntrepreneurFreeLayout>
+        </Provider>
+      </SessionProvider>
+    );
+  }
 
   const role = roleFromPathSegments(pathname) ?? USER_ROLES.CUSTOMER;
 

@@ -49,8 +49,8 @@ export default function Commitment() {
             className="commitment-txt"
             style={{ color: "#fff", textAlign: "left", fontWeight: "100" }}
           >
-            Deedyte builds for the long term, and that means investing in our
-            planet so that we can future proof Deedyte and help our merchants
+            DeeDyte builds for the long term, and that means investing in our
+            planet so that we can future proof DeeDyte and help our merchants
             future proof their businesses, too. Our Sustainability Fund includes
             kickstarting the carbon removal market and choosing renewable
             energy, reducing and removing our carbon emissions, and creating

@@ -1,53 +1,16 @@
 /**
- * Legal Page Body Component
- * 
- * Main content section for the Legal page.
- * Displays legal documents and information.
- * 
+ * Legal page body — delegates to the global DeeDyte legal hub.
  * @module components/entrepreneur/legal/Body
  */
 
 import React from "react";
+import LegalHubContent from "../../legal/LegalHubContent";
+import "../../legal/legal-pages.css";
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-/**
- * Legal document sections
- * TODO: Add actual legal content
- */
-const LEGAL_SECTIONS = [
-  {
-    title: "",
-    items: ["", "", "", "", ""],
-  },
-];
-
-// ============================================================================
-// BODY COMPONENT
-// ============================================================================
-
-/**
- * Legal page body section component
- * 
- * @returns {JSX.Element} The body section
- */
 export default function Body() {
   return (
-    <section>
-      <ul>
-        {LEGAL_SECTIONS.map((section, index) => (
-          <li key={index}>
-            <h5>{section.title}</h5>
-            <div>
-              {section.items.map((item, itemIndex) => (
-                <small key={itemIndex}>{item}</small>
-              ))}
-            </div>
-          </li>
-        ))}
-      </ul>
+    <section className="legal-page__body" style={{ borderRadius: 0 }}>
+      <LegalHubContent />
     </section>
   );
 }

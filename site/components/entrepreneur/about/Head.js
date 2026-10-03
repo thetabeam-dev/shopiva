@@ -24,10 +24,10 @@ export default function Head() {
     <section id="deedyte-about-head">
       {/* Text Content */}
       <div>
-        <h3 style={{ fontWeight: "400" }}>About Deedyte</h3>
+        <h3 style={{ fontWeight: "400" }}>About DeeDyte</h3>
 
         <h2 style={{ fontWeight: "400" }}>
-          Deedyte makes e-commerce enjoyable and better.
+          DeeDyte makes e-commerce enjoyable and better.
         </h2>
         
         <br />
@@ -54,7 +54,7 @@ export default function Head() {
         <img
           src={ui_image.src}
           style={{ height: "100%", width: "100%", borderRadius: "10px" }}
-          alt="About Deedyte hero"
+          alt="About DeeDyte hero"
         />
       </div>
     </section>

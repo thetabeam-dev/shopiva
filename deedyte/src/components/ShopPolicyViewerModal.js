@@ -133,7 +133,7 @@ export default function ShopPolicyViewerModal({
                     <View style={styles.notice}>
                       <Icon name="shield-checkmark-outline" size={20} color={BRAND} />
                       <Text style={styles.noticeText}>
-                        Your payment is protected by Shopiva's escrow until you receive your order.
+                        Your payment is protected by DeeDyte's escrow until you receive your order.
                       </Text>
                     </View>
                   </>

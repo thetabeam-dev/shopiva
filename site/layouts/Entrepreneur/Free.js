@@ -432,10 +432,16 @@ export default function EntrepreneurFreeLayout({ children }) {
             <h6>Deedyte</h6>
             <ul>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/about")}
+                onClick={() => (window.location.href = "/about")}
                 style={{ fontSize: "small" }}
               >
                 About
+              </li>
+              <li
+                onClick={() => (window.location.href = "/contact")}
+                style={{ fontSize: "small" }}
+              >
+                Contact
               </li>
               <li
                 onClick={() => (window.location.href = "/entrepreneur/ng/investors")}
@@ -526,16 +532,22 @@ export default function EntrepreneurFreeLayout({ children }) {
                 Sitemap
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/terms-of-use")}
+                onClick={() => (window.location.href = "/terms-of-use")}
                 style={{ fontSize: "small" }}
               >
                 Terms Of Service
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/privacy-policy")}
+                onClick={() => (window.location.href = "/privacy-policy")}
                 style={{ fontSize: "small" }}
               >
                 Privacy Policy
+              </li>
+              <li
+                onClick={() => (window.location.href = "/legal")}
+                style={{ fontSize: "small" }}
+              >
+                Legal
               </li>
             </ul>
           </div>

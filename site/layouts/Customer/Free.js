@@ -275,31 +275,43 @@ export default function CustomerFreeLayout({ children }) {
             </div>
             <br />
             <div>
-              <h6 style={{ margin: "0" }}>deedyte@deedyte.net</h6>
+              <h6 style={{ margin: "0" }}>admin@deedyte.com</h6>
             </div>
           </div>
 
-          {/* Support Links */}
+          {/* Support & Legal Links */}
           <div>
             <h6 style={{ fontSize: "4vh" }}>Support</h6>
             <ul>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/")}
+                onClick={() => (window.location.href = "/contact")}
                 style={{ fontSize: "small" }}
               >
-                Help Center
+                Contact
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-academy")}
+                onClick={() => (window.location.href = "/about")}
                 style={{ fontSize: "small" }}
               >
-                Deedyte Academy
+                About
               </li>
               <li
-                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-community")}
+                onClick={() => (window.location.href = "/terms-of-use")}
                 style={{ fontSize: "small" }}
               >
-                Deedyte Community
+                Terms Of Service
+              </li>
+              <li
+                onClick={() => (window.location.href = "/privacy-policy")}
+                style={{ fontSize: "small" }}
+              >
+                Privacy Policy
+              </li>
+              <li
+                onClick={() => (window.location.href = "/legal")}
+                style={{ fontSize: "small" }}
+              >
+                Legal
               </li>
             </ul>
           </div>

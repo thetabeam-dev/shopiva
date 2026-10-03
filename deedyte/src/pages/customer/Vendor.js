@@ -641,7 +641,7 @@ export default function VendorShopScreen({ route, navigation }) {
         loading={deliveryLoading}
         emptyMessage={
           deliveryError ||
-          'This vendor has not set delivery locations on Shopiva yet.'
+          'This vendor has not set delivery locations on DeeDyte yet.'
         }
       />
     </View>

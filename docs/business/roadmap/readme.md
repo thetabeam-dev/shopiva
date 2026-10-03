@@ -1,8 +1,8 @@
-# Shopiva Startup Roadmap
+# DeeDyte Startup Roadmap
 
-This directory contains the strategic roadmap for **Shopiva**, an e-commerce marketplace that connects customers with vendors and enables them to discover, purchase, and receive products through the platform.
+This directory contains the strategic roadmap for **DeeDyte**, an e-commerce marketplace that connects customers with vendors and enables them to discover, purchase, and receive products through the platform.
 
-The roadmap outlines how Shopiva plans to progress from its initial launch into a sustainable and scalable business. Each stage focuses on a specific period of the company's development, including product readiness, customer acquisition, market validation, operational growth, monetization, and expansion.
+The roadmap outlines how DeeDyte plans to progress from its initial launch into a sustainable and scalable business. Each stage focuses on a specific period of the company's development, including product readiness, customer acquisition, market validation, operational growth, monetization, and expansion.
 
 The roadmap is divided into the following stages:
 
@@ -16,4 +16,4 @@ The roadmap is divided into the following stages:
 
 The roadmap is informed by principles from Eric Ries' *The Lean Startup*, particularly **validated learning, the Build–Measure–Learn cycle, MVP development, and evidence-based decision making**.
 
-This is a living document and may evolve as Shopiva gains new customers, market insights, and operational experience.
+This is a living document and may evolve as  gains new customers, market insights, and operational experience.

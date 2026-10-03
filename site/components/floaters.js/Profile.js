@@ -139,7 +139,7 @@ export default function ProfileFloater() {
    */
   const handleHelpCenter = () => {
     // window.open("/entrepreneur/ng/help", "_blank");
-    window.open("/entrepreneur/ng/terms-of-use", "_blank");
+    window.open("/terms-of-use", "_blank");
   };
 
   /**

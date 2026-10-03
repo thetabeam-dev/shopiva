@@ -809,7 +809,7 @@ export default function VendorScreen({ route, navigation }) {
     const shopLabel = String(row.name ?? 'Shop').trim() || 'Shop';
     closeVendorMenu();
     if (!shopId) {
-      Alert.alert('Shopiva', 'This shop cannot load delivery details (missing id).');
+      Alert.alert('DeeDyte', 'This shop cannot load delivery details (missing id).');
       return;
     }
     setVendorPolicyTitle('Delivery details');
@@ -827,7 +827,7 @@ export default function VendorScreen({ route, navigation }) {
       setVendorPolicyEmptyMessage(
         delivery?.locations?.length
           ? ''
-          : `${shopLabel} has not set delivery locations on Shopiva yet.`,
+          : `${shopLabel} has not set delivery locations on DeeDyte yet.`,
       );
     } catch (e) {
       setVendorDeliveryLocations([]);
