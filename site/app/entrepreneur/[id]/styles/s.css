@@ -393,6 +393,10 @@
         width: 100%;
     }
 
+    #about-card{
+        width: 100%;
+    }
+
     .content{
         padding: 10px;
         text-align: center;
