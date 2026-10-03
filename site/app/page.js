@@ -176,7 +176,7 @@ export default function Dashboard() {
    * @returns {JSX.Element} Step card
    */
   const renderHowItWorksStep = (step, index) => (
-    <div key={index} className="card about-card" style={{ border: "none" }}>
+    <div key={index} className="card about-card" id="about-card" style={{ border: "none" }}>
       <img src={step.icon.src} alt={step.title} />
       <div className="content">
         <div className="title">{step.title}</div>
