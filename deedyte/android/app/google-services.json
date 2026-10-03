@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "679915600515",
-    "project_id": "deedyte-f66b6",
-    "storage_bucket": "deedyte-f66b6.firebasestorage.app"
+    "project_number": "583221565844",
+    "project_id": "deedyte-8911d",
+    "storage_bucket": "deedyte-8911d.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:679915600515:android:7803e4f331f050c8d679b6",
+        "mobilesdk_app_id": "1:583221565844:android:0774d0a5390b09788bd781",
         "android_client_info": {
           "package_name": "com.thetabeam.shopiva"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyACkDbJTR5yjoLb9virw14psg7Hh28w22U"
+          "current_key": "AIzaSyCHrec9vzcONZlzd0JkItVw9Q9J3R-7zbA"
         }
       ],
       "services": {

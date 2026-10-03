@@ -198,6 +198,8 @@ export async function confirmCartCheckoutAndCreateChatRoom(
       [reference]
     );
 
+    console.log("ordersByReference: ", ordersByReference)
+
     if (ordersByReference.length) {
       const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, ordersByReference, txnId, false);
       if (rooms.length) {

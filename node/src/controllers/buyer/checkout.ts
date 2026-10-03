@@ -14,6 +14,7 @@ export async function PostBuyerCheckoutConfirmPaymentController(req: AuthRequest
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+    console.log(req.body);
     const body = (req.body ?? {}) as { reference?: unknown; shipping_naira?: unknown };
     const reference = String(body.reference ?? "").trim();
     const shippingNaira = body.shipping_naira != null ? Number(body.shipping_naira) : 0;
