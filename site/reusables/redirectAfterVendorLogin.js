@@ -14,7 +14,7 @@ const AUTH_URL = "/api/user/authorization";
  */
 export async function resolvePostLoginNavigation(role) {
   if (role === "customer") {
-    return { path: "/customer", hasShop: null, shop: null };
+    return { path: "/", hasShop: null, shop: null };
   }
 
   try {

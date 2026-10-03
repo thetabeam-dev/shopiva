@@ -368,7 +368,7 @@ export default function ShopCreate() {
               maxLength={SLUG_MAX}
               aria-invalid={!!errors.slug}
             />
-            <span className="shop-hint">deedyte.com/customer/store/{slug || "your-url"}</span>
+            <span className="shop-hint">deedyte.com/store/{slug || "your-url"}</span>
             {errors.slug && (
               <span className="shop-err" role="alert">
                 {errors.slug}

@@ -85,12 +85,12 @@ function ProfileIcon() {
 }
 
 /**
- * Shared top bar for buyer-facing `/customer` routes (hidden on vendor storefront
- * `/customer/store/:slug` — see `shouldShowCustomerShellHeader` in Restricted layout).
+ * Shared top bar for buyer-facing `/` routes (hidden on vendor storefront
+ * `/store/:slug` — see `shouldShowCustomerShellHeader` in Restricted layout).
  */
 export default function CustomerShellHeader() {
   const pathname = pathWithoutQueryAndTrailingSlash(usePathname());
-  const isCustomerHome = pathname === "/customer";
+  const isCustomerHome = pathname === "/";
 
   return (
     <div
@@ -98,15 +98,15 @@ export default function CustomerShellHeader() {
       role="banner"
       aria-label="Deedyte"
     >
-      <Link href="/customer" className="customer-shell-header__logo">
+      <Link href="/" className="customer-shell-header__logo">
         Deedyte
       </Link>
       <div className="customer-shell-header__tools">
-        <Link href="/customer/store/cart" className="customer-shell-header__icon" aria-label="Cart">
+        <Link href="/store/cart" className="customer-shell-header__icon" aria-label="Cart">
           <CartIcon />
         </Link>
         <Link
-          href="/customer/user-profile"
+          href="/user-profile"
           className="customer-shell-header__icon"
           aria-label="Account"
         >

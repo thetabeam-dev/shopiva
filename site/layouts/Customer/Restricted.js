@@ -2,7 +2,7 @@
  * Customer Restricted Layout Component
  *
  * Layout for authenticated customer pages.
- * Uses a slim top bar (no vendor sidebar — that is only on /customer/*).
+ * Uses a slim top bar for buyer index routes (`/`, `/store/*`, `/vendors`, etc.).
  *
  * @module layouts/Customer/Restricted
  */
@@ -32,7 +32,7 @@ import { useVerifyAuth, requiresAuth } from "../../reusables/verifyAuth";
 const ASIDE_MIN_WIDTH = 1200;
 const RESIZE_DEBOUNCE_DELAY = 150;
 
-/** `/customer/store/*` segments that use shell chrome — not vendor storefront slugs. */
+/** `/store/*` segments that use shell chrome — not vendor storefront slugs. */
 const STORE_APP_SEGMENTS = new Set([
   "cart",
   "checkouts",
@@ -42,24 +42,24 @@ const STORE_APP_SEGMENTS = new Set([
 ]);
 
 /**
- * Aside on buyer hub: `/customer/store/inbox`, `.../orders`, `.../disputes`
+ * Aside on buyer hub: `/store/inbox`, `.../orders`, `.../disputes`
  * (hidden on order/dispute detail pages).
  */
 function shouldShowCustomerCheckoutAside(pathname) {
   const path = (pathname || "").split("?")[0].replace(/\/+$/, "") || "/";
   const segments = path.split("/").filter(Boolean);
-  if (segments.length < 3) return false;
-  if (segments[0] !== "customer" || segments[1] !== "store") return false;
-  if (!["inbox", "orders", "disputes"].includes(segments[2])) return false;
-  if (segments[2] === "orders" && segments.length >= 4) return false;
-  if (segments[2] === "disputes" && segments.length >= 4) return false;
+  if (segments.length < 2) return false;
+  if (segments[0] !== "store") return false;
+  if (!["inbox", "orders", "disputes"].includes(segments[1])) return false;
+  if (segments[1] === "orders" && segments.length >= 3) return false;
+  if (segments[1] === "disputes" && segments.length >= 3) return false;
   return true;
 }
 
 /**
- * Buyer shell header on `/customer/*`, except vendor storefront
- * `/customer/store/:shopSlug` and PDP `/customer/store/:shopSlug/product/:id`
- * (e.g. no header on `/customer/store/lexicon`).
+ * Buyer shell header on index customer routes, except vendor storefront
+ * `/store/:shopSlug` and PDP `/store/:shopSlug/product/:id`
+ * (e.g. no header on `/store/lexicon`).
  *
  * @param {string} pathname
  * @returns {boolean}
@@ -67,24 +67,22 @@ function shouldShowCustomerCheckoutAside(pathname) {
 function shouldShowCustomerShellHeader(pathname) {
   const raw = (pathname || "").split("?")[0] || "/";
   const path = raw.replace(/\/+$/, "") || "/";
-  if (!path.startsWith("/customer")) return false;
-
   const segments = path.split("/").filter(Boolean);
+
+  // Hide on vendor storefront + product detail pages
   if (
-    segments[0] === "customer" &&
-    segments[1] === "store" &&
-    segments.length >= 3 &&
-    !STORE_APP_SEGMENTS.has(segments[2])
+    segments[0] === "store" &&
+    segments.length >= 2 &&
+    !STORE_APP_SEGMENTS.has(segments[1])
   ) {
-    return false;
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 /**
- * Full-bleed `/public/customer.mp4` background only under the buyer app (`/customer/*`).
- * Other routes may still use this layout but must not show the video.
+ * Full-bleed `/public/customer.mp4` background for the buyer app at the index routes.
  *
  * @param {string} pathname
  * @returns {boolean}
@@ -92,7 +90,11 @@ function shouldShowCustomerShellHeader(pathname) {
 function shouldShowCustomerBgVideo(pathname) {
   const path = (pathname || "").split("?")[0] || "/";
   const norm = path.replace(/\/+$/, "") || "/";
-  return norm === "/customer" || norm.startsWith("/customer/");
+  if (norm === "/") return true;
+  if (norm === "/vendors" || norm.startsWith("/vendors/")) return true;
+  if (norm === "/user-profile" || norm.startsWith("/user-profile/")) return true;
+  if (norm === "/store" || norm.startsWith("/store/")) return true;
+  return false;
 }
 
 function debounce(func, wait) {

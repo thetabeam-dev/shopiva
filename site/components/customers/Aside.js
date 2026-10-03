@@ -16,9 +16,9 @@ function isPathActive(pathname, href) {
 }
 
 const LINKS = [
-//   { href: "/customer/store/inbox", label: "Inbox" },
-  { href: "/customer/store/orders", label: "Orders" },
-  { href: "/customer/store/disputes", label: "Disputes" },
+//   { href: "/store/inbox", label: "Inbox" },
+  { href: "/store/orders", label: "Orders" },
+  { href: "/store/disputes", label: "Disputes" },
 ];
 
 export default function Aside() {
@@ -49,7 +49,7 @@ export default function Aside() {
         </ul>
 
         <div >
-            <button className="user-head" onClick={e => window.location.href = "/customer/user-profile"}>
+            <button className="user-head" onClick={e => window.location.href = "/user-profile"}>
                 <span>
 
                 </span>

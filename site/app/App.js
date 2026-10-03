@@ -27,7 +27,6 @@ import EntrepreneurRestrictedLayout from "../layouts/Entrepreneur/Restricted";
 import EntrepreneurFreeLayout from "../layouts/Entrepreneur/Free";
 
 // Customer Layout Imports
-import CustomerRestrictedLayout from "../layouts/Customer/Restricted";
 import CustomerFreeLayout from "../layouts/Customer/Free";
 
 // ============================================================================
@@ -101,12 +100,27 @@ const isAuthPage = (pathname) => {
 
 /**
  * Checks if the current path requires a free (public) layout
+ * Country/locale marketing pages use a 2-letter first segment, e.g. `/ng`, `/ng/pricing`,
+ * or legacy `/entrepreneur/ng`, `/customer/ng`.
  * @param {string} pathname - Current route pathname
  * @returns {boolean} True if free layout should be used
  */
 const isFreeLayout = (pathname) => {
-  const pathParts = pathname.split("/");
-  return pathParts.length > 2 && pathParts.splice(0, 3)[2]?.length === 2;
+  const segments = (pathname || "").split("/").filter(Boolean);
+  if (segments.length === 0) return false;
+
+  // Index locale pages: /ng, /ng/pricing, ...
+  if (segments[0].length === 2) return true;
+
+  // Role-scoped locale pages: /entrepreneur/ng, /customer/ng, ...
+  if (
+    (segments[0] === "entrepreneur" || segments[0] === "customer") &&
+    segments[1]?.length === 2
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 // ============================================================================
@@ -165,8 +179,9 @@ export default function App({ session, children }) {
  */
 function Entrepreneur({ children }) {
   const pathname = usePathname();
-  const pathParts = pathname.split("/");
-  const isShopDetailPage = pathParts[0] === "entrepreneur" && pathParts[1] === "shop" && pathParts.length > 2;
+  const segments = pathname.split("/").filter(Boolean);
+  const isShopDetailPage =
+    segments[0] === "entrepreneur" && segments[1] === "shop" && segments.length > 2;
 
   // Shop detail/editor route renders full-width page without dashboard chrome.
   if (isShopDetailPage) {
@@ -178,15 +193,10 @@ function Entrepreneur({ children }) {
     return <AuthLayout>{children}</AuthLayout>;
   }
 
-  // Determine if restricted or free layout
-  if (pathname.split("/").length > 2) {
-    if (isFreeLayout(pathname)) {
-      return <EntrepreneurFreeLayout>{children}</EntrepreneurFreeLayout>;
-    }
-    return <EntrepreneurRestrictedLayout>{children}</EntrepreneurRestrictedLayout>;
+  if (isFreeLayout(pathname)) {
+    return <EntrepreneurFreeLayout>{children}</EntrepreneurFreeLayout>;
   }
 
-  // Default to restricted layout
   return <EntrepreneurRestrictedLayout>{children}</EntrepreneurRestrictedLayout>;
 }
 
@@ -196,11 +206,11 @@ function Entrepreneur({ children }) {
 
 /**
  * Customer layout wrapper component
- * Determines which layout to use based on current route
- * 
+ * All customer routes use the Free layout (marketing shell).
+ *
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components
- * @returns {JSX.Element} Appropriate customer layout
+ * @returns {JSX.Element} Customer free layout (or Auth layout)
  */
 function Customer({ children }) {
   const pathname = usePathname();
@@ -210,14 +220,5 @@ function Customer({ children }) {
     return <AuthLayout>{children}</AuthLayout>;
   }
 
-  // Determine if restricted or free layout
-  if (pathname.split("/").length > 2) {
-    if (isFreeLayout(pathname)) {
-      return <CustomerFreeLayout>{children}</CustomerFreeLayout>;
-    }
-    return <CustomerRestrictedLayout>{children}</CustomerRestrictedLayout>;
-  }
-
-  // Default to restricted layout
-  return <CustomerRestrictedLayout>{children}</CustomerRestrictedLayout>;
+  return <CustomerFreeLayout>{children}</CustomerFreeLayout>;
 }
