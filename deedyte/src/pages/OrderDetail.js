@@ -195,7 +195,18 @@ function SummaryRow({ icon, label, value, last }) {
       <Text style={styles.summaryLabel}>{label}</Text>
       <View style={styles.summaryValue}>
         {typeof value === 'string' || typeof value === 'number' ? (
-          <Text style={styles.summaryValueText} numberOfLines={1}>
+          <Text
+            style={[
+              styles.summaryValueText,
+              {
+                textTransform:
+                  String(label).toLowerCase() === 'logistics provider'
+                    ? 'uppercase'
+                    : 'capitalize',
+              },
+            ]}
+            // numberOfLines={1}
+          >
             {String(value)}
           </Text>
         ) : (
@@ -1053,6 +1064,16 @@ export default function OrderDetailScreen() {
               'Awaiting shipment',
             )}
           />
+
+          <SummaryRow
+            icon="cube-outline"
+            label="Logistics Provider"
+            value={String(
+              orderInfo?.order?.logistic_provider ||
+              'Not Available',
+            )}
+          />
+
           <SummaryRow
             icon="calendar-outline"
             label="Estimated Delivery Date"
@@ -1796,6 +1817,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLOR.DARK,
+    // width: "auto",
     textTransform: 'capitalize',
   },
   escrowStatusRow: {

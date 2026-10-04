@@ -675,6 +675,7 @@ function Shipping({ data }) {
     useState(false);
   const [shippingMethod, setShippingMethod] = useState(null);
   const [estimatedDelivery, setEstimatedDelivery] = useState(null);
+  const [logisticProvider, setLogisticProvider] = useState('');
   const [trackingId, setTrackingId] = useState('');
 
   useEffect(() => {
@@ -695,6 +696,9 @@ function Shipping({ data }) {
       FULFILLMENT_TIMEFRAME_OPTIONS,
       estimatedDelivery,
     ),
+    logistic_provider: shippingUsesTrackingId(shippingMethod)
+      ? logisticProvider.trim() || null
+      : null,
     tracking_id: shippingUsesTrackingId(shippingMethod)
       ? trackingId.trim() || null
       : null,
@@ -716,6 +720,13 @@ function Shipping({ data }) {
       return false;
     }
     if (shippingUsesTrackingId(shippingMethod)) {
+      if (!logisticProvider.trim()) {
+        Alert.alert(
+          'Logistics provider required',
+          'Enter the company or service handling this shipment. Self delivery is the only option that skips this.',
+        );
+        return false;
+      }
       const tid = trackingId.trim();
       if (!tid) {
         Alert.alert(
@@ -813,12 +824,33 @@ function Shipping({ data }) {
                 onChange={item => {
                   setShippingMethod(item.value);
                   if (!shippingUsesTrackingId(item.value)) {
+                    setLogisticProvider('');
                     setTrackingId('');
                   }
                 }}
               />
               {shippingUsesTrackingId(shippingMethod) ? (
                 <>
+                  <Text
+                    style={[
+                      styles.processingFieldLabel,
+                      styles.shippingTrackingLabel,
+                    ]}
+                  >
+                    Logistics provider
+                  </Text>
+                  <Text style={styles.processingFieldHint}>
+                    Company or service moving this order — courier, dispatch
+                    company, or bus line. Not required for self delivery.
+                  </Text>
+                  <TextInput
+                    style={[styles.textInput, styles.acceptanceFormInput]}
+                    placeholder="Enter logistics provider"
+                    value={logisticProvider}
+                    onChangeText={setLogisticProvider}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                  />
                   <Text
                     style={[
                       styles.processingFieldLabel,

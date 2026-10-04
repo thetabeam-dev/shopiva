@@ -97,27 +97,27 @@ function emitOrderUpdateToUser(
   notifyUser(id, event, { result, list });
   let msg = fcmMssg(event);
 
-  db().then(async(pool) => {
+  db().then(async (pool) => {
 
-  const {rows: [{devicetoken: customerDevicetoken}]} = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
-  sendFcmForActivities(
+    const { rows: [{ devicetoken: customerDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
+    sendFcmForActivities(
       customerDevicetoken /**token */,
       "New Update From Order Activity" /** title */,
       msg /**body */,
       "null" /** media */,
       { type: "order", order_id: orderId } /** meta */,
-  );
-  const {rows: [{devicetoken: vendorDevicetoken}]} = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
-  if(event === "order_disputed"){
-    sendFcmForActivities(
-      vendorDevicetoken /**token */,
-      "New Update From Order Activity" /** title */,
-      msg /**body */,
-      "null" /** media */,
-      { type: "order", order_id: orderId } /** meta */,
     );
-  }
-})
+    const { rows: [{ devicetoken: vendorDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
+    if (event === "order_disputed") {
+      sendFcmForActivities(
+        vendorDevicetoken /**token */,
+        "New Update From Order Activity" /** title */,
+        msg /**body */,
+        "null" /** media */,
+        { type: "order", order_id: orderId } /** meta */,
+      );
+    }
+  })
 }
 
 /**
@@ -385,8 +385,17 @@ export const handleOrderShipping = async (
       }
       const shipping_method = metaObj?.shipping_method ?? null;
       const tracking_id = metaObj?.tracking_id ?? null;
+      const logistic_provider =
+        shipping_method != null && shipping_method !== "self_delivery"
+          ? (metaObj?.logistic_provider ?? null)
+          : null;
       if (shipping_method !== null) {
-        await updateShippingMethod(shipping_method, tracking_id, order_id);
+        await updateShippingMethod(
+          shipping_method,
+          tracking_id,
+          logistic_provider,
+          order_id,
+        );
       }
       const orderPayload = await broadcastOrderUpdate(
         "order_shipping",
@@ -831,12 +840,13 @@ async function updateShipping(delivery_duration: unknown, order_id: unknown) {
 async function updateShippingMethod(
   shipping_method: unknown,
   tracking_number: unknown,
+  logistic_provider: unknown,
   order_id: unknown,
 ) {
   const pool = await db();
   return await pool.query(
-    `UPDATE orders SET shipping_method = $1, tracking_number = $2  WHERE id = $3`,
-    [shipping_method, tracking_number, order_id],
+    `UPDATE orders SET shipping_method = $1, tracking_number = $2, logistic_provider = $3 WHERE id = $4`,
+    [shipping_method, tracking_number, logistic_provider, order_id],
   );
 }
 

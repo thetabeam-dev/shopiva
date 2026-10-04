@@ -21,6 +21,7 @@ CREATE TABLE orders (
     shipping_address TEXT NOT NULL,
 
     payment_reference VARCHAR(255),
+    logistic_provider VARCHAR(255),
 
     shipping_method VARCHAR(100),
 
