@@ -1,8 +1,7 @@
-import { getMessaging } from '@react-native-firebase/messaging';
 import { apiFetch } from './client';
 import { DEFAULT_API_BASE_URL, getApiBaseUrl } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
+import { getFcmToken } from '../utils/firebaseTokenReqConfig';
 
 /**
  * Matches Deedyte Express (`deedyte/node`): `/user/signin`, `/user/signup`.
@@ -120,10 +119,10 @@ export async function loginWithPassword(emailOrUsername, password) {
   if (!login || !pwd) {
     return { ok: false, message: 'Enter email or username and password.' };
   }
-  const fcmToken = await getMessaging().getToken();
-  // Alert.alert(fcmToken)
-  // console.log('Device FCM Token:', token);
-  await AsyncStorage.setItem("fcm", (fcmToken));
+  const fcmToken = await getFcmToken();
+  if (fcmToken) {
+    await AsyncStorage.setItem('fcm', fcmToken);
+  }
 
   /** Backend `/user/signin` expects `{ email, password }` (email sign-in only). */
   const res = await apiFetchSafe('/user/signin', {

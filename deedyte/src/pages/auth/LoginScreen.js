@@ -82,6 +82,7 @@ export default function LoginScreen({ navigation, route }) {
       Alert.alert('Could not log in', result.message || 'Check your credentials and try again.');
     } catch (e) {
       Alert.alert('Network error', e instanceof Error ? (e.message) : (String(e)));
+      console.log("error: ", e)
       // Alert.alert('Network error', JSON.stringify((e)));
     } finally {
       setSubmitting(false);
