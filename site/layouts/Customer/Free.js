@@ -227,21 +227,16 @@ export default function CustomerFreeLayout({ children }) {
   const renderDesktopNav = () => (
     <section style={{ margin: "0px 0px 0px 0px" }}>
       <ul>
-        <li onClick={() => {
-          setResourcesMenu(false);
-          setSolutionMenu(!solutionMenu);
-        }}>
-          Home
-        </li>
         
         <li onClick={() => {
-          setSolutionMenu(false);
-          setResourcesMenu(!resourcesMenu);
+          // setSolutionMenu(false);
+          // setResourcesMenu(!resourcesMenu);
+          window.open("/contact")
         }}>
           Contacts
         </li>
 
-        <li onClick={() => window.open("/entrepreneur/ng/pricing")}>
+        <li onClick={() => window.open("/about")}>
           About
         </li>
       </ul>

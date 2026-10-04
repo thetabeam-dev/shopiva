@@ -74,7 +74,7 @@ const FEATURE_HIGHLIGHTS = [
     icon: ui_svg,
     title: "Simple Dashboard Easy Control",
   }
-  
+
 ];
 
 // ============================================================================
@@ -92,7 +92,7 @@ export default function EntrepreneurFreeLayout({ children }) {
   // ============================================================================
   // HOOKS & STATE
   // ============================================================================
-  
+
   const pathname = usePathname();
   const { entrepreneur_id } = useSelector((state) => state.entrepreneur_id);
 
@@ -107,7 +107,7 @@ export default function EntrepreneurFreeLayout({ children }) {
   // ============================================================================
   // EFFECTS
   // ============================================================================
-  
+
   // Update logged in state based on entrepreneur ID
   useEffect(() => {
     setLoggedIn(entrepreneur_id !== null);
@@ -130,7 +130,7 @@ export default function EntrepreneurFreeLayout({ children }) {
   // Set body styles on mount
   useEffect(() => {
     document.body.style.background = "#fff";
-    
+
     const mainElement = document.body.querySelector("main");
     if (mainElement) {
       mainElement.style.background = "#fff";
@@ -140,7 +140,7 @@ export default function EntrepreneurFreeLayout({ children }) {
   // ============================================================================
   // EVENT HANDLERS
   // ============================================================================
-  
+
   /**
    * Handles menu toggle for mobile
    */
@@ -171,7 +171,7 @@ export default function EntrepreneurFreeLayout({ children }) {
   // ============================================================================
   // RENDER HELPERS
   // ============================================================================
-  
+
   /**
    * Checks if current page is the landing page
    */
@@ -188,7 +188,7 @@ export default function EntrepreneurFreeLayout({ children }) {
    */
   const renderDesktopNav = () => (
     <section>
-      <ul>
+      {/* <ul>
         <li onClick={() => {
           setResourcesMenu(false);
           setSolutionMenu(!solutionMenu);
@@ -203,9 +203,24 @@ export default function EntrepreneurFreeLayout({ children }) {
           Resources
         </li>
 
-        {/* <li onClick={() => window.open("/entrepreneur/ng/pricing")}>
+        <li onClick={() => window.open("/entrepreneur/ng/pricing")}>
           Pricing
-        </li> */}
+        </li>
+      </ul> */}
+
+      <ul>
+
+        <li onClick={() => {
+          // setSolutionMenu(false);
+          // setResourcesMenu(!resourcesMenu);
+          window.open("/contact")
+        }}>
+          Contacts
+        </li>
+
+        <li onClick={() => window.open("/about")}>
+          About
+        </li>
       </ul>
     </section>
   );
@@ -338,7 +353,7 @@ export default function EntrepreneurFreeLayout({ children }) {
   // ============================================================================
   // RENDER
   // ============================================================================
-  
+
   return (
     <>
       {/* Header */}
