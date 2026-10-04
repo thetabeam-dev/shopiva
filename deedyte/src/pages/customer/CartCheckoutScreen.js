@@ -675,7 +675,7 @@ export default function CartCheckoutScreen({ navigation }) {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollInner, { paddingBottom: 180 }]}
+          contentContainerStyle={[styles.scrollInner, { paddingBottom: Platform.OS === 'ios' ? 180 : 210 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
