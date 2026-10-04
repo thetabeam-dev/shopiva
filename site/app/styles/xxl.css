@@ -283,9 +283,10 @@
         background-color: #ffffff;
         border-radius: 0px;
         display: flex;
-        margin: 20px;
+        /* margin: 20px; */
         justify-content: space-between;
     }
+    
     #about h1{
         color: #00926E;
         font-size: 5.5vh;

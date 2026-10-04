@@ -71,7 +71,7 @@ const HOW_IT_WORKS_STEPS = [
 ];
 
 /**
- * Why Deedyte features
+ * Why DeeDyte features
  */
 const WHY_DEEDYTE_FEATURES = [
   {
@@ -314,9 +314,9 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Why Deedyte Section */}
+      {/* Why DeeDyte Section */}
       <section id="why-section">
-        <h1>Why Deedyte?</h1>
+        <h1>Why DeeDyte?</h1>
         <div className="why-cnt">
           {WHY_DEEDYTE_FEATURES.map(renderWhyFeature)}
         </div>
