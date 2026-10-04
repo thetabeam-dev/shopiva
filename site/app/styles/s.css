@@ -1,41 +1,49 @@
 @media screen and (max-width: 480px) {
-    #headline{
+    #headline {
         font-size: 9vh;
     }
-    #interval-text{
+
+    #interval-text {
         font-size: 5vh;
     }
-    #section{
+
+    #section {
         padding: 20px 55px;
     }
-    #conclude-cnt{
+
+    #conclude-cnt {
         padding: 50px;
     }
-    #globe-section{
+
+    #globe-section {
         padding: 20px;
     }
-    #header-logo-cnt{
+
+    #header-logo-cnt {
         /* margin-left: 20px; */
         display: flex;
         flex-direction: row;
         width: fit-content;
         align-items: flex-end;
     }
-    #header-logo-cnt h3{
+
+    #header-logo-cnt h3 {
         padding-left: 20px;
         margin: 0;
         color: rgba(0, 146, 110, 1);
         font-weight: 1000;
     }
-    #header-logo-cnt img{
+
+    #header-logo-cnt img {
         height: 50px;
         width: 50px;
     }
-    ul li div:hover{
+
+    ul li div:hover {
         background-color: transparent;
     }
-    
-    header{
+
+    header {
         height: 100vh;
         background-color: transparent;
         /* background-color: ; */
@@ -48,13 +56,13 @@
         padding: 0;
         top: 0;
         align-items: flex-start;
-    
+
         justify-content: space-between;
     }
-    
-    
-    
-    .header section ul{
+
+
+
+    .header section ul {
         list-style-type: none;
         display: flex;
         align-items: center;
@@ -62,27 +70,28 @@
         margin: 0;
         justify-content: center;
     }
-    .header section ul li{
+
+    .header section ul li {
         border: 1px solid #00926E;
         padding: 12px 12px;
         border-radius: 25px;
         margin: 0px 5px;
         font-weight: 500;
         color: #00926E;
-    
+
     }
-    
-    .header section ul li:last-child{
+
+    .header section ul li:last-child {
         background-color: #00926E;
         color: #fff;
     }
-    
-    .header section ul li:hover{
+
+    .header section ul li:hover {
         background-color: #00926E;
         color: #fff;
     }
-    
-    .header{
+
+    .header {
         height: 60px;
         background-color: transparent;
         /* background-color: ; */
@@ -99,16 +108,16 @@
         transition: background-color 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .header.header--scrolled{
+    .header.header--scrolled {
         background-color: #fff;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
     }
 
-    .header-auth{
+    .header-auth {
         margin: 0 25px 0 0;
     }
 
-    .customer-free-layout{
+    .customer-free-layout {
         height: 100vh;
         height: 100dvh;
         max-height: 100vh;
@@ -122,7 +131,7 @@
         -webkit-overflow-scrolling: touch;
     }
 
-    .customer-free-main{
+    .customer-free-main {
         flex: 1 0 auto;
         width: 100%;
         height: fit-content;
@@ -136,18 +145,18 @@
         background-color: transparent;
     }
 
-    .header-auth ul{
+    .header-auth ul {
         position: relative;
         background-color: transparent;
         width: fit-content;
     }
 
-    .header-auth ul li{
+    .header-auth ul li {
         width: fit-content;
     }
-    
-    
-    main{
+
+
+    main {
         height: calc(100vh - 60px);
         display: flex;
         flex-direction: column;
@@ -155,8 +164,8 @@
         align-items: center;
         background-color: #f8f8f8;
     }
-    
-    .hero-section{
+
+    .hero-section {
         width: 100%;
         height: 100vh;
         display: flex;
@@ -168,7 +177,7 @@
         padding: 0px 0px;
     }
 
-    .video-bg{
+    .video-bg {
         position: absolute;
         top: 0;
         left: 0;
@@ -180,7 +189,7 @@
         pointer-events: none;
     }
 
-    .video-bg video{
+    .video-bg video {
         position: absolute;
         inset: 0;
         width: 100%;
@@ -189,7 +198,7 @@
         display: block;
     }
 
-    .hero-right{
+    .hero-right {
         width: 45%;
         height: 100%;
         background-color: transparent;
@@ -203,7 +212,7 @@
         background-color: rgba(0, 146, 110, .2);
     }
 
-    .hero-left{
+    .hero-left {
         width: 100%;
         height: 100%;
         z-index: 100;
@@ -215,18 +224,18 @@
         background-color: rgba(0, 146, 110, .2);
     }
 
-    .hero-info{
+    .hero-info {
         width: 470px;
     }
 
-    .hero-left h2{
+    .hero-left h2 {
         padding: 20px 20px 20px 20px;
         color: rgb(255, 255, 255);
         font-size: 4.5vh;
         font-weight: 800;
     }
 
-    .hero-left ul{
+    .hero-left ul {
         margin: 0;
         padding: 0;
         display: flex;
@@ -235,7 +244,7 @@
         padding: 0px;
     }
 
-    .theme{
+    .theme {
         padding: 20px 20px;
         font-weight: 600;
         font-size: large;
@@ -243,7 +252,7 @@
         text-align: justify;
     }
 
-    .download_btn{
+    .download_btn {
         width: 100%;
         height: 100px;
         display: flex;
@@ -253,11 +262,12 @@
         padding: 20px;
         margin-top: 20px;
     }
-    .download_btn{
+
+    .download_btn {
         border-radius: 10px;
     }
 
-    .order_btn{
+    .order_btn {
         width: 100%;
         height: 100px;
         margin: 5px 0px;
@@ -268,7 +278,7 @@
         cursor: pointer;
     }
 
-    .order_btn button{
+    .order_btn button {
         padding: 0;
         height: 100%;
         width: 100%;
@@ -284,14 +294,14 @@
         border-radius: 8px;
     }
 
-    .download_btn button{
+    .download_btn button {
         width: 48%;
         padding: 0;
         border: none;
         background-color: transparent;
     }
-    
-    #about{
+
+    #about {
         /* height: 70vh; */
         width: 100%;
         background-color: #ffffff;
@@ -302,7 +312,8 @@
         margin: 0px 0px;
         justify-content: space-between;
     }
-    #about h1{
+
+    #about h1 {
         color: #00926E;
         font-size: 3.5vh;
         font-weight: 700;
@@ -312,16 +323,16 @@
         margin: 20px 0px;
     }
 
-    .about-card-cnt{
+    .about-card-cnt {
         display: flex;
         flex-direction: column;
-        
+
         /* margin: 5px; */
         color: #000;
         width: 100%;
     }
 
-    .about-card{
+    .about-card {
         padding: 10px;
         width: 100%;
         display: flex;
@@ -329,17 +340,21 @@
         align-items: center;
     }
 
-    .about-card img{
+    #about-card {
+        width: 100%;
+    }
+
+    .about-card img {
         height: 150px;
         width: 150px;
     }
 
-    .content{
+    .content {
         padding: 10px;
         text-align: center;
     }
 
-    .title{
+    .title {
         font-size: large;
         font-weight: 600;
         font-size: 2.5vh;
@@ -347,12 +362,12 @@
         margin: 10px 0px;
     }
 
-    .summary{
+    .summary {
         font-size: large;
         line-height: 30px;
     }
-    
-    #why-section{
+
+    #why-section {
         background-color: #00926E;
         color: #fff;
         padding: 20px;
@@ -362,7 +377,8 @@
         z-index: 200;
         justify-content: center;
     }
-    #why-card{
+
+    #why-card {
         display: flex;
         width: 100%;
         flex-direction: column;
@@ -374,19 +390,23 @@
         border-radius: 5px;
         color: #000;
     }
-    #why-card:nth-child(odd){
+
+    #why-card:nth-child(odd) {
         flex-direction: column;
     }
-     #why-card:nth-child(even){
+
+    #why-card:nth-child(even) {
         flex-direction: column;
     }
-    #why-card:nth-child(even) .content{
+
+    #why-card:nth-child(even) .content {
         width: 100%;
         /* padding: 25px 35px; */
 
         text-align: justify;
     }
-    #why-card:nth-child(odd) .content{
+
+    #why-card:nth-child(odd) .content {
         width: 100%;
         /* padding: 25px 35px; */
         text-align: justify;
@@ -395,23 +415,24 @@
         justify-content: space-between;
     }
 
-    #why-card:nth-child(even) img{
+    #why-card:nth-child(even) img {
         width: 100%;
         height: 100%;
         border-radius: 5px;
         /* padding: 10px; */
         text-align: right;
     }
-    #why-card:nth-child(odd) img{
+
+    #why-card:nth-child(odd) img {
         width: 100%;
         /* padding: 10px; */
         border-radius: 5px;
         height: 100%;
         text-align: left;
     }
- 
 
-    .input-cnt{
+
+    .input-cnt {
         height: auto;
         width: auto;
         display: flex;
@@ -419,13 +440,13 @@
         flex-direction: row;
     }
 
-    .input-cnt input{
+    .input-cnt input {
         height: 40px;
         width: 200px;
 
     }
 
-    .footer-button{
+    .footer-button {
         height: 40px;
         width: 70px;
         border-radius: 8px;
@@ -434,8 +455,8 @@
         align-items: center;
     }
 
-   
 
-   
+
+
 
 }
