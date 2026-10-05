@@ -275,20 +275,16 @@ export default function CreateProduct() {
               : {}
           setLoadedSpecifications(specs)
 
-          const catNorm = (p.category != null ? String(p.category) : "").trim()
-          if (catNorm === "fashion") {
-            setGender(specs.gender != null ? String(specs.gender) : "")
-            setType(
-              specs.type != null
+          setGender(specs.gender != null ? String(specs.gender) : "")
+          setType(
+            p.type != null && String(p.type).trim()
+              ? String(p.type)
+              : specs.type != null
                 ? String(specs.type)
                 : specs.product_type != null
                   ? String(specs.product_type)
                   : ""
-            )
-          } else {
-            setGender("")
-            setType("")
-          }
+          )
 
           const rows =
             specs.variants ?? specs.deedyte_variants ?? specs.saved_variants
@@ -453,19 +449,18 @@ export default function CreateProduct() {
           delivery: Boolean(deliveryMethods.delivery),
         },
       }
-      if (category === "fashion") {
-        specifications.gender = gender
-        specifications.type = type
-      } else {
-        delete specifications.gender
-        delete specifications.type
-      }
+      const genderValue = String(gender ?? "").trim()
+      const typeValue = String(type ?? "").trim()
+      if (genderValue) specifications.gender = genderValue
+      else delete specifications.gender
+      if (typeValue) specifications.type = typeValue
+      else delete specifications.type
 
       const productPayload = {
         name: title.trim(),
         slug,
         description: description?.trim() || null,
-        short_description: (description?.trim() || "").slice(0, 200) || null,
+        type: typeValue || null,
         category: category ? String(category).trim() : null,
         subcategory: subCategory ? String(subCategory).trim() : null,
         brand: brand?.trim() || null,

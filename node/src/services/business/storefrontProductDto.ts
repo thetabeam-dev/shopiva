@@ -14,8 +14,8 @@ export type StorefrontListingProduct = {
   gender: string;
   subCategory: string;
   type: string;
-  /** Lowercased variant label -> values present on this product. */
-  attributes: Record<string, string[]>;
+  /** Variant labels from specifications, lowercased, excluding price and stock. */
+  filters: Record<string, string[]>;
 };
 
 export type StorefrontVariantDto = {
@@ -130,37 +130,40 @@ function availableStock(inv: InventoryRow): number {
   return Math.max(0, qty - reserved);
 }
 
+function isPriceOrStockLabel(label: string): boolean {
+  return /^(price|unit\s*price|amount|cost|stock|quantity|qty)$/i.test(label.trim());
+}
+
 function inferListingFilters(p: ProductRow): {
   gender: string;
   subCategory: string;
   type: string;
-  attributes: Record<string, string[]>;
+  filters: Record<string, string[]>;
 } {
   const specs = coerceSpecifications(p.specifications);
   const gender = String(specs.gender ?? "").trim();
   const subCategory = String(p.subcategory ?? specs.subcategory ?? specs.subCategory ?? "").trim();
-  const type = String(specs.type ?? specs.product_type ?? "").trim();
-  const attributes: Record<string, string[]> = {};
-  const addAttribute = (label: unknown, value: unknown) => {
+  const type = String(p.type ?? specs.type ?? specs.product_type ?? "").trim();
+  const filters: Record<string, string[]> = {};
+  const addFilter = (label: unknown, value: unknown) => {
     const key = String(label ?? "").trim().toLowerCase();
     const text = String(value ?? "").trim().toLowerCase();
-    if (!key || !text) return;
-    const list = attributes[key] ?? [];
+    if (!key || !text || isPriceOrStockLabel(key)) return;
+    const list = filters[key] ?? [];
     if (!list.includes(text)) list.push(text);
-    attributes[key] = list;
+    filters[key] = list;
   };
-  const variants = Array.isArray(specs.variants) ? specs.variants : [];
-  for (const variant of variants) {
+  for (const variant of parseSpecVariants(specs)) {
     if (!variant || typeof variant !== "object") continue;
     const details = (variant as { details?: unknown }).details;
     if (!Array.isArray(details)) continue;
     for (const detail of details) {
       if (!detail || typeof detail !== "object") continue;
       const row = detail as { label?: unknown; value?: unknown };
-      addAttribute(row.label, row.value);
+      addFilter(row.label, row.value);
     }
   }
-  return { gender, subCategory, type, attributes };
+  return { gender, subCategory, type, filters };
 }
 
 function groupInventoryByProductId(rows: InventoryRow[]): Map<number, InventoryRow[]> {
@@ -203,7 +206,7 @@ export function buildStorefrontListingProducts(
       gender: f.gender,
       subCategory: f.subCategory,
       type: f.type,
-      attributes: f.attributes,
+      filters: f.filters,
     });
   }
   return out;

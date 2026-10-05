@@ -80,7 +80,7 @@ async function main(): Promise<void> {
 
     const productRes = await client.query<{ id: number }>(
       `INSERT INTO products (
-        shop_id, name, slug, description, short_description,
+        shop_id, name, slug, description, type,
         category, subcategory, brand, images, videos, tags,
         weight, dimensions, specifications, status,
         is_published, published_at, is_featured

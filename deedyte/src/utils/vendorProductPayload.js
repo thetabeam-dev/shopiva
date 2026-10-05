@@ -107,24 +107,22 @@ export function buildProductCreatePayloads({
   };
 
   const catKeyTrim = String(category ?? '').trim();
-  const catNorm = catKeyTrim.toLowerCase();
   /** Same string the web sends from its category `<select>` (`key.split("_").join(" & ")`). */
   const categoryForApi = catKeyTrim ? catKeyTrim.split('_').join(' & ') : null;
 
-  if (catNorm === 'fashion') {
-    specifications.gender = String(gender ?? '').trim().toLowerCase();
-    specifications.type = String(type ?? '').trim();
-  } else {
-    delete specifications.gender;
-    delete specifications.type;
-  }
+  const genderValue = String(gender ?? '').trim();
+  const typeValue = String(type ?? '').trim();
+  if (genderValue) specifications.gender = genderValue;
+  else delete specifications.gender;
+  if (typeValue) specifications.type = typeValue;
+  else delete specifications.type;
 
   const descTrim = String(description ?? '').trim();
   const productPayload = {
     name: String(title ?? '').trim(),
     slug,
     description: descTrim ? descTrim : null,
-    short_description: descTrim.slice(0, 200) || null,
+    type: typeValue || null,
     category: categoryForApi,
     subcategory: subCategory ? String(subCategory).trim() : null,
     brand: brand?.trim() ? String(brand).trim() : null,

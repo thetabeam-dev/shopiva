@@ -195,7 +195,9 @@ function productMatchesFilters(product, filters) {
   if (filters.type && type !== normFilterText(filters.type)) return false;
 
   const selected = filters.variants && typeof filters.variants === "object" ? filters.variants : {};
-  const attributes = product?.attributes && typeof product.attributes === "object" ? product.attributes : {};
+  const attributes =
+    (product?.filters && typeof product.filters === "object" ? product.filters : null) ||
+    (product?.attributes && typeof product.attributes === "object" ? product.attributes : {});
   for (const [key, value] of Object.entries(selected)) {
     if (!value) continue;
     const have = attributes[normFilterText(key)];

@@ -318,7 +318,7 @@ async function main() {
         const tags = [category, sub];
         const { rows: prodRows } = await client.query<{ id: number }>(
           `INSERT INTO products (
-            shop_id, name, slug, description, short_description,
+            shop_id, name, slug, description, type,
             category, subcategory, brand, images, tags,
             status, is_published, is_featured
           ) VALUES (

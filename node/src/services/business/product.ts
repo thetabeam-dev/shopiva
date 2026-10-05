@@ -52,8 +52,7 @@ export async function UpdateProductService(payload: Partial<UpdateProductPayload
     name: payload.name ?? existing.name,
     slug: payload.slug ?? existing.slug,
     description: payload.description !== undefined ? payload.description : existing.description,
-    short_description:
-      payload.short_description !== undefined ? payload.short_description : existing.short_description,
+    type: payload.type !== undefined ? payload.type : existing.type,
     category: payload.category !== undefined ? payload.category : existing.category,
     subcategory: payload.subcategory !== undefined ? payload.subcategory : existing.subcategory,
     brand: payload.brand !== undefined ? payload.brand : existing.brand,

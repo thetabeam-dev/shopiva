@@ -25,7 +25,7 @@ export type ProductRow = {
   name: string;
   slug: string;
   description: string | null;
-  short_description: string | null;
+  type: string | null;
   category: string | null;
   subcategory: string | null;
   brand: string | null;
@@ -106,7 +106,7 @@ export type CreateProductPayload = {
   name: string;
   slug: string;
   description?: string | null;
-  short_description?: string | null;
+  type?: string | null;
   category?: string | null;
   category_id?: number | null;
   subcategory?: string | null;
@@ -154,7 +154,7 @@ export class product {
       name,
       slug,
       description = null,
-      short_description = null,
+      type = null,
       category = null,
       category_id = null,
       subcategory = null,
@@ -178,7 +178,7 @@ export class product {
 
       const { rows } = await client.query<ProductRow>(
         `INSERT INTO products (
-          shop_id, name, slug, description, short_description,
+          shop_id, name, slug, description, type,
           category, subcategory, brand, images, thumbnail_url, weight, dimensions, specifications, status,
           is_published, published_at, is_featured
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
@@ -188,7 +188,7 @@ export class product {
           name,
           slug,
           description,
-          short_description,
+          type,
           category,
           subcategory,
           brand,
@@ -243,7 +243,7 @@ export class product {
       name,
       slug,
       description = null,
-      short_description = null,
+      type = null,
       category = null,
       subcategory = null,
       brand = null,
@@ -263,7 +263,7 @@ export class product {
       await db()
     ).query<ProductRow>(
       `UPDATE products SET
-        shop_id = $1, name = $2, slug = $3, description = $4, short_description = $5,
+        shop_id = $1, name = $2, slug = $3, description = $4, type = $5,
         category = $6, subcategory = $7, brand = $8, images = $9,
         weight = $10, dimensions = $11, specifications = $12, status = $13,
         is_published = $14, published_at = $15, is_featured = $16, updated_at = CURRENT_TIMESTAMP
@@ -274,7 +274,7 @@ export class product {
         name,
         slug,
         description,
-        short_description,
+        type,
         category,
         subcategory,
         brand,

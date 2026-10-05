@@ -7,7 +7,7 @@ CREATE TABLE products (
     slug VARCHAR(255) UNIQUE NOT NULL,
 
     description TEXT,
-    short_description VARCHAR(500),
+    type TEXT,
 
     category VARCHAR(100),
     subcategory VARCHAR(100),

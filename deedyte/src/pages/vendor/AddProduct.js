@@ -276,7 +276,9 @@ export default function VendorCreateProductScreen() {
         );
         setGender(String(productSpecs.gender ?? ''));
         setSubCategory(String(product.subcategory ?? ''));
-        setProductType(String(productSpecs.type ?? ''));
+        setProductType(
+          String(product.type ?? productSpecs.type ?? productSpecs.product_type ?? ''),
+        );
         setAllowPickup(Boolean(productSpecs.delivery_methods?.pickup));
         setAllowDelivery(Boolean(productSpecs.delivery_methods?.delivery));
         setSavedVariants(variantEntries);
