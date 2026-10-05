@@ -106,13 +106,21 @@
         background-color: #fff;
     }
 
-    .vendor-card-product-img-cnt img{
+    .vendor-card-product-img-cnt .product-img{
         width: calc(50% - 10px);
         height: auto;
         aspect-ratio: 1 / 1;
         border-radius: 5px;
         flex-shrink: 0;
-        background-color: #f9f9f9;
+        background-color: #f3f3f3;
+        object-fit: cover;
+    }
+
+    .vendor-card-product-img-cnt .product-img--placeholder{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #c5c5c5;
     }
 
     .vendor-card-details-cnt{

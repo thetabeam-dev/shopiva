@@ -291,6 +291,7 @@ function CustomerFreeLayout({ children }) {
       {/* Header */}
       <div
         ref={headerRef}
+        style={pathname !== "/" ? { background: "#fff" } : undefined}
         className={`header${headerScrolled ? " header--scrolled" : ""}`}
       >
         {/* Logo Section */}

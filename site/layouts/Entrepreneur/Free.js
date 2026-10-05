@@ -253,13 +253,13 @@ export default function EntrepreneurFreeLayout({ children }) {
           objectFit: "cover",
           zIndex: "1000",
         }}
-        src="https://media-23.b-cdn.net/packaging.mp4"
+        src="/vendor.mp4"
         autoPlay
         loop
         muted
         playsInline
       >
-        <source src="/packaging.mp4" type="video/mp4" />
+        <source src="/vendor.mp4" type="video/mp4" />
       </video>
 
       {/* Headline Overlay */}
@@ -368,6 +368,7 @@ export default function EntrepreneurFreeLayout({ children }) {
           alignItems: "center",
           justifyContent: "space-between",
         }}
+        
       >
         {/* Logo Section */}
         <section

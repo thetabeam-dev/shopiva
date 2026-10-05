@@ -703,7 +703,20 @@ export class shop{
               s.slug,
               s.location,
               m.average_rating,
-              m.review_count
+              m.review_count,
+              COALESCE((
+                SELECT json_agg(json_build_object('thumbnail_url', thumb.thumbnail_url))
+                FROM (
+                  SELECT p.thumbnail_url
+                  FROM products p
+                  WHERE p.shop_id = s.id
+                    AND p.is_published = true
+                    AND p.thumbnail_url IS NOT NULL
+                    AND btrim(p.thumbnail_url) <> ''
+                  ORDER BY p.created_at DESC NULLS LAST
+                  LIMIT 4
+                ) thumb
+              ), '[]'::json) AS products
             FROM shops s
             LEFT JOIN shop_review_metrics m ON m.shop_id = s.id
             WHERE (

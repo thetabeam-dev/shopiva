@@ -191,14 +191,43 @@ function VendorsDiscoverContent() {
       <>
         <div className="vendor-card" key={index}>
           <div className="vendor-card-product-img-cnt">
-            {
-              [1,2,3,4].map((product, index) => (
-                <img key={index} tyle={{
-                  height: "12px",
-                  width: "12px"
-                }} src={""} alt="" className="product-img" />
-              ))
-            }
+            {Array.from({ length: 4 }, (_, imageIndex) => {
+              const product = Array.isArray(vendor.products) ? vendor.products[imageIndex] : null;
+              if (product?.thumbnail_url) {
+                return (
+                  <img
+                    key={`${vendor.id}-${imageIndex}`}
+                    src={product.thumbnail_url}
+                    alt=""
+                    className="product-img"
+                  />
+                );
+              }
+              return (
+                <div
+                  key={`${vendor.id}-placeholder-${imageIndex}`}
+                  className="product-img product-img--placeholder"
+                  aria-hidden
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M4 16.5L8.2 12.3C8.6 11.9 9.2 11.9 9.6 12.3L13 15.7L14.6 14.1C15 13.7 15.6 13.7 16 14.1L20 18.1"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M4 6.5H20V17.5C20 18.05 19.55 18.5 19 18.5H5C4.45 18.5 4 18.05 4 17.5V6.5Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="8.5" cy="10" r="1.2" fill="currentColor" />
+                  </svg>
+                </div>
+              );
+            })}
           </div>
           <div className="vendor-card-details-cnt">
             <div style={{
