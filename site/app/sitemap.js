@@ -6,13 +6,11 @@ const SITE = "https://deedyte.com";
 const STATIC_PATHS = [
   "/",
   "/about",
-  "/contact",
   "/vendors",
   "/pricing",
   "/legal",
   "/privacy-policy",
   "/terms-of-use",
-  "/sitemap",
   "/auth/login",
   "/auth/signup",
   "/entrepreneur/ng",
