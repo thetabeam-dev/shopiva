@@ -39,7 +39,7 @@ async function storefrontEntries() {
       )
     ORDER BY name ASC
   `);
-
+ 
   const products = await query(`
     SELECT s.slug, p.id, p.updated_at
     FROM products p
