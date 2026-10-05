@@ -10,8 +10,59 @@ import {
   NIGERIAN_STATE_OPTIONS,
   buyerStateMatchesVendorState,
 } from "../geoUtils";
+import { useRegisterVendorLocationFilter } from "../../layouts/Customer/vendorLocationFilterContext";
 
-import logo from "../../images/Deedyte.png";
+
+function EmptyVendorsIcon() {
+  return (
+    <svg
+      width={56}
+      height={56}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path
+        d="M3.5 9.5L5 5.5H19L20.5 9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4 9.5H20V19.5C20 20.05 19.55 20.5 19 20.5H5C4.45 20.5 4 20.05 4 19.5V9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 20.5V14.5H15V20.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4 9.5C4 11 5.2 12 6.7 12C8.2 12 9.2 11 9.2 9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9.2 9.5C9.2 11 10.4 12 11.9 12C13.4 12 14.6 11 14.6 9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14.6 9.5C14.6 11 15.8 12 17.3 12C18.8 12 20 11 20 9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 function ExploreArrowIcon() {
   return (
@@ -31,25 +82,6 @@ function ExploreArrowIcon() {
   );
 }
 
-function LocationIcon() {
-  return (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path
-        d="M12 13.5C13.933 13.5 15.5 11.933 15.5 10C15.5 8.067 13.933 6.5 12 6.5C10.067 6.5 8.5 8.067 8.5 10C8.5 11.933 10.067 13.5 12 13.5Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M12 21C15.8 17.8 18.5 14.4 18.5 10.3C18.5 6.7 15.6 4 12 4C8.4 4 5.5 6.7 5.5 10.3C5.5 14.4 8.2 17.8 12 21Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function VendorsDiscoverContent() {
   const searchParams = useSearchParams();
   const category = searchParams.get("category")?.trim() || "";
@@ -64,11 +96,6 @@ function VendorsDiscoverContent() {
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
 
   useEffect(() => {
-    if (!category) {
-      setErr("Pick a category on the home map, then open this list again.");
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       try {
@@ -128,6 +155,26 @@ function VendorsDiscoverContent() {
     setIsLocationSheetOpen(false);
   }, []);
 
+  const locationFilter = useMemo(
+    () => ({
+      selectedState,
+      stateSelectOptions,
+      isLocationSheetOpen,
+      setIsLocationSheetOpen,
+      formatStateOptionLabel,
+      onChange: handleStateChange,
+    }),
+    [
+      selectedState,
+      stateSelectOptions,
+      isLocationSheetOpen,
+      formatStateOptionLabel,
+      handleStateChange,
+    ],
+  );
+
+  useRegisterVendorLocationFilter(locationFilter);
+
   useEffect(() => {
     if (!isLocationSheetOpen) return;
     const prevOverflow = document.body.style.overflow;
@@ -186,40 +233,6 @@ function VendorsDiscoverContent() {
 
   return (
     <div className="customer-vendors-page">
-      <div className="customer-vendor-page-header">
-        <img className="inscription" src={logo.src} alt="" />
-
-        <h3 className="customer-vendor-page-category" style={{textTransform: "capitalize", color: "#00926e"}}>{category}</h3>
-        
-        
-        <div className="customer-vendor-page-locale-filter">
-          <button
-            type="button"
-            className="customer-vendor-page-locale-filter__mobile-btn"
-            onClick={() => setIsLocationSheetOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={isLocationSheetOpen}
-            aria-label={selectedState ? `Change location: ${selectedState.label}` : "Select location"}
-          >
-            <LocationIcon />
-          </button>
-          <div className="customer-vendor-page-locale-filter__desktop-select">
-            <Select
-              inputId="customer-vendors-state"
-              instanceId="customer-vendors-state"
-              options={stateSelectOptions}
-              value={selectedState}
-              onChange={setSelectedState}
-              placeholder="Select location"
-              isClearable
-              isSearchable
-              formatOptionLabel={formatStateOptionLabel}
-              getOptionValue={(o) => o.value}
-            />
-          </div>
-        </div>
-        {/* <small>Viewing {rows.length} vendors in your state</small> */}
-      </div>
       {/* <Link href="/" className="customer-vendors-page__back">
         ← Back to map
       </Link>
@@ -258,6 +271,29 @@ function VendorsDiscoverContent() {
         {displayedRows.map((vendor, index) =>
           renderVendorCard(vendor, index)
         )}
+
+        {!loading && !err && displayedRows.length === 0 ? (
+          <div
+            style={{
+              height: "100%",
+              width: "100%",
+              minHeight: "280px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "12px",
+              color: "#00926e",
+              textAlign: "center",
+              padding: "24px",
+            }}
+          >
+            <EmptyVendorsIcon />
+            <span style={{ color: "#3d3d3d", fontSize: "15px", maxWidth: "280px" }}>
+              No available vendors at the moment.
+            </span>
+          </div>
+        ) : null}
       </div>
 
       {isLocationSheetOpen ? (

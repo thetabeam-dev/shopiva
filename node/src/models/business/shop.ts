@@ -694,7 +694,7 @@ export class shop{
      * Location JSON is parsed in the service layer.
      */
     static listShopsForMapByCategory = withErrorHandling(async (categoryVariants: string[], excludeOwnerId?: number) => {
-        if (!categoryVariants.length) return [];
+        const variants = categoryVariants.length ? categoryVariants : null;
         const { rows } = await (await db()).query(
             `
             SELECT
@@ -706,14 +706,17 @@ export class shop{
               m.review_count
             FROM shops s
             LEFT JOIN shop_review_metrics m ON m.shop_id = s.id
-            WHERE EXISTS (
-                SELECT 1
-                FROM UNNEST($1::text[]) AS u(v)
-                WHERE regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') =
-                      regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
-                   OR regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') LIKE
-                      ('%' || regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g') || '%')
-              )
+            WHERE (
+                $1::text[] IS NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM UNNEST($1::text[]) AS u(v)
+                    WHERE regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') =
+                          regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
+                       OR regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') LIKE
+                          ('%' || regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g') || '%')
+                )
+            )
               AND ($2::integer IS NULL OR s.ownerid <> $2)
                 AND EXISTS (
                   SELECT 1
@@ -724,7 +727,7 @@ export class shop{
               AND s.status IN ('active', 'pending_approval')
             ORDER BY s.name ASC
             `,
-            [categoryVariants, excludeOwnerId ?? null]
+            [variants, excludeOwnerId ?? null]
         );
         return rows;
     });

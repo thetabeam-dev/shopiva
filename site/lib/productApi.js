@@ -60,8 +60,11 @@ export async function getShop(shopId, id) {
  * @returns {Promise<Array<{ id: number, name: string, slug: string, lat: number | null, lng: number | null, state: string | null, address: string | null, city: string | null }>>}
  */
 export async function getVendorsOnMapByCategory(category) {
-  const q = encodeURIComponent(category);
-  const res = await backendFetch(`discover/vendors?category=${q}`);
+  const q = typeof category === "string" ? category.trim() : "";
+  const path = q
+    ? `discover/vendors?category=${encodeURIComponent(q)}`
+    : "discover/vendors";
+  const res = await backendFetch(path);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const hint =

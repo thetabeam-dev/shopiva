@@ -16,6 +16,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
+import Select from "react-select";
+import {
+  useVendorLocationFilter,
+  VendorLocationFilterProvider,
+} from "./vendorLocationFilterContext";
 
 // Styles
 import "../../app/entrepreneur/[id]/global.css";
@@ -24,6 +29,7 @@ import "../../app/styles/m.css";
 import "../../app/styles/l.css";
 import "../../app/styles/xl.css";
 import "../../app/styles/xxl.css";
+
 
 // Assets
 import menu_img from "../../svgs/menu-alt-2-svgrepo-com.svg";
@@ -67,12 +73,32 @@ const HEADLINE_INTERVAL = 5000;
  * @param {React.ReactNode} props.children - Child components to render
  * @returns {JSX.Element} The free customer layout
  */
-export default function CustomerFreeLayout({ children }) {
+function LocationIcon() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M12 13.5C13.933 13.5 15.5 11.933 15.5 10C15.5 8.067 13.933 6.5 12 6.5C10.067 6.5 8.5 8.067 8.5 10C8.5 11.933 10.067 13.5 12 13.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M12 21C15.8 17.8 18.5 14.4 18.5 10.3C18.5 6.7 15.6 4 12 4C8.4 4 5.5 6.7 5.5 10.3C5.5 14.4 8.2 17.8 12 21Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CustomerFreeLayout({ children }) {
   // ============================================================================
   // HOOKS & STATE
   // ============================================================================
-  
+
   const pathname = usePathname();
+  const locationFilter = useVendorLocationFilter();
   const { entrepreneur_id } = useSelector((state) => state.entrepreneur_id);
 
   // UI State
@@ -90,7 +116,7 @@ export default function CustomerFreeLayout({ children }) {
   // ============================================================================
   // EFFECTS
   // ============================================================================
-  
+
   // Update logged in state based on entrepreneur ID
   useEffect(() => {
     setLoggedIn(entrepreneur_id !== null);
@@ -189,7 +215,7 @@ export default function CustomerFreeLayout({ children }) {
   // ============================================================================
   // EVENT HANDLERS
   // ============================================================================
-  
+
   /**
    * Handles menu toggle for mobile
    */
@@ -220,14 +246,14 @@ export default function CustomerFreeLayout({ children }) {
   // ============================================================================
   // RENDER HELPERS
   // ============================================================================
-  
+
   /**
    * Renders the desktop navigation menu
    */
   const renderDesktopNav = () => (
     <section style={{ margin: "0px 0px 0px 0px" }}>
       <ul>
-        
+
         <li onClick={() => {
           // setSolutionMenu(false);
           // setResourcesMenu(!resourcesMenu);
@@ -259,7 +285,7 @@ export default function CustomerFreeLayout({ children }) {
   // ============================================================================
   // RENDER
   // ============================================================================
-  
+
   return (
     <div ref={layoutRef} className="customer-free-layout">
       {/* Header */}
@@ -270,26 +296,62 @@ export default function CustomerFreeLayout({ children }) {
         {/* Logo Section */}
         <section id="header-logo-cnt">
           &nbsp;
-          <h3>DeeDyte</h3>
+          <img className="inscription" src={logo_img.src} alt="" />
+          {/* <h3>DeeDyte</h3> */}
         </section>
 
         {/* Desktop Navigation */}
-        {screenWidth > DESKTOP_NAV_BREAKPOINT && renderDesktopNav()}
+        {screenWidth > DESKTOP_NAV_BREAKPOINT && pathname === "/" && renderDesktopNav()}
 
         {/* Auth Buttons */}
-        <section className="header-auth">
-          <ul>
-            {loggedIn && (
-              <li onClick={() => window.open("/entrepreneur/ng")}>Log in</li>
-            )}
-            <li onClick={() => window.open("/entrepreneur/ng")}>
-              Become A Vendor
-            </li>
-          </ul>
-        </section>
+        {
+          pathname === "/" &&
+          <section className="header-auth">
+            <ul>
+              <li onClick={() => window.open("/entrepreneur/ng")}>
+                Become A Vendor
+              </li>
+            </ul>
+          </section>
+        }
 
         {/* Mobile Menu Button */}
-        {screenWidth < MOBILE_MENU_BREAKPOINT && renderMobileMenuButton()}
+        {screenWidth < MOBILE_MENU_BREAKPOINT && pathname === "/" && renderMobileMenuButton()}
+
+        {pathname.startsWith("/vendors") && locationFilter ? (
+          <div className="customer-vendor-page-locale-filter" style={{
+            marginRight: screenWidth > DESKTOP_NAV_BREAKPOINT ? "25px" : "10px"
+          }}>
+            <button
+              type="button"
+              className="customer-vendor-page-locale-filter__mobile-btn"
+              onClick={() => locationFilter.setIsLocationSheetOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={locationFilter.isLocationSheetOpen}
+              aria-label={
+                locationFilter.selectedState
+                  ? `Change location: ${locationFilter.selectedState.label}`
+                  : "Select location"
+              }
+            >
+              <LocationIcon />
+            </button>
+            <div className="customer-vendor-page-locale-filter__desktop-select">
+              <Select
+                inputId="customer-vendors-state"
+                instanceId="customer-vendors-state"
+                options={locationFilter.stateSelectOptions}
+                value={locationFilter.selectedState}
+                onChange={locationFilter.onChange}
+                placeholder="Select location"
+                isClearable
+                isSearchable
+                formatOptionLabel={locationFilter.formatStateOptionLabel}
+                getOptionValue={(o) => o.value}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Main Content */}
@@ -408,5 +470,13 @@ export default function CustomerFreeLayout({ children }) {
         </section>
       </footer>
     </div>
+  );
+}
+
+export default function CustomerFreeLayoutRoot({ children }) {
+  return (
+    <VendorLocationFilterProvider>
+      <CustomerFreeLayout>{children}</CustomerFreeLayout>
+    </VendorLocationFilterProvider>
   );
 }

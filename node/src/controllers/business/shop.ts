@@ -698,14 +698,15 @@ export async function GetShopMetricsController(req: Request, res: Response) {
 
 /**
  * Public vendor discovery by category (no auth). Includes shops without map coordinates.
+ * GET /discover/vendors
  * GET /discover/vendors?category=fashion
  */
 export async function ListShopsForDiscoverByCategoryController(req: Request, res: Response) {
     try {
         const raw = req.query?.category;
         const category = typeof raw === "string" ? raw.trim() : "";
-        if (!category || category.length > 120) {
-            res.status(400).json({ error: "Query parameter category is required." });
+        if (category.length > 120) {
+            res.status(400).json({ error: "Query parameter category is too long." });
             return;
         }
         const ownerId = Number((req as Request & { user?: { id?: unknown } }).user?.id);

@@ -257,7 +257,7 @@ export default function Dashboard() {
 
               {/* Order Button */}
               <div className="order_btn">
-                <button>Order Now</button>
+                <button onClick={e => window.location.href = "/vendors"}>Order Now</button>
               </div>
 
               {/* Download Buttons */}
