@@ -117,7 +117,7 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <title>DeeDyte — Discover Deals & Entrepreneurs</title>
+        <title>DeeDyte — The Trusted Marketplace for Buyers & Vendors</title>
         <meta
           name="description"
           content="DeeDyte is an e-commerce marketplace connecting buyers with trusted vendors."
