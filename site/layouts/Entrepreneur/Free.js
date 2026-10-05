@@ -253,13 +253,13 @@ export default function EntrepreneurFreeLayout({ children }) {
           objectFit: "cover",
           zIndex: "1000",
         }}
-        src="/https://res.cloudinary.com/jh7nqlrd/video/upload/v1791224952/WhatsApp_Video_2026-10-05_at_19.11.49.mp4"
+        src="https://res.cloudinary.com/jh7nqlrd/video/upload/v1791224952/WhatsApp_Video_2026-10-05_at_19.11.49.mp4"
         autoPlay
         loop
         muted
         playsInline
       >
-        <source src="/https://res.cloudinary.com/jh7nqlrd/video/upload/v1791224952/WhatsApp_Video_2026-10-05_at_19.11.49.mp4" type="video/mp4" />
+        <source src="https://res.cloudinary.com/jh7nqlrd/video/upload/v1791224952/WhatsApp_Video_2026-10-05_at_19.11.49.mp4" type="video/mp4" />
       </video>
 
       {/* Headline Overlay */}
