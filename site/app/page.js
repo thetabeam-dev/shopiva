@@ -250,7 +250,7 @@ export default function Dashboard() {
 
             <div>
               <p className="theme">
-                Deedyte is your pocket mall! Whether you are unready to shop in
+                DeeDyte is your pocket mall! Whether you are unready to shop in
                 physical stores, use Deedyte to order from the closest vendor at
                 your locations and get delivery at your doorstep in minutes.
               </p>
