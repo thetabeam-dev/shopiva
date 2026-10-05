@@ -307,9 +307,10 @@ export default function EntrepreneurFreeLayout({ children }) {
         height: "auto",
         borderRadius: "10px 10px 0px 0px",
         overflow: "auto",
+       
       }}
     >
-      <ul style={{ width: "100%", overflow: "auto", flexWrap: "nowrap" }}>
+      <ul style={{ width: "100%", overflow: "auto", flexWrap: "nowrap",  background: "transparent"}}>
         {FEATURE_HIGHLIGHTS.map((feature, index) => (
           <li
             key={index}
@@ -393,7 +394,9 @@ export default function EntrepreneurFreeLayout({ children }) {
 
         {/* Auth Buttons */}
         <section>
-          <ul>
+          <ul style={{
+             background: "transparent"
+          }}>
             {loggedIn && (
               <li onClick={() => { window.location.href = "/auth/login?role=entrepreneur"; }}>Continue Selling</li>
             )}
