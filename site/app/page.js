@@ -24,6 +24,7 @@ import Inventory from "../images/warehouse-storage-shelves-with-cardboard-boxes.
 import Bank from "../images/payday.webp";
 import Delivery from "../images/safe.webp";
 import Fraud from "../images/fraud.jpg";
+import Screenshot from "../images/screenshot.png";
 
 // SVG Icons
 import BasketSvg from "../svgs/basket.svg";
@@ -43,8 +44,8 @@ const APP_STORE_LINKS = {
   android: "/svgs/play_store.svg",
 };
 
-/** App screenshot URL */
-const APP_SCREENSHOT_URL = '';
+/** App screenshot shown in the hero phone frame */
+const APP_SCREENSHOT_URL = Screenshot.src;
 
 /**
  * How it works steps
