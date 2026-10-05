@@ -270,7 +270,7 @@ export default function Dashboard() {
                   borderRadius: '10px',
                   height: '100%',
                   color: '#00926E'
-                }} onClick={e => window.location.href = 'https://apps.apple.com/ng/app/deedyte/id6792328397DeeDyte'}>
+                }} onClick={e => window.location.href = 'itms-apps://apps.apple.com/app/id6792328397'}>
                   <img
                     src={APP_STORE_LINKS.ios}
                     alt="App Store"
@@ -290,6 +290,8 @@ export default function Dashboard() {
                   borderRadius: '10px',
                   color: '#00926E'
 
+                }} onClick={e => {
+                  window.location.href = 'market://details?id=com.thetabeam.shopiva';
                 }}>
                   <img
                     src={APP_STORE_LINKS.android}

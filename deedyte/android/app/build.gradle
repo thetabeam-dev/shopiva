@@ -90,7 +90,7 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.thetabeam.shopiva"
-    defaultConfig {
+    defaultConfig {      
         applicationId "com.thetabeam.shopiva"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
