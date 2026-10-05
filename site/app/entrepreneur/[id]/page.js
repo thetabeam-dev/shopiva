@@ -86,7 +86,7 @@ const HOW_IT_WORKS_STEPS = [
     icon: PhoneSvg,
     title: "Get the App",
     summary:
-      "Download ShopKiva and complete quick account and identity verification to open your vendor dashboard.",
+      "Download DeeDyte and complete quick account and identity verification to open your vendor dashboard.",
   },
 
   {

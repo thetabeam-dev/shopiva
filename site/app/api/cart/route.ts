@@ -35,11 +35,18 @@ export async function GET(request: NextRequest) {
          i.sku,
          i.price,
          i.currency,
+         CASE
+           WHEN i.track_inventory IS FALSE THEN GREATEST(0, COALESCE(i.quantity, 0))
+           ELSE GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0))
+         END AS stock,
          p.name,
-         p.images
+         p.images,
+         p.shop_id,
+         s.slug AS shop_slug
        FROM cart_items ci
        INNER JOIN inventory i ON i.id = ci.inventory_id
        INNER JOIN products p ON p.id = i.product_id
+       LEFT JOIN shops s ON s.id = p.shop_id
        WHERE ci.user_id = $1
        ORDER BY ci.id ASC`,
       [auth.userId]
@@ -55,6 +62,9 @@ export async function GET(request: NextRequest) {
       price: Number(r.price) || 0,
       currency: r.currency != null ? String(r.currency) : "NGN",
       quantity: Number(r.quantity) || 1,
+      stock: Number(r.stock) || 0,
+      shopId: Number(r.shop_id) || 0,
+      shopSlug: r.shop_slug != null ? String(r.shop_slug) : "",
       images: Array.isArray(r.images) ? r.images.map(String) : [],
     }));
 

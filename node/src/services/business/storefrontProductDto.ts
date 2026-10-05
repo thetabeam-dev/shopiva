@@ -238,6 +238,9 @@ export function buildStorefrontProductDetail(
     shop_id: product.shop_id,
     name: String(product.name ?? "").trim() || "Product",
     description: typeof product.description === "string" ? product.description : "",
+    category: String(product.category ?? "").trim(),
+    subcategory: String(product.subcategory ?? "").trim(),
+    type: String(product.type ?? "").trim(),
     images,
     /** Used by storefront controller; must reflect DB or PDP always 404s. */
     is_published: Boolean(product.is_published),

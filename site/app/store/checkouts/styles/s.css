@@ -1,9 +1,4 @@
 @media screen and (max-width: 480px) {
-
-  div{
-    width: unset;
-    height: unset;
-  }
   .co-page {
     --co-accent: #00926e;
     --co-accent-soft: #e0f6ef;
@@ -433,4 +428,35 @@
   .co-cta:hover {
     filter: brightness(1.05);
   }
+}
+
+.co-page .co-delivery-hint {
+  margin: 0 0 14px;
+  color: #6b6b6b;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.co-page select.co-input {
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.co-page .co-section {
+  height: auto;
+  width: auto;
+  max-width: none;
+  color: var(--co-text, #1a1a1a);
+  font-size: 1rem;
+  font-weight: 400;
+  text-align: left;
+  overflow: visible;
+  background: #fff;
+  border: 1px solid var(--co-border, #e5e5e5);
+  border-radius: var(--co-radius, 5px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
 }

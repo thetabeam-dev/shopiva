@@ -493,7 +493,7 @@ export default function PublicShopPage() {
         <div
           className="product-card"
           onClick={() => {
-            window.location.href = `/store/${slug}/product/${product.id}`;
+            window.location.href = `/store/${slug}/${product.id}`;
           }}
         >
           <div className="card-thumbnail">

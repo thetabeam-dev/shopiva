@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./styles/xxl.css";
 import "./styles/s.css";
-import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
+import { API_BACKEND, buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 
 const AUTH_URL = "/api/user/authorization";
 
@@ -65,10 +65,71 @@ function validateCheckoutFields(values) {
   return errors;
 }
 
+function computeMultiItemShippingFee(itemCount, baseFee, discountPercent) {
+  const count = Math.max(0, Math.floor(Number(itemCount) || 0));
+  const base = Math.max(0, Number(baseFee) || 0);
+  const discount = Math.min(100, Math.max(0, Number(discountPercent) || 0)) / 100;
+  if (count <= 0 || base <= 0) return 0;
+  const extra = Math.max(0, count - 1);
+  return Math.round(base + extra * base * (1 - discount));
+}
+
+function normalizeShopDelivery(data) {
+  if (!data || typeof data !== "object") return null;
+  const shopId = Number(data.shopId ?? data.shop_id);
+  if (!Number.isFinite(shopId) || shopId <= 0) return null;
+  const locations = Array.isArray(data.locations)
+    ? data.locations
+        .map((loc) => {
+          const name = String(loc?.name ?? "").trim();
+          const key = String(loc?.key ?? name).trim().toLowerCase();
+          return {
+            key,
+            name: name || key,
+            fee: Math.max(0, Math.round(Number(loc?.fee) || 0)),
+            discountPercent: Number.isFinite(Number(loc?.discountPercent))
+              ? Number(loc.discountPercent)
+              : Number(data.discountPercent) || 50,
+          };
+        })
+        .filter((loc) => loc.name)
+    : [];
+  return { shopId, locations };
+}
+
+function mergeCheckoutDeliveryLocations(shops) {
+  const usable = shops.filter((shop) => shop.delivery && shop.delivery.locations.length);
+  if (!usable.length) return [];
+  const byKey = new Map();
+  for (const shop of usable) {
+    for (const loc of shop.delivery.locations) {
+      const prev = byKey.get(loc.key) || { name: loc.name, perShop: [] };
+      prev.perShop.push({
+        fee: loc.fee,
+        discountPercent: loc.discountPercent,
+        itemCount: shop.itemCount,
+      });
+      byKey.set(loc.key, prev);
+    }
+  }
+  const rows = [];
+  for (const [key, value] of byKey.entries()) {
+    if (value.perShop.length !== usable.length) continue;
+    const checkoutFee = value.perShop.reduce(
+      (sum, shop) => sum + computeMultiItemShippingFee(shop.itemCount, shop.fee, shop.discountPercent),
+      0
+    );
+    rows.push({ key, name: value.name, checkoutFee });
+  }
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows;
+}
+
 export default function CheckoutPage() {
-  const [delivery, setDelivery] = useState("standard");
-  const [payment, setPayment] = useState("paystack");
   const [items, setItems] = useState([]);
+  const [shopDeliveries, setShopDeliveries] = useState([]);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [selectedDeliveryKey, setSelectedDeliveryKey] = useState("");
   const [cartLoading, setCartLoading] = useState(true);
   const [cartError, setCartError] = useState("");
   const [authRequired, setAuthRequired] = useState(false);
@@ -83,7 +144,30 @@ export default function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formSummaryError, setFormSummaryError] = useState("");
 
-  const shipping = delivery === "express" ? 1000 : 0;
+  const shopIdsKey = useMemo(() => {
+    const ids = [...new Set(items.map((item) => Number(item.shopId)).filter((id) => id > 0))];
+    ids.sort((a, b) => a - b);
+    return ids.join(",");
+  }, [items]);
+
+  const deliveryLocations = useMemo(() => {
+    const qtyByShop = new Map();
+    for (const item of items) {
+      const shopId = Number(item.shopId);
+      if (!shopId) continue;
+      qtyByShop.set(shopId, (qtyByShop.get(shopId) || 0) + (Number(item.quantity) || 0));
+    }
+    const shops = [...qtyByShop.entries()].map(([shopId, itemCount]) => ({
+      shopId,
+      itemCount,
+      delivery: shopDeliveries.find((row) => row.shopId === shopId) || null,
+    }));
+    return mergeCheckoutDeliveryLocations(shops);
+  }, [items, shopDeliveries]);
+
+  const selectedDelivery =
+    deliveryLocations.find((loc) => loc.key === selectedDeliveryKey) || null;
+  const shipping = selectedDelivery ? Number(selectedDelivery.checkoutFee) || 0 : 0;
   const itemsTotal = useMemo(
     () =>
       items.reduce(
@@ -161,6 +245,47 @@ export default function CheckoutPage() {
   useEffect(() => {
     void loadCart();
   }, [loadCart]);
+
+  useEffect(() => {
+    const ids = shopIdsKey ? shopIdsKey.split(",").map((id) => Number(id)) : [];
+    if (!ids.length) {
+      setShopDeliveries([]);
+      setDeliveryLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setDeliveryLoading(true);
+      const next = [];
+      await Promise.all(
+        ids.map(async (shopId) => {
+          try {
+            const res = await fetch(`${API_BACKEND}/storefront/delivery/${shopId}`);
+            const data = await res.json().catch(() => null);
+            if (!res.ok) return;
+            const normalized = normalizeShopDelivery(data);
+            if (normalized) next.push(normalized);
+          } catch {
+            /* shop without delivery zones */
+          }
+        })
+      );
+      if (!cancelled) {
+        setShopDeliveries(next);
+        setDeliveryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shopIdsKey]);
+
+  useEffect(() => {
+    if (!selectedDeliveryKey) return;
+    if (!deliveryLocations.some((loc) => loc.key === selectedDeliveryKey)) {
+      setSelectedDeliveryKey("");
+    }
+  }, [deliveryLocations, selectedDeliveryKey]);
 
   const paystackBase = useMemo(
     () => ({
@@ -247,6 +372,11 @@ export default function CheckoutPage() {
       country,
     };
     const errors = validateCheckoutFields(values);
+    if (deliveryLocations.length > 0 && !selectedDelivery) {
+      errors.delivery = "Select a delivery state.";
+    } else if (!deliveryLoading && items.length > 0 && deliveryLocations.length === 0) {
+      errors.delivery = "These vendors do not share a common delivery state.";
+    }
     setFieldErrors(errors);
 
     const firstKeys = [
@@ -258,7 +388,7 @@ export default function CheckoutPage() {
       "zip",
       "country",
     ];
-    const firstInvalid = firstKeys.find((k) => errors[k]);
+    const firstInvalid = firstKeys.find((k) => errors[k]) || (errors.delivery ? "delivery" : "");
     if (firstInvalid) {
       setFormSummaryError("Please complete all fields correctly before paying.");
       const idMap = {
@@ -269,6 +399,7 @@ export default function CheckoutPage() {
         city: "co-city",
         zip: "co-zip",
         country: "co-country",
+        delivery: "co-delivery-state",
       };
       requestAnimationFrame(() => {
         document.getElementById(idMap[firstInvalid])?.focus();
@@ -297,7 +428,9 @@ export default function CheckoutPage() {
             {
               display_name: "Shipping address",
               variable_name: "shipping_address",
-              value: `${street.trim()}, ${city.trim()} ${zip.trim()}, ${country.trim()}`,
+              value: `${street.trim()}, ${city.trim()} ${zip.trim()}, ${country.trim()}${
+                selectedDelivery ? ` · ${selectedDelivery.name}` : ""
+              }`,
             },
           ],
         },
@@ -347,7 +480,7 @@ export default function CheckoutPage() {
 
         <div className="co-main">
           <div className="co-forms">
-            <section className="co-section">
+            <div className="co-section">
               <h2 className="co-section__title">Contact information</h2>
               {formSummaryError ? (
                 <p className="co-field__error co-field__error--summary" role="alert">
@@ -429,9 +562,9 @@ export default function CheckoutPage() {
                   ) : null}
                 </div>
               </div>
-            </section>
+            </div>
 
-            <section className="co-section">
+            <div className="co-section">
               <h2 className="co-section__title">Shipping address</h2>
               <div className="co-field">
                 <label className="co-label" htmlFor="co-street">
@@ -525,63 +658,54 @@ export default function CheckoutPage() {
                   </p>
                 ) : null}
               </div>
-            </section>
+            </div>
 
-            <section className="co-section">
-              <h2 className="co-section__title">Delivery options</h2>
-              <button
-                type="button"
-                className={
-                  delivery === "standard"
-                    ? "co-delivery-option is-selected"
-                    : "co-delivery-option"
-                }
-                onClick={() => setDelivery("standard")}
-              >
-                <div className="co-delivery-option__main">
-                  <strong>Standard shipping</strong>
-                  <span>Delivered in 5–7 days</span>
-                </div>
-                <span className="co-delivery-option__price">Free</span>
-              </button>
-              <button
-                type="button"
-                className={
-                  delivery === "express"
-                    ? "co-delivery-option is-selected"
-                    : "co-delivery-option"
-                }
-                onClick={() => setDelivery("express")}
-              >
-                <div className="co-delivery-option__main">
-                  <strong>Express shipping</strong>
-                  <span>Delivered in 2–3 days</span>
-                </div>
-                <span className="co-delivery-option__price">₦1,000</span>
-              </button>
-            </section>
-
-            <section className="co-section">
-              <h2 className="co-section__title">Payment method</h2>
-              {["paystack"].map((id) => (
-                <div key={id}>
-                  <button
-                    type="button"
-                    className={
-                      payment === id ? "co-pay-row is-selected" : "co-pay-row"
-                    }
-                    onClick={() => setPayment(id)}
-                  >
-                    <span className="co-pay-row__label">
-                      {id === "paystack" && "Paystack"}
-                    </span>
-                    <span className="co-pay-row__label" style={{ opacity: 0.6 }}>
-                      {id === "paystack" && ""}
-                    </span>
-                  </button>
-                </div>
-              ))}
-            </section>
+            <div className="co-section">
+              <h2 className="co-section__title">Delivery location</h2>
+              <p className="co-delivery-hint">
+                Choose the state this order should be delivered to. The fee comes from the vendor&apos;s shipping zones.
+              </p>
+              <div className="co-field">
+                <label className="co-label" htmlFor="co-delivery-state">
+                  Delivery state
+                </label>
+                <select
+                  id="co-delivery-state"
+                  className={`co-input${fieldErrors.delivery ? " co-input--error" : ""}`}
+                  value={selectedDeliveryKey}
+                  disabled={deliveryLoading || deliveryLocations.length === 0}
+                  onChange={(e) => {
+                    setSelectedDeliveryKey(e.target.value);
+                    clearFieldError("delivery");
+                  }}
+                  aria-invalid={Boolean(fieldErrors.delivery)}
+                  aria-describedby={fieldErrors.delivery ? "co-delivery-error" : undefined}
+                >
+                  <option value="">
+                    {deliveryLoading
+                      ? "Loading states…"
+                      : deliveryLocations.length
+                        ? "Select a state"
+                        : "No delivery states available"}
+                  </option>
+                  {deliveryLocations.map((loc) => (
+                    <option key={loc.key} value={loc.key}>
+                      {loc.name} · {fmt(loc.checkoutFee)}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.delivery ? (
+                  <p id="co-delivery-error" className="co-field__error">
+                    {fieldErrors.delivery}
+                  </p>
+                ) : null}
+              </div>
+              {selectedDelivery ? (
+                <p className="co-delivery-hint">
+                  Delivery to {selectedDelivery.name} · {fmt(shipping)}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <aside className="co-summary" aria-label="Order summary">
@@ -642,7 +766,15 @@ export default function CheckoutPage() {
             <div className="co-totals">
               <div className="co-totals__row">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? "Free" : fmt(shipping)}</span>
+                <span>
+                  {!selectedDelivery
+                    ? deliveryLocations.length
+                      ? "Select state"
+                      : "—"
+                    : shipping === 0
+                      ? "Free"
+                      : fmt(shipping)}
+                </span>
               </div>
               <div className="co-totals__row co-totals__row--total">
                 <span>Total</span>

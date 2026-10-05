@@ -108,6 +108,34 @@ function formatNgn(n) {
   return `₦${Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
 }
 
+function inventoryFromProduct(product) {
+  if (!product) return [];
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    return product.variants.map((variant, index) => ({
+      id: variant.id ?? index,
+      price: variant.price ?? product.price ?? product.minPrice ?? 0,
+      compare_at_price: variant.compare_at_price ?? null,
+      sku: variant.sku ?? null,
+      stock: variant.stock ?? product.stock ?? null,
+    }));
+  }
+  const price = product.price ?? product.minPrice ?? product.maxPrice;
+  if (product.inventoryId == null && price == null) return [];
+  return [{
+    id: product.inventoryId ?? product.id,
+    price: price ?? 0,
+    compare_at_price: product.compare_at_price ?? null,
+    sku: null,
+    stock: product.stock ?? null,
+  }];
+}
+
+function shownPrice(inv, product) {
+  const raw = inv?.price ?? inv?.minPrice ?? inv?.maxPrice ?? product?.price ?? product?.minPrice;
+  if (raw == null || raw === "" || Number.isNaN(Number(raw))) return "—";
+  return formatNgn(raw);
+}
+
 export default function ProductDetail() {
   const params = useParams();
   const slug = typeof params?.slug === "string" ? params.slug : "";
@@ -115,6 +143,8 @@ export default function ProductDetail() {
     typeof params?.id === "string" ? params.id : String(params?.id ?? "");
 
   const [product, setProduct] = useState(null);
+  const [productReviews, setProductReviews] = useState([]);
+  const [reviewMetrics, setReviewMetrics] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [shopLabel, setShopLabel] = useState("Shop name");
   const [loadError, setLoadError] = useState("");
@@ -128,7 +158,7 @@ export default function ProductDetail() {
   /** null | "adding" | "removing" — drives disabled state and button label while a request runs. */
   const [cartAction, setCartAction] = useState(null);
   const [cartMessage, setCartMessage] = useState("");
-  /** Maps inventory id (string key) → cart line id for this PDP product (from GET /api/cart). */
+  /** Maps inventory id (string key) → { lineId, quantity } for this product (from GET /api/cart). */
   const [cartLinesByInvId, setCartLinesByInvId] = useState(() => ({}));
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -154,15 +184,23 @@ export default function ProductDetail() {
     [inventory, selectedInvId]
   );
 
-  const selectedCartLineId = useMemo(() => {
+  const selectedCartLine = useMemo(() => {
     if (selectedInv?.id == null) return null;
     const n = Number(selectedInv.id);
     if (!Number.isFinite(n)) return null;
-    const lineId = cartLinesByInvId[String(n)];
-    return typeof lineId === "number" && Number.isFinite(lineId) ? lineId : null;
+    const line = cartLinesByInvId[String(n)];
+    if (!line || !Number.isFinite(Number(line.lineId))) return null;
+    const quantity = Math.max(1, Number(line.quantity) || 1);
+    return { lineId: Number(line.lineId), quantity };
   }, [cartLinesByInvId, selectedInv?.id]);
 
-  const selectedInvInCart = selectedCartLineId != null;
+  const selectedInvInCart = selectedCartLine != null;
+  const selectedQty = selectedCartLine?.quantity ?? 0;
+  const maxUnits = useMemo(() => {
+    const stock = Number(selectedInv?.stock);
+    if (Number.isFinite(stock) && stock > 0) return Math.min(99, Math.floor(stock));
+    return 99;
+  }, [selectedInv?.stock]);
 
   const selectedPriceNaira = Number(selectedInv?.price) || 0;
   /** Paystack NGN amount in kobo (smallest unit). */
@@ -242,8 +280,9 @@ export default function ProductDetail() {
         if (Number(row.productId) !== routePk) continue;
         const inv = Number(row.inventoryId);
         const line = Number(row.cartLineId);
+        const quantity = Math.max(1, Number(row.quantity) || 1);
         if (Number.isFinite(inv) && Number.isFinite(line)) {
-          next[String(inv)] = line;
+          next[String(inv)] = { lineId: line, quantity };
         }
       }
       setCartLinesByInvId(next);
@@ -252,21 +291,50 @@ export default function ProductDetail() {
     }
   }, [productId]);
 
-  const toggleCart = useCallback(async () => {
-    if (!selectedInv?.id) return;
-    const inventoryId = selectedInv.id;
-    const invNum = Number(inventoryId);
+  const changeUnits = useCallback(async (delta) => {
+    if (!selectedInv?.id || !Number.isFinite(Number(delta)) || delta === 0) return;
+    const invNum = Number(selectedInv.id);
     if (!Number.isFinite(invNum)) return;
     const invKey = String(invNum);
-    const existingLineId = cartLinesByInvId[invKey];
-    const removing = typeof existingLineId === "number" && Number.isFinite(existingLineId);
+    const existing = cartLinesByInvId[invKey];
+    const lineId = existing && Number.isFinite(Number(existing.lineId)) ? Number(existing.lineId) : null;
+    const currentQty = lineId != null ? Math.max(1, Number(existing.quantity) || 1) : 0;
+    const nextQty = currentQty + delta;
 
     setCartMessage("");
-    setCartAction(removing ? "removing" : "adding");
-    try {
-      if (removing) {
+    if (lineId == null) {
+      if (delta < 0) return;
+      setCartAction("adding");
+      try {
+        const res = await fetch("/api/cart", {
+          method: "POST",
+          headers: buyerAuthHeaders(),
+          credentials: "include",
+          body: JSON.stringify({ inventoryId: invNum, quantity: 1 }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          setCartMessage("Sign in to add items to your cart.");
+          return;
+        }
+        if (!res.ok) {
+          setCartMessage(typeof data.error === "string" ? data.error : "Could not add to cart.");
+          return;
+        }
+        await refreshCartLinesForProduct();
+      } catch {
+        setCartMessage("Could not add to cart.");
+      } finally {
+        setCartAction(null);
+      }
+      return;
+    }
+
+    if (nextQty < 1) {
+      setCartAction("removing");
+      try {
         const res = await fetch(
-          `/api/cart?cartLineId=${encodeURIComponent(String(existingLineId))}`,
+          `/api/cart?cartLineId=${encodeURIComponent(String(lineId))}`,
           {
             method: "DELETE",
             headers: buyerAuthHeaders(),
@@ -290,33 +358,44 @@ export default function ProductDetail() {
           delete next[invKey];
           return next;
         });
-        return;
+      } catch {
+        setCartMessage("Could not remove from cart.");
+      } finally {
+        setCartAction(null);
       }
+      return;
+    }
 
+    const capped = Math.min(maxUnits, nextQty);
+    if (capped === currentQty) return;
+    setCartAction("updating");
+    try {
       const res = await fetch("/api/cart", {
-        method: "POST",
+        method: "PATCH",
         headers: buyerAuthHeaders(),
         credentials: "include",
-        body: JSON.stringify({ inventoryId, quantity: 1 }),
+        body: JSON.stringify({ cartLineId: lineId, quantity: capped }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
-        setCartMessage("Sign in to add items to your cart.");
+        setCartMessage("Sign in to update your cart.");
         return;
       }
       if (!res.ok) {
-        setCartMessage(typeof data.error === "string" ? data.error : "Could not add to cart.");
+        if (res.status === 404) await refreshCartLinesForProduct();
+        setCartMessage(typeof data.error === "string" ? data.error : "Could not update units.");
         return;
       }
-      await refreshCartLinesForProduct();
+      setCartLinesByInvId((prev) => ({
+        ...prev,
+        [invKey]: { lineId, quantity: capped },
+      }));
     } catch {
-      setCartMessage(
-        removing ? "Could not remove from cart." : "Could not add to cart."
-      );
+      setCartMessage("Could not update units.");
     } finally {
       setCartAction(null);
     }
-  }, [selectedInv, cartLinesByInvId, refreshCartLinesForProduct]);
+  }, [selectedInv, cartLinesByInvId, refreshCartLinesForProduct, maxUnits]);
 
   useEffect(() => {
     void refreshCartLinesForProduct();
@@ -349,6 +428,8 @@ export default function ProductDetail() {
       if (Number.isNaN(pid)) {
         setLoadError("Invalid product");
         setProduct(null);
+        setProductReviews([]);
+        setReviewMetrics(null);
         setInventory([]);
         return;
       }
@@ -368,18 +449,26 @@ export default function ProductDetail() {
         if (!prodRes.ok) {
           setLoadError(prodJ.error || "Product not found");
           setProduct(null);
+          setProductReviews([]);
+          setReviewMetrics(null);
           setInventory([]);
           setSelectedInvId(null);
           return;
         }
         setProduct(prodJ.product);
-        const inv = Array.isArray(prodJ.inventory) ? prodJ.inventory : [];
+        setProductReviews(Array.isArray(prodJ.productReviews) ? prodJ.productReviews : []);
+        setReviewMetrics(prodJ.reviewMetrics ?? null);
+        const inv = Array.isArray(prodJ.inventory) && prodJ.inventory.length
+          ? prodJ.inventory
+          : inventoryFromProduct(prodJ.product);
         setInventory(inv);
         setSelectedInvId(inv[0]?.id ?? null);
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
           setProduct(null);
+          setProductReviews([]);
+          setReviewMetrics(null);
           setInventory([]);
         }
       }
@@ -478,9 +567,17 @@ export default function ProductDetail() {
     });
   };
 
+  useEffect(() => {
+    document.querySelector(".header").style.display="none";
+    document.querySelector(".customer-free-main").style.height = "100vh";
+  }, [])
   return (
     <div className="shop-page pdp-page">
-      <header className="pdp-header">
+      <header className="pdp-header" style={{
+        position: "fixed",
+        top: "0",
+        left: "0"
+      }}>
         <div className="pdp-header__brand">
           <span className="pdp-header__logo">{shopLabel}</span>
         </div>
@@ -508,6 +605,8 @@ export default function ProductDetail() {
           <Link href="/store/cart" className="customer-shell-header__icon" aria-label="Cart">
             <CartIcon />
           </Link>
+          &nbsp;
+          &nbsp;
           <Link
             href="/user-profile"
             className="customer-shell-header__icon"
@@ -516,11 +615,16 @@ export default function ProductDetail() {
           </Link>
         </span>
       </header>
+      <br />
+      <br />
+      <br />
+      <br />
 
       <div
         className={`pdp-menu-backdrop${mobileMenuOpen ? " pdp-menu-backdrop--open" : ""}`}
         aria-hidden={!mobileMenuOpen}
         onClick={closeMobileMenu}
+        
       />
       <div
         id="pdp-mobile-menu"
@@ -528,6 +632,7 @@ export default function ProductDetail() {
         role="dialog"
         aria-modal="true"
         aria-label="Shop menu"
+        
       >
         <div className="pdp-menu-drawer__top">
           <span className="pdp-menu-drawer__title">Menu</span>
@@ -723,7 +828,7 @@ export default function ProductDetail() {
                   : ""}
               </span>
               <span className="pdp-buybox__price">
-                {selectedInv ? formatNgn(selectedInv.price) : "—"}
+                {shownPrice(selectedInv, product)}
               </span>
             </div>
             <div className="pdp-buybox__rating">
@@ -747,7 +852,9 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          <div>
+          <div style={{
+            minHeight: "100px"
+          }}>
             <label htmlFor=""><b>Description:</b></label>
             {product?.description ? (
               <div
@@ -755,107 +862,70 @@ export default function ProductDetail() {
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             ) : (
-              <p className="pdp-buybox__desc">—</p>
+              <p className="pdp-buybox__desc" style={{
+                padding: "10px 20px"
+              }}>No Description For This Product</p>
             )}
           </div>
 
-          <div className="pdp-option">
-            <p className="pdp-option__label">
-              Color: <strong>{selectedColor.label}</strong>
-            </p>
-            <div className="pdp-swatches" role="list">
-              {COLORS.map((c) => (
+         
+          <div className="pdp-ctas">
+            {selectedInvInCart ? (
+              <div className="pdp-units" role="group" aria-label="Units in cart">
                 <button
-                  key={c.id}
                   type="button"
-                  role="listitem"
-                  className={
-                    c.id === selectedColorId
-                      ? "pdp-swatch is-selected"
-                      : "pdp-swatch"
+                  className="pdp-units__btn"
+                  aria-label={selectedQty <= 1 ? "Remove from cart" : "Remove unit"}
+                  disabled={!product || !selectedInv || !!loadError || cartAction != null}
+                  onClick={() => void changeUnits(-1)}
+                >
+                  −
+                </button>
+                <span className="pdp-units__count" aria-live="polite">
+                  {cartAction != null ? "…" : selectedQty}
+                </span>
+                <button
+                  type="button"
+                  className="pdp-units__btn"
+                  aria-label="Add unit"
+                  disabled={
+                    !product ||
+                    !selectedInv ||
+                    !!loadError ||
+                    cartAction != null ||
+                    selectedQty >= maxUnits
                   }
-                  style={{ backgroundColor: c.hex }}
-                  aria-label={c.label}
-                  aria-pressed={c.id === selectedColorId}
-                  onClick={() => setSelectedColorId(c.id)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="pdp-option">
-            <div className="pdp-option__row">
-              <p className="pdp-option__label">
-                Size:{" "}
-                <strong>
-                  {inventory.length
-                    ? selectedInv?.sku || "—"
-                    : selectedSize}
-                </strong>
-              </p>
-              <button type="button" className="pdp-link">
-                View size chart
+                  onClick={() => void changeUnits(1)}
+                >
+                  +
+                </button>
+              </div>
+            ) : null}
+            <div className="pdp-ctas__actions">
+              <button
+                type="button"
+                className="pdp-btn pdp-btn--primary"
+                disabled={!product || !selectedInv || !!loadError || cartAction != null}
+                aria-pressed={selectedInvInCart}
+                onClick={() => void changeUnits(selectedInvInCart ? -selectedQty : 1)}
+              >
+                {cartAction === "adding"
+                  ? "Adding…"
+                  : cartAction === "removing"
+                    ? "Removing…"
+                    : selectedInvInCart
+                      ? "Remove from cart"
+                      : "Add to cart"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBuyNow()}
+                className="pdp-btn pdp-btn--secondary"
+                disabled={!product || !selectedInv || !!loadError}
+              >
+                Buy now
               </button>
             </div>
-            <div className="pdp-sizes" role="list">
-              {inventory.length > 0
-                ? inventory.map((inv) => (
-                  <button
-                    key={inv.id}
-                    type="button"
-                    role="listitem"
-                    className={
-                      inv.id === selectedInv?.id
-                        ? "pdp-size is-selected"
-                        : "pdp-size"
-                    }
-                    aria-pressed={inv.id === selectedInv?.id}
-                    onClick={() => setSelectedInvId(inv.id)}
-                  >
-                    {inv.sku || "—"}
-                  </button>
-                ))
-                : SIZES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    role="listitem"
-                    className={
-                      s === selectedSize ? "pdp-size is-selected" : "pdp-size"
-                    }
-                    aria-pressed={s === selectedSize}
-                    onClick={() => setSelectedSize(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-            </div>
-          </div>
-
-          <div className="pdp-ctas">
-            <button
-              type="button"
-              className="pdp-btn pdp-btn--primary"
-              disabled={!product || !selectedInv || !!loadError || cartAction != null}
-              aria-pressed={selectedInvInCart}
-              onClick={() => void toggleCart()}
-            >
-              {cartAction === "adding"
-                ? "Adding…"
-                : cartAction === "removing"
-                  ? "Removing…"
-                  : selectedInvInCart
-                    ? "Remove from cart"
-                    : "Add to cart"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleBuyNow()}
-              className="pdp-btn pdp-btn--secondary"
-              disabled={!product || !selectedInv || !!loadError}
-            >
-              Buy now
-            </button>
             {cartMessage ? (
               <p className="pdp-option__label" role="status" style={{ marginTop: 8 }}>
                 {cartMessage}
@@ -915,7 +985,7 @@ export default function ProductDetail() {
       </div>
 
       <div className="pdp-reviews-wrap">
-        <ProductReviews />
+        <ProductReviews reviews={productReviews} metrics={reviewMetrics} />
       </div>
     </div>
   );

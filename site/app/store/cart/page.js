@@ -6,15 +6,26 @@ import "./styles/xxl.css";
 import "./styles/s.css";
 import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 
-const DELIVERY_NGN = 40_000;
-const TAX_NGN = 22_000;
-const DISCOUNT_NGN = 95_000;
-
 function formatMoney(n) {
-  return `₦${Number(n).toLocaleString("en-NG", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+  return `₦${Number(n || 0).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13h8l1-13"
+      />
+    </svg>
+  );
 }
 
 export default function CartPage() {
@@ -23,8 +34,6 @@ export default function CartPage() {
   const [loadError, setLoadError] = useState("");
   const [authRequired, setAuthRequired] = useState(false);
   const [actionError, setActionError] = useState("");
-  const [promo, setPromo] = useState("SAVE60");
-  const [promoApplied, setPromoApplied] = useState(true);
 
   const loadCart = useCallback(async () => {
     setLoadError("");
@@ -61,22 +70,24 @@ export default function CartPage() {
     loadCart();
   }, [loadCart]);
 
+  const productCount = items.length;
   const itemCount = useMemo(
-    () => items.reduce((s, i) => s + (Number(i.quantity) || 0), 0),
+    () => items.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0),
     [items]
   );
-
   const subtotal = useMemo(
     () =>
       items.reduce(
-        (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0),
+        (sum, row) => sum + (Number(row.price) || 0) * (Number(row.quantity) || 0),
         0
       ),
     [items]
   );
 
-  const discountAmount = promoApplied ? DISCOUNT_NGN : 0;
-  const total = subtotal + DELIVERY_NGN + TAX_NGN - discountAmount;
+  const continueHref = useMemo(() => {
+    const slug = items.find((row) => row.shopSlug)?.shopSlug;
+    return slug ? `/store/${encodeURIComponent(slug)}` : "/";
+  }, [items]);
 
   async function setQty(cartLineId, next) {
     const q = Math.max(1, Math.min(99, Number(next) || 1));
@@ -131,43 +142,12 @@ export default function CartPage() {
     }
   }
 
-  async function removeAll() {
-    const prev = items;
-    setItems([]);
-    try {
-      const res = await fetch("/api/cart", {
-        method: "DELETE",
-        headers: buyerAuthHeaders(),
-        credentials: "include",
-      });
-      if (!res.ok) {
-        setItems(prev);
-        const data = await res.json().catch(() => ({}));
-        setActionError(typeof data.error === "string" ? data.error : "Could not clear cart.");
-      } else {
-        setActionError("");
-      }
-    } catch {
-      setItems(prev);
-      setActionError("Could not clear cart.");
-    }
-  }
-
-  function applyPromo() {
-    const code = promo.trim().toLowerCase();
-    if (code === "save60" || code === "save") {
-      setPromoApplied(true);
-    }
-  }
-
   if (loading) {
     return (
       <div className="crt-page">
-        <main className="crt-main">
-          <p className="crt-empty" role="status">
-            Loading your cart…
-          </p>
-        </main>
+        <p className="crt-status" role="status">
+          Loading your cart…
+        </p>
       </div>
     );
   }
@@ -175,174 +155,145 @@ export default function CartPage() {
   if (authRequired) {
     return (
       <div className="crt-page">
-        <main className="crt-main">
-          <p className="crt-empty">
-            <Link href="/auth/login?role=customer" className="crt-empty__link">
-              Sign in
-            </Link>{" "}
-            to view your cart.
-          </p>
-        </main>
+        <p className="crt-status">
+          <Link href="/auth/login?role=customer">Sign in</Link> to view your cart.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="crt-page">
-      <main className="crt-main">
-        {loadError ? (
-          <p className="crt-empty" role="alert">
-            {loadError}{" "}
-            <button type="button" className="crt-empty__link" onClick={() => loadCart()}>
-              Retry
-            </button>
-          </p>
-        ) : null}
-        {actionError ? (
-          <p className="crt-empty" role="alert">
-            {actionError}
-          </p>
-        ) : null}
-        {!loadError && items.length === 0 ? (
-          <p className="crt-empty">
-            <Link href="/" className="crt-empty__link">
-              Continue shopping
-            </Link>
-          </p>
-        ) : null}
-        {!loadError && items.length > 0 ? (
+      {loadError ? (
+        <p className="crt-status" role="alert">
+          {loadError}{" "}
+          <button type="button" onClick={() => loadCart()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
+      {actionError ? (
+        <p className="crt-status" role="alert">
+          {actionError}
+        </p>
+      ) : null}
+
+      {!loadError && items.length === 0 ? (
+        <div className="crt-empty">
+          <p>Your cart is empty.</p>
+          <Link href={continueHref} className="crt-continue">
+            Continue shopping →
+          </Link>
+        </div>
+      ) : null}
+
+      {!loadError && items.length > 0 ? (
+        <div className="crt-shell">
+          <header className="crt-head">
+            <p className="crt-head__count">
+              {productCount} product{productCount === 1 ? "" : "s"} · {itemCount} item
+              {itemCount === 1 ? "" : "s"}
+            </p>
+          </header>
+
           <div className="crt-layout">
-            <section className="crt-lines" aria-label="Cart items">
+            <div className="crt-lines">
               {items.map((row) => {
                 const priceEach = Number(row.price) || 0;
                 const qty = Number(row.quantity) || 1;
+                const stock = Number(row.stock);
                 const lineTotal = priceEach * qty;
-                const thumb =
-                  Array.isArray(row.images) && row.images[0]
-                    ? row.images[0]
-                    : "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop&q=80";
-                const skuLabel = row.sku && String(row.sku).trim() ? row.sku : "—";
+                const thumb = Array.isArray(row.images) && row.images[0] ? row.images[0] : "";
+                const maxQty =
+                  Number.isFinite(stock) && stock > 0 ? Math.min(99, stock) : 99;
+                const productHref =
+                  row.shopSlug && row.productId
+                    ? `/store/${encodeURIComponent(row.shopSlug)}/${row.productId}`
+                    : continueHref;
                 return (
                   <article key={String(row.id)} className="crt-line">
-                    <div className="crt-line__thumb-wrap">
-                      <img
-                        className="crt-line__thumb"
-                        src={thumb}
-                        alt=""
-                        width={88}
-                        height={88}
-                      />
+                    <div className="crt-line__thumb">
+                      {thumb ? <img src={thumb} alt="" /> : null}
                     </div>
-                    <div className="crt-line__info">
-                      <h2 className="crt-line__name">{row.name}</h2>
-                      <p className="crt-line__meta">Color: —</p>
-                      <p className="crt-line__meta">SKU: {skuLabel}</p>
-                      <p className="crt-line__meta">
-                        Price: {formatMoney(priceEach)} / per item
-                      </p>
-                    </div>
-                    <div className="crt-line__total">{formatMoney(lineTotal)}</div>
-                    <div className="crt-line__controls">
-                      <label className="crt-qty-label">
-                        <span className="crt-sr-only">Quantity for {row.name}</span>
-                        <select
-                          className="crt-qty"
-                          value={qty}
-                          onChange={(e) => setQty(row.id, e.target.value)}
-                          aria-label={`Quantity for ${row.name}`}
-                        >
-                          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                            <option key={n} value={n}>
-                              Qty: {n}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="crt-line__actions">
-                        <button
-                          type="button"
-                          className="crt-icon-btn"
-                          aria-label={`Remove ${row.name} from cart`}
-                          onClick={() => removeLine(row.id)}
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-                            <path
-                              fill="currentColor"
-                              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                            />
-                          </svg>
-                        </button>
+                    <div className="crt-line__body">
+                      <div className="crt-line__top">
+                        <div>
+                          <h2 className="crt-line__name">
+                            <Link href={productHref}>{row.name}</Link>
+                          </h2>
+                          <p className="crt-line__stock">
+                            {Number.isFinite(stock) ? stock : 0} units available
+                          </p>
+                        </div>
+                        <p className="crt-line__unit">{formatMoney(priceEach)}</p>
+                      </div>
+                      <div className="crt-line__bottom">
+                        <div className="crt-line__tools">
+                          <div className="crt-qty" role="group" aria-label={`Units for ${row.name}`}>
+                            <button
+                              type="button"
+                              aria-label="Remove unit"
+                              disabled={qty <= 1}
+                              onClick={() => setQty(row.id, qty - 1)}
+                            >
+                              −
+                            </button>
+                            <span>{qty}</span>
+                            <button
+                              type="button"
+                              aria-label="Add unit"
+                              disabled={qty >= maxQty}
+                              onClick={() => setQty(row.id, qty + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="crt-remove"
+                            onClick={() => removeLine(row.id)}
+                          >
+                            <TrashIcon />
+                            Remove
+                          </button>
+                        </div>
+                        <div className="crt-line__totals">
+                          <span>Item total</span>
+                          <strong>{formatMoney(lineTotal)}</strong>
+                        </div>
                       </div>
                     </div>
                   </article>
                 );
               })}
-              <div className="crt-lines__footer">
-                <button type="button" className="crt-remove-all" onClick={removeAll}>
-                  Remove all from cart
-                </button>
-              </div>
-            </section>
+            </div>
 
             <aside className="crt-summary" aria-label="Order summary">
-              <div className="crt-promo">
-                <input
-                  type="text"
-                  className="crt-promo__input"
-                  placeholder="Promocode"
-                  value={promo}
-                  onChange={(e) => setPromo(e.target.value)}
-                  aria-label="Promocode"
-                />
-                <button type="button" className="crt-promo__btn" onClick={applyPromo}>
-                  Apply
-                </button>
-              </div>
-              {promoApplied ? (
-                <p className="crt-promo__ok" role="status">
-                  Promocode applied.
-                </p>
-              ) : null}
-
-              <dl className="crt-breakdown">
-                <div className="crt-row">
-                  <dt>
-                    {itemCount} item{itemCount === 1 ? "" : "s"}:
-                  </dt>
+              <h2>Order summary</h2>
+              <dl>
+                <div>
+                  <dt>Subtotal</dt>
                   <dd>{formatMoney(subtotal)}</dd>
                 </div>
-                <div className="crt-row">
-                  <dt>Delivery cost:</dt>
-                  <dd>{formatMoney(DELIVERY_NGN)}</dd>
-                </div>
-                <div className="crt-row">
-                  <dt>Tax:</dt>
-                  <dd>{formatMoney(TAX_NGN)}</dd>
-                </div>
-                <div className="crt-row crt-row--discount">
-                  <dt>Discount:</dt>
-                  <dd>{discountAmount > 0 ? `- ${formatMoney(discountAmount)}` : "—"}</dd>
+                <div>
+                  <dt>Delivery</dt>
+                  <dd>Free</dd>
                 </div>
               </dl>
-
-              <div className="crt-total-row">
-                <span className="crt-total-label">Total:</span>
-                <span className="crt-total-value">{formatMoney(total)}</span>
+              <div className="crt-summary__total">
+                <span>Total</span>
+                <strong>{formatMoney(subtotal)}</strong>
               </div>
-
-              <Link href="/store/checkouts" className="crt-checkout">
-                Checkout
-                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-                  <path
-                    fill="currentColor"
-                    d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"
-                  />
-                </svg>
+              <Link href="/store/checkouts" style={{textDecoration: "none"}} className="crt-checkout">
+                Proceed to checkout →
               </Link>
+              <p className="crt-summary__note">
+                Your order details will be confirmed at checkout.
+              </p>
             </aside>
           </div>
-        ) : null}
-      </main>
+        </div>
+      ) : null}
     </div>
   );
 }

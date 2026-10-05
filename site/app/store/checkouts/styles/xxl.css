@@ -1,5 +1,4 @@
-@media screen and (min-width: 1200px) {
-  .co-page {
+.co-page {
     --co-accent: #00926e;
     --co-accent-soft: #e0f6ef;
     --co-text: #1a1a1a;
@@ -446,4 +445,3 @@
   .co-cta:hover {
     filter: brightness(1.05);
   }
-}
