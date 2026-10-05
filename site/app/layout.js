@@ -77,6 +77,7 @@ export default async function RootLayout({ children }) {
     "@type": "WebSite",
     name: "DeeDyte",
     url: "https://www.deedyte.com/",
+    logo: "https://res.cloudinary.com/jh7nqlrd/image/upload/v1791187434/WhatsApp_Image_2026-09-22_at_22.45.49.jpg",
     description: "Sign up, sign in, and rely on us to handle your purchase.",
     hasPart: [
       {
