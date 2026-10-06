@@ -391,6 +391,11 @@
         width: 33.3%;
     }
 
+    #about-card{
+        /* padding: 10px; */
+        width: 33.3%;
+    }
+
     .content{
         padding: 10px;
         text-align: center;

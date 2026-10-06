@@ -25,7 +25,7 @@ export async function GET() {
         p.thumbnail_url,
         s.slug AS shop_slug,
         MIN(i.price) AS price
-      FROM deals p
+      FROM products p
       INNER JOIN inventory i ON i.product_id = p.id
       INNER JOIN shops s ON s.id = p.shop_id
       WHERE p.is_published = true
@@ -36,7 +36,7 @@ export async function GET() {
 
     if (!result.rows || result.rows.length === 0) {
       return NextResponse.json(
-        { success: false, message: "No active deals found" },
+        { success: false, message: "No active products found" },
         { status: 404 },
       );
     }
@@ -45,7 +45,7 @@ export async function GET() {
       "@type": "ListItem",
       position: index + 1,
       item: {
-        "@type": "Deals",
+        "@type": "Products",
         name: item.name,
         image: productImageUrl(item.thumbnail_url),
         url: `https://www.deedyte.com/store/${encodeURIComponent(String(item.shop_slug))}/product/${item.id}`,
@@ -65,8 +65,8 @@ export async function GET() {
         data: {
           "@context": "https://schema.org",
           "@type": "ItemList",
-          name: "Trending Deals",
-          description: "Discover trending Deals on DeeDyte",
+          name: "Trending Products",
+          description: "Discover trending Products on DeeDyte",
           numberOfItems: result.rows.length,
           url: "https://www.deedyte.com/vendors",
           itemListElement: productData,
@@ -80,7 +80,7 @@ export async function GET() {
       },
     );
   } catch (error) {
-    console.error("Error fetching deals:", error);
+    console.error("Error fetching products:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 },
