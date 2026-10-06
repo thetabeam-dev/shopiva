@@ -85,7 +85,7 @@ export default function ShopReviewScreen({ navigation }) {
         review_tag: reviewType,
         comment,
       });
-      navigation.pop(2);
+      navigation.pop(2); 
     } catch (error) {
       Alert.alert(
         'Review failed',

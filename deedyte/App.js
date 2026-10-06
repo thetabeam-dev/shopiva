@@ -21,60 +21,60 @@ import { checkForUpdate } from './src/api';
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
-  const handleDeepLink = (url) => {
-    if (!url) return;
+  // const handleDeepLink = (url) => {
+  //   if (!url) return;
 
-    const parsed = new URL(url);
-    const pathname = parsed.pathname;
+  //   const parsed = new URL(url);
+  //   const pathname = parsed.pathname;
 
-    const match = pathname.match(
-      /^\/store\/([^/]+)\/product\/([^/]+)$/
-    );
+  //   const match = pathname.match(
+  //     /^\/store\/([^/]+)\/product\/([^/]+)$/
+  //   );
 
-    if (!match) return;
+  //   if (!match) return;
 
-    const shopSlug = decodeURIComponent(match[1]);
-    const productId = match[2];
+  //   const shopSlug = decodeURIComponent(match[1]);
+  //   const productId = match[2];
 
-    console.log({
-      shopSlug,
-      productId,
-    });
-    navigation.navigate('Product', {
-      shopSlug,
-      productId,
-    });
+  //   console.log({
+  //     shopSlug,
+  //     productId,
+  //   });
+  //   navigation.navigate('Product', {
+  //     shopSlug,
+  //     productId,
+  //   });
 
-    // Navigate to your product screen
-  };
+  //   // Navigate to your product screen
+  // };
 
-  useEffect(() => {
-    // const handleDeepLink = ({ url }) => {
-    //   if (!url) return;
+  // useEffect(() => {
+  //   // const handleDeepLink = ({ url }) => {
+  //   //   if (!url) return;
 
-    //   const parsed = new URL(url);
+  //   //   const parsed = new URL(url);
 
-    //   console.log('Deep link:', parsed.pathname);
+  //   //   console.log('Deep link:', parsed.pathname);
 
-    //   // Example:
-    //   // /store/fabians-store/product/123
-    // };
+  //   //   // Example:
+  //   //   // /store/fabians-store/product/123
+  //   // };
 
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
+  //   Linking.getInitialURL().then((url) => {
+  //     if (url) {
+  //       handleDeepLink({ url });
+  //     }
+  //   });
 
-    const subscription = Linking.addEventListener(
-      'url',
-      handleDeepLink
-    );
+  //   const subscription = Linking.addEventListener(
+  //     'url',
+  //     handleDeepLink
+  //   );
 
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  //   return () => {
+  //     subscription.remove();
+  //   };
+  // }, []);
 
   useEffect(() => {
     if (WIPE_STORAGE_ON_LAUNCH) {
