@@ -129,6 +129,15 @@ function inventoryFromProduct(product) {
   }];
 }
 
+const VIDEO_FILE = /\.(mp4|webm|mov|m4v|ogv|ogg|avi|mkv)(\?|#|$)/i;
+
+function isVideoFile(url) {
+  const value = String(url || "").trim();
+  if (!value) return false;
+  if (VIDEO_FILE.test(value)) return true;
+  return /\/video\/upload\//i.test(value);
+}
+
 function shownPrice(inv, product) {
   const raw = inv?.price ?? inv?.minPrice ?? inv?.maxPrice ?? product?.price ?? product?.minPrice;
   if (raw == null || raw === "" || Number.isNaN(Number(raw))) return "—";
@@ -167,13 +176,19 @@ export default function ProductDetail({ product, slug }) {
   const gallery = useMemo(() => {
     if (!product) return [];
     const name = product.name || "Product";
-    const imgs = Array.isArray(product.images)
-      ? product.images.map((url) => ({ url, alt: name, isVideo: false }))
-      : [];
-    const vids = Array.isArray(product.videos)
-      ? product.videos.map((url) => ({ url, alt: name, isVideo: true }))
-      : [];
-    return [...imgs, ...vids];
+    const urls = [
+      ...(Array.isArray(product.images) ? product.images : []),
+      ...(Array.isArray(product.videos) ? product.videos : []),
+    ];
+    const seen = new Set();
+    return urls
+      .map((url) => String(url || "").trim())
+      .filter((url) => {
+        if (!url || seen.has(url)) return false;
+        seen.add(url);
+        return true;
+      })
+      .map((url) => ({ url, alt: name, isVideo: isVideoFile(url) }));
   }, [product]);
 
   const activeImage = gallery[activeImageIndex] ?? gallery[0];
@@ -660,8 +675,9 @@ export default function ProductDetail({ product, slug }) {
                   style={{ background: "#eee", minHeight: 280 }}
                   aria-hidden
                 />
-              ) : activeImage.isVideo ? (
+              ) : isVideoFile(activeImage.url) ? (
                 <video
+                  key={activeImage.url}
                   src={activeImage.url}
                   className="pdp-gallery__main"
                   controls
@@ -715,7 +731,7 @@ export default function ProductDetail({ product, slug }) {
                 role="tab"
                 aria-selected={index === activeImageIndex}
                 aria-label={
-                  img.isVideo
+                  isVideoFile(img.url)
                     ? `Video ${index + 1}`
                     : `Image ${index + 1} of ${gallery.length}`
                 }
@@ -726,12 +742,12 @@ export default function ProductDetail({ product, slug }) {
                 }
                 onClick={() => setActiveImageIndex(index)}
               >
-                <img src={img.url} alt="" />
-                {img.isVideo ? (
-                  <span className="thumbnail-list__play" aria-hidden>
-                    ▶
-                  </span>
-                ) : null}
+                
+                {isVideoFile(img.url) ? (
+                  <video src={img.url} muted playsInline preload="metadata" />
+                ) : (
+                  <img src={img.url} alt="" />
+                )}
               </button>
             ))}
           </div>
