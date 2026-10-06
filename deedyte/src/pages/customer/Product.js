@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Video from 'react-native-video';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
@@ -43,6 +44,15 @@ import {
 } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
+
+const VIDEO_FILE = /\.(mp4|webm|mov|m4v|ogv|ogg|avi|mkv)(\?|#|$)/i;
+
+function isVideoFile(url) {
+  const value = String(url || '').trim();
+  if (!value) return false;
+  if (VIDEO_FILE.test(value)) return true;
+  return /\/video\/upload\//i.test(value);
+}
 
 const { width: WINDOW_W } = Dimensions.get('window');
 const PURPLE = '#00926e';
@@ -438,19 +448,27 @@ export default function ProductScreen({ route, navigation }) {
     return { count: list.length, avg: sum / list.length };
   }, [productReviews, reviewMetrics]);
 
-  const galleryUrls = useMemo(() => {
-    const imgs =
-      d && Array.isArray(d.images)
-        ? d.images.filter(x => typeof x === 'string' && x.trim())
-        : [];
-    if (imgs.length) return imgs.map(x => String(x).trim());
-    const u = typeof product?.uri === 'string' ? product.uri.trim() : '';
-    return u ? [u] : [];
+  const gallery = useMemo(() => {
+    const imageList = d && Array.isArray(d.images) ? d.images : [];
+    const videoList = d && Array.isArray(d.videos) ? d.videos : [];
+    const seen = new Set();
+    const urls = [...imageList, ...videoList]
+      .map(item => (typeof item === 'string' ? item.trim() : ''))
+      .filter(url => {
+        if (!url || seen.has(url)) return false;
+        seen.add(url);
+        return true;
+      });
+    if (!urls.length) {
+      const fallback = typeof product?.uri === 'string' ? product.uri.trim() : '';
+      return fallback ? [{ url: fallback, isVideo: isVideoFile(fallback) }] : [];
+    }
+    return urls.map(url => ({ url, isVideo: isVideoFile(url) }));
   }, [d, product?.uri]);
 
   useEffect(() => {
     setImgIndex(0);
-  }, [galleryUrls.length, productIdParam]);
+  }, [gallery.length, productIdParam]);
 
   const bumpQty = useCallback(delta => {
     setQty(q => Math.min(99, Math.max(1, q + delta)));
@@ -705,7 +723,8 @@ export default function ProductScreen({ route, navigation }) {
     setLoading(true);
 
     const imageUri =
-      galleryUrls[0] ||
+      gallery.find(item => !item.isVideo)?.url ||
+      gallery[0]?.url ||
       (typeof product?.uri === 'string' ? product.uri.trim() : '') ||
       '';
     const buyLine = {
@@ -731,7 +750,7 @@ export default function ProductScreen({ route, navigation }) {
     });
   }, [
     ensureReadyForCartOrCheckout,
-    galleryUrls,
+    gallery,
     product?.uri,
     productIdParam,
     title,
@@ -881,21 +900,34 @@ export default function ProductScreen({ route, navigation }) {
           </View>
         ) : null}
         <View style={styles.heroWrap}>
-          {galleryUrls.length > 0 ? (
+          {gallery.length > 0 ? (
             <>
-              <Image
-                source={{ uri: galleryUrls[imgIndex % galleryUrls.length] }}
-                style={styles.heroImg}
-                resizeMode="cover"
-              />
-              {galleryUrls.length > 1 ? (
+              {gallery[imgIndex % gallery.length].isVideo ? (
+                <Video
+                  key={gallery[imgIndex % gallery.length].url}
+                  source={{ uri: gallery[imgIndex % gallery.length].url }}
+                  style={styles.heroImg}
+                  resizeMode="cover"
+                  controls
+                  paused={false}
+                  repeat
+                  muted={false}
+                  playInBackground={false}
+                  useTextureView={Platform.OS === 'android'}
+                />
+              ) : (
+                <Image
+                  source={{ uri: gallery[imgIndex % gallery.length].url }}
+                  style={styles.heroImg}
+                  resizeMode="cover"
+                />
+              )}
+              {gallery.length > 1 ? (
                 <>
                   <TouchableOpacity
                     style={[styles.heroChevron, styles.heroChevronLeft]}
                     onPress={() =>
-                      setImgIndex(
-                        i => (i - 1 + galleryUrls.length) % galleryUrls.length,
-                      )
+                      setImgIndex(i => (i - 1 + gallery.length) % gallery.length)
                     }
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
@@ -904,7 +936,7 @@ export default function ProductScreen({ route, navigation }) {
                   <TouchableOpacity
                     style={[styles.heroChevron, styles.heroChevronRight]}
                     onPress={() =>
-                      setImgIndex(i => (i + 1) % galleryUrls.length)
+                      setImgIndex(i => (i + 1) % gallery.length)
                     }
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
@@ -919,6 +951,50 @@ export default function ProductScreen({ route, navigation }) {
             </View>
           )}
         </View>
+        {gallery.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.thumbRow}
+            contentContainerStyle={styles.thumbRowContent}
+          >
+            {gallery.map((item, index) => (
+              <TouchableOpacity
+                key={`${index}-${item.url}`}
+                style={[
+                  styles.thumb,
+                  index === imgIndex % gallery.length && styles.thumbActive,
+                ]}
+                onPress={() => setImgIndex(index)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  item.isVideo
+                    ? `Video ${index + 1}`
+                    : `Image ${index + 1} of ${gallery.length}`
+                }
+              >
+                {item.isVideo ? (
+                  <Video
+                    source={{ uri: item.url }}
+                    style={styles.thumbMedia}
+                    resizeMode="cover"
+                    paused
+                    muted
+                    repeat={false}
+                    playInBackground={false}
+                    useTextureView={Platform.OS === 'android'}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: item.url }}
+                    style={styles.thumbMedia}
+                    resizeMode="cover"
+                  />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
         <View style={styles.titleBlock}>
           <View style={styles.titleRow}>
             <Text style={styles.productTitle} numberOfLines={2}>
@@ -1083,7 +1159,8 @@ export default function ProductScreen({ route, navigation }) {
         title={title}
         subtitle={`${priceDisplayLabel} · ${shopName}`}
         headerImageUri={
-          galleryUrls[0] ||
+          gallery.find(item => !item.isVideo)?.url ||
+          gallery[0]?.url ||
           (typeof product?.uri === 'string' ? product.uri.trim() : '')
         }
         fallbackLetter={title.charAt(0).toUpperCase() || 'P'}
@@ -1307,6 +1384,31 @@ const styles = StyleSheet.create({
   },
   heroChevronRight: {
     right: 8,
+  },
+  thumbRow: {
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  thumbRowContent: {
+    paddingHorizontal: PAD,
+    gap: 8,
+  },
+  thumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    backgroundColor: '#F3F3F3',
+  },
+  thumbActive: {
+    borderColor: PURPLE,
+    borderWidth: 2,
+  },
+  thumbMedia: {
+    width: '100%',
+    height: '100%',
   },
   titleBlock: {
     marginBottom: 8,
