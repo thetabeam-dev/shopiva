@@ -29,7 +29,7 @@ export function baseTemplate(content: string, previewText?: string): string {
             background-color: #ffffff;
         }
         .header {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background: linear-gradient(135deg, #00926E 0%,rgb(0, 183, 137) 100%);
             padding: 32px 24px;
             text-align: center;
         }
@@ -45,7 +45,7 @@ export function baseTemplate(content: string, previewText?: string): string {
         .button {
             display: inline-block;
             padding: 14px 32px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background: linear-gradient(135deg, #00926E 0%, #rgb(0, 183, 137) 100%);
             color: #ffffff !important;
             text-decoration: none;
             border-radius: 8px;
@@ -65,7 +65,7 @@ export function baseTemplate(content: string, previewText?: string): string {
             border-top: 1px solid #e5e7eb;
         }
         .footer a {
-            color: #6366f1;
+            color: #00926E;
             text-decoration: none;
         }
         h2 {
@@ -85,7 +85,7 @@ export function baseTemplate(content: string, previewText?: string): string {
             font-weight: 700;
             letter-spacing: 4px;
             text-align: center;
-            color: #6366f1;
+            color: #00926E;
             margin: 24px 0;
         }
         .divider {
