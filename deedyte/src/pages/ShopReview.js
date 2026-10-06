@@ -85,7 +85,7 @@ export default function ShopReviewScreen({ navigation }) {
         review_tag: reviewType,
         comment,
       });
-      navigation.goBack();
+      navigation.pop(2);
     } catch (error) {
       Alert.alert(
         'Review failed',
@@ -238,45 +238,52 @@ export default function ShopReviewScreen({ navigation }) {
   );
 }
 
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
   },
+
   flex: {
     flex: 1,
   },
+
   scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 8,
+    paddingTop: 8,
     paddingBottom: 24,
   },
+
   heroCard: {
     backgroundColor: CARD,
-    borderRadius: 18,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: BORDER,
     paddingVertical: 24,
     paddingHorizontal: 18,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
+
   logo: {
     width: 76,
     height: 76,
-    borderRadius: 20,
+    borderRadius: 50,
     backgroundColor: '#EEF2F0',
     marginBottom: 14,
   },
+
   logoFallback: {
     width: 76,
     height: 76,
-    borderRadius: 20,
+    borderRadius: 50,
     backgroundColor: '#E8F6F1',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
+
   heroEyebrow: {
     fontSize: 13,
     fontWeight: '700',
@@ -285,6 +292,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 6,
   },
+
   shopName: {
     fontSize: 22,
     fontWeight: '800',
@@ -292,27 +300,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 6,
   },
+
   heroSub: {
     fontSize: 15,
     color: MUTED,
     textAlign: 'center',
     lineHeight: 21,
   },
+
   card: {
     backgroundColor: CARD,
-    borderRadius: 16,
+    borderRadius: 8,
     padding: 18,
     borderWidth: 1,
     borderColor: BORDER,
-    marginBottom: 12,
+    marginBottom: 6,
   },
+
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: TEXT,
-    marginBottom: 14,
+    marginBottom: 12,
     textAlign: 'center',
   },
+
   cardHint: {
     marginTop: -8,
     marginBottom: 12,
@@ -320,50 +332,57 @@ const styles = StyleSheet.create({
     color: MUTED,
     textAlign: 'center',
   },
+
   tagGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
+
   tagChip: {
     width: '48%',
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1.5,
     borderColor: BORDER,
     backgroundColor: '#FAFAFA',
     marginBottom: 10,
     paddingHorizontal: 10,
   },
+
   tagText: {
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
     color: TEXT,
   },
+
   tagTextSelected: {
     color: '#FFFFFF',
   },
+
   comment: {
     minHeight: 130,
     backgroundColor: '#FAFAFA',
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
     color: TEXT,
   },
+
   charCount: {
     marginTop: 8,
     fontSize: 12,
     color: MUTED,
     textAlign: 'right',
   },
+
   footer: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -371,47 +390,55 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER,
     backgroundColor: BG,
   },
+
   submit: {
     backgroundColor: BRAND,
-    borderRadius: 14,
+    borderRadius: 8,
     minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   submitDisabled: {
     opacity: 0.55,
   },
+
   submitText: {
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '700',
   },
+
   skip: {
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
     marginTop: 4,
   },
+
   skipText: {
     fontSize: 15,
     fontWeight: '600',
     color: MUTED,
   },
+
   busyOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(244, 245, 247, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   busyCard: {
     backgroundColor: CARD,
-    borderRadius: 14,
+    borderRadius: 8,
     paddingHorizontal: 22,
     paddingVertical: 18,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: BORDER,
   },
+
   busyText: {
     marginTop: 10,
     fontSize: 14,
