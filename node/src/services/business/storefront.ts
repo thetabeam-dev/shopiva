@@ -72,6 +72,7 @@ export async function GetStorefrontProductService(productId: number) {
   const inventoryRows = data.inventory as InventoryRow[];
   const productDto = buildStorefrontProductDetail(productRow, inventoryRows);
   const shopId = productRow.shop_id;
+  let shopSlug = "";
   let shopPolicies: {
     deliverypolicy: unknown;
     refundpolicy: unknown;
@@ -90,7 +91,11 @@ export async function GetStorefrontProductService(productId: number) {
         custompolicies: parseJsonbPolicyField(pr.custompolicies),
       };
     }
+    const shopRows = await shopModel.getShopById(sid);
+    const shopRow = shopRows?.[0] as { slug?: unknown } | undefined;
+    shopSlug = typeof shopRow?.slug === "string" ? shopRow.slug.trim() : "";
   }
+  productDto.slug = shopSlug;
   productReviews = await productModel.getProductReviewsByProductId(productId);
   const metricRows = await productModel.getProductReviewMetricsByProductId(productId);
   reviewMetrics = (metricRows as Record<string, unknown> | undefined) ?? null;

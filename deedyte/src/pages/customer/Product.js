@@ -8,6 +8,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -82,43 +83,43 @@ export default function ProductScreen({ route, navigation }) {
   const [detailRetryToken, setDetailRetryToken] = useState(0);
   /** Storefront product detail DTO from GET /storefront/product/:id */
   const [detailProduct, setDetailProduct] = useState(
-    /** @type {Record<string, unknown> | null} */ (null),
+    /** @type {Record<string, unknown> | null} */(null),
   );
   const [shopPolicies, setShopPolicies] = useState(
-    /** @type {Record<string, unknown> | null} */ (null),
+    /** @type {Record<string, unknown> | null} */(null),
   );
   const [productReviews, setProductReviews] = useState(
-    /** @type {unknown[]} */ ([]),
+    /** @type {unknown[]} */([]),
   );
   const [reviewMetrics, setReviewMetrics] = useState(
-    /** @type {Record<string, unknown> | null} */ (null),
+    /** @type {Record<string, unknown> | null} */(null),
   );
   /** Vendors publish delivery policy only; opened from the ⋮ menu. */
   const [deliveryPolicyModalVisible, setDeliveryPolicyModalVisible] =
     useState(false);
   const [deliveryInfo, setDeliveryInfo] = useState(
-    /** @type {ReturnType<typeof normalizeShopDelivery>} */ (null),
+    /** @type {ReturnType<typeof normalizeShopDelivery>} */(null),
   );
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const [deliveryError, setDeliveryError] = useState('');
   /** Resolved variant when all attribute axes are chosen (null until complete + in stock). */
   const [selectedVariant, setSelectedVariant] = useState(
-    /** @type {Record<string, unknown> | null} */ (null),
+    /** @type {Record<string, unknown> | null} */(null),
   );
   /** Per-axis selection for `hasVariants` products (values are attribute string or null). */
   const [selectedAttrs, setSelectedAttrs] = useState(
-    /** @type {Record<string, string | null>} */ ({}),
+    /** @type {Record<string, string | null>} */({}),
   );
   /** Cart line for the currently selected inventory row (if any). */
   const [cartLineForSelection, setCartLineForSelection] = useState(
-    /** @type {{ cartItemId: number; qty: number } | null} */ (null),
+    /** @type {{ cartItemId: number; qty: number } | null} */(null),
   );
   const [cartToggleBusy, setCartToggleBusy] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastHideTimerRef = useRef(
-    /** @type {ReturnType<typeof setTimeout> | null} */ (null),
+    /** @type {ReturnType<typeof setTimeout> | null} */(null),
   );
   /* MVP: wishlist / save-for-later disabled
   const [saved, setSaved] = useState(false);
@@ -221,9 +222,9 @@ export default function ProductScreen({ route, navigation }) {
     const base = variantAttributeKeys(variants).length
       ? variants
       : variants.map((v, i) => ({
-          ...v,
-          attributes: { option: `Option ${i + 1}` },
-        }));
+        ...v,
+        attributes: { option: `Option ${i + 1}` },
+      }));
     /** Coerce attribute values to strings so chip labels and equality checks match API numbers/objects. */
     return base.map(v => {
       if (!v || typeof v !== 'object') return v;
@@ -292,23 +293,27 @@ export default function ProductScreen({ route, navigation }) {
       priceUsd = Number(d.price) || 0;
     } else if (hasVariants && selectedVariant) {
       const pv = getVariantRowPrice(
-        /** @type {Record<string, unknown>} */ (selectedVariant),
+        /** @type {Record<string, unknown>} */(selectedVariant),
       );
       priceUsd = Number.isFinite(pv) ? pv : 0;
     } else if (typeof p.priceUsd === 'number') {
       priceUsd = p.priceUsd;
     }
+    const detailSlug = typeof d?.slug === 'string' ? d.slug.trim() : '';
+    const vendorSlug = typeof vendor?.slug === 'string' ? vendor.slug.trim() : '';
+    const routeSlug = typeof p.slug === 'string' ? p.slug.trim() : '';
     return {
       ...p,
       title: name,
       uri,
       shop_id: shopId,
+      slug: detailSlug || vendorSlug || routeSlug,
       priceUsd,
       currency: 'NGN',
       description:
         typeof d?.description === 'string' ? d.description : p.description,
     };
-  }, [routeProduct, shopId, d, hasVariants, selectedVariant]);
+  }, [routeProduct, shopId, vendor, d, hasVariants, selectedVariant]);
 
   const product = mergedProduct;
 
@@ -373,7 +378,7 @@ export default function ProductScreen({ route, navigation }) {
       if (hasVariants) {
         const nums = variantsForUi
           .map(v =>
-            getVariantRowPrice(/** @type {Record<string, unknown>} */ (v)),
+            getVariantRowPrice(/** @type {Record<string, unknown>} */(v)),
           )
           .filter(n => Number.isFinite(n) && n > 0);
         if (!nums.length) return '—';
@@ -391,12 +396,12 @@ export default function ProductScreen({ route, navigation }) {
     if (!hasVariants) return formatNaira(Number(d.price) || 0);
     if (selectedVariant) {
       const vp = getVariantRowPrice(
-        /** @type {Record<string, unknown>} */ (selectedVariant),
+        /** @type {Record<string, unknown>} */(selectedVariant),
       );
       return Number.isFinite(vp) ? formatNaira(vp) : '—';
     }
     const nums = variantsForUi
-      .map(v => getVariantRowPrice(/** @type {Record<string, unknown>} */ (v)))
+      .map(v => getVariantRowPrice(/** @type {Record<string, unknown>} */(v)))
       .filter(n => Number.isFinite(n) && n > 0);
     if (!nums.length) return '—';
     const lo = Math.min(...nums);
@@ -565,7 +570,7 @@ export default function ProductScreen({ route, navigation }) {
         let cartOpts = /** @type {{ unitPrice?: number }} */ ({});
         if (hasVariants && selectedVariant) {
           const vp = getVariantRowPrice(
-            /** @type {Record<string, unknown>} */ (selectedVariant),
+            /** @type {Record<string, unknown>} */(selectedVariant),
           );
           if (Number.isFinite(vp)) cartOpts = { unitPrice: vp };
         } else if (d && !hasVariants) {
@@ -629,7 +634,7 @@ export default function ProductScreen({ route, navigation }) {
     if (!hasVariants || !selectedVariant) return '';
     const a =
       selectedVariant.attributes &&
-      typeof selectedVariant.attributes === 'object'
+        typeof selectedVariant.attributes === 'object'
         ? selectedVariant.attributes
         : {};
     return Object.keys(a)
@@ -645,7 +650,7 @@ export default function ProductScreen({ route, navigation }) {
     if (!hasVariants) return Number(d.price) || 0;
     if (selectedVariant) {
       const pv = getVariantRowPrice(
-        /** @type {Record<string, unknown>} */ (selectedVariant),
+        /** @type {Record<string, unknown>} */(selectedVariant),
       );
       return Number.isFinite(pv) ? pv : 0;
     }
@@ -653,7 +658,7 @@ export default function ProductScreen({ route, navigation }) {
   }, [d, hasVariants, selectedVariant, routeProduct?.priceUsd]);
 
   const anyVariantInStock = variantsForUi.some(v =>
-    isVariantPurchasable(/** @type {Record<string, unknown>} */ (v)),
+    isVariantPurchasable(/** @type {Record<string, unknown>} */(v)),
   );
 
   const noSimpleStock =
@@ -672,7 +677,7 @@ export default function ProductScreen({ route, navigation }) {
         detailLoading
           ? 'Still loading this product. Try again in a moment.'
           : detailError.trim() ||
-              'Product details are not available. Pull down to refresh or tap Try again above.',
+          'Product details are not available. Pull down to refresh or tap Try again above.',
       );
       return false;
     }
@@ -1013,6 +1018,28 @@ export default function ProductScreen({ route, navigation }) {
               <TouchableOpacity
                 style={styles.iconCircle}
                 accessibilityLabel="Share"
+                onPress={async () => {
+                  // const isShareSaved = await AddShare()
+                  // if (!isShareSaved) {
+                  //   setLoading(false)
+
+                  //   return Alert.alert('Error', 'Please ensure you have stable network and try again.');
+                  // }
+
+                  try {
+                    setLoading(false)
+                    await Share.share({
+                      message: `Check out this product on DeeDyte! https://www.deedyte.com/store/${product.slug}/${product?.id}`,
+                      title: product?.name,
+                    });
+                  } catch (error) {
+                    console.error(error);
+                    return Alert.alert('Error', 'Please ensure you have stable network and try again.');
+
+                  }
+
+
+                }}
               >
                 <Icon name="share-outline" size={22} color="#000000" />
               </TouchableOpacity>
@@ -1125,7 +1152,7 @@ export default function ProductScreen({ route, navigation }) {
         <Text style={styles.sectionHeading}>Description</Text>
         <Text style={styles.descriptionBody}>
           {typeof product?.description === 'string' &&
-          product.description.trim()
+            product.description.trim()
             ? product.description.trim()
             : 'No description provided for this product.'}
         </Text>
@@ -1202,32 +1229,32 @@ export default function ProductScreen({ route, navigation }) {
           </Animated.View>
         </View>
       ) : null}
-     
+
     </View>
   );
 }
 
 
-  function Spinner() {
-    return (
-      <>
-        <View
-          style={{
-            height: '100%',
-            width: '100%',
-            position: 'absolute',
-            top: 0,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <ActivityIndicator size="large" color="green" />
-        </View>
-      </>
-    );
-  }
+function Spinner() {
+  return (
+    <>
+      <View
+        style={{
+          height: '100%',
+          width: '100%',
+          position: 'absolute',
+          top: 0,
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}
+      >
+        <ActivityIndicator size="large" color="green" />
+      </View>
+    </>
+  );
+}
 
 const styles = StyleSheet.create({
   root: {
