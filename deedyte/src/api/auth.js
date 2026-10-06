@@ -298,3 +298,73 @@ export async function resendVerificationEmail(email) {
       'If an account exists, a new code was sent.',
   };
 }
+
+/**
+ * Confirm the account email and email a reset PIN.
+ * @param {string} email
+ */
+export async function requestPasswordResetPin(email) {
+  const res = await apiFetchSafe('/user/password/forgot', {
+    method: 'POST',
+    body: JSON.stringify({ email: String(email).trim().toLowerCase() }),
+  });
+  if (isNetworkError(res)) {
+    return { ok: false, message: cannotReachApiMessage() };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: pickErrorMessage(data, res) };
+  }
+  return { ok: true };
+}
+
+/**
+ * @param {string} email
+ * @param {string} pin
+ * @returns {Promise<{ ok: true, resetToken: string } | { ok: false, message: string }>}
+ */
+export async function verifyPasswordResetPin(email, pin) {
+  const res = await apiFetchSafe('/user/password/verify-pin', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: String(email).trim().toLowerCase(),
+      pin: String(pin).trim(),
+    }),
+  });
+  if (isNetworkError(res)) {
+    return { ok: false, message: cannotReachApiMessage() };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: pickErrorMessage(data, res) };
+  }
+  const token = data && typeof data === 'object' ? /** @type {{ resetToken?: string }} */ (data).resetToken : '';
+  if (typeof token !== 'string' || !token) {
+    return { ok: false, message: 'Could not confirm that PIN.' };
+  }
+  return { ok: true, resetToken: token };
+}
+
+/**
+ * @param {string} email
+ * @param {string} resetToken
+ * @param {string} newPassword
+ */
+export async function resetPasswordWithPin(email, resetToken, newPassword) {
+  const res = await apiFetchSafe('/user/password/reset', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: String(email).trim().toLowerCase(),
+      resetToken,
+      newPassword,
+    }),
+  });
+  if (isNetworkError(res)) {
+    return { ok: false, message: cannotReachApiMessage() };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: pickErrorMessage(data, res) };
+  }
+  return { ok: true };
+}

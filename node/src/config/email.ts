@@ -20,7 +20,7 @@ const {
 
 // Create reusable transporter
 const transporter = nodemailer.createTransport({
-    host: EMAIL_HOST || "smtp.gmail.com",
+    host: EMAIL_HOST,
     port: parseInt(EMAIL_PORT || "587"),
     secure: EMAIL_PORT === "465", // true for 465, false for other ports
     auth: {

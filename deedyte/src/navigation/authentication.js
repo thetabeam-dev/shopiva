@@ -8,6 +8,8 @@ import LoginScreen from '../pages/auth/LoginScreen';
 import OnboardingProfileScreen from '../pages/auth/OnboardingProfileScreen';
 import SignUpScreen from '../pages/auth/SignUpScreen';
 import VerifyCodeScreen from '../pages/auth/VerifyCodeScreen';
+import PasswordRecoveryScreen from '../pages/auth/PasswordRecoveryScreen';
+import ResetPasswordScreen from '../pages/auth/ResetPasswordScreen';
 import ShopSetupScreen from '../pages/auth/ShopSetup';
 // import WelcomeScreen from '../pages/auth/WelcomeScreen';
 import { SplashScreen } from '../pages/SplashScreen';
@@ -51,6 +53,8 @@ export default function RootNavigator() {
           initialParams={{ allowSkip: loginSkipAllowed }}
         />
         <AuthStack.Screen name="VerifyCode" component={VerifyCodeScreen} />
+        <AuthStack.Screen name="PasswordRecovery" component={PasswordRecoveryScreen} />
+        <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       </AuthStack.Navigator>
     );
   }

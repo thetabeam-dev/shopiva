@@ -1,5 +1,10 @@
 import type { Request, Response } from "express";
 import { SignupService, SigninService, UpdateProfileService, UpdateEmailService, UpdatePhoneService, UpdatePhotoService, UpdatePasswordService, DeleteUserService, UpdateRoleService } from "../services/user.js";
+import {
+    RequestPasswordResetPinService,
+    ResetPasswordWithPinService,
+    VerifyPasswordResetPinService,
+} from "../services/passwordRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
 
 export async function SignupController(req: Request, res: Response) {
@@ -16,6 +21,51 @@ export async function SignupController(req: Request, res: Response) {
     } catch (err) {
         res.status(400).json({
             error: err instanceof Error ? err.message : String(err)
+        });
+    }
+}
+
+function recoveryStatus(err: unknown): number {
+    const status = err && typeof err === "object" && "status" in err ? Number((err as { status?: number }).status) : 400;
+    return Number.isFinite(status) ? status : 400;
+}
+
+export async function ForgotPasswordController(req: Request, res: Response) {
+    try {
+        const result = await RequestPasswordResetPinService(req.body?.email);
+        res.status(200).json({ success: true, message: "A PIN was sent to that email.", ...result });
+    } catch (err) {
+        res.status(recoveryStatus(err)).json({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
+export async function VerifyPasswordPinController(req: Request, res: Response) {
+    try {
+        const result = await VerifyPasswordResetPinService(req.body?.email, req.body?.pin);
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(recoveryStatus(err)).json({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
+export async function ResetPasswordController(req: Request, res: Response) {
+    try {
+        const result = await ResetPasswordWithPinService(
+            req.body?.email,
+            req.body?.resetToken,
+            req.body?.newPassword,
+        );
+        res.status(200).json({ success: true, message: "Password updated.", ...result });
+    } catch (err) {
+        res.status(recoveryStatus(err)).json({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
         });
     }
 }

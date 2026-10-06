@@ -958,7 +958,7 @@ export default function ProductDetail({ product, slug }) {
                             }}>
                                 <i className="fa-brands fa-instagram" aria-hidden="true" />
                             </button>
-                            <button type="button" className="pdp-social-icon" aria-label="TikTok" onClick={async () => {
+                            {/* <button type="button" className="pdp-social-icon" aria-label="TikTok" onClick={async () => {
                                 const text = `Check out this product on DeeDyte ${window.location.href}`;
                                 try {
                                     await navigator.clipboard.writeText(text);
@@ -966,7 +966,7 @@ export default function ProductDetail({ product, slug }) {
                                 window.open("https://www.tiktok.com/", "_blank", "noopener,noreferrer");
                             }}>
                                 <i className="fa-brands fa-tiktok" aria-hidden="true" />
-                            </button>
+                            </button> */}
                             <button type="button" className="pdp-social-icon" aria-label="Copy link" onClick={async () => {
                                 try {
                                     await navigator.clipboard.writeText(window.location.href);

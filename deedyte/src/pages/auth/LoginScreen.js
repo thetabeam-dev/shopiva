@@ -225,6 +225,13 @@ export default function LoginScreen({ navigation, route }) {
             Please Sign up.
           </Text>
         </Text>
+
+        <Text style={styles.footer}>
+          Forgot My Password?{' '}
+          <Text style={styles.footerLink} onPress={() => navigation.navigate('PasswordRecovery')}>
+            Reset Password Here.
+          </Text>
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

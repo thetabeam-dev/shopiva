@@ -1,12 +1,15 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
-import { DeleteMyAccountController, DeleteUserController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController } from "../controllers/user.js";
+import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController } from "../controllers/user.js";
 
 export const UserRouter = express.Router();
 
 // Public routes (no middleware)
 UserRouter.post("/user/signup", SignupController);
 UserRouter.post("/user/signin", SigninController);
+UserRouter.post("/user/password/forgot", ForgotPasswordController);
+UserRouter.post("/user/password/verify-pin", VerifyPasswordPinController);
+UserRouter.post("/user/password/reset", ResetPasswordController);
 UserRouter.post("/user/authorization", verifyToken, async(req: AuthRequest, res) => {
   // Token is already verified by middleware, just return the decoded user info
 

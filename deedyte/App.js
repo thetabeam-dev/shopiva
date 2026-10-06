@@ -21,6 +21,61 @@ import { checkForUpdate } from './src/api';
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
+  const handleDeepLink = (url) => {
+    if (!url) return;
+
+    const parsed = new URL(url);
+    const pathname = parsed.pathname;
+
+    const match = pathname.match(
+      /^\/store\/([^/]+)\/product\/([^/]+)$/
+    );
+
+    if (!match) return;
+
+    const shopSlug = decodeURIComponent(match[1]);
+    const productId = match[2];
+
+    console.log({
+      shopSlug,
+      productId,
+    });
+    navigation.navigate('Product', {
+      shopSlug,
+      productId,
+    });
+
+    // Navigate to your product screen
+  };
+
+  useEffect(() => {
+    // const handleDeepLink = ({ url }) => {
+    //   if (!url) return;
+
+    //   const parsed = new URL(url);
+
+    //   console.log('Deep link:', parsed.pathname);
+
+    //   // Example:
+    //   // /store/fabians-store/product/123
+    // };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    const subscription = Linking.addEventListener(
+      'url',
+      handleDeepLink
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (WIPE_STORAGE_ON_LAUNCH) {
       void clearAllDeedyteStorage();
@@ -66,7 +121,7 @@ function App() {
       if (data && typeof data === 'object') {
         setVersionCheck({
           isLatest: Boolean(data.isLatest),
-          storeUrl: typeof(data.storeUrl) === 'string' ? data.storeUrl : '',
+          storeUrl: typeof (data.storeUrl) === 'string' ? data.storeUrl : '',
         });
       }
     })();
@@ -117,96 +172,96 @@ function App() {
   return (
     <>
 
-    {
-      !versionCheck.isLatest &&
-      <SafeAreaView
-        style={{
-          flex: 1,
-          backgroundColor: '#FFFFFF',
-          justifyContent: 'center',
-          paddingHorizontal: 28,
-        }}
-      >
-        <TouchableOpacity onPress={openStore}
-          // disabled={!versionCheck.storeUrl?.trim()}
-          activeOpacity={0.85}
-          accessibilityRole="link"
-          accessibilityLabel={
-            Platform.OS === 'ios'
-              ? 'Open App Store to download latest version'
-              : 'Open Play Store to download latest version'
-          }>
-          <View style={{ alignItems: 'center' }}>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: '800',
-                color: '#111111',
-                textAlign: 'center',
-                marginBottom: 10,
-              }}
-            >
-              Update required
-            </Text>
-            <Text
-              style={{
-                fontSize: 15,
-                lineHeight: 22,
-                color: '#555555',
-                textAlign: 'center',
-                marginBottom: 20,
-              }}
-            >
-              Your app is outdated. Install the latest version to keep using Deedyte.
-            </Text>
-            <TouchableOpacity
-              onPress={openStore}
-              // disabled={!versionCheck.storeUrl?.trim()}
-              activeOpacity={0.85}
-              accessibilityRole="link"
-              accessibilityLabel={
-                Platform.OS === 'ios'
-                  ? 'Open App Store to download latest version'
-                  : 'Open Play Store to download latest version'
-              }
-            >
+      {
+        !versionCheck.isLatest &&
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: '#FFFFFF',
+            justifyContent: 'center',
+            paddingHorizontal: 28,
+          }}
+        >
+          <TouchableOpacity onPress={openStore}
+            // disabled={!versionCheck.storeUrl?.trim()}
+            activeOpacity={0.85}
+            accessibilityRole="link"
+            accessibilityLabel={
+              Platform.OS === 'ios'
+                ? 'Open App Store to download latest version'
+                : 'Open Play Store to download latest version'
+            }>
+            <View style={{ alignItems: 'center' }}>
               <Text
                 style={{
-                  fontSize: 16,
-                  fontWeight: '700',
-                  color: '#00926e',
+                  fontSize: 22,
+                  fontWeight: '800',
+                  color: '#111111',
                   textAlign: 'center',
-                  cursor: "pointer"
-                  // opacity: versionCheck.storeUrl?.trim() ? 1 : 0.5,
+                  marginBottom: 10,
                 }}
               >
-                Click Here To Download The Latest Version
+                Update required
               </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </SafeAreaView>
-    }
+              <Text
+                style={{
+                  fontSize: 15,
+                  lineHeight: 22,
+                  color: '#555555',
+                  textAlign: 'center',
+                  marginBottom: 20,
+                }}
+              >
+                Your app is outdated. Install the latest version to keep using Deedyte.
+              </Text>
+              <TouchableOpacity
+                onPress={openStore}
+                // disabled={!versionCheck.storeUrl?.trim()}
+                activeOpacity={0.85}
+                accessibilityRole="link"
+                accessibilityLabel={
+                  Platform.OS === 'ios'
+                    ? 'Open App Store to download latest version'
+                    : 'Open Play Store to download latest version'
+                }
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '700',
+                    color: '#00926e',
+                    textAlign: 'center',
+                    cursor: "pointer"
+                    // opacity: versionCheck.storeUrl?.trim() ? 1 : 0.5,
+                  }}
+                >
+                  Click Here To Download The Latest Version
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </SafeAreaView>
+      }
 
-    {
-      versionCheck.isLatest &&
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider style={{ flex: 1 }}>
-          {PaystackProvider ? (
-            <PaystackProvider
-              publicKey={paystackPublicKey}
-              currency="NGN"
-              defaultChannels={['card', 'ussd', 'bank']}
-              debug={__DEV__}
-            >
-              {appBody}
-            </PaystackProvider>
-          ) : (
-            appBody
-          )}
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    }
+      {
+        versionCheck.isLatest &&
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider style={{ flex: 1 }}>
+            {PaystackProvider ? (
+              <PaystackProvider
+                publicKey={paystackPublicKey}
+                currency="NGN"
+                defaultChannels={['card', 'ussd', 'bank']}
+                debug={__DEV__}
+              >
+                {appBody}
+              </PaystackProvider>
+            ) : (
+              appBody
+            )}
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      }
 
     </>
   );
