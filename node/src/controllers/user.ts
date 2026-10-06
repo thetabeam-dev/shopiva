@@ -33,7 +33,7 @@ function recoveryStatus(err: unknown): number {
 export async function ForgotPasswordController(req: Request, res: Response) {
     try {
         const result = await RequestPasswordResetPinService(req.body?.email);
-        res.status(200).json({ success: true, message: "A PIN was sent to that email.", ...result });
+        res.status(200).json({ ...result, message: "A PIN was sent to that email." });
     } catch (err) {
         res.status(recoveryStatus(err)).json({
             success: false,
@@ -61,7 +61,7 @@ export async function ResetPasswordController(req: Request, res: Response) {
             req.body?.resetToken,
             req.body?.newPassword,
         );
-        res.status(200).json({ success: true, message: "Password updated.", ...result });
+        res.status(200).json({ ...result, message: "Password updated." });
     } catch (err) {
         res.status(recoveryStatus(err)).json({
             success: false,
