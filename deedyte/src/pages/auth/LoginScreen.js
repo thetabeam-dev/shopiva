@@ -62,7 +62,7 @@ export default function LoginScreen({ navigation, route }) {
     const login = email.trim();
     const pwd = password;
     if (!login || !pwd) {
-      Alert.alert('Missing fields', 'Enter email or username and password.');
+      Alert.alert('Missing fields', 'Enter email and password.');
       return;
     }
     setSubmitting(true);
@@ -145,11 +145,11 @@ export default function LoginScreen({ navigation, route }) {
           <Text style={styles.socialBtnText}>Continue with Apple</Text>
         </TouchableOpacity> */}
 
-        <Text style={styles.label}>Email or username</Text>
+        <Text style={styles.label}>Email</Text>
         <View style={styles.inputWrap}>
           <TextInput
             style={styles.input}
-            placeholder="Email or username"
+            placeholder="Email"
             placeholderTextColor={AUTH.textMuted}
             autoCapitalize="none"
             autoCorrect={false}

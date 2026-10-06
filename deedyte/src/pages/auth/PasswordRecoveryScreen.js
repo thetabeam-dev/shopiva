@@ -54,7 +54,7 @@ export default function PasswordRecoveryScreen({ navigation }) {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity
+        {/* <TouchableOpacity
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
           accessibilityLabel="Back to login"
@@ -62,7 +62,7 @@ export default function PasswordRecoveryScreen({ navigation }) {
         >
           <Icon name="chevron-back" size={22} color={AUTH.text} />
           <Text style={styles.backText}>Log in</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <View style={styles.logoBlock}>
           <Image source={require('../../assets/Deedyte.png')} style={{ height: 50, width: 50 }} />
