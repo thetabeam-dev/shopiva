@@ -5,6 +5,16 @@ import ProductDetail from "./product"; // Client component
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/$/, "");
 
+/** JPEG 1200×630 so WhatsApp can preview the link. Facebook accepts WebP; WhatsApp does not. */
+function whatsappOgImage(url) {
+  const raw = String(url ?? "").trim();
+  if (!raw.includes("/image/upload/")) return raw;
+  return raw.replace(
+    "/image/upload/",
+    "/image/upload/f_jpg,c_fill,w_1200,h_630,q_auto/",
+  );
+}
+
 async function readRouteParams(params) {
   const resolved = params && typeof params.then === "function" ? await params : params;
   const slug = typeof resolved?.slug === "string" ? resolved.slug : String(resolved?.slug ?? "");
@@ -56,8 +66,12 @@ export async function generateMetadata({ params }) {
     const videoUrl = Array.isArray(product?.videos) && product.videos[0]
       ? product.videos[0]
       : "";
-    const isImg = Boolean(thumbnail) && ["jpg", "jpeg", "png", "gif", "webp"].includes(
-      String(thumbnail).split(".").pop()?.split("?")[0]?.toLowerCase()
+    const ogImage = whatsappOgImage(thumbnail);
+    const isImg = Boolean(ogImage) && (
+      ogImage.includes("/image/upload/") ||
+      ["jpg", "jpeg", "png", "gif"].includes(
+        String(thumbnail).split(".").pop()?.split("?")[0]?.toLowerCase()
+      )
     );
 
     const formattedTitle = `${product?.name ?? product?.title ?? slug} - ₦${new Intl.NumberFormat(
@@ -81,7 +95,7 @@ export async function generateMetadata({ params }) {
         type: isImg ? "website" : "video.other",
         ...(isImg
           ? {
-              images: [{ url: thumbnail, width: 1200, height: 630 }],
+              images: [{ url: ogImage, width: 1200, height: 630, type: "image/jpeg" }],
             }
           : {
               videos: [
@@ -100,7 +114,7 @@ export async function generateMetadata({ params }) {
         title: formattedTitle,
         description: product?.description || "",
         ...(isImg
-          ? { images: [thumbnail] }
+          ? { images: [ogImage] }
           : { 
               player: videoUrl, 
               playerStream: videoUrl, // Direct MP4 link
