@@ -65,7 +65,7 @@ import {
   getVariantPriceRange,
 } from '../../utils/vendorProductPayload';
 
-const GENDERS = ['Male', 'Female'];
+const GENDER_OPTIONS = ['male', 'female', 'unisex'];
 
 /** @template T @param {T[]} arr @param {number} size @returns {T[][]} */
 function chunkArray(arr, size) {
@@ -214,6 +214,7 @@ export default function VendorCreateProductScreen() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaUploadError, setMediaUploadError] = useState('');
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showFinishSheet, setShowFinishSheet] = useState(false);
   const [loadingExistingProduct, setLoadingExistingProduct] = useState(false);
 
@@ -326,14 +327,26 @@ export default function VendorCreateProductScreen() {
     [variantFields],
   );
 
+  const genderOptions = useMemo(() => {
+    const row = reduxCategoryState.categories.find(item => item.category === categoryKey);
+    const keys = Object.keys(row?.productType ?? {})
+      .map(key => String(key).trim().toLowerCase())
+      .filter(key => GENDER_OPTIONS.includes(key));
+    const fromCategory = GENDER_OPTIONS.filter(key => keys.includes(key));
+    return fromCategory.length ? fromCategory : GENDER_OPTIONS;
+  }, [categoryKey, reduxCategoryState.categories]);
+
   const typeOptions = useMemo(() => {
     if (isGenderDrivenCategory(categoryKey)) {
+      const row = reduxCategoryState.categories.find(item => item.category === categoryKey);
+      const fromCategory = row?.productType?.[String(gender).trim().toLowerCase()];
+      if (Array.isArray(fromCategory) && fromCategory.length) return fromCategory;
       return getGenderDrivenTypeOptions(categoryKey, gender);
     }
     const sub = String(subCategory || '').trim();
     if (!sub) return [];
     return typesBySubCategory.get(sub) ?? [];
-  }, [categoryKey, gender, subCategory, typesBySubCategory]);
+  }, [categoryKey, gender, reduxCategoryState.categories, subCategory, typesBySubCategory]);
 
   /** MVP: single shop — always the first shop returned for the signed-in owner. */
   useEffect(() => {
@@ -527,6 +540,40 @@ export default function VendorCreateProductScreen() {
     ? productType.trim().length > 0
     : subCategory.trim().length > 0 && productType.trim().length > 0;
 
+  const missingRequiredFields = useMemo(() => {
+    const missing = [];
+    if (title.trim().length <= 1) missing.push('Product name');
+    if (!category.trim()) missing.push('Category');
+    if (isGenderCategory && !gender.trim()) missing.push('Gender');
+    if (!isGenderCategory && !subCategory.trim()) missing.push('Sub category');
+    if (!productType.trim()) missing.push('Type');
+    if (uploadedMedia.length === 0) missing.push('Product image');
+    if (!hasVariantsList) {
+      missing.push('At least one variant');
+    } else {
+      if (!isQuantityValid) missing.push('Variant quantity');
+      if (!isPriceValid) missing.push('Variant price');
+    }
+    return missing;
+  }, [
+    title,
+    category,
+    isGenderCategory,
+    gender,
+    subCategory,
+    productType,
+    uploadedMedia.length,
+    hasVariantsList,
+    isQuantityValid,
+    isPriceValid,
+  ]);
+
+  const fieldInvalid = (name) => showFieldErrors && missingRequiredFields.includes(name);
+  const variantSectionInvalid =
+    fieldInvalid('At least one variant') ||
+    fieldInvalid('Variant quantity') ||
+    fieldInvalid('Variant price');
+
   const handleRemoveMedia = useCallback(mediaId => {
     setUploadedMedia(prev => prev.filter(item => item.id !== mediaId));
     setMediaUploadError('');
@@ -590,12 +637,20 @@ export default function VendorCreateProductScreen() {
   }, [productId, resolvedShopId]);
 
   const onSave = useCallback(() => {
+    if (canAddVariant) {
+      Alert.alert(
+        'Add the variant',
+        'The variant form is ready, but it has not been added yet. Tap Add variant before you save.',
+      );
+      return;
+    }
     if (!hasCoreFields || !hasCategoryFields) {
+      setShowFieldErrors(true);
       setShowValidationModal(true);
       return;
     }
     setShowFinishSheet(true);
-  }, [hasCategoryFields, hasCoreFields]);
+  }, [canAddVariant, hasCategoryFields, hasCoreFields]);
 
   const clearVariantFields = useCallback(() => {
     setVariantColor(null);
@@ -793,8 +848,8 @@ export default function VendorCreateProductScreen() {
     if (picker === 'gender') {
       return {
         title: 'Gender',
-        options: GENDERS,
-        formatLabel: s => s,
+        options: genderOptions,
+        formatLabel: formatMvpCategoryLabel,
         swatchByValue: undefined,
       };
     }
@@ -1073,9 +1128,9 @@ export default function VendorCreateProductScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.label}>Product title</Text>
+          <Text style={[styles.label, fieldInvalid('Product name') && styles.labelError]}>Product title</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, fieldInvalid('Product name') && styles.inputError]}
             placeholder="Product Title"
             placeholderTextColor="#9CA3AF"
             value={title}
@@ -1101,8 +1156,8 @@ export default function VendorCreateProductScreen() {
             onChangeText={setDescription}
           />
 
-          <Text style={[styles.label, styles.spaceTop]}>Media</Text>
-          <View style={styles.mediaBox}>
+          <Text style={[styles.label, styles.spaceTop, fieldInvalid('Product image') && styles.labelError]}>Media</Text>
+          <View style={[styles.mediaBox, fieldInvalid('Product image') && styles.mediaBoxError]}>
             <View style={styles.mediaBtnsRow}>
               <TouchableOpacity
                 style={[
@@ -1178,12 +1233,13 @@ export default function VendorCreateProductScreen() {
           </Text>
           {isGenderCategory ? (
             <>
-              <Text style={[styles.label, styles.spaceTop]}>Gender</Text>
+              <Text style={[styles.label, styles.spaceTop, fieldInvalid('Gender') && styles.labelError]}>Gender</Text>
               <SelectField
                 value={
                   gender ? formatMvpCategoryLabel(gender) : 'Select gender'
                 }
                 onPress={() => setPicker('gender')}
+                invalid={fieldInvalid('Gender')}
               />
             </>
           ) : null}
@@ -1194,7 +1250,7 @@ export default function VendorCreateProductScreen() {
           <View style={styles.row}>
             {!isGenderCategory ? (
               <View style={styles.half}>
-                <Text style={styles.label}>Sub-Category</Text>
+                <Text style={[styles.label, fieldInvalid('Sub category') && styles.labelError]}>Sub-Category</Text>
                 <SelectField
                   value={
                     subCategory
@@ -1203,13 +1259,14 @@ export default function VendorCreateProductScreen() {
                   }
                   onPress={() => setPicker('sub')}
                   disabled={subCategories.length === 0}
+                  invalid={fieldInvalid('Sub category')}
                 />
               </View>
             ) : null}
             <View
               style={isGenderCategory ? styles.fullWidthField : styles.half}
             >
-              <Text style={styles.label}>Product-Type</Text>
+              <Text style={[styles.label, fieldInvalid('Type') && styles.labelError]}>Product-Type</Text>
               <SelectField
                 value={
                   productType
@@ -1226,13 +1283,14 @@ export default function VendorCreateProductScreen() {
                     ? !gender.trim() || typeOptions.length === 0
                     : !subCategory.trim() || typeOptions.length === 0
                 }
+                invalid={fieldInvalid('Type')}
               />
             </View>
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Options (Variant)</Text>
+        <View style={[styles.card, variantSectionInvalid && styles.cardError]}>
+          <Text style={[styles.sectionTitle, variantSectionInvalid && styles.labelError]}>Options (Variant)</Text>
           <View style={styles.optionHeader}>
             <Icon name="add-circle-outline" size={20} color="#111111" />
             <Text style={styles.optionHeaderText}>
@@ -1514,10 +1572,13 @@ export default function VendorCreateProductScreen() {
           <View style={styles.validationModalCard}>
             <Text style={styles.validationTitle}>Complete the form</Text>
             <Text style={styles.validationText}>
-              Please fill in every required field on this page, including at
-              least one valid variant with quantity and price, before saving.
-              Shipping is optional and does not need to be completed.
+              These required fields are empty:
             </Text>
+            {missingRequiredFields.map(field => (
+              <Text key={field} style={styles.validationText}>
+                • {field}
+              </Text>
+            ))}
             <TouchableOpacity
               style={styles.validationOkBtn}
               onPress={() => setShowValidationModal(false)}
@@ -1640,10 +1701,14 @@ function VariantFieldLabel({ title, optional }) {
 /**
  * @param {{ value: string; onPress: () => void; disabled?: boolean; leadingSwatch?: string }} p
  */
-function SelectField({ value, onPress, disabled, leadingSwatch }) {
+function SelectField({ value, onPress, disabled, leadingSwatch, invalid }) {
   return (
     <TouchableOpacity
-      style={[styles.selectField, disabled && styles.selectFieldDisabled]}
+      style={[
+        styles.selectField,
+        disabled && styles.selectFieldDisabled,
+        invalid && styles.inputError,
+      ]}
       onPress={disabled ? undefined : onPress}
       activeOpacity={disabled ? 1 : 0.88}
       disabled={disabled}
@@ -1881,6 +1946,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#3F3F46',
     marginBottom: 10,
+  },
+  labelError: {
+    color: '#DC2626',
+  },
+  inputError: {
+    borderColor: '#DC2626',
+  },
+  mediaBoxError: {
+    borderColor: '#DC2626',
+  },
+  cardError: {
+    borderColor: '#DC2626',
   },
   label: {
     fontSize: 14,

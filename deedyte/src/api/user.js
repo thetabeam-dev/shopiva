@@ -159,11 +159,13 @@ export async function updateUserPhone(userId, phone) {
 /**
  * Upload a profile image. Multipart field `file`.
  * @param {{ uri: string; name: string; type: string }} file
+ * @param {string} [previousUrl] Current photo URL. The server deletes it before storing the new file.
  * @returns {Promise<{ url?: string; image?: { url?: string } }>}
  */
-export async function uploadUserPhoto(file) {
+export async function uploadUserPhoto(file, previousUrl) {
   const form = new FormData();
   form.append('file', file);
+  if (previousUrl) form.append('previousUrl', previousUrl);
   const res = await apiFetchAuthMultipart('/user/photo/upload', {
     method: 'POST',
     body: form,

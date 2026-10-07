@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -192,11 +193,14 @@ export default function PersonalInformationScreen() {
       const file = Array.isArray(fileResult) ? fileResult[0] : fileResult;
       if (!file?.uri) return;
       setUploadingPhoto(true);
-      const uploaded = await uploadUserPhoto({
-        uri: file.uri,
-        type: file.type || 'image/jpeg',
-        name: file.name || `avatar.${String(file.uri).split('.').pop() || 'jpg'}`,
-      });
+      const uploaded = await uploadUserPhoto(
+        {
+          uri: file.uri,
+          type: file.type || 'image/jpeg',
+          name: file.name || `avatar.${String(file.uri).split('.').pop() || 'jpg'}`,
+        },
+        user?.avatarUrl?.trim() || '',
+      );
       const url = uploaded?.url || uploaded?.image?.url;
       if (!url) {
         Alert.alert('Edit image', 'Upload did not return an image URL.');
@@ -212,7 +216,7 @@ export default function PersonalInformationScreen() {
     } finally {
       setUploadingPhoto(false);
     }
-  }, [user?.id, uploadingPhoto, savePhoto]);
+  }, [user?.id, user?.avatarUrl, uploadingPhoto, savePhoto]);
 
   const vendorAccount = isVendorAccountRole(user?.roleRaw);
 
@@ -223,6 +227,7 @@ export default function PersonalInformationScreen() {
   const avatarLetter = avatarLetterSource.charAt(0).toUpperCase();
 
   return (
+    <>
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -341,6 +346,13 @@ export default function PersonalInformationScreen() {
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
+      <Modal visible={uploadingPhoto} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.photoBackdrop} accessibilityViewIsModal>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.photoBackdropText}>Updating photo…</Text>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -481,6 +493,18 @@ function LocationBlock({ value, onChangeText }) {
 const AVATAR_SIZE = 120;
 
 const styles = StyleSheet.create({
+  photoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  photoBackdropText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   flex: {
     flex: 1,
     backgroundColor: BG,

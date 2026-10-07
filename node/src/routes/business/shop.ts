@@ -1,6 +1,10 @@
 import express from "express";
 import { authenticate, optionalVerifyToken, verifyToken } from "../../middleware/auth.js";
 import {
+    UploadShopMediaController,
+    shopMediaUploadMiddleware,
+} from "../../controllers/business/shopMediaUpload.js";
+import {
     VerifyShopBvnController,
     UploadShopVerificationDocumentController,
     verificationUploadMiddleware,
@@ -95,6 +99,12 @@ BusinessRouter.post(
   verifyToken,
   verificationUploadMiddleware,
   UploadShopVerificationDocumentController,
+);
+BusinessRouter.post(
+  "/shop/:shopId/media/upload",
+  verifyToken,
+  shopMediaUploadMiddleware,
+  UploadShopMediaController,
 );
 BusinessRouter.post(
   "/shop/:shopId/product/upload",

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -29,6 +31,7 @@ import {
   fetchShopDetails,
   fetchShopOrders,
   updateVendorShop,
+  uploadShopMedia,
   uploadShopVerificationDocument,
   verifyShopBvn,
   checkShippingConfigStatus,
@@ -415,6 +418,7 @@ export default function ProfileShopInfoScreen() {
   const [bvnDraft, setBvnDraft] = useState('');
   const [bvnBusy, setBvnBusy] = useState(false);
   const [modalDeliveryPolicy, setModalDeliveryPolicy] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(/** @type {null | 'logo' | 'banner'} */ (null));
 
   const uid = user?.id;
 
@@ -574,6 +578,75 @@ export default function ProfileShopInfoScreen() {
       openingHours,
       load,
       refresh,
+    ],
+  );
+
+  const onEditShopMedia = useCallback(
+    async (kind) => {
+      if (!uid || !shopRow || !activeShopId || mediaBusy) return;
+      try {
+        const fileResult = await pick({
+          type: [types.images],
+          copyTo: 'cachesDirectory',
+        });
+        const file = Array.isArray(fileResult) ? fileResult[0] : fileResult;
+        if (!file?.uri) return;
+        setMediaBusy(kind);
+        const previousUrl =
+          kind === 'logo'
+            ? pickStr(shopRow, 'logo', 'Logo')
+            : pickStr(shopRow, 'banner', 'Banner');
+        const uploaded = await uploadShopMedia(
+          activeShopId,
+          kind,
+          {
+            uri: file.uri,
+            type: file.type || 'image/jpeg',
+            name: file.name || `${kind}.jpg`,
+          },
+          previousUrl,
+        );
+        const url = uploaded?.url || uploaded?.image?.url;
+        if (!url) {
+          throw new Error('Upload did not return an image URL.');
+        }
+        const body = buildUpdateBody(shopRow, {
+          name,
+          slug,
+          description,
+          category,
+          contactEmail,
+          contactPhone,
+          location: { ...locationState, openingHours },
+        });
+        body[kind] = url;
+        setShopRow(prev => (prev ? { ...prev, [kind]: url } : prev));
+        await updateVendorShop(activeShopId, uid, body);
+        await load();
+      } catch (e) {
+        if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) return;
+        Alert.alert(
+          kind === 'logo' ? 'Shop logo' : 'Shop banner',
+          e instanceof Error ? e.message : 'Could not update this image.',
+        );
+      } finally {
+        setMediaBusy(null);
+      }
+    },
+    [
+      uid,
+      shopRow,
+      activeShopId,
+      mediaBusy,
+      name,
+      slug,
+      description,
+      category,
+      contactEmail,
+      contactPhone,
+      locationState,
+      openingHours,
+      load,
     ],
   );
 
@@ -876,6 +949,8 @@ export default function ProfileShopInfoScreen() {
   }
 
   const shopStatus = pickStr(shopRow, 'status', 'Status') || 'pending_approval';
+  const logoUri = pickStr(shopRow, 'logo', 'Logo');
+  const bannerUri = pickStr(shopRow, 'banner', 'Banner');
 
   return (
     <KeyboardAvoidingView
@@ -891,15 +966,51 @@ export default function ProfileShopInfoScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[styles.hero, { paddingTop: Math.max(insets.top, 12) + 8 }]}
+        <Pressable
+          style={styles.hero}
+          onPress={() => onEditShopMedia('banner')}
+          disabled={!!mediaBusy}
+          accessibilityRole="button"
+          accessibilityLabel="Edit shop banner"
         >
-          <View style={styles.heroInner}>
-            <View style={styles.avatarCircle}>
-              <Icon name="storefront-outline" size={36} color={BRAND} />
+          <ImageBackground
+            source={bannerUri ? { uri: bannerUri } : undefined}
+            style={styles.heroFill}
+            imageStyle={styles.heroImage}
+            resizeMode="cover"
+            pointerEvents="box-none"
+          >
+            <Pressable
+              style={styles.bannerEditBadge}
+              onPress={() => onEditShopMedia('banner')}
+              disabled={!!mediaBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Edit shop banner"
+            >
+              <Icon name="camera-outline" size={16} color={BRAND} />
+            </Pressable>
+            <View style={styles.heroInner} pointerEvents="box-none">
+              <View>
+                <Pressable
+                  style={styles.avatarCircle}
+                  onPress={() => onEditShopMedia('logo')}
+                  disabled={!!mediaBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit shop logo"
+                >
+                  {logoUri ? (
+                    <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="cover" />
+                  ) : (
+                    <Icon name="storefront-outline" size={36} color={BRAND} />
+                  )}
+                </Pressable>
+                <View style={styles.logoEditBadge} pointerEvents="none">
+                  <Icon name="create-outline" size={14} color={BRAND} />
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          </ImageBackground>
+        </Pressable>
 
         <View style={styles.sheet}>
           <Text style={styles.statusText}>
@@ -1414,6 +1525,14 @@ export default function ProfileShopInfoScreen() {
         shopId={activeShopId}
         onSaved={onDeliveryPolicySaved}
       />
+      <Modal visible={mediaBusy != null} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.mediaBackdrop} accessibilityViewIsModal>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.mediaBackdropText}>
+            {mediaBusy === 'logo' ? 'Updating logo…' : 'Updating banner…'}
+          </Text>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1697,11 +1816,52 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: PAGE_BG },
   hero: {
     backgroundColor: BRAND,
-    paddingBottom: 48,
+    overflow: 'hidden',
+    height: 220,
+  },
+  heroFill: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: undefined,
+    height: undefined,
+  },
+  heroBannerHit: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bannerEditBadge: {
+    position: 'absolute',
+    left: 16,
+    bottom: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginBottom: 35,
+    backgroundColor: CARD,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  logoEditBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: CARD,
+    borderWidth: 2,
+    borderColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   heroInner: {
     alignItems: 'flex-end',
     paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   avatarCircle: {
     width: 88,
@@ -1711,6 +1871,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
+    overflow: 'hidden',
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.35)',
     ...Platform.select({
@@ -1722,6 +1883,22 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 4 },
     }),
+  },
+  logoImage: {
+    width: 88,
+    height: 88,
+  },
+  mediaBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  mediaBackdropText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   sheet: {
     marginTop: -36,

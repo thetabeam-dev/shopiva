@@ -7,11 +7,13 @@ import { ProfileStackScreen } from '../stacks/customer/Profile';
 import { CartStackScreen } from '../stacks/customer/Cart';
 import { ActivitiesStackScreen } from '../stacks/customer/Activities';
 import { ProfileProvider } from '../context/ProfileContext';
+import { useAuth } from '../hooks/useAuth';
 
 const Tab = createBottomTabNavigator();
 
 export default function CustomerTab() {
   const { nested_nav } = useSelector(s => s?.nested_nav);
+  const { isGuest } = useAuth();
   const [tabBarStyle, setTabBarStyle] = React.useState('flex');
 
   React.useEffect(() => {
@@ -49,8 +51,8 @@ export default function CustomerTab() {
         })}
       >
         <Tab.Screen name="Home" component={HomeStackScreen} />
-        <Tab.Screen name="Activities" component={ActivitiesStackScreen} />
-        <Tab.Screen name="Cart" component={CartStackScreen} />
+        {isGuest ? null : <Tab.Screen name="Activities" component={ActivitiesStackScreen} />}
+        {isGuest ? null : <Tab.Screen name="Cart" component={CartStackScreen} />}
         <Tab.Screen name="Profile" component={ProfileStackScreen} />
       </Tab.Navigator>
     </ProfileProvider>

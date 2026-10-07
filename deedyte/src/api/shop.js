@@ -149,6 +149,25 @@ export async function uploadProductImage(shopId, file, productId) {
 }
 
 /**
+ * Upload a shop logo or banner. Deletes `previousUrl` on Cloudinary before storing the new file.
+ * @param {number | string} shopId
+ * @param {'logo' | 'banner'} kind
+ * @param {{ uri: string; name: string; type: string }} file
+ * @param {string} [previousUrl]
+ */
+export async function uploadShopMedia(shopId, kind, file, previousUrl) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('kind', kind);
+  if (previousUrl) form.append('previousUrl', previousUrl);
+  const res = await apiFetchAuthMultipart(`/shop/${encodeURIComponent(String(shopId))}/media/upload`, {
+    method: 'POST',
+    body: form,
+  });
+  return readJson(res);
+}
+
+/**
  * Upload delivery proof image to Cloudinary via API.
  * POST /shop/delivery-evidence-upload (multipart field `file`)
  * @param {{ uri: string; name: string; type: string }} file

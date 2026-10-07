@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
-import type { AuthRequest } from "../middleware/auth.js";
-import Cloudinary from "../utils/cloudinary.js";
+import type { AuthRequest } from "../../middleware/auth.js";
+import Cloudinary from "../../utils/cloudinary.js";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const upload = multer({
@@ -19,19 +19,32 @@ const ALLOWED_MIMES = new Set([
   "image/heif",
 ]);
 
-export const userPhotoUploadMiddleware = upload.single("file");
+export const shopMediaUploadMiddleware = upload.single("file");
 
 type ReqWithFile = AuthRequest & { file?: Express.Multer.File };
 
 /**
- * POST /user/photo/upload
- * Multipart field `file` — stores a profile image and returns its URL.
+ * POST /shop/:shopId/media/upload
+ * Multipart field `file`, plus `kind` (`logo` | `banner`) and optional `previousUrl`.
+ * Deletes the previous Cloudinary image before storing the new one.
  */
-export async function UploadUserPhotoController(req: Request, res: Response): Promise<void> {
+export async function UploadShopMediaController(req: Request, res: Response): Promise<void> {
   try {
     const user = (req as AuthRequest).user;
     if (!user?.id) {
       res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const shopId = String(req.params.shopId ?? "").trim();
+    if (!shopId) {
+      res.status(400).json({ error: "Shop id is required." });
+      return;
+    }
+
+    const kind = req.body?.kind === "banner" ? "banner" : req.body?.kind === "logo" ? "logo" : "";
+    if (!kind) {
+      res.status(400).json({ error: "kind must be logo or banner." });
       return;
     }
 
@@ -70,7 +83,7 @@ export async function UploadUserPhotoController(req: Request, res: Response): Pr
       } catch (deleteErr) {
         const message = deleteErr instanceof Error ? deleteErr.message : String(deleteErr);
         if (!message.toLowerCase().includes("not found")) {
-          res.status(500).json({ error: "Could not remove the current photo before uploading a new one." });
+          res.status(500).json({ error: "Could not remove the current image before uploading a new one." });
           return;
         }
       }
@@ -78,15 +91,16 @@ export async function UploadUserPhotoController(req: Request, res: Response): Pr
 
     const uploadResult = await Cloudinary.uploadAsset({
       file,
-      productId: `users/avatars/user-${user.id}`,
+      productId: `shops/${shopId}/${kind}`,
     });
 
     res.status(200).json({
       image: uploadResult.data,
       url: uploadResult.data.url,
+      kind,
     });
   } catch (err) {
-    console.error("Upload user photo error:", err);
+    console.error("Upload shop media error:", err);
     res.status(500).json({
       error: err instanceof Error ? err.message : "Upload failed.",
     });
