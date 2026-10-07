@@ -5,6 +5,7 @@ import { apiFetchAuth } from './client';
  * @property {number} id
  * @property {string} name
  * @property {string} slug
+ * @property {string | null} [logo]
  * @property {number | null} lat
  * @property {number | null} lng
  * @property {string | null} [state]

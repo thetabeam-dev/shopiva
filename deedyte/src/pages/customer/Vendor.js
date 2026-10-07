@@ -465,18 +465,18 @@ export default function VendorShopScreen({ route, navigation }) {
                   <TouchableOpacity style={styles.circleBrown} onPress={() => navigation.goBack()} activeOpacity={0.85}>
                     <Icon name="arrow-back" size={22} color="#000000" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
+                  {/* <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
                     <Icon name="search-outline" size={20} color="#000000" />
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                 </View>
                 <View style={styles.heroTopRight}>
-                  <TouchableOpacity style={styles.followPill} onPress={onFollow} activeOpacity={0.88}>
+                  {/* <TouchableOpacity style={styles.followPill} onPress={onFollow} activeOpacity={0.88}>
                     <Text style={styles.followPillText}>{following ? 'Following' : 'Follow'}</Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                   {deliveryHeaderActions}
-                  <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
+                  {/* <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
                     <Icon name="share-outline" size={20} color="#000000" />
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                 </View>
               </View>
               <View style={styles.heroBrandBlock}>
@@ -544,7 +544,13 @@ export default function VendorShopScreen({ route, navigation }) {
                   product={p}
                   width={colW}
                   navigation={navigation}
-                  vendor={vendor}
+                  vendor={{
+                    ...vendor,
+                    logo:
+                      (typeof shopMeta.logo === 'string' && shopMeta.logo.trim()) ||
+                      vendor?.logo ||
+                      '',
+                  }}
                   category={category}
                   shop={shopMeta}
                 />

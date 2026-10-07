@@ -701,6 +701,7 @@ export class shop{
               s.id,
               s.name,
               s.slug,
+              s.logo,
               s.location,
               m.average_rating,
               m.review_count,
