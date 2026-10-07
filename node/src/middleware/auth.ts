@@ -40,6 +40,7 @@ interface AuthenticatedUserProfile {
   role: string | null;
   devicetoken: string | null,
   location: Record<string, unknown> | null;
+  photo: string | null;
   preferredLanguage: string;
   timezone: string;
   isEmailVerified: boolean;
@@ -62,7 +63,7 @@ const authenticateUser = async (id: number): Promise<AuthenticatedUserProfile | 
   try {
     const result = await (await db()).query(
       `SELECT id, fname, lname, email, provider, accountstatus, phone, gender, role, location, devicetoken,
-              preferredlanguage, timezone, isemailverified, isphoneverified, lastlogin
+              photo, preferredlanguage, timezone, isemailverified, isphoneverified, lastlogin
        FROM users WHERE id = $1`,
       [id]
     );
@@ -96,6 +97,7 @@ const authenticateUser = async (id: number): Promise<AuthenticatedUserProfile | 
       role: row.role != null ? String(row.role) : null,
       devicetoken: row.devicetoken,
       location: locationParsed,
+      photo: row.photo != null ? String(row.photo) : null,
       preferredLanguage: row.preferredlanguage ?? "en",
       timezone: row.timezone ?? "UTC",
       isEmailVerified: Boolean(row.isemailverified),

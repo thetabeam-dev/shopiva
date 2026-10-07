@@ -693,7 +693,7 @@ export class shop{
      * Active shops matching any of the given category strings (public vendor discovery / optional map).
      * Location JSON is parsed in the service layer.
      */
-    static listShopsForMapByCategory = withErrorHandling(async (categoryVariants: string[], excludeOwnerId?: number) => {
+    static listShopsForMapByCategory = withErrorHandling(async (categoryVariants: string[]) => {
         const variants = categoryVariants.length ? categoryVariants : null;
         const { rows } = await (await db()).query(
             `
@@ -713,34 +713,43 @@ export class shop{
                     AND p.is_published = true
                     AND p.thumbnail_url IS NOT NULL
                     AND btrim(p.thumbnail_url) <> ''
+                    AND (
+                      $1::text[] IS NULL
+                      OR EXISTS (
+                        SELECT 1
+                        FROM UNNEST($1::text[]) AS u(v)
+                        WHERE regexp_replace(lower(trim(p.category)), '[^a-z0-9]+', '_', 'g') =
+                              regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
+                      )
+                    )
                   ORDER BY p.created_at DESC NULLS LAST
                   LIMIT 4
                 ) thumb
               ), '[]'::json) AS products
             FROM shops s
             LEFT JOIN shop_review_metrics m ON m.shop_id = s.id
-            WHERE (
-                $1::text[] IS NULL
-                OR EXISTS (
-                    SELECT 1
-                    FROM UNNEST($1::text[]) AS u(v)
-                    WHERE regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') =
-                          regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
-                       OR regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') LIKE
-                          ('%' || regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g') || '%')
-                )
-            )
-              AND ($2::integer IS NULL OR s.ownerid <> $2)
-                AND EXISTS (
-                  SELECT 1
-                  FROM products p
-                  WHERE p.shop_id = s.id
-                )
-              AND s.isactive = true
+            WHERE s.isactive = true
               AND s.status IN ('active', 'pending_approval')
+              AND EXISTS (
+                SELECT 1
+                FROM products p
+                WHERE p.shop_id = s.id
+                  AND p.is_published = true
+                  AND (
+                    $1::text[] IS NULL
+                    OR EXISTS (
+                      SELECT 1
+                      FROM UNNEST($1::text[]) AS u(v)
+                      WHERE regexp_replace(lower(trim(p.category)), '[^a-z0-9]+', '_', 'g') =
+                            regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
+                         OR regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') =
+                            regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
+                    )
+                  )
+              )
             ORDER BY s.name ASC
             `,
-            [variants, excludeOwnerId ?? null]
+            [variants]
         );
         return rows;
     });

@@ -3,6 +3,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 // import { useSelector } from 'react-redux';
 import React from 'react';
 import {
+  Alert,
   Image,
   Platform,
   StyleSheet,
@@ -60,8 +61,12 @@ const vendorsOpt = (navigation) => ({
 
       <TouchableOpacity
         accessibilityRole="button"
+        accessibilityLabel="Notifications"
         onPress={() =>
-          navigation.navigate('')
+          Alert.alert(
+            'Notifications',
+            'This feature will be available in a future update.',
+          )
         }
         style={styles.vendorsHeaderFilter}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

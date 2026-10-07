@@ -1,5 +1,5 @@
 import DeviceInfo from 'react-native-device-info';
-import { apiFetchAuth } from './client';
+import { apiFetchAuth, apiFetchAuthMultipart } from './client';
 import { getApiBaseUrl } from './config';
 import { Platform } from 'react-native';
 import axios from 'axios';
@@ -156,6 +156,48 @@ export async function updateUserPhone(userId, phone) {
  *   location?: { city?: string; state?: string; country?: string }
  * }} fields
  */
+/**
+ * Upload a profile image. Multipart field `file`.
+ * @param {{ uri: string; name: string; type: string }} file
+ * @param {string} [previousUrl] Current photo URL. The server deletes it before storing the new file.
+ * @returns {Promise<{ url?: string; image?: { url?: string } }>}
+ */
+export async function uploadUserPhoto(file, previousUrl) {
+  const form = new FormData();
+  form.append('file', file);
+  if (previousUrl) form.append('previousUrl', previousUrl);
+  const res = await apiFetchAuthMultipart('/user/photo/upload', {
+    method: 'POST',
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(pickError(data, res));
+  }
+  return data;
+}
+
+/**
+ * @param {number} userId
+ * @param {string} photoUrl
+ */
+export async function updateUserPhoto(userId, photoUrl) {
+  const res = await apiFetchAuth(`/user/photo/update/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ photo: photoUrl }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: pickError(data, res) };
+  }
+  return {
+    ok: true,
+    user: /** @type {object | undefined} */ (
+      /** @type {{ user?: object }} */ (data).user
+    ),
+  };
+}
+
 export async function updateUserProfileFields(userId, fields) {
   const res = await apiFetchAuth(`/user/profile/update/${userId}`, {
     method: 'PUT',

@@ -16,16 +16,13 @@ import { apiFetchAuth } from './client';
  * Public vendor discovery by category (list/browse; coordinates optional if shop has no geo yet).
  * Node route: `GET /discover/vendors?category=...`
  *
- * @param {string} category - Top-level category key (e.g. from `mvp_category.json` on the site: "fashion", …)
+ * @param {string} [category] - Top-level category key. Omit or pass an empty string to load every shop.
  * @returns {Promise<VendorDiscoverShop[]>}
  */
 export async function getVendorsOnMapByCategory(category) {
   const trimmed = String(category ?? '').trim();
-  if (!trimmed) {
-    throw new Error('category is required');
-  }
-  const q = encodeURIComponent(trimmed);
-  const res = await apiFetchAuth(`/discover/vendors?category=${q}`);
+  const q = trimmed ? `?category=${encodeURIComponent(trimmed)}` : '';
+  const res = await apiFetchAuth(`/discover/vendors${q}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const hint =

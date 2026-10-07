@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +18,13 @@ import Geolocation from '@react-native-community/geolocation';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  errorCodes,
+  isErrorWithCode,
+  pick as pickDocument,
+  types as documentPickerTypes,
+} from '@react-native-documents/picker';
+import { uploadUserPhoto } from '../api/user';
 import { useProfile } from '../context/ProfileContext';
 import { genderToApi, isVendorAccountRole, parseLocationString } from '../profile/normalizeUser';
 
@@ -112,12 +120,13 @@ function initialNameFor(u) {
 export default function PersonalInformationScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { user, saveProfileFields, refresh } = useProfile();
+  const { user, saveProfileFields, savePhoto, refresh } = useProfile();
 
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [gender, setGender] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -174,10 +183,40 @@ export default function PersonalInformationScreen() {
     }
   }, [user, name, gender, location, saveProfileFields]);
 
-  const onEditImage = useCallback(() => {
-
-    Alert.alert('Edit image', 'Photo picker will be available in a future update.');
-  }, []);
+  const onEditImage = useCallback(async () => {
+    if (!user?.id || uploadingPhoto) return;
+    try {
+      const fileResult = await pickDocument({
+        type: [documentPickerTypes.images],
+        copyTo: 'cachesDirectory',
+      });
+      const file = Array.isArray(fileResult) ? fileResult[0] : fileResult;
+      if (!file?.uri) return;
+      setUploadingPhoto(true);
+      const uploaded = await uploadUserPhoto(
+        {
+          uri: file.uri,
+          type: file.type || 'image/jpeg',
+          name: file.name || `avatar.${String(file.uri).split('.').pop() || 'jpg'}`,
+        },
+        user?.avatarUrl?.trim() || '',
+      );
+      const url = uploaded?.url || uploaded?.image?.url;
+      if (!url) {
+        Alert.alert('Edit image', 'Upload did not return an image URL.');
+        return;
+      }
+      const out = await savePhoto(url);
+      if (!out.ok) {
+        Alert.alert('Edit image', out.message || 'Could not save your photo.');
+      }
+    } catch (err) {
+      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) return;
+      Alert.alert('Edit image', err instanceof Error ? err.message : 'Could not update your photo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }, [user?.id, user?.avatarUrl, uploadingPhoto, savePhoto]);
 
   const vendorAccount = isVendorAccountRole(user?.roleRaw);
 
@@ -188,6 +227,7 @@ export default function PersonalInformationScreen() {
   const avatarLetter = avatarLetterSource.charAt(0).toUpperCase();
 
   return (
+    <>
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -210,8 +250,12 @@ export default function PersonalInformationScreen() {
               <Text style={styles.avatarPhText}>{avatarLetter}</Text>
             </View>
           )}
-          <Pressable onPress={onEditImage} hitSlop={12} accessibilityRole="button">
-            <Text style={styles.editImageLink}>Edit image</Text>
+          <Pressable onPress={onEditImage} hitSlop={12} accessibilityRole="button" disabled={uploadingPhoto}>
+            {uploadingPhoto ? (
+              <ActivityIndicator color={LINK_BLUE} />
+            ) : (
+              <Text style={styles.editImageLink}>Edit image</Text>
+            )}
           </Pressable>
         </View>
 
@@ -302,6 +346,13 @@ export default function PersonalInformationScreen() {
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
+      <Modal visible={uploadingPhoto} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.photoBackdrop} accessibilityViewIsModal>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.photoBackdropText}>Updating photo…</Text>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -442,6 +493,18 @@ function LocationBlock({ value, onChangeText }) {
 const AVATAR_SIZE = 120;
 
 const styles = StyleSheet.create({
+  photoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  photoBackdropText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   flex: {
     flex: 1,
     backgroundColor: BG,

@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../hooks/useAuth';
 import ProfileScreen from '../../pages/Profile';
 import ProfileSettings from '../../pages/ProfileSettings';
 import TransactionsScreen from '../../pages/TransactionsScreen';
@@ -48,20 +49,22 @@ const SETTINGS_ROUTE_TITLES = {
 };
 
 function ProfileMainHeader({ navigation }) {
-  const insets = useSafeAreaInsets();
+  const { isGuest } = useAuth();
 
   return (
     <View style={[styles.headerContainer, { paddingTop: Platform === 'ios' ? 0 : Math.max(0, 30) }]}>
       <Text style={styles.headerTitle}>Profile</Text>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Profile-settings')}
-        style={styles.iconBtn}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel="Settings"
-      >
-        <Icon name="settings-outline" size={22} color="#000000" />
-      </TouchableOpacity>
+      {isGuest ? null : (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile-settings')}
+          style={styles.iconBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+        >
+          <Icon name="settings-outline" size={22} color="#000000" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

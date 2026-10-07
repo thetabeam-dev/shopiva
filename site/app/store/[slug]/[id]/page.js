@@ -135,4 +135,3 @@ export default async function ProductPage({ params }) {
     return <div>Error loading product. Please try again later.</div>;
   }
 }
-   

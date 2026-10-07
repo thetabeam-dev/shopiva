@@ -11,6 +11,7 @@ import {
   updateUserEmail,
   updateUserPassword,
   updateUserPhone,
+  updateUserPhoto,
   updateUserProfileFields,
 } from '../api/user';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../auth/session';
@@ -29,6 +30,7 @@ const ProfileContext = createContext(
  *   saveEmail: (email: string) => Promise<{ ok: boolean; message?: string }>;
  *   savePassword: (newPassword: string) => Promise<{ ok: boolean; message?: string }>;
  *   saveProfileFields: (fields: { fname?: string; lname?: string; gender?: string; location?: { city?: string; state?: string; country?: string } }) => Promise<{ ok: boolean; message?: string }>;
+ *   savePhoto: (photoUrl: string) => Promise<{ ok: boolean; message?: string }>;
    * }} */ (null),
 );
 
@@ -122,6 +124,21 @@ export function ProfileProvider({ children }) {
     [user?.id, refresh],
   );
 
+  const savePhoto = useCallback(
+    async (photoUrl) => {
+      const uid = user?.id;
+      if (!uid) return { ok: false, message: 'Not signed in.' };
+      const out = await updateUserPhoto(uid, photoUrl);
+      if (out.ok && out.user) {
+        await mergeRemoteUser(out.user);
+      } else if (out.ok) {
+        await refresh();
+      }
+      return out.ok ? { ok: true } : { ok: false, message: out.message };
+    },
+    [user?.id, mergeRemoteUser, refresh],
+  );
+
   const saveProfileFields = useCallback(
     async (fields) => {
       const uid = user?.id;
@@ -148,8 +165,9 @@ export function ProfileProvider({ children }) {
       saveEmail,
       savePassword,
       saveProfileFields,
+      savePhoto,
     }),
-    [user, loading, error, refresh, mergeRemoteUser, savePhone, saveEmail, savePassword, saveProfileFields],
+    [user, loading, error, refresh, mergeRemoteUser, savePhone, saveEmail, savePassword, saveProfileFields, savePhoto],
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

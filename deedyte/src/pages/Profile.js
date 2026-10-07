@@ -35,7 +35,7 @@ const AI_STYLING_TOAST_MS = 2400;
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { signOut, isAuthenticated, activeRole } = useAuth();
+  const { signOut, isAuthenticated, isGuest, activeRole } = useAuth();
   const { user, loading, refresh } = useProfile();
 
   useFocusEffect(
@@ -176,12 +176,14 @@ export default function ProfileScreen() {
           />
         </View> */}
           <View style={styles.menuDivider} />
-          <MenuRow
-            icon="person-outline"
-            title="Personal Information"
-            right={<Icon name="chevron-forward" size={20} color={BLACK} />}
-            onPress={() => navigation.navigate('profile-personal-information')}
-          />
+          {isGuest ? null : (
+            <MenuRow
+              icon="person-outline"
+              title="Personal Information"
+              right={<Icon name="chevron-forward" size={20} color={BLACK} />}
+              onPress={() => navigation.navigate('profile-personal-information')}
+            />
+          )}
           {showShopInfo ? (
             <>
               <View style={styles.menuDivider} />

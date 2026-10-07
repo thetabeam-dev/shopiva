@@ -33,8 +33,8 @@ import {
 import {
   createInventory,
   createProduct,
+  deleteInventory,
   getProduct,
-  updateInventory,
   updateProduct,
 } from '../../api/product';
 import { useProfile } from '../../context/ProfileContext';
@@ -65,7 +65,7 @@ import {
   getVariantPriceRange,
 } from '../../utils/vendorProductPayload';
 
-const GENDERS = ['Male', 'Female'];
+const GENDER_OPTIONS = ['male', 'female', 'unisex'];
 
 /** @template T @param {T[]} arr @param {number} size @returns {T[][]} */
 function chunkArray(arr, size) {
@@ -196,6 +196,10 @@ export default function VendorCreateProductScreen() {
   const [savedVariants, setSavedVariants] = useState(
     /** @type {{ id: string; details: { label: string; value: string }[]; stock: number }[]} */ ([]),
   );
+  const [existingInventoryIds, setExistingInventoryIds] = useState(
+    /** @type {number[]} */ ([]),
+  );
+  const [editingVariantId, setEditingVariantId] = useState(/** @type {string | null} */ (null));
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [continueSelling, setContinueSelling] = useState(false);
@@ -214,6 +218,7 @@ export default function VendorCreateProductScreen() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaUploadError, setMediaUploadError] = useState('');
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showFinishSheet, setShowFinishSheet] = useState(false);
   const [loadingExistingProduct, setLoadingExistingProduct] = useState(false);
 
@@ -282,6 +287,12 @@ export default function VendorCreateProductScreen() {
         setAllowPickup(Boolean(productSpecs.delivery_methods?.pickup));
         setAllowDelivery(Boolean(productSpecs.delivery_methods?.delivery));
         setSavedVariants(variantEntries);
+        const inventoryRows = Array.isArray(data?.inventory) ? data.inventory : [];
+        setExistingInventoryIds(
+          inventoryRows
+            .map(row => Number(row?.id ?? row?.inventory_id))
+            .filter(id => Number.isFinite(id) && id > 0),
+        );
 
         const images = Array.isArray(product.images)
           ? product.images
@@ -326,14 +337,26 @@ export default function VendorCreateProductScreen() {
     [variantFields],
   );
 
+  const genderOptions = useMemo(() => {
+    const row = reduxCategoryState.categories.find(item => item.category === categoryKey);
+    const keys = Object.keys(row?.productType ?? {})
+      .map(key => String(key).trim().toLowerCase())
+      .filter(key => GENDER_OPTIONS.includes(key));
+    const fromCategory = GENDER_OPTIONS.filter(key => keys.includes(key));
+    return fromCategory.length ? fromCategory : GENDER_OPTIONS;
+  }, [categoryKey, reduxCategoryState.categories]);
+
   const typeOptions = useMemo(() => {
     if (isGenderDrivenCategory(categoryKey)) {
+      const row = reduxCategoryState.categories.find(item => item.category === categoryKey);
+      const fromCategory = row?.productType?.[String(gender).trim().toLowerCase()];
+      if (Array.isArray(fromCategory) && fromCategory.length) return fromCategory;
       return getGenderDrivenTypeOptions(categoryKey, gender);
     }
     const sub = String(subCategory || '').trim();
     if (!sub) return [];
     return typesBySubCategory.get(sub) ?? [];
-  }, [categoryKey, gender, subCategory, typesBySubCategory]);
+  }, [categoryKey, gender, reduxCategoryState.categories, subCategory, typesBySubCategory]);
 
   /** MVP: single shop — always the first shop returned for the signed-in owner. */
   useEffect(() => {
@@ -463,34 +486,6 @@ export default function VendorCreateProductScreen() {
     return stockOk && priceOk;
   }, [variantStock, variantPrice]);
 
-  useEffect(() => {
-    setSubCategory('');
-    setProductType('');
-    if (isGenderDrivenCategory(categoryKey)) {
-      setGender('');
-    }
-  }, [categoryKey]);
-
-  useEffect(() => {
-    if (isGenderDrivenCategory(categoryKey)) {
-      setProductType('');
-      return;
-    }
-    setProductType('');
-  }, [subCategory, categoryKey]);
-
-  useEffect(() => {
-    if (isGenderDrivenCategory(categoryKey) && productType.trim()) {
-      setSubCategory(productType);
-    }
-  }, [categoryKey, productType]);
-
-  useEffect(() => {
-    if (isGenderDrivenCategory(categoryKey)) {
-      setProductType('');
-    }
-  }, [gender, categoryKey]);
-
   const variantStockTotal = useMemo(
     () => savedVariants.reduce((t, v) => t + Number(v?.stock || 0), 0),
     [savedVariants],
@@ -526,6 +521,40 @@ export default function VendorCreateProductScreen() {
   const hasCategoryFields = isGenderCategory
     ? productType.trim().length > 0
     : subCategory.trim().length > 0 && productType.trim().length > 0;
+
+  const missingRequiredFields = useMemo(() => {
+    const missing = [];
+    if (title.trim().length <= 1) missing.push('Product name');
+    if (!category.trim()) missing.push('Category');
+    if (isGenderCategory && !gender.trim()) missing.push('Gender');
+    if (!isGenderCategory && !subCategory.trim()) missing.push('Sub category');
+    if (!productType.trim()) missing.push('Type');
+    if (uploadedMedia.length === 0) missing.push('Product image');
+    if (!hasVariantsList) {
+      missing.push('At least one variant');
+    } else {
+      if (!isQuantityValid) missing.push('Variant quantity');
+      if (!isPriceValid) missing.push('Variant price');
+    }
+    return missing;
+  }, [
+    title,
+    category,
+    isGenderCategory,
+    gender,
+    subCategory,
+    productType,
+    uploadedMedia.length,
+    hasVariantsList,
+    isQuantityValid,
+    isPriceValid,
+  ]);
+
+  const fieldInvalid = (name) => showFieldErrors && missingRequiredFields.includes(name);
+  const variantSectionInvalid =
+    fieldInvalid('At least one variant') ||
+    fieldInvalid('Variant quantity') ||
+    fieldInvalid('Variant price');
 
   const handleRemoveMedia = useCallback(mediaId => {
     setUploadedMedia(prev => prev.filter(item => item.id !== mediaId));
@@ -590,12 +619,20 @@ export default function VendorCreateProductScreen() {
   }, [productId, resolvedShopId]);
 
   const onSave = useCallback(() => {
+    if (canAddVariant) {
+      Alert.alert(
+        'Add the variant',
+        'The variant form is ready, but it has not been added yet. Tap Add variant before you save.',
+      );
+      return;
+    }
     if (!hasCoreFields || !hasCategoryFields) {
+      setShowFieldErrors(true);
       setShowValidationModal(true);
       return;
     }
     setShowFinishSheet(true);
-  }, [hasCategoryFields, hasCoreFields]);
+  }, [canAddVariant, hasCategoryFields, hasCoreFields]);
 
   const clearVariantFields = useCallback(() => {
     setVariantColor(null);
@@ -666,14 +703,17 @@ export default function VendorCreateProductScreen() {
         arr.findIndex(item => item.label === detail.label && item.value === detail.value) === index,
     );
 
-    setSavedVariants(prev => [
-      ...prev,
-      {
-        id: `${Date.now()}-${prev.length}`,
-        details,
-        stock: Number(variantStock),
-      },
-    ]);
+    const nextVariant = {
+      id: editingVariantId ?? `${Date.now()}`,
+      details,
+      stock: Number(variantStock),
+    };
+    setSavedVariants(prev =>
+      editingVariantId
+        ? prev.map(item => (item.id === editingVariantId ? nextVariant : item))
+        : [...prev, nextVariant],
+    );
+    setEditingVariantId(null);
     clearVariantFields();
     setDynamicVariantValues({});
   }, [
@@ -687,7 +727,48 @@ export default function VendorCreateProductScreen() {
     variantCtx.sizeFieldLabel,
     variantCtx.materialFieldLabel,
     clearVariantFields,
+    editingVariantId,
   ]);
+
+  const closeVariantEditor = useCallback(() => {
+    setEditingVariantId(null);
+    clearVariantFields();
+    setDynamicVariantValues({});
+  }, [clearVariantFields]);
+
+  const openVariantEditor = useCallback((variant) => {
+    const details = Array.isArray(variant?.details) ? variant.details : [];
+    const valueFor = (...labels) => {
+      const wanted = labels.map(label => String(label).trim().toLowerCase());
+      const found = details.find(detail =>
+        wanted.includes(String(detail?.label ?? '').trim().toLowerCase()),
+      );
+      return found ? String(found.value ?? '') : '';
+    };
+    const nextValues = {};
+    for (const [fieldKey] of dynamicVariantEntries) {
+      const selected = valueFor(fieldKey, formatMvpCategoryLabel(fieldKey));
+      if (!selected) continue;
+      nextValues[fieldKey] = selected;
+      if (fieldKey === 'color') {
+        const opt = colorByValue[selected] ?? Object.values(colorByValue).find(
+          item => String(item?.label ?? '').toLowerCase() === selected.toLowerCase(),
+        );
+        setVariantColor(
+          opt
+            ? { value: opt.value, label: opt.label, color: opt.color }
+            : { value: selected, label: selected, color: '#CCCCCC' },
+        );
+      }
+      if (fieldKey === 'size') setVariantSize(selected);
+      if (fieldKey === 'material') setVariantMaterial(selected);
+    }
+    setDynamicVariantValues(nextValues);
+    setVariantStock(String(variant?.stock ?? valueFor('quantity', 'stock') ?? ''));
+    setVariantPrice(valueFor('price', 'variant price'));
+    setVariantError('');
+    setEditingVariantId(variant.id);
+  }, [colorByValue, dynamicVariantEntries]);
 
   const handleDeleteVariant = useCallback(variantId => {
     setSavedVariants(prev => prev.filter(item => item.id !== variantId));
@@ -722,6 +803,7 @@ export default function VendorCreateProductScreen() {
           break;
         case 'sub':
           setSubCategory(s);
+          setProductType('');
           break;
         case 'type':
           setProductType(s);
@@ -731,6 +813,7 @@ export default function VendorCreateProductScreen() {
           break;
         case 'gender':
           setGender(s);
+          setProductType('');
           break;
         case 'variantColor': {
           const opt = colorByValue[s];
@@ -793,8 +876,8 @@ export default function VendorCreateProductScreen() {
     if (picker === 'gender') {
       return {
         title: 'Gender',
-        options: GENDERS,
-        formatLabel: s => s,
+        options: genderOptions,
+        formatLabel: formatMvpCategoryLabel,
         swatchByValue: undefined,
       };
     }
@@ -953,30 +1036,25 @@ export default function VendorCreateProductScreen() {
           throw new Error('Invalid response from server (missing product id).');
         }
 
-        const inventoryRows = Array.isArray(result?.inventory)
-          ? result.inventory
-          : [];
-
-        if (inventoryRows.length > 0) {
-          await Promise.all(
-            inventoryRows.map(row =>
-              updateInventory(
-                resolvedShopId,
-                Number(updatedProductId),
-                row.id ?? row.inventory_id,
-                uid,
-                inventoryPayload,
-              ),
-            ),
-          );
-        } else {
-          await createInventory(
-            resolvedShopId,
-            Number(updatedProductId),
-            uid,
-            inventoryPayload,
-          );
-        }
+        const returnedInventory = Array.isArray(result?.inventory) ? result.inventory : [];
+        const inventoryIds = [
+          ...existingInventoryIds,
+          ...returnedInventory
+            .map(row => Number(row?.id ?? row?.inventory_id))
+            .filter(id => Number.isFinite(id) && id > 0),
+        ];
+        const uniqueInventoryIds = [...new Set(inventoryIds)];
+        await Promise.all(
+          uniqueInventoryIds.map(inventoryId =>
+            deleteInventory(resolvedShopId, Number(updatedProductId), inventoryId, uid),
+          ),
+        );
+        await createInventory(
+          resolvedShopId,
+          Number(updatedProductId),
+          uid,
+          inventoryPayload,
+        );
       } else {
         const data = await createProduct(resolvedShopId, uid, productPayload);
         const rawProduct = data?.product;
@@ -1035,6 +1113,7 @@ export default function VendorCreateProductScreen() {
     thumbnailUrl,
     productId,
     editProductId,
+    existingInventoryIds,
     navigation,
   ]);
 
@@ -1073,9 +1152,9 @@ export default function VendorCreateProductScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.label}>Product title</Text>
+          <Text style={[styles.label, fieldInvalid('Product name') && styles.labelError]}>Product title</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, fieldInvalid('Product name') && styles.inputError]}
             placeholder="Product Title"
             placeholderTextColor="#9CA3AF"
             value={title}
@@ -1101,8 +1180,8 @@ export default function VendorCreateProductScreen() {
             onChangeText={setDescription}
           />
 
-          <Text style={[styles.label, styles.spaceTop]}>Media</Text>
-          <View style={styles.mediaBox}>
+          <Text style={[styles.label, styles.spaceTop, fieldInvalid('Product image') && styles.labelError]}>Media</Text>
+          <View style={[styles.mediaBox, fieldInvalid('Product image') && styles.mediaBoxError]}>
             <View style={styles.mediaBtnsRow}>
               <TouchableOpacity
                 style={[
@@ -1178,12 +1257,13 @@ export default function VendorCreateProductScreen() {
           </Text>
           {isGenderCategory ? (
             <>
-              <Text style={[styles.label, styles.spaceTop]}>Gender</Text>
+              <Text style={[styles.label, styles.spaceTop, fieldInvalid('Gender') && styles.labelError]}>Gender</Text>
               <SelectField
                 value={
                   gender ? formatMvpCategoryLabel(gender) : 'Select gender'
                 }
                 onPress={() => setPicker('gender')}
+                invalid={fieldInvalid('Gender')}
               />
             </>
           ) : null}
@@ -1194,7 +1274,7 @@ export default function VendorCreateProductScreen() {
           <View style={styles.row}>
             {!isGenderCategory ? (
               <View style={styles.half}>
-                <Text style={styles.label}>Sub-Category</Text>
+                <Text style={[styles.label, fieldInvalid('Sub category') && styles.labelError]}>Sub-Category</Text>
                 <SelectField
                   value={
                     subCategory
@@ -1203,13 +1283,14 @@ export default function VendorCreateProductScreen() {
                   }
                   onPress={() => setPicker('sub')}
                   disabled={subCategories.length === 0}
+                  invalid={fieldInvalid('Sub category')}
                 />
               </View>
             ) : null}
             <View
               style={isGenderCategory ? styles.fullWidthField : styles.half}
             >
-              <Text style={styles.label}>Product-Type</Text>
+              <Text style={[styles.label, fieldInvalid('Type') && styles.labelError]}>Product-Type</Text>
               <SelectField
                 value={
                   productType
@@ -1226,13 +1307,14 @@ export default function VendorCreateProductScreen() {
                     ? !gender.trim() || typeOptions.length === 0
                     : !subCategory.trim() || typeOptions.length === 0
                 }
+                invalid={fieldInvalid('Type')}
               />
             </View>
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Options (Variant)</Text>
+        <View style={[styles.card, variantSectionInvalid && styles.cardError]}>
+          <Text style={[styles.sectionTitle, variantSectionInvalid && styles.labelError]}>Options (Variant)</Text>
           <View style={styles.optionHeader}>
             <Icon name="add-circle-outline" size={20} color="#111111" />
             <Text style={styles.optionHeaderText}>
@@ -1363,6 +1445,17 @@ export default function VendorCreateProductScreen() {
                     <Text style={styles.savedVariantTitle}>
                       Variant {index + 1}
                     </Text>
+                    <View style={styles.savedVariantActions}>
+                    <TouchableOpacity
+                      style={styles.savedVariantEditBtn}
+                      onPress={() => openVariantEditor(variant)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit variant"
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.savedVariantEditText}>Edit</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.savedVariantDeleteBtn}
                       onPress={() => handleDeleteVariant(variant.id)}
@@ -1373,6 +1466,7 @@ export default function VendorCreateProductScreen() {
                     >
                       <Text style={styles.savedVariantDeleteText}>Delete</Text>
                     </TouchableOpacity>
+                    </View>
                   </View>
                   <View style={styles.savedVariantGrid}>
                     {chunkArray(variant.details, 4).map((row, rowIndex) => (
@@ -1509,15 +1603,90 @@ export default function VendorCreateProductScreen() {
           <Text style={styles.uploadOverlayText}>Uploading images…</Text>
         </View>
       ) : null}
+      <Modal
+        transparent
+        visible={editingVariantId != null}
+        animationType="slide"
+        onRequestClose={closeVariantEditor}
+      >
+        <View style={styles.sheetRoot}>
+          <Pressable style={styles.sheetBackdrop} onPress={closeVariantEditor} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[styles.sheetCard, { paddingBottom: insets.bottom + 14, maxHeight: '85%' }]}
+          >
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={styles.sheetTitle}>Edit variant</Text>
+              <Text style={styles.variantFormHint}>
+                Quantity and variant price are required. Color, size, and material are optional.
+              </Text>
+              {dynamicVariantEntries.map(([fieldKey, fieldOptions]) => {
+                if (!Array.isArray(fieldOptions) || fieldOptions.length === 0) return null;
+                const displayLabel = formatMvpCategoryLabel(fieldKey);
+                const selectedValue =
+                  fieldKey === 'color'
+                    ? variantColor?.label
+                    : fieldKey === 'size'
+                      ? variantSize
+                      : fieldKey === 'material'
+                        ? variantMaterial
+                        : dynamicVariantValues[fieldKey];
+                return (
+                  <View key={`edit-${fieldKey}`}>
+                    <VariantFieldLabel title={displayLabel} optional />
+                    <SelectField
+                      value={
+                        selectedValue
+                          ? String(selectedValue)
+                          : `Select a ${displayLabel.toLowerCase()}`
+                      }
+                      onPress={() => setPicker(fieldKey)}
+                    />
+                  </View>
+                );
+              })}
+              <VariantFieldLabel title="Quantity" />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter variant quantity"
+                placeholderTextColor="#9CA3AF"
+                value={variantStock}
+                onChangeText={handleVariantStockChange}
+              />
+              <VariantFieldLabel title="Variant price" />
+              <NairaInput
+                value={variantPrice}
+                onChangeText={handleVariantPriceChange}
+                placeholder="Enter variant price"
+              />
+              {variantError ? (
+                <Text style={styles.variantErrorText}>{variantError}</Text>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.addVariantBtn, !canAddVariant && styles.addVariantBtnDisabled]}
+                activeOpacity={0.88}
+                onPress={handleSaveVariant}
+              >
+                <Text style={[styles.addVariantBtnText, !canAddVariant && styles.addVariantBtnTextDisabled]}>
+                  Save variant
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
       <Modal transparent visible={showValidationModal} animationType="fade">
         <View style={styles.modalRoot}>
           <View style={styles.validationModalCard}>
             <Text style={styles.validationTitle}>Complete the form</Text>
             <Text style={styles.validationText}>
-              Please fill in every required field on this page, including at
-              least one valid variant with quantity and price, before saving.
-              Shipping is optional and does not need to be completed.
+              These required fields are empty:
             </Text>
+            {missingRequiredFields.map(field => (
+              <Text key={field} style={styles.validationText}>
+                • {field}
+              </Text>
+            ))}
             <TouchableOpacity
               style={styles.validationOkBtn}
               onPress={() => setShowValidationModal(false)}
@@ -1640,10 +1809,14 @@ function VariantFieldLabel({ title, optional }) {
 /**
  * @param {{ value: string; onPress: () => void; disabled?: boolean; leadingSwatch?: string }} p
  */
-function SelectField({ value, onPress, disabled, leadingSwatch }) {
+function SelectField({ value, onPress, disabled, leadingSwatch, invalid }) {
   return (
     <TouchableOpacity
-      style={[styles.selectField, disabled && styles.selectFieldDisabled]}
+      style={[
+        styles.selectField,
+        disabled && styles.selectFieldDisabled,
+        invalid && styles.inputError,
+      ]}
       onPress={disabled ? undefined : onPress}
       activeOpacity={disabled ? 1 : 0.88}
       disabled={disabled}
@@ -1882,6 +2055,18 @@ const styles = StyleSheet.create({
     color: '#3F3F46',
     marginBottom: 10,
   },
+  labelError: {
+    color: '#DC2626',
+  },
+  inputError: {
+    borderColor: '#DC2626',
+  },
+  mediaBoxError: {
+    borderColor: '#DC2626',
+  },
+  cardError: {
+    borderColor: '#DC2626',
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -2100,10 +2285,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  savedVariantActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   savedVariantTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#3F3F46',
+  },
+  savedVariantEditBtn: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  savedVariantEditText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
   },
   savedVariantDeleteBtn: {
     backgroundColor: '#FCE7E7',
