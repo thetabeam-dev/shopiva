@@ -709,11 +709,7 @@ export async function ListShopsForDiscoverByCategoryController(req: Request, res
             res.status(400).json({ error: "Query parameter category is too long." });
             return;
         }
-        const ownerId = Number((req as Request & { user?: { id?: unknown } }).user?.id);
-        const vendors = await GetShopsForDiscoverByCategoryService(
-            category,
-            Number.isFinite(ownerId) && ownerId > 0 ? ownerId : undefined,
-        );
+        const vendors = await GetShopsForDiscoverByCategoryService(category);
 
         res.status(200).json({ vendors });
     } catch (err) {

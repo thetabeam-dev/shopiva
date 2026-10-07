@@ -35,6 +35,8 @@ import {
   selectCategoryRows,
 } from '../../../redux/categoriesSlice';
 
+const ALL_CATEGORY = '__all__';
+
 const WINDOW_W = Dimensions.get('window').width;
 const WINDOW_H = Dimensions.get('window').height;
 
@@ -102,6 +104,16 @@ const STATE_ALIASES = new Map([
  * @param {unknown} raw
  * @returns {string | null}
  */
+function vendorStateRaw(vendor) {
+  if (!vendor || typeof vendor !== 'object') return null;
+  if (vendor.state != null && String(vendor.state).trim()) return vendor.state;
+  const location = vendor.location;
+  if (location && typeof location === 'object' && location.state != null) {
+    return location.state;
+  }
+  return null;
+}
+
 function normalizeVendorState(raw) {
   if (raw == null) return null;
   const t = String(raw).trim().toLowerCase().replace(/\s+/g, ' ');
@@ -124,18 +136,17 @@ function buildLocationRows(vendors) {
   const counts = new Map();
   let other = 0;
   for (const v of vendors) {
-    const canon = normalizeVendorState(v.state);
+    const canon = normalizeVendorState(vendorStateRaw(v));
     if (canon) {
       counts.set(canon, (counts.get(canon) || 0) + 1);
     } else {
       other += 1;
     }
   }
-  const stateRows = NG_STATES.map(name => ({
-    key: name,
-    name,
-    count: counts.get(name) ?? 0,
-  }));
+  const stateRows = NG_STATES.flatMap(name => {
+    const count = counts.get(name) ?? 0;
+    return count > 0 ? [{ key: name, name, count }] : [];
+  });
   if (other > 0) {
     stateRows.push({ key: 'Other', name: 'Other', count: other });
   }
@@ -568,14 +579,16 @@ export default function VendorScreen({ route, navigation }) {
   const categoriesLoading = useSelector(selectCategoriesLoading);
   const categoriesError = useSelector(selectCategoriesError) ?? '';
   const visibleCategories = useMemo(
-    () =>
-      categoryRows
+    () => [
+      ALL_CATEGORY,
+      ...categoryRows
         .filter(row => Number(row?.existingProductCount ?? 0) > 0)
         .map(row => String(row?.category ?? '').trim().toLowerCase())
         .filter(Boolean),
+    ],
     [categoryRows],
   );
-  const [selectedCategory, setSelectedCategory] = useState(routeCategory);
+  const [selectedCategory, setSelectedCategory] = useState(routeCategory || ALL_CATEGORY);
   const category = selectedCategory;
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -614,13 +627,14 @@ export default function VendorScreen({ route, navigation }) {
 
     setSelectedCategory((current) => {
       const currentKey = String(current ?? '').trim().toLowerCase();
+      if (currentKey === ALL_CATEGORY) return ALL_CATEGORY;
       if (currentKey) {
         const existing = visibleCategories.find((option) => option === currentKey);
         if (existing) return existing;
       }
 
       const routeMatch = visibleCategories.find((option) => option === routeCategory);
-      return routeMatch ?? visibleCategories[0];
+      return routeMatch ?? ALL_CATEGORY;
     });
   }, [routeCategory, visibleCategories]);
 
@@ -635,7 +649,9 @@ export default function VendorScreen({ route, navigation }) {
       setLoading(true);
       setError('');
       try {
-        const rows = await getVendorsOnMapByCategory(category);
+        const rows = await getVendorsOnMapByCategory(
+          category === ALL_CATEGORY ? '' : category,
+        );
         if (!cancelled) {
           setVendors(rows);
         }
@@ -936,7 +952,7 @@ export default function VendorScreen({ route, navigation }) {
   const displayedVendors = useMemo(() => {
     if (locationFilter == null) return vendors;
     return vendors.filter(
-      v => normalizeVendorState(v.state) === locationFilter,
+      v => normalizeVendorState(vendorStateRaw(v)) === locationFilter,
     );
   }, [vendors, locationFilter]);
 
@@ -962,10 +978,10 @@ export default function VendorScreen({ route, navigation }) {
               activeOpacity={0.82}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`Show ${formatCategoryLabel(item)} shops`}
+              accessibilityLabel={`Show ${item === ALL_CATEGORY ? 'all' : formatCategoryLabel(item)} shops`}
             >
               <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
-                {formatCategoryLabel(item)}
+                {item === ALL_CATEGORY ? 'All' : formatCategoryLabel(item)}
               </Text>
             </TouchableOpacity>
           );
