@@ -843,9 +843,17 @@ export default function ProductScreen({ route, navigation }) {
           </TouchableOpacity>
           <View style={styles.vendorLeft}>
             <View style={styles.vendorAvatar}>
-              <Text style={styles.vendorAvatarLetter}>
-                {shopName.charAt(0).toUpperCase()}
-              </Text>
+              {String(vendor?.logo ?? '').trim() ? (
+                <Image
+                  source={{ uri: String(vendor.logo).trim() }}
+                  style={styles.vendorAvatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.vendorAvatarLetter}>
+                  {shopName.charAt(0).toUpperCase()}
+                </Text>
+              )}
             </View>
             <View style={styles.vendorTextCol}>
               <Text style={styles.vendorName} numberOfLines={1}>
@@ -1185,12 +1193,8 @@ export default function ProductScreen({ route, navigation }) {
         onClose={() => setOverflowMenuOpen(false)}
         title={title}
         subtitle={`${priceDisplayLabel} · ${shopName}`}
-        headerImageUri={
-          gallery.find(item => !item.isVideo)?.url ||
-          gallery[0]?.url ||
-          (typeof product?.uri === 'string' ? product.uri.trim() : '')
-        }
-        fallbackLetter={title.charAt(0).toUpperCase() || 'P'}
+        headerImageUri={String(vendor?.logo ?? '').trim()}
+        fallbackLetter={shopName.charAt(0).toUpperCase() || 'S'}
         onDeliveryPolicy={openDeliveryPolicyModal}
         onVisitShop={() => {
           setOverflowMenuOpen(false);
@@ -1285,6 +1289,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minWidth: 0,
   },
+  vendorAvatarImage: {
+    width: 48,
+    height: 48,
+  },
   vendorAvatar: {
     width: 48,
     height: 48,
@@ -1292,6 +1300,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFEFEF',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   vendorAvatarLetter: {
     fontSize: 20,

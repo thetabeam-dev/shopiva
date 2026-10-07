@@ -270,6 +270,7 @@ function VendorCard({
   const isDark = index % 2 === 0;
   const t = isDark ? DARK : LIGHT;
   const slug = String(item.slug ?? '').trim();
+  const logo = String(item.logo ?? '').trim();
   const loc = vendorLocationLine(item);
   const pv = preview ?? { loading: Boolean(slug), items: [] };
   const carouselItems = Array.isArray(pv.items) ? pv.items : [];
@@ -287,9 +288,13 @@ function VendorCard({
             ]}
             onPress={() => onOpenShop?.(item)}
           >
-            <Text style={[styles.avatarLetter, { color: t.primaryText }]}>
-              {(item.name || 'S').trim().charAt(0).toUpperCase()}
-            </Text>
+            {logo ? (
+              <Image source={{ uri: logo }} style={styles.avatarImage} resizeMode="cover" />
+            ) : (
+              <Text style={[styles.avatarLetter, { color: t.primaryText }]}>
+                {(item.name || 'S').trim().charAt(0).toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerText} onPress={() => onOpenShop?.(item)}>
             <View style={styles.nameRow}>
@@ -652,8 +657,22 @@ export default function VendorScreen({ route, navigation }) {
         const rows = await getVendorsOnMapByCategory(
           category === ALL_CATEGORY ? '' : category,
         );
+        const withLogos = await Promise.all(
+          rows.map(async row => {
+            if (String(row?.logo ?? '').trim()) return row;
+            const slug = String(row?.slug ?? '').trim();
+            if (!slug) return row;
+            try {
+              const shopRes = await getStorefrontShop(slug);
+              const logo = String(shopRes?.shop?.logo ?? '').trim();
+              return logo ? { ...row, logo } : row;
+            } catch {
+              return row;
+            }
+          }),
+        );
         if (!cancelled) {
-          setVendors(rows);
+          setVendors(withLogos);
         }
       } catch (e) {
         if (!cancelled) {
@@ -857,11 +876,9 @@ export default function VendorScreen({ route, navigation }) {
     }
   }, [menuVendor, closeVendorMenu]);
 
-  const menuSlug = menuVendor ? String(menuVendor.slug ?? '').trim() : '';
-  const menuHeaderImage =
-    menuSlug && slugPreviews[menuSlug]?.items?.[0]?.uri
-      ? String(slugPreviews[menuSlug].items[0].uri)
-      : '';
+  const menuHeaderImage = menuVendor
+    ? String(menuVendor.logo ?? '').trim()
+    : '';
 
   const menuSheetTitle = useMemo(() => {
     if (!menuVendor) return '';
@@ -1140,6 +1157,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
   },
   avatarLetter: {
     fontSize: 20,
@@ -1263,7 +1285,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 12,
+    height: 20
   },
   footerLabel: {
     fontSize: 17,
@@ -1272,9 +1295,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   arrowCta: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
