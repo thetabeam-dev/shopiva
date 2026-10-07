@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
 import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController } from "../controllers/user.js";
+import { UploadUserPhotoController, userPhotoUploadMiddleware } from "../controllers/userPhotoUpload.js";
 
 export const UserRouter = express.Router();
 
@@ -27,6 +28,7 @@ UserRouter.delete('/user/delete/:id', authenticate, DeleteUserController);
 UserRouter.put('/user/role/update/:id', authenticate, UpdateRoleController);
 UserRouter.put('/user/email/update/:id', authenticate, UpdateEmailController);
 UserRouter.put('/user/phone/update/:id', authenticate, UpdatePhoneController);
+UserRouter.post("/user/photo/upload", authenticate, userPhotoUploadMiddleware, UploadUserPhotoController);
 UserRouter.put('/user/photo/update/:id', authenticate, UpdatePhotoController);
 UserRouter.put('/user/profile/update/:id', authenticate, UpdateProfileController);
 UserRouter.put('/user/password/update/:id', authenticate, UpdatePasswordController);
