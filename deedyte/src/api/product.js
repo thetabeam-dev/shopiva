@@ -109,3 +109,15 @@ export async function updateInventory(shopId, productId, inventoryId, entreprene
   );
   return readJson(res);
 }
+
+export async function deleteInventory(shopId, productId, inventoryId, entrepreneurId) {
+  const sid = String(shopId).trim();
+  const pid = String(productId).trim();
+  const iid = String(inventoryId).trim();
+  const eid = String(entrepreneurId).trim();
+  const res = await apiFetchAuth(
+    `/shop/${sid}/product/${pid}/inventory/delete/${iid}/${eid}`,
+    { method: 'POST' },
+  );
+  return readJson(res);
+}
