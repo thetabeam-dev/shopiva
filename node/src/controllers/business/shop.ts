@@ -42,6 +42,40 @@ const NAME_MAX = 255;
 const SLUG_MAX = 255;
 const DESCRIPTION_MAX = 5000;
 
+function splitCategoryList(raw: string): string[] {
+    const text = raw.trim();
+    if (text.startsWith("[") && text.endsWith("]")) {
+        try {
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) return parsed.map(item => String(item));
+        } catch {
+            return [text];
+        }
+    }
+    if (text.startsWith("{") && text.endsWith("}")) {
+        return text
+            .slice(1, -1)
+            .split(",")
+            .map(part => part.trim().replace(/^"|"$/g, ""));
+    }
+    return [text];
+}
+
+function normalizeShopCategories(raw: unknown): string[] {
+    const list = Array.isArray(raw)
+        ? raw.flatMap(item => splitCategoryList(String(item ?? "")))
+        : typeof raw === "string" && raw.trim()
+            ? splitCategoryList(raw)
+            : [];
+    const out: string[] = [];
+    for (const item of list) {
+        const key = String(item ?? "").trim().toLowerCase();
+        if (!key || key.length > 100 || out.includes(key)) continue;
+        out.push(key);
+    }
+    return out;
+}
+
 function slugify(name: string): string {
     return name
         .trim()
@@ -90,13 +124,9 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
          * shipped in the client's mvp_category.json (e.g. "fashion"). Stored lowercased
          * so downstream filters (e.g. /discover/vendors?category=) match.
          */
-        const categoryStr = typeof categoryBody === "string" ? categoryBody.trim().toLowerCase() : "";
-        if (!categoryStr) {
-            res.status(400).json({ success: false, error: "Category is required." });
-            return;
-        }
-        if (categoryStr.length > 100) {
-            res.status(400).json({ success: false, error: "Category must be 100 characters or less." });
+        const categories = normalizeShopCategories(categoryBody);
+        if (!categories.length) {
+            res.status(400).json({ success: false, error: "Select at least one category." });
             return;
         }
         const existingName = await GetShopByNameService(nameStr);
@@ -138,7 +168,7 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
             slug,
             description: descriptionStr ?? null,
             logo: null,
-            category: categoryStr,
+            category: categories,
             vendortype: vendorType,
             location: locationJson ?? null,
         });
@@ -234,6 +264,12 @@ export async function UpdateShopController(req: Request, res: Response) {
             verificationDocuments
         } = req.body;
 
+        const categories = category == null ? category : normalizeShopCategories(category);
+        if (Array.isArray(categories) && categories.length === 0) {
+            res.status(400).json({ error: "Select at least one category." });
+            return;
+        }
+
         const result = await UpdateShopService({
             ownerId: req.params.id as unknown as number,
             shopId: req.params.shopId as unknown as number,
@@ -242,7 +278,7 @@ export async function UpdateShopController(req: Request, res: Response) {
             description,
             logo,
             banner,
-            category,
+            category: categories,
             tags,
             contactEmail,
             contactPhone,

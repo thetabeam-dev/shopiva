@@ -49,6 +49,7 @@ import {
 } from '../utils/deviceLocation';
 import { useSelector } from 'react-redux';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
+import { parseShopCategories } from '../utils/shopCategories';
 import { selectCategoryKeys } from '../../redux/categoriesSlice';
 import geoZones from '../json/zones.json';
 import { formatPriceInput } from '../utils/variantOptions';
@@ -302,7 +303,7 @@ function buildUpdateBody(row, form, verificationDocumentsOverride) {
     description: form.description.trim() || null,
     logo: row.logo != null ? String(row.logo) : null,
     banner: row.banner != null ? String(row.banner) : null,
-    category: form.category.trim() || null,
+    category: parseShopCategories(form.category),
     tags,
     contactEmail: form.contactEmail.trim() || null,
     contactPhone: form.contactPhone.trim() || null,
@@ -365,7 +366,7 @@ export default function ProfileShopInfoScreen() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(/** @type {string[]} */ ([]));
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [locationState, setLocationState] = useState({ ...DEFAULT_LOCATION });
@@ -450,7 +451,7 @@ export default function ProfileShopInfoScreen() {
       setName(pickStr(detail, 'name', 'Name'));
       setSlug(pickStr(detail, 'slug', 'Slug'));
       setDescription(pickStr(detail, 'description', 'Description'));
-      setCategory(pickStr(detail, 'category', 'Category'));
+      setCategory(parseShopCategories(detail?.category ?? detail?.Category));
       setContactEmail(pickStr(detail, 'contactEmail', 'contactemail'));
       setContactPhone(pickStr(detail, 'contactPhone', 'contactphone'));
       const loc = {
@@ -1067,12 +1068,14 @@ export default function ProfileShopInfoScreen() {
             onEdit={() => setModalCategory(true)}
           />
           <View style={styles.chipWrap}>
-            {category.trim() ? (
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>
-                  {formatMvpCategoryLabel(category)}
-                </Text>
-              </View>
+            {category.length ? (
+              category.map(item => (
+                <View style={styles.chip} key={item}>
+                  <Text style={styles.chipText}>
+                    {formatMvpCategoryLabel(item)}
+                  </Text>
+                </View>
+              ))
             ) : (
               <Text style={styles.placeholderLine}>No category set</Text>
             )}
@@ -1362,7 +1365,7 @@ export default function ProfileShopInfoScreen() {
 
       <FormModal
         visible={modalCategory}
-        title="Category"
+        title="Categories"
         saving={saving}
         onClose={() => !saving && setModalCategory(false)}
         onSave={() => persistAndClose(() => setModalCategory(false))}
@@ -1371,8 +1374,7 @@ export default function ProfileShopInfoScreen() {
           <Text style={styles.placeholderLine}>No categories available.</Text>
         ) : (
           categoryOptions.map(opt => {
-            const selected =
-              category.trim().toLowerCase() === opt.toLowerCase();
+            const selected = category.some(item => item.toLowerCase() === opt.toLowerCase());
             return (
               <Pressable
                 key={opt}
@@ -1380,7 +1382,13 @@ export default function ProfileShopInfoScreen() {
                   styles.pickerItem,
                   selected && styles.pickerItemSelected,
                 ]}
-                onPress={() => setCategory(opt)}
+                onPress={() =>
+                  setCategory(current =>
+                    selected
+                      ? current.filter(item => item.toLowerCase() !== opt.toLowerCase())
+                      : [...current, opt],
+                  )
+                }
               >
                 <Text style={styles.pickerItemText}>
                   {formatMvpCategoryLabel(opt)}

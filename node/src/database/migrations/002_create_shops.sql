@@ -7,7 +7,7 @@ CREATE TABLE shops (
   description TEXT,
   logo TEXT,
   banner TEXT,
-  category VARCHAR(100),
+  category TEXT,
   tags TEXT[] DEFAULT '{}',
   contactEmail VARCHAR(255),
   contactPhone VARCHAR(20),

@@ -81,6 +81,17 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true, service: "deedyte-api" });
 });
 
+app.get("/config/customer-access", (_req, res) => {
+  const enabled = String(process.env.CUSTOMER_ACCESS_ENABLED ?? "true").trim().toLowerCase() !== "false";
+  const unquote = (value: string | undefined) =>
+    String(value ?? "").trim().replace(/^["']|["']$/g, "");
+  res.status(200).json({
+    enabled,
+    title: unquote(process.env.CUSTOMER_ACCESS_TITLE) || "Shopping Is Coming Soon!",
+    message: unquote(process.env.CUSTOMER_ACCESS_MESSAGE),
+  });
+});
+
 app.get("/config/app-version", (req, res) => {
   const { _v, _os } = req.query;
   console.log(req.query);

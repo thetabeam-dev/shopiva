@@ -1,5 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
+import { getCustomerAccess } from '../../api/user';
 import { AUTH } from './theme';
 
 /**
@@ -18,11 +22,34 @@ import { AUTH } from './theme';
 export default function AuthPurposeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { setPreAuthChoice } = useAuth();
+  const [checkingCustomer, setCheckingCustomer] = useState(false);
+  const [accessNotice, setAccessNotice] = useState(
+    /** @type {{ title: string; message: string } | null} */ (null),
+  );
 
-  const goCustomer = useCallback(() => {
-    void setPreAuthChoice('customer');
-    navigation.replace('Login', { allowSkip: true, intentRole: 'customer' });
-  }, [navigation, setPreAuthChoice]);
+  const goCustomer = useCallback(async () => {
+    if (checkingCustomer) return;
+    setCheckingCustomer(true);
+    try {
+      const access = await getCustomerAccess();
+      if (!access.enabled) {
+        setAccessNotice({
+          title: access.title || 'Shopping Is Coming Soon!',
+          message: access.message,
+        });
+        return;
+      }
+      await setPreAuthChoice('customer');
+      navigation.replace('Login', { allowSkip: true, intentRole: 'customer' });
+    } catch (e) {
+      setAccessNotice({
+        title: 'Customer access',
+        message: e instanceof Error ? e.message : 'Could not check customer access.',
+      });
+    } finally {
+      setCheckingCustomer(false);
+    }
+  }, [checkingCustomer, navigation, setPreAuthChoice]);
 
   const goVendor = useCallback(() => {
     void setPreAuthChoice('vendor');
@@ -46,6 +73,9 @@ export default function AuthPurposeScreen({ navigation }) {
           <Text style={styles.cardTitle}>Customer (Buyer)</Text>
           <Text style={styles.cardDesc}>Browse stores and discover products as a customer.</Text>
           <Text style={styles.cardHint}>Login is optional (skip available)</Text>
+          {checkingCustomer ? (
+            <ActivityIndicator style={styles.cardSpinner} color={AUTH.primary} />
+          ) : null}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -59,6 +89,29 @@ export default function AuthPurposeScreen({ navigation }) {
           <Text style={styles.cardHint}>Login is required</Text>
         </TouchableOpacity>
       </ScrollView>
+      <Modal
+        visible={accessNotice != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccessNotice(null)}
+      >
+        <View style={styles.noticeRoot}>
+          <Pressable style={styles.noticeBackdrop} onPress={() => setAccessNotice(null)} />
+          <View style={styles.noticeCard}>
+            <Text style={styles.noticeTitle}>{accessNotice?.title}</Text>
+            {accessNotice?.message ? (
+              <Text style={styles.noticeMessage}>{accessNotice.message}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={styles.noticeButton}
+              onPress={() => setAccessNotice(null)}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.noticeButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -113,5 +166,46 @@ const styles = StyleSheet.create({
     color: AUTH.primary,
     marginTop: 12,
     fontWeight: '600',
+  },
+  cardSpinner: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  noticeRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  noticeBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  noticeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+  },
+  noticeTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: AUTH.text,
+    marginBottom: 10,
+  },
+  noticeMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: AUTH.textMuted,
+  },
+  noticeButton: {
+    marginTop: 18,
+    backgroundColor: AUTH.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  noticeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

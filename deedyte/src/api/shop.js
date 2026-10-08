@@ -28,7 +28,7 @@ export async function hasVendorShop() {
  * @param {{
  *   name: string;
  *   vendorType: 'reseller' | 'dropshipper' | 'manufacturer';
- *   category: string;
+ *   category: string | string[];
  *   location?: {
  *     address?: string;
  *     city?: string;
@@ -40,10 +40,17 @@ export async function hasVendorShop() {
  * }} payload
  */
 export async function createVendorShop(payload) {
-  const category = String(payload.category ?? '').trim();
-  if (!category) {
-    throw new Error('Category is required.');
+  const categoryList = Array.isArray(payload.category)
+    ? payload.category.map(item => String(item).trim().toLowerCase()).filter(Boolean)
+    : String(payload.category ?? '').trim()
+      ? [String(payload.category).trim().toLowerCase()]
+      : [];
+  if (!categoryList.length) {
+    throw new Error('Select at least one category.');
   }
+  // The live API still requires `category` to be one string. A Postgres array
+  // literal is a string, and it is stored correctly in the text[] column.
+  const category = `{${categoryList.map(item => `"${item.replace(/"/g, '')}"`).join(',')}}`;
   const body = {
     name: String(payload.name ?? '').trim(),
     vendorType: payload.vendorType,

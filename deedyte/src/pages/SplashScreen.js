@@ -42,7 +42,7 @@ export function SplashScreen(){
                 </View>
 
                 <Text>
-                    Sponsored by UP
+                    Sponsored By THETABEAM
                 </Text>
             </View>
         </>

@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   Platform,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -597,6 +598,10 @@ export default function VendorScreen({ route, navigation }) {
   const category = selectedCategory;
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const vendorsRef = useRef(vendors);
+  vendorsRef.current = vendors;
+  const vendorRequestId = useRef(0);
   const [error, setError] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   /** Vendor row opened in the ⋮ menu, or `null` when closed. */
@@ -643,52 +648,59 @@ export default function VendorScreen({ route, navigation }) {
     });
   }, [routeCategory, visibleCategories]);
 
-  useEffect(() => {
+  const loadVendors = useCallback(async (isRefresh) => {
+    const requestId = vendorRequestId.current + 1;
+    vendorRequestId.current = requestId;
     if (!category) {
       setLoading(false);
+      setRefreshing(false);
       setVendors([]);
-      return undefined;
+      return;
     }
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const rows = await getVendorsOnMapByCategory(
-          category === ALL_CATEGORY ? '' : category,
-        );
-        const withLogos = await Promise.all(
-          rows.map(async row => {
-            if (String(row?.logo ?? '').trim()) return row;
-            const slug = String(row?.slug ?? '').trim();
-            if (!slug) return row;
-            try {
-              const shopRes = await getStorefrontShop(slug);
-              const logo = String(shopRes?.shop?.logo ?? '').trim();
-              return logo ? { ...row, logo } : row;
-            } catch {
-              return row;
-            }
-          }),
-        );
-        if (!cancelled) {
-          setVendors(withLogos);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
-          setVendors([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError('');
+    try {
+      const rows = await getVendorsOnMapByCategory(
+        category === ALL_CATEGORY ? '' : category,
+      );
+      const withLogos = await Promise.all(
+        rows.map(async row => {
+          if (String(row?.logo ?? '').trim()) return row;
+          const slug = String(row?.slug ?? '').trim();
+          if (!slug) return row;
+          try {
+            const shopRes = await getStorefrontShop(slug);
+            const logo = String(shopRes?.shop?.logo ?? '').trim();
+            return logo ? { ...row, logo } : row;
+          } catch {
+            return row;
+          }
+        }),
+      );
+      if (vendorRequestId.current !== requestId) return;
+      setVendors(withLogos);
+    } catch (e) {
+      if (vendorRequestId.current !== requestId) return;
+      setError(e instanceof Error ? e.message : String(e));
+      if (!isRefresh) setVendors([]);
+    } finally {
+      if (vendorRequestId.current === requestId) {
+        setLoading(false);
+        setRefreshing(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    }
   }, [category]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadVendors(vendorsRef.current.length > 0);
+    }, [loadVendors]),
+  );
+
+  const onRefreshVendors = useCallback(() => {
+    loadVendors(true);
+  }, [loadVendors]);
 
   useEffect(() => {
     const slugs = [
@@ -1058,6 +1070,14 @@ export default function VendorScreen({ route, navigation }) {
           data={displayedVendors}
           keyExtractor={item => String(item.id)}
           renderItem={renderVendorCard}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefreshVendors}
+              tintColor="#00926e"
+              colors={['#00926e']}
+            />
+          }
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListEmptyComponent={

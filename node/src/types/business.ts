@@ -21,7 +21,7 @@ export interface NewShopDocument{
     logo?: string | null,
     slug: string,
     vendortype?: VendorType,
-    category?: string | null,
+    category?: string[] | string | null,
     location?: ShopLocation | Record<string, unknown> | null,
     createdAt?: Date,
     updatedAt?: Date
@@ -75,7 +75,7 @@ export interface ShopDocument {
   description?: string | null;
   logo?: string | null;
   banner?: string | null;
-  category?: string | null;
+  category?: string[] | string | null;
   tags: string[];
   contactEmail?: string | null;
   contactPhone?: string | null;
