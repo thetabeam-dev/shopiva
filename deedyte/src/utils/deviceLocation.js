@@ -23,10 +23,16 @@ export async function requestLocationPermission() {
       return false;
     }
   }
-  // iOS shows the system prompt from requestAuthorization, or from the first location read.
-  const geo = /** @type {{ requestAuthorization?: (level?: string) => void }} */ (Geolocation);
+  // iOS shows the system prompt from requestAuthorization. The first argument must be a callback.
+  const geo = /** @type {{ requestAuthorization?: (success?: () => void, error?: (err: unknown) => void) => void }} */ (
+    Geolocation
+  );
   if (typeof geo.requestAuthorization === 'function') {
-    geo.requestAuthorization('whenInUse');
+    geo.requestAuthorization(
+      () => {},
+      () => {},
+    );
+    return true;
   }
   Geolocation.getCurrentPosition(
     () => {},
