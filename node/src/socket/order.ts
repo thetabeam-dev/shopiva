@@ -3,6 +3,7 @@ import { db } from "../config/database.js";
 import { orderTransformer } from "../transformers/business/order.js";
 import { ordersTransformer as vendorOrdersTransformer } from "../transformers/business/orders.js";
 import { ordersTransformer as customerOrdersTransformer } from "../transformers/buyer/orders.js";
+import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 
