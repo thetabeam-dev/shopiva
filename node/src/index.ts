@@ -26,6 +26,9 @@ import nodeCron from "node-cron";
 import { paystack } from "./services/paystack.js";
 import { error } from "console";
 import { sendFcmForActivities } from "./services/firebaseConfig.js";
+import { createAndEmitNotification } from "./services/notifications.js";
+import { GetShopOwnerByShopIdService } from "./services/business/shop.js";
+import { sendNotificationEmail } from "./services/email.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -222,6 +225,61 @@ app.use(BusinessRouter);
 app.use(BuyerRouter);
 app.use(StorefrontRouter);
 
+function formatNaira(amount: number): string {
+  const value = Number.isFinite(amount) ? amount : 0;
+  return `₦${value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+async function notifyShopOfPayout(payout: {
+  shop_id: unknown;
+  order_id: unknown;
+  net_amount: unknown;
+}): Promise<void> {
+  try {
+    const owner = await GetShopOwnerByShopIdService(Number(payout.shop_id));
+    const vendorId = Number(owner?.id);
+    const orderId = Number(payout.order_id);
+    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(orderId) || orderId <= 0) return;
+
+    const amount = formatNaira(Number(payout.net_amount));
+    const title = "Payout Sent";
+    const message = `A payout of ${amount} for order #${orderId} has been sent to your shop’s payout account. It will arrive once the transfer is completed.`;
+
+    await createAndEmitNotification({
+      recipientId: vendorId,
+      title,
+      message,
+      sourceType: "order",
+      sourceId: orderId,
+      role: "vendor",
+    });
+
+    const pool = await db();
+    const { rows } = await pool.query<{ devicetoken: string | null; email: string | null; fname: string | null }>(
+      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
+      [vendorId],
+    );
+    const token = String(rows[0]?.devicetoken ?? "").trim();
+    if (token) {
+      await sendFcmForActivities(token, title, message, null, {
+        type: "order",
+        order_id: orderId,
+      });
+    }
+
+    const email = String(rows[0]?.email ?? owner.email ?? "").trim();
+    if (email) {
+      await sendNotificationEmail(email, {
+        fname: String(rows[0]?.fname ?? owner.fname ?? "there"),
+        title,
+        message,
+      });
+    }
+  } catch (err) {
+    console.error("notifyShopOfPayout failed", err);
+  }
+}
+
 const server = app.listen(process.env.PORT, () => {
   console.log(`listening to port ${process.env.PORT}`);
   console.log(`Swagger docs at http://localhost:${process.env.PORT}/api-docs`);
@@ -269,6 +327,7 @@ const server = app.listen(process.env.PORT, () => {
             transfer_reference: ref,
             id: payout.order_id,
           });
+          await notifyShopOfPayout(payout);
         }
       } catch (error) {
         console.log(error);

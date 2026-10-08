@@ -917,9 +917,10 @@ async function createNewShopPayout(order_id: any) {
     rows: [order],
   } = await pool.query(`SELECT * FROM orders WHERE id = $1`, [order_id]);
 
+  const escrow_fee = 200;
   const shop_id = order.shop_id;
   const gross_amount = Number(order.total_paid);
-  const commission_amount = Number((gross_amount * 0.03).toFixed(2));
+  const commission_amount = Number((gross_amount * 0.03).toFixed(2) + escrow_fee);
   const net_amount = Number((gross_amount - commission_amount).toFixed(2));
 
   await pool.query(
