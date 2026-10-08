@@ -2,6 +2,7 @@ import type { Namespace } from "socket.io";
 import { db } from "../config/database.js";
 import { chatModel, type ParticipantRole } from "../models/chat.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
+import { sendFcmForActivities } from "../services/firebaseConfig.js";
 import { MODERATION_CONFIG } from "../utils/moderationConfig.js";
 import {
   getSessionModerationStrikes,
@@ -144,6 +145,35 @@ export async function handleCreateRoom(
   });
 
   nsp.to(`user:${recipient_id}`).emit("room_created", { room, existing: false });
+  const recipientAppRole = appRoleToNotificationRole(recipient_role) ?? "vendor";
+  void (async () => {
+    const title = "New chat";
+    const message = "A new chat was opened for your order.";
+    await createAndEmitNotification({
+      recipientId: recipient_id,
+      title,
+      message,
+      sourceType: "chat",
+      sourceId: order_id,
+      role: recipientAppRole,
+    });
+    const { rows } = await (await db()).query<{ devicetoken: string | null }>(
+      `SELECT devicetoken FROM users WHERE id = $1`,
+      [recipient_id],
+    );
+    const token = String(rows[0]?.devicetoken ?? "").trim();
+    if (!token) return;
+    await sendFcmForActivities(
+      token,
+      "New Chat Started",
+      "A new chat has been started regarding your order. Open DeeDyte to view the conversation.",
+      null,
+      {
+        type: "order",
+        order_id,
+      },
+    );
+  })();
 }
 
 export async function handleCreateMessage(
@@ -267,6 +297,26 @@ export async function handleCreateMessage(
   const others = await chatModel.otherParticipantIds(room_id, userId);
   const room = await chatModel.getRoomById(room_id);
   const orderId = Number(room?.order_id);
+  const pool = await db();
+  const { rows: senderRows } = await pool.query<{ name: string | null }>(
+    `SELECT trim(concat_ws(' ', fname, lname)) AS name FROM users WHERE id = $1`,
+    [userId],
+  );
+  const senderName = String(senderRows[0]?.name ?? "").trim() || "Someone";
+  let orderName = Number.isFinite(orderId) && orderId > 0 ? `Order #${orderId}` : "Order";
+  if (Number.isFinite(orderId) && orderId > 0) {
+    const { rows: orderRows } = await pool.query<{ order_name: string | null }>(
+      `SELECT COALESCE(NULLIF(trim(s.name), ''), 'Order #' || o.id::text) AS order_name
+       FROM orders o
+       LEFT JOIN shops s ON s.id::text = trim(o.shop_id::text)
+       WHERE o.id = $1
+       LIMIT 1`,
+      [orderId],
+    );
+    const named = String(orderRows[0]?.order_name ?? "").trim();
+    if (named) orderName = named;
+  }
+  const preview = String(content ?? "").trim().slice(0, 140) || "New chat message";
   const seen = new Set<number>();
   for (const uid of others) {
     if (seen.has(uid)) continue;
@@ -275,7 +325,6 @@ export async function handleCreateMessage(
     const participantRole = await chatModel.getParticipantRole(room_id, uid);
     const role = appRoleToNotificationRole(participantRole);
     if (role && Number.isFinite(orderId) && orderId > 0) {
-      const preview = String(content ?? "").trim().slice(0, 140) || "New chat message";
       void createAndEmitNotification({
         recipientId: uid,
         title: "New message",
@@ -283,6 +332,17 @@ export async function handleCreateMessage(
         sourceType: "chat",
         sourceId: orderId,
         role,
+      });
+    }
+    const { rows: tokenRows } = await pool.query<{ devicetoken: string | null }>(
+      `SELECT devicetoken FROM users WHERE id = $1`,
+      [uid],
+    );
+    const token = String(tokenRows[0]?.devicetoken ?? "").trim();
+    if (token) {
+      void sendFcmForActivities(token, senderName, `${orderName}: ${preview}`, null, {
+        type: "order",
+        order_id: orderId,
       });
     }
   }

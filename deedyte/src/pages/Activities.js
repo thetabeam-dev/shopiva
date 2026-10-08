@@ -1,8 +1,31 @@
 import { useCallback } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
+import { useUnreadChatTotal } from '../components/UnreadMessageBadge';
+import { refreshPendingReviewCount, usePendingReviewCount } from '../hooks/usePendingReviewCount';
+
+function unreadFor(items, activeRole, sourceType) {
+  const role = activeRole === 'vendor' ? 'vendor' : 'buyer';
+  return items.filter((item) => {
+    if (String(item?.status ?? '').toLowerCase() === 'read') return false;
+    if (String(item?.source_type ?? '').toLowerCase() !== sourceType) return false;
+    const itemRole = String(item?.role ?? '').toLowerCase();
+    if (role === 'vendor') return itemRole === 'vendor' || itemRole === 'seller';
+    return itemRole === 'buyer' || itemRole === 'customer';
+  }).length;
+}
+
+function CountBadge({ count }) {
+  if (!count) return null;
+  return (
+    <View style={styles.countBadge}>
+      <Text style={styles.countBadgeText}>{count > 99 ? '99+' : String(count)}</Text>
+    </View>
+  );
+}
 
 /**
  * Entry for the Order tab: nested orders list and disputes (vendor-only).
@@ -11,6 +34,18 @@ export default function ActivitiesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   const auth = useSelector(s => s.auth)
+  const items = useSelector((state) => state.notifications?.items ?? []);
+  const unreadChats = useUnreadChatTotal();
+  const orderCount = unreadFor(items, auth.activeRole, 'order') + unreadChats;
+  const disputeCount = unreadFor(items, auth.activeRole, 'dispute');
+  const returnCount = unreadFor(items, auth.activeRole, 'return');
+  const reviewCount = usePendingReviewCount();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshPendingReviewCount(auth.activeRole).catch(() => {});
+    }, [auth.activeRole]),
+  );
 
   const goOrders = useCallback(() => {
     navigation.navigate('Orders');
@@ -47,6 +82,7 @@ export default function ActivitiesScreen({ navigation }) {
               "View & manage your orders"
             }</Text>
           </View>
+          <CountBadge count={orderCount} />
           <Icon name="chevron-forward" size={22} color="#9CA3AF" />
         </TouchableOpacity>
 
@@ -62,6 +98,7 @@ export default function ActivitiesScreen({ navigation }) {
               "Resolve issues with vendors"
             }</Text>
           </View>
+          <CountBadge count={disputeCount} />
           <Icon name="chevron-forward" size={22} color="#9CA3AF" />
         </TouchableOpacity>
 
@@ -77,6 +114,7 @@ export default function ActivitiesScreen({ navigation }) {
               "View & manage returns to vendors"
             }</Text>
           </View>
+          <CountBadge count={returnCount} />
           <Icon name="chevron-forward" size={22} color="#9CA3AF" />
         </TouchableOpacity>
 
@@ -89,6 +127,7 @@ export default function ActivitiesScreen({ navigation }) {
               <Text style={styles.optionTitle}>Pending Reviews</Text>
               <Text style={styles.optionDesc}>Leave feedback on delivered orders</Text>
             </View>
+            <CountBadge count={reviewCount} />
             <Icon name="chevron-forward" size={22} color="#9CA3AF" />
           </TouchableOpacity>
         ) : null}
@@ -164,5 +203,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 14,
     color: '#6B7280',
+  },
+  countBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    marginRight: 8,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

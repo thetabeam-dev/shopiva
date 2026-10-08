@@ -35,34 +35,118 @@ async function cartVendorIdsForUser(userId: number): Promise<number[]> {
   return [...new Set(out)];
 }
 
+function formatNaira(amount: number): string {
+  const value = Number.isFinite(amount) ? amount : 0;
+  return `₦${value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function newOrderPushBody(itemCount: number, orderTotal: number): string {
+  const count = Math.max(0, Math.round(Number(itemCount) || 0));
+  const label = count === 1 ? "item" : "items";
+  return `You have a new order for ${count} ${label} totaling ${formatNaira(orderTotal)}.`;
+}
+
 const VENDOR_PURCHASE_TITLE = "New order";
 const VENDOR_PURCHASE_MESSAGE = "A customer just made a purchase from your shop.";
+const VENDOR_PURCHASE_FCM_TITLE = "New Order Received";
 
-async function notifyVendorOfPurchase(shopId: unknown, orderId: unknown): Promise<void> {
-  const owner = await GetShopOwnerByShopIdService(Number(shopId));
-  const vendorId = Number(owner?.id);
-  const sourceId = Number(orderId);
-  if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(sourceId) || sourceId <= 0) return;
+async function notifyVendorOfPurchase(
+  shopId: unknown,
+  orderId: unknown,
+  summary?: { itemCount: number; total: number },
+): Promise<void> {
+  try {
+    const owner = await GetShopOwnerByShopIdService(Number(shopId));
+    const vendorId = Number(owner?.id);
+    const sourceId = Number(orderId);
+    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(sourceId) || sourceId <= 0) return;
 
-  await createAndEmitNotification({
-    recipientId: vendorId,
-    title: VENDOR_PURCHASE_TITLE,
-    message: VENDOR_PURCHASE_MESSAGE,
-    sourceType: "order",
-    sourceId,
-    role: "vendor",
-  });
+    const pool = await db();
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM notifications
+       WHERE recipient_id = $1 AND source_type = 'order' AND source_id = $2 AND title = $3
+       LIMIT 1`,
+      [vendorId, sourceId, VENDOR_PURCHASE_TITLE],
+    );
+    if (!existing.length) {
+      await createAndEmitNotification({
+        recipientId: vendorId,
+        title: VENDOR_PURCHASE_TITLE,
+        message: VENDOR_PURCHASE_MESSAGE,
+        sourceType: "order",
+        sourceId,
+        role: "vendor",
+      });
+      const { rows } = await pool.query<{ devicetoken: string | null }>(
+        `SELECT devicetoken FROM users WHERE id = $1`,
+        [vendorId],
+      );
+      const token = String(rows[0]?.devicetoken ?? "").trim();
+      if (token) {
+        let itemCount = summary?.itemCount;
+        let total = summary?.total;
+        if (itemCount == null || total == null) {
+          const { rows: totals } = await pool.query<{ item_count: number; total: number }>(
+            `SELECT COALESCE(SUM(oi.units), 0)::int AS item_count,
+                    COALESCE(o.amount_paid, 0) + COALESCE(o.shipping_fee, 0) AS total
+             FROM orders o
+             LEFT JOIN order_items oi ON oi.order_id = o.id
+             WHERE o.id = $1
+             GROUP BY o.amount_paid, o.shipping_fee`,
+            [sourceId],
+          );
+          itemCount = Number(totals[0]?.item_count ?? 0);
+          total = Number(totals[0]?.total ?? 0);
+        }
+        await sendFcmForActivities(token, VENDOR_PURCHASE_FCM_TITLE, newOrderPushBody(itemCount, total), null, {
+          type: "order",
+          order_id: sourceId,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("notifyVendorOfPurchase failed", err);
+  }
+}
 
-  const { rows } = await (await db()).query<{ devicetoken: string | null }>(
-    `SELECT devicetoken FROM users WHERE id = $1`,
-    [vendorId],
-  );
-  const token = String(rows[0]?.devicetoken ?? "").trim();
-  if (!token) return;
-  await sendFcmForActivities(token, VENDOR_PURCHASE_TITLE, VENDOR_PURCHASE_MESSAGE, null, {
-    type: "order",
-    order_id: sourceId,
-  });
+async function notifyChatRecipient(
+  recipientId: unknown,
+  orderId: unknown,
+  role: "buyer" | "vendor",
+): Promise<void> {
+  try {
+    const userId = Number(recipientId);
+    const sourceId = Number(orderId);
+    if (!Number.isFinite(userId) || userId <= 0 || !Number.isFinite(sourceId) || sourceId <= 0) return;
+    const title = "New chat";
+    const message = "A new chat was opened for your order.";
+    await createAndEmitNotification({
+      recipientId: userId,
+      title,
+      message,
+      sourceType: "chat",
+      sourceId,
+      role,
+    });
+    const { rows } = await (await db()).query<{ devicetoken: string | null }>(
+      `SELECT devicetoken FROM users WHERE id = $1`,
+      [userId],
+    );
+    const token = String(rows[0]?.devicetoken ?? "").trim();
+    if (!token) return;
+    await sendFcmForActivities(
+      token,
+      "New Chat Started",
+      "A new chat has been started regarding your order. Open DeeDyte to view the conversation.",
+      null,
+      {
+        type: "order",
+        order_id: sourceId,
+      },
+    );
+  } catch (err) {
+    console.error("notifyChatRecipient failed", err);
+  }
 }
 
 async function clearCartForUser(userId: number): Promise<void> {
@@ -112,6 +196,7 @@ async function createCheckoutRoomsForOrderRows(
     const payload = { room, existing: false };
     notifyUser(buyerUserId, "room_created", payload);
     notifyUser(vid as any, "room_created", payload);
+    void notifyChatRecipient(vid, roomOrderId, "vendor");
   }
 
   return results;
@@ -243,7 +328,10 @@ export async function confirmCartCheckoutAndCreateChatRoom(
     console.log("ordersByReference: ", ordersByReference)
 
     if (ordersByReference.length) {
-      const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, ordersByReference, txnId, false);
+        const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, ordersByReference, txnId, false);
+        for (const order of ordersByReference) {
+          await notifyVendorOfPurchase(order.shop_id, order.id);
+        }
       if (rooms.length) {
         await clearCartForUser(buyerUserId);
         return { rooms, transaction_id: txnId };
@@ -291,7 +379,14 @@ export async function confirmCartCheckoutAndCreateChatRoom(
             tracking_number: "",
           };
           const orderId = await OrderHandler.newOrder(newOrder);
-          await notifyVendorOfPurchase(order.shop_id, orderId);
+          const itemCount = order.items.reduce((sum, item) => {
+            const qty = Number(item.unit ?? item.quantity ?? 0);
+            return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+          }, 0);
+          await notifyVendorOfPurchase(order.shop_id, orderId, {
+            itemCount: itemCount || order.items.length,
+            total: Number(order.subtotal ?? 0) + Number(order.shipping_fee ?? 0),
+          });
           await OrderHandler.orderEvent({
             order_id: String(orderId),
             event_type: "payment",
@@ -358,6 +453,9 @@ export async function confirmCartCheckoutAndCreateChatRoom(
     txnId,
     false
   );
+  for (const order of orders) {
+    await notifyVendorOfPurchase(order.shop_id, order.id);
+  }
 
   await clearCartForUser(buyerUserId);
 

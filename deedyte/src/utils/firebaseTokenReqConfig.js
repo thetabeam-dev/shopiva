@@ -1,5 +1,6 @@
 import messaging from '@react-native-firebase/messaging';
-import { Alert, PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
+import notifee, { AndroidImportance, EventType } from 'react-native-notify-kit';
 import { navigateToActivitiesScreen, navigationRef } from '../navigation/root';
 
 /**
@@ -229,22 +230,35 @@ export function handleNotificationOpen(remoteMessage) {
 }
 
 /**
- * Foreground message — show Alert; Open uses the same deep-link handler.
+ * Foreground message — show a system notification. A tap opens the same screen as a background notification.
  * @param {import('@react-native-firebase/messaging').FirebaseMessagingTypes.RemoteMessage} remoteMessage
  */
-export function handleForegroundMessage(remoteMessage) {
+export async function handleForegroundMessage(remoteMessage) {
   const parsed = parseFcmMessage(remoteMessage);
   console.log('[fcm] foreground message:', parsed);
 
   if (!parsed.title && !parsed.body) return;
 
-  Alert.alert(parsed.title || 'Deedyte', parsed.body || '', [
-    { text: 'Dismiss', style: 'cancel' },
-    {
-      text: 'Open',
-      onPress: () => handleNotificationOpen(remoteMessage),
+  await notifee.createChannel({
+    id: 'deedyte',
+    name: 'Deedyte',
+    importance: AndroidImportance.HIGH,
+  });
+
+  await notifee.displayNotification({
+    title: parsed.title || 'Deedyte',
+    body: parsed.body || '',
+    data: {
+      payload: JSON.stringify({
+        notification: { title: parsed.title, body: parsed.body },
+        data: parsed.data,
+      }),
     },
-  ]);
+    android: {
+      channelId: 'deedyte',
+      pressAction: { id: 'default' },
+    },
+  });
 }
 
 /**
@@ -254,6 +268,17 @@ export function handleForegroundMessage(remoteMessage) {
 export function setupFcmListeners() {
   const unsubOnMessage = messaging().onMessage(async (remoteMessage) => {
     handleForegroundMessage(remoteMessage);
+  });
+
+  const unsubNotify = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type !== EventType.PRESS) return;
+    const raw = detail.notification?.data?.payload;
+    if (typeof raw !== 'string' || !raw) return;
+    try {
+      handleNotificationOpen(JSON.parse(raw));
+    } catch {
+      /* ignore a notification that has no navigation payload */
+    }
   });
 
   const unsubOpened = messaging().onNotificationOpenedApp((remoteMessage) => {
@@ -277,6 +302,7 @@ export function setupFcmListeners() {
 
   return () => {
     unsubOnMessage();
+    unsubNotify();
     unsubOpened();
     unsubTokenRefresh();
   };

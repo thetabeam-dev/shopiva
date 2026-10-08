@@ -11,31 +11,31 @@ import { sendFcmForActivities } from "../services/firebaseConfig.js";
 function fcmMssg(event: string) {
   switch (event) {
     case "return_acceptance":
-      return "Great news! The buyer has accepted your return and will begin processing it shortly.";
+      return "Your return request has been accepted. The return process can now proceed.";
 
     case "return_processing":
-      return "Your return is currently being prepared by the buyer.";
+      return "Your return is being processed. We’ll keep you updated on its progress.";
 
     case "return_shipping":
-      return "Your return has been shipped and is on its way to you.";
+      return "Your returned item has been shipped and is on its way to the recipient.";
 
     case "return_out_for_delivery":
-      return "Your return is out for delivery and should arrive soon.";
+      return "Your returned item is out for delivery and should arrive soon.";
 
     case "return_delivered":
-      return "Your return has been marked as delivered. Please confirm receipt if everything is in return.";
+      return "Your returned item has been marked as delivered. Please confirm that it has been received.";
 
     case "return_confirmed":
-      return "Thank you! You've confirmed receipt of your return. The transaction is now complete.";
+      return "Receipt of the returned item has been confirmed. The return process is now complete.";
 
     case "return_disputed":
-      return "A dispute has been opened for this return. We'll review the case and keep you updated.";
+      return "A dispute has been raised regarding this return. We’ll review the matter and keep you informed.";
 
     case "return_cancelled":
-      return "This return has been cancelled. If you made a payment, any applicable refund will be processed.";
+      return "This return has been cancelled. If a refund applies, we’ll provide updates on its progress.";
 
     default:
-      return "You have a new update regarding your return.";
+      return "There’s a new update regarding your return. Open DeeDyte to see the details.";
   }
 }
 
@@ -117,7 +117,7 @@ function emitReturnUpdateToUser(
         const {rows: [{devicetoken}]} = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
         sendFcmForActivities(
             devicetoken /**token */,
-            "New Update From Return Activity" /** title */,
+            "Return Update" /** title */,
             msg /**body */,
             "null" /** media */,
             { type: "return", return_id: returnId } /** meta */,

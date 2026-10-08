@@ -30,16 +30,16 @@ type DisputeSocketPayload = {
 function fcmMssg(event: string) {
   switch (event) {
     case "raise_dispute":
-      return "Bad news! The buyer has raised a dispute for this order.";
+      return "A dispute has been raised regarding this order. We’ll review the matter and keep you informed.";
 
     case "dispute_acceptance":
-      return "The seller accepted the dispute claim.";
+      return "The seller has accepted the dispute claim. Open DeeDyte to view the latest details.";
 
     case "dispute_escalation":
-      return "This seller rejected the dispute claim and has escalated the dispute to the admin.";
+      return "The seller has rejected the dispute claim, and it has been referred to our support team for review.";
 
     default:
-      return "You have a new update regarding your order.";
+      return "There’s a new update regarding your dispute. Open DeeDyte to see the details.";
   }
 }
 
@@ -139,7 +139,7 @@ async function broadcastDisputeUpdate(
         const {rows: [{devicetoken}]} = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [recipient]);
         sendFcmForActivities(
             devicetoken /**token */,
-            "New Update From Dispute Activity" /** title */,
+            "Dispute Update" /** title */,
             msg /**body */,
             "null" /** media */,
             { type: "dispute", dispute_id: disputeId } /** meta */,
@@ -168,7 +168,7 @@ async function broadcastDisputeUpdate(
         const {rows: [{devicetoken}]} = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [recipient]);
         sendFcmForActivities(
             devicetoken /**token */,
-            "New Update From Dispute Activity" /** title */,
+            "Dispute Update" /** title */,
             msg /**body */,
             "null" /** media */,
             { type: "dispute", dispute_id: disputeId } /** meta */,

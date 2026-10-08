@@ -10,31 +10,31 @@ import { sendFcmForActivities } from "../services/firebaseConfig.js";
 function fcmMssg(event: string) {
   switch (event) {
     case "order_acceptance":
-      return "Great news! The seller has accepted your order and will begin processing it shortly.";
+      return "Good news! The seller has accepted your order and will begin processing it soon.";
 
     case "order_processing":
-      return "Your order is currently being prepared by the seller.";
+      return "Your order is being prepared by the seller. We’ll keep you updated on its progress.";
 
     case "order_shipping":
       return "Your order has been shipped and is on its way to you.";
 
     case "order_out_for_delivery":
-      return "Your order is out for delivery and should arrive soon.";
+      return "Your order is out for delivery and should arrive soon. Please be available to receive it.";
 
     case "order_delivered":
-      return "Your order has been marked as delivered. Please confirm receipt if everything is in order.";
+      return "Your order has been marked as delivered. Please confirm that you have received it.";
 
     case "order_confirmed":
-      return "Thank you! You've confirmed receipt of your order. The transaction is now complete.";
+      return "You’ve confirmed that you received your order. The transaction is now complete.";
 
     case "order_disputed":
-      return "A dispute has been opened for this order. We'll review the case and keep you updated.";
+      return "A dispute has been raised for this order. We’ll review the matter and keep you informed.";
 
     case "order_cancelled":
-      return "This order has been cancelled. If you made a payment, any applicable refund will be processed.";
+      return "Your order has been cancelled. If a refund applies, we’ll provide updates on its progress.";
 
     default:
-      return "You have a new update regarding your order.";
+      return "There’s a new update regarding your order. Open DeeDyte to see the details.";
   }
 }
 
@@ -116,7 +116,7 @@ function emitOrderUpdateToUser(
     const { rows: [{ devicetoken: customerDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
     sendFcmForActivities(
       customerDevicetoken /**token */,
-      "New Update From Order Activity" /** title */,
+      "Order Update" /** title */,
       msg /**body */,
       "null" /** media */,
       { type: "order", order_id: orderId } /** meta */,
@@ -125,7 +125,7 @@ function emitOrderUpdateToUser(
     if (event === "order_disputed") {
       sendFcmForActivities(
         vendorDevicetoken /**token */,
-        "New Update From Order Activity" /** title */,
+        "Order Update" /** title */,
         msg /**body */,
         "null" /** media */,
         { type: "order", order_id: orderId } /** meta */,

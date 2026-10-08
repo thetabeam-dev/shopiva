@@ -10,7 +10,7 @@ import { ProfileProvider } from '../context/ProfileContext';
 import { useAuth } from '../hooks/useAuth';
 import { useUnreadChatTotal } from '../components/UnreadMessageBadge';
 import { listNotifications } from '../api/user';
-import { set_notifications } from '../../redux/notifications';
+import { refreshPendingReviewCount, usePendingReviewCount } from '../hooks/usePendingReviewCount';
 
 const Tab = createBottomTabNavigator();
 
@@ -18,6 +18,7 @@ function useActivitiesBadge() {
   const dispatch = useDispatch();
   const { activeRole } = useAuth();
   const chatTotal = useUnreadChatTotal();
+  const reviewCount = usePendingReviewCount();
   const items = useSelector((state) => state.notifications?.items ?? []);
 
   React.useEffect(() => {
@@ -36,7 +37,7 @@ function useActivitiesBadge() {
     return itemRole === 'buyer' || itemRole === 'customer';
   }).length;
 
-  const total = changes + chatTotal;
+  const total = changes + chatTotal + reviewCount;
   return total > 0 ? total : undefined;
 }
 

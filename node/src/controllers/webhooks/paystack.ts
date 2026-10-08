@@ -180,15 +180,38 @@ export async function PaystackWebhookController(
           tracking_number: "",
         };
         const orderId = await OrderHandler.newOrder(newOrder);
-        const { id: vendorId } = await GetShopOwnerByShopIdService(shop_id);
-        await createAndEmitNotification({
-          recipientId: Number(vendorId),
-          title: "New order",
-          message: "A customer just made a purchase from your shop.",
-          sourceType: "order",
-          sourceId: Number(orderId),
-          role: "vendor",
-        });
+        try {
+          const { id: vendorId } = await GetShopOwnerByShopIdService(Number(shop_id));
+          await createAndEmitNotification({
+            recipientId: Number(vendorId),
+            title: "New order",
+            message: "A customer just made a purchase from your shop.",
+            sourceType: "order",
+            sourceId: Number(orderId),
+            role: "vendor",
+          });
+          const tokenResult = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [vendorId]);
+          const vendorToken = String(tokenResult.rows[0]?.devicetoken ?? "").trim();
+          const itemCount = (items ?? []).reduce((sum: number, item: { unit?: number; quantity?: number }) => {
+            const qty = Number(item.unit ?? item.quantity ?? 0);
+            return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+          }, 0);
+          const orderTotal = Number(subtotal || 0) + Number(shipping_fee || 0);
+          const count = itemCount || (items?.length ?? 0);
+          const itemLabel = count === 1 ? "item" : "items";
+          const totalLabel = `₦${orderTotal.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          if (vendorToken) {
+            sendFcmForActivities(
+              vendorToken,
+              "New Order Received",
+              `You have a new order for ${count} ${itemLabel} totaling ${totalLabel}.`,
+              null,
+              { type: "order", order_id: orderId },
+            );
+          }
+        } catch (err) {
+          console.error("vendor new-order notification failed", err);
+        }
 
         const orderEvent = {
           order_id: orderId,
@@ -236,24 +259,6 @@ export async function PaystackWebhookController(
       io.to(`user:${vid}`).emit("payment_received", {
         list: await vendorOrdersTransformer(shop_id),
       });
-
-      io.to(`user:${vid}`).emit("payment_received", {
-        list: await vendorOrdersTransformer(shop_id),
-      });
-      const {
-        rows: [{ devicetoken: vendorDevicetoken }],
-      } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [
-        vid,
-      ]);
-      console.log("vendorDevicetoken: ", vendorDevicetoken);
-
-      sendFcmForActivities(
-        vendorDevicetoken /**token */,
-        "New Update From Order Activity" /** title */,
-        `A customer just made a purchase from your inventory! Please ensure to respond immediately` /**body */,
-        "null" /** media */,
-        { type: "order", order_id: order.id } /** meta */,
-      );
       const {
         rows: [{ buyerDevicetoken }],
       } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [
@@ -261,8 +266,8 @@ export async function PaystackWebhookController(
       ]);
       sendFcmForActivities(
         buyerDevicetoken /**token */,
-        "New Update From Order Activity" /** title */,
-        `Your payment has been received successfully. The seller has been notified.` /**body */,
+        "Payment Successful" /** title */,
+        "Your payment has been received successfully, and the seller has been notified. You’ll receive updates as your order progresses." /**body */,
         "null" /** media */,
         { type: "order", order_id: order.id } /** meta */,
       );
