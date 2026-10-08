@@ -374,6 +374,7 @@ export async function handleGetRoomMessages(
   if (!roleOk) return;
 
   const messages = await chatModel.listMessages(room_id, userId, lim);
+  await chatModel.markRoomRead(room_id, userId);
   respond(ack, {
     success: true,
     result: { messages },

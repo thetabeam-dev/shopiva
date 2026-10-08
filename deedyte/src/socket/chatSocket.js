@@ -265,8 +265,12 @@ function ensureDomainListeners(socket) {
       if (!row) return;
       const store = require('../../redux/store').default;
       const activeRole = store.getState()?.auth?.activeRole;
-      const expected = activeRole === 'vendor' ? 'vendor' : 'buyer';
-      if (row.role !== expected) return;
+      const rowRole = String(row.role ?? '').toLowerCase();
+      const visible =
+        activeRole === 'vendor'
+          ? rowRole === 'vendor' || rowRole === 'seller'
+          : rowRole === 'buyer' || rowRole === 'customer';
+      if (!visible) return;
       store.dispatch({ type: 'notifications/push_notification', payload: row });
     });
   }

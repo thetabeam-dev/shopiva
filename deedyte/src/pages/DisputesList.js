@@ -21,6 +21,7 @@ import { getStoredUser } from '../auth/session';
 import { connectChatSocket } from '../socket/chatSocket';
 import { set_disputeInfo } from '../../redux/dispute';
 import { set_disputeList } from '../../redux/disputes';
+import { ActivityBadge, dismissUpdatedActivity } from '../components/ActivityBadge';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -69,44 +70,41 @@ function statusLabel(key) {
 
 function DisputeCard({ item, onPress }) {
   const t = STATUS_THEME[item.status] ?? STATUS_THEME.open;
+  const title = item.reason || item.dispute_ref || 'Dispute';
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
     >
       <View style={styles.cardTop}>
-        <View style={[styles.iconCircle, { backgroundColor: t.iconBg }]}>
-          <Icon name={t.icon} size={22} color={t.iconColor} />
+        <View style={styles.iconCircle}>
+          <Icon name="alert-circle-outline" size={22} color="#111111" />
         </View>
         <View style={styles.cardTitleCol}>
-          <Text style={styles.disputeId}>{item.dispute_ref}</Text>
-          <Text style={styles.orderRef} numberOfLines={1}>
-            ORD-{item?.order?.id} · {item.reason}
+          <Text style={styles.disputeId} numberOfLines={1}>{title}</Text>
+          <Text style={styles.orderRef} numberOfLines={1}>#{item.dispute_ref}</Text>
+          <ActivityBadge sourceType="dispute" sourceId={item.id} />
+        </View>
+        <View style={[styles.statusPill, { backgroundColor: t.pillBg }]}>
+          <View style={[styles.statusDot, { backgroundColor: t.pillText }]} />
+          <Text style={[styles.statusPillText, { color: t.pillText }]}>
+            {statusLabel(item.status)}
           </Text>
         </View>
-        <Icon name="chevron-forward" size={20} color={MUTED} />
       </View>
-
-      <Text style={styles.summary} numberOfLines={2}>
-        {item.description}
-      </Text>
 
       <View style={styles.metaRow}>
         <View style={styles.metaCol}>
           <Text style={styles.metaLabel}>Opened</Text>
-          <Text style={styles.metaValue}>{dayjs().to(dayjs(item.created_at))}</Text>
+          <Text style={styles.metaValue}>{dayjs(item.created_at).format('D MMM')}</Text>
         </View>
         <View style={styles.metaCol}>
           <Text style={styles.metaLabel}>Updated</Text>
-          <Text style={styles.metaValue}>{dayjs().to(dayjs(item.updated_at))}</Text>
+          <Text style={styles.metaValue}>{dayjs(item.updated_at).format('D MMM')}</Text>
         </View>
         <View style={[styles.metaCol, styles.metaColLast]}>
-          <Text style={styles.metaLabel}>Status</Text>
-          <View style={[styles.statusPill, { backgroundColor: t.pillBg }]}>
-            <Text style={[styles.statusPillText, { color: t.pillText, textTransform: "capitalize" }]}>
-              {statusLabel(item.status)}
-            </Text>
-          </View>
+          <Text style={styles.metaLabel}>Order</Text>
+          <Text style={styles.metaValue}>#{item?.order?.id ?? '—'}</Text>
         </View>
       </View>
     </Pressable>
@@ -183,6 +181,7 @@ export default function DisputesListScreen() {
       <DisputeCard
         item={item}
         onPress={() => {
+          dismissUpdatedActivity('dispute', item.id);
           dispatch(set_disputeInfo(item));
           navigation.navigate('Dispute-detail', {
             dispute: item,
@@ -333,7 +332,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: WHITE,
-    borderRadius: 5,
+    borderRadius: 18,
     padding: 16,
     ...Platform.select({
       ios: {
@@ -356,10 +355,11 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 44,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    backgroundColor: '#F3F4F6',
   },
   cardTitleCol: {
     flex: 1,
@@ -394,11 +394,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   metaLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
     color: MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
     marginBottom: 6,
   },
   metaValue: {
@@ -407,10 +405,18 @@ const styles = StyleSheet.create({
     color: BLACK,
   },
   statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 5,
+    paddingVertical: 6,
+    borderRadius: 20,
     alignSelf: 'flex-start',
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 6,
   },
   statusPillText: {
     fontSize: 12,

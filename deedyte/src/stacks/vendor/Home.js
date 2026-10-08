@@ -12,6 +12,11 @@ import {
 } from 'react-native';
 import HomeScreen from "../../pages/vendor/Home"
 import NotificationsScreen from "../../pages/NotificationsScreen";
+import OrderDetailScreen from "../../pages/OrderDetail";
+import DisputeDetailScreen from "../../pages/DisputeDetail";
+import ReturnDetailScreen from "../../pages/ReturnDetail";
+import ChatRoomScreen from "../../pages/ChatRoom";
+import { NotificationBell } from "../../components/NotificationBell";
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
 const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
 // import { set_connect_modal } from '../../redux/modal/connect';
@@ -35,15 +40,10 @@ export function VendorHomeStackScreen(){
               headerShadowVisible: false,
               headerStyle: styles.homeHeaderBar,
               headerRight: () => (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Notifications"
+                <NotificationBell
                   onPress={() => navigation.navigate('Notifications')}
-                  style={{ marginRight: 12 }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Icon name="notifications-outline" size={22} color="#000000" />
-                </TouchableOpacity>
+                  style={{ marginRight: 16 }}
+                />
               ),
             })}
           />
@@ -140,6 +140,21 @@ export function VendorHomeStackScreen(){
           name="Notifications"
           component={NotificationsScreen}
           options={{ title: 'Notifications', headerShadowVisible: false }}
+        />
+        <HomeStack.Screen name="Order-detail" component={OrderDetailScreen} options={{ title: 'Order detail', headerBackVisible: false, headerShadowVisible: false }} />
+        <HomeStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ title: 'Dispute detail', headerBackVisible: false, headerShadowVisible: false }} />
+        <HomeStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ title: 'Return detail', headerBackVisible: false, headerShadowVisible: false }} />
+        <HomeStack.Screen
+          name="Inbox"
+          component={ChatRoomScreen}
+          options={{
+            title: 'Inbox',
+            headerBackVisible: true,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: '#075E54' },
+            headerTintColor: '#FFFFFF',
+            headerTitleStyle: { color: '#FFFFFF', fontWeight: '600' },
+          }}
         />
     </HomeStack.Navigator>
     )

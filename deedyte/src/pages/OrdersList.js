@@ -19,6 +19,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { getStoredUser } from '../auth/session';
 import { fetchOwnerShops, fetchShopOrders } from '../api';
 import { set_orderList } from '../../redux/orders';
+import { ActivityBadge, dismissUpdatedActivity } from '../components/ActivityBadge';
+import { UnreadMessageBadge } from '../components/UnreadMessageBadge';
 import { STATUS_THEME, COLOR } from '../utils/statusTheme';
 
 
@@ -51,6 +53,9 @@ function statusThemeFor(raw) {
 
 function OrderCard({ item, onPress }) {
   const t = statusThemeFor(item.status);
+  const title = item.customer || item.vendor || item.shop_name || 'Order';
+  const placed = item.dateLabel || item.date || item.created_at;
+  const placedLabel = placed ? String(placed).slice(0, 12) : '—';
 
   return (
     <Pressable
@@ -58,19 +63,19 @@ function OrderCard({ item, onPress }) {
       onPress={onPress}
     >
       <View style={styles.cardTop}>
-        <View style={[styles.iconCircle, { backgroundColor: t.bg }]}>
-          <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
+        <View style={styles.iconCircle}>
+          <Icon name="cube-outline" size={22} color="#111111" />
         </View>
         <View style={styles.cardTitleCol}>
-          <Text style={styles.orderId}>ORD-{item.order_id}</Text>
-          {/* <Text style={styles.vendorLine} numberOfLines={1}>
-            {
-              auth.activeRole !== "customer" ? item.vendor
-              : item.customer
-            }
-          </Text> */}
+          <Text style={styles.orderId} numberOfLines={1}>{title}</Text>
+          <Text style={styles.vendorLine}>#{item.order_id}</Text>
+          <ActivityBadge sourceType="order" sourceId={item.order_id ?? item.id} />
+          <UnreadMessageBadge orderId={item.order_id ?? item.id} />
         </View>
-        <Icon name="chevron-forward" size={20} color={COLOR.MUTED} />
+        <View style={[styles.statusPill, { backgroundColor: t.bg }]}>
+          <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
+          <Text style={[styles.statusPillText, { color: t.text }]}>{t.label}</Text>
+        </View>
       </View>
 
       <View style={styles.grid}>
@@ -83,11 +88,8 @@ function OrderCard({ item, onPress }) {
           <Text style={styles.gridValue}>{formatNaira(item.amount)}</Text>
         </View>
         <View style={[styles.gridCol, styles.gridColLast]}>
-          <Text style={styles.gridLabel}>Status</Text>
-          <View style={[styles.statusPill, { backgroundColor: t.bg }]}>
-            <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
-            <Text style={[styles.statusPillText, { color: t.text }]}>{t.label}</Text>
-          </View>
+          <Text style={styles.gridLabel}>Placed</Text>
+          <Text style={styles.gridValue}>{placedLabel}</Text>
         </View>
       </View>
     </Pressable>
@@ -152,11 +154,12 @@ export default function OrderListScreen() {
     ({ item }) => (
       <OrderCard
         item={item}
-        onPress={() =>
+        onPress={() => {
+          dismissUpdatedActivity('order', item.order_id ?? item.id);
           navigation.navigate('Order-detail', {
             order: item,
-          })
-        }
+          });
+        }}
       />
     ),
     [navigation],
@@ -323,10 +326,11 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 44,
     height: 44,
-    borderRadius: 10,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    backgroundColor: '#F3F4F6',
   },
   cardTitleCol: {
     flex: 1,
@@ -355,11 +359,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start'
   },
   gridLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
     color: COLOR.MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
     marginBottom: 6,
   },
   gridValue: {
@@ -376,9 +378,9 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
     alignSelf: 'flex-start',
   },
   statusPillText: {

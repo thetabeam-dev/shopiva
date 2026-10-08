@@ -39,6 +39,7 @@ import {
   COLOR,
 } from '../utils/statusTheme';
 import { set_disputeInfo } from '../../redux/dispute';
+import { MessageIconBadge, useUnreadMessageCount } from '../components/UnreadMessageBadge';
 
 function parseEventMeta(meta) {
   if (meta == null) return {};
@@ -248,6 +249,9 @@ export default function OrderDetailScreen() {
   const [cancelledModalOpen, setCancelledModalOpen] = useState(false);
   const [statusInfoOpen, setStatusInfoOpen] = useState(false);
   const { orderInfo } = useSelector(s => s.orderInfo);
+  const unreadMessages = useUnreadMessageCount(
+    orderInfo?.order?.id ?? orderInfo?.order?.order_id ?? orderIdParam,
+  );
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -376,6 +380,7 @@ export default function OrderDetailScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerBackVisible: false,
       headerLeft: () => (
         <Pressable
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -1190,6 +1195,7 @@ export default function OrderDetailScreen() {
                     size={22}
                     color={COLOR.BRAND_COLOR}
                   />
+                  <MessageIconBadge count={unreadMessages} />
                 </Pressable>
               </View>
             </View>
@@ -1222,6 +1228,7 @@ export default function OrderDetailScreen() {
                     size={22}
                     color={COLOR.BRAND_COLOR}
                   />
+                  <MessageIconBadge count={unreadMessages} />
                 </Pressable>
               </View>
             </View>
@@ -1976,6 +1983,7 @@ const styles = StyleSheet.create({
   headMessageBtn: {
     padding: 4,
     flexShrink: 0,
+    position: 'relative',
   },
   avatar: {
     width: 40,

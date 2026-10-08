@@ -24,6 +24,7 @@ import {
 } from '../moderation/messageModeration';
 import { connectChatSocket, emitChatSocketAck, getChatSocket } from '../socket/chatSocket';
 import { setLastOpenedChatRoomId } from '../utils/lastOpenedChatRoom';
+import { refreshUnreadChats } from '../components/UnreadMessageBadge';
 import { useSelector } from 'react-redux';
 
 const BG = '#ECE5DD';
@@ -160,6 +161,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         .map((x) => mapMessage(/** @type {Record<string, unknown>} */(x)))
         .filter((x) => x.text);
       setMessages(mapped);
+      refreshUnreadChats(appRolePayload).catch(() => {});
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
     } finally {
       setLoading(false);

@@ -19,6 +19,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { getStoredUser } from '../auth/session';
 import { fetchOwnerShops, fetchShopReturns } from '../api';
 import { set_returnList } from '../../redux/returns';
+import { ActivityBadge, dismissUpdatedActivity } from '../components/ActivityBadge';
 import { RETURN_STATUS_THEME, RETURN_PAY_THEME, COLOR } from '../utils/statusTheme';
 
 const FILTERS = [
@@ -48,23 +49,26 @@ function statusThemeFor(raw) {
 
 function ReturnCard({ item, onPress }) {
   const t = statusThemeFor(item.statusRaw ?? item.status);
+  const title = item.customer || item.vendor || 'Return';
+  const statusText = String(item.status ?? '').split('_').join(' ');
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
     >
       <View style={styles.cardTop}>
-        <View style={[styles.iconCircle, { backgroundColor: t.bg }]}>
-          <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
+        <View style={styles.iconCircle}>
+          <Icon name="return-down-back-outline" size={22} color="#111111" />
         </View>
         <View style={styles.cardTitleCol}>
-          <Text style={styles.orderId}>{`RTN-${item?.return_id}`}</Text>
-          {/* <Text style={styles.vendorLine} numberOfLines={1}>
-            {item.customer}
-            auth.activeRole === "vendor" ? item.customer : item.vendor
-          </Text> */}
+          <Text style={styles.orderId} numberOfLines={1}>{title}</Text>
+          <Text style={styles.vendorLine}>#{item?.return_id}</Text>
+          <ActivityBadge sourceType="return" sourceId={item.return_id ?? item.id} />
         </View>
-        <Icon name="chevron-forward" size={20} color={COLOR.MUTED} />
+        <View style={[styles.statusPill, { backgroundColor: t.bg }]}>
+          <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
+          <Text style={[styles.statusPillText, { color: t.text, textTransform: 'capitalize' }]}>{statusText}</Text>
+        </View>
       </View>
 
       <View style={styles.grid}>
@@ -77,11 +81,8 @@ function ReturnCard({ item, onPress }) {
           <Text style={styles.gridValue}>{formatNaira(item.amount)}</Text>
         </View>
         <View style={[styles.gridCol, styles.gridColLast]}>
-          <Text style={styles.gridLabel}>Status</Text>
-          <View style={[styles.statusPill, { backgroundColor: t.bg }]}>
-            <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
-            <Text style={[styles.statusPillText, { color: t.text, textTransform: "capitalize" }]}>{item.status.split('_').join(" ")}</Text>
-          </View>
+          <Text style={styles.gridLabel}>Order</Text>
+          <Text style={styles.gridValue}>#{item.order_id ?? '—'}</Text>
         </View>
       </View>
     </Pressable>
@@ -149,12 +150,13 @@ export default function ReturnListScreen() {
     ({ item }) => (
       <ReturnCard
         item={item}
-        onPress={() =>
+        onPress={() => {
+          dismissUpdatedActivity('return', item.return_id ?? item.id);
           navigation.navigate('Return-detail', {
             returnItem: item,
             returnId: item.return_id,
-          })
-        }
+          });
+        }}
       />
     ),
     [navigation],
@@ -298,7 +300,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: COLOR.NEUTRAL,
-    borderRadius: 10,
+    borderRadius: 18,
     padding: 16,
     ...Platform.select({
       ios: {
@@ -321,10 +323,11 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 44,
     height: 44,
-    borderRadius: 10,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    backgroundColor: '#F3F4F6',
   },
   cardTitleCol: {
     flex: 1,
@@ -353,11 +356,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start'
   },
   gridLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
     color: COLOR.MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
     marginBottom: 6,
   },
   gridValue: {

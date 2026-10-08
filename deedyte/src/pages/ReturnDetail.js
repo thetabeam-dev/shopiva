@@ -347,6 +347,17 @@ export default function ReturnDetailScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
+      headerBackVisible: false,
+      headerLeft: () => (
+        <Pressable
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Icon name="chevron-back" size={24} color={COLOR.TEXT} />
+        </Pressable>
+      ),
       headerTitle: () => (
         <View style={{
           width: "100%",

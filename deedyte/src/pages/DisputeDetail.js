@@ -195,6 +195,17 @@ export default function DisputeDetailScreen() {
     }
 
     navigation.setOptions({
+      headerBackVisible: false,
+      headerLeft: () => (
+        <Pressable
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Icon name="chevron-back" size={24} color="#111111" />
+        </Pressable>
+      ),
       headerTitle: () => (
         <View style={[styles.statusRow, { flexDirection: "column" }]}>
           <Text style={styles.disputeId}>{dispute.dispute_ref}</Text>

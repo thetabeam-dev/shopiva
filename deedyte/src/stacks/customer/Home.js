@@ -19,7 +19,12 @@ import CartCheckoutScreen from '../../pages/customer/CartCheckoutScreen';
 import PaymentSuccessScreen from '../../pages/customer/PaymentSuccessScreen';
 import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
 import NotificationsScreen from '../../pages/NotificationsScreen';
+import OrderDetailScreen from '../../pages/OrderDetail';
+import DisputeDetailScreen from '../../pages/DisputeDetail';
+import ReturnDetailScreen from '../../pages/ReturnDetail';
+import ChatRoomScreen from '../../pages/ChatRoom';
 import { HomeStackCartIconButton } from '../../components/HomeStackCartButton';
+import { NotificationBell } from '../../components/NotificationBell';
 
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
 const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
@@ -59,15 +64,10 @@ const vendorsOpt = (navigation) => ({
         <Icon name="location-outline" size={22} color="#000000" />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Notifications"
+      <NotificationBell
         onPress={() => navigation.navigate('Notifications')}
         style={styles.vendorsHeaderFilter}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Icon name="notifications-outline" size={22} color="#000000" />
-      </TouchableOpacity>
+      />
     </View>
   ),
 })
@@ -125,6 +125,21 @@ export function HomeStackScreen() {
         name="Notifications"
         component={NotificationsScreen}
         options={{ title: 'Notifications', headerShadowVisible: false }}
+      />
+      <HomeStack.Screen name="Order-detail" component={OrderDetailScreen} options={{ title: 'Order detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ title: 'Dispute detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ title: 'Return detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen
+        name="Inbox"
+        component={ChatRoomScreen}
+        options={{
+          title: 'Inbox',
+          headerBackVisible: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#075E54' },
+          headerTintColor: '#FFFFFF',
+          headerTitleStyle: { color: '#FFFFFF', fontWeight: '600' },
+        }}
       />
     </HomeStack.Navigator>
   );

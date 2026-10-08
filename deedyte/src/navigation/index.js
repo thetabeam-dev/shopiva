@@ -31,7 +31,7 @@ export { navigationRef, navigate } from './root';
 /** Renders inside `<Provider>` so `useDispatch` and navigation share one Redux context. */
 function NavigationTree() {
   const dispatch = useDispatch();
-  const { signIn } = useAuth();
+  const { signIn, status } = useAuth();
 
   const handleOAuthUrl = useCallback(
     async (url) => {
@@ -69,8 +69,9 @@ function NavigationTree() {
   }, [handleOAuthUrl]);
 
   useEffect(() => {
-    connectChatSocket()
-  }, []);
+    if (status !== 'signedIn') return;
+    connectChatSocket();
+  }, [status]);
 
   useEffect(() => {
     async function getFcm () {

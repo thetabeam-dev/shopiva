@@ -12,6 +12,7 @@ import { ordersTransformer as vendorOrdersTransformer } from "../../transformers
 import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
 import { escrow } from "../../services/escrow.js";
 import { sendFcmForActivities } from "../../services/firebaseConfig.js";
+import { createAndEmitNotification } from "../../services/notifications.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
 
 export async function PaystackWebhookController(
@@ -179,6 +180,15 @@ export async function PaystackWebhookController(
           tracking_number: "",
         };
         const orderId = await OrderHandler.newOrder(newOrder);
+        const { id: vendorId } = await GetShopOwnerByShopIdService(shop_id);
+        await createAndEmitNotification({
+          recipientId: Number(vendorId),
+          title: "New order",
+          message: "A customer just made a purchase from your shop.",
+          sourceType: "order",
+          sourceId: Number(orderId),
+          role: "vendor",
+        });
 
         const orderEvent = {
           order_id: orderId,

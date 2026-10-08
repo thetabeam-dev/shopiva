@@ -123,7 +123,7 @@ async function broadcastDisputeUpdate(
     });
     void createAndEmitNotification({
       recipientId: Number(recipient),
-      title: "Dispute update",
+      title: event === "raise_dispute" ? "New dispute" : "Dispute update",
       message: fcmMssg(event),
       sourceType: "dispute",
       sourceId: Number(disputeId),
@@ -152,7 +152,7 @@ async function broadcastDisputeUpdate(
     });
     void createAndEmitNotification({
       recipientId: Number(recipient),
-      title: "Dispute update",
+      title: event === "raise_dispute" ? "New dispute" : "Dispute update",
       message: fcmMssg(event),
       sourceType: "dispute",
       sourceId: Number(disputeId),
@@ -301,6 +301,15 @@ export const handleDisputeResponse = async(
           dispute.order_id, dispute.customer_id, shop.id, "return_initiated", JSON.stringify((response as any).return_address)
         ]
       );
+
+      await createAndEmitNotification({
+        recipientId: Number(dispute.customer_id),
+        title: "New return",
+        message: "A return was opened for your order.",
+        sourceType: "return",
+        sourceId: Number(id?.id),
+        role: "buyer",
+      });
 
       await pool.query(
         `

@@ -4,7 +4,11 @@ import type { ChatRoomRecord } from "../../models/chat.js";
 import { paystack } from "../paystack.js";
 import { listCartLinesForUser } from "./cart.js";
 import { notifyUser } from "../socketBroadcast.js";
+import { createAndEmitNotification } from "../notifications.js";
+import { sendFcmForActivities } from "../firebaseConfig.js";
 import { GetShopOwnerByShopIdService } from "../business/shop.js";
+import { OrderHandler } from "../webhook/paystack.js";
+import type { NewOrder } from "../../types/paystack.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -29,6 +33,36 @@ async function cartVendorIdsForUser(userId: number): Promise<number[]> {
   );
   const out = rows.map((r) => r.vid).filter((n) => Number.isFinite(n) && n > 0);
   return [...new Set(out)];
+}
+
+const VENDOR_PURCHASE_TITLE = "New order";
+const VENDOR_PURCHASE_MESSAGE = "A customer just made a purchase from your shop.";
+
+async function notifyVendorOfPurchase(shopId: unknown, orderId: unknown): Promise<void> {
+  const owner = await GetShopOwnerByShopIdService(Number(shopId));
+  const vendorId = Number(owner?.id);
+  const sourceId = Number(orderId);
+  if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(sourceId) || sourceId <= 0) return;
+
+  await createAndEmitNotification({
+    recipientId: vendorId,
+    title: VENDOR_PURCHASE_TITLE,
+    message: VENDOR_PURCHASE_MESSAGE,
+    sourceType: "order",
+    sourceId,
+    role: "vendor",
+  });
+
+  const { rows } = await (await db()).query<{ devicetoken: string | null }>(
+    `SELECT devicetoken FROM users WHERE id = $1`,
+    [vendorId],
+  );
+  const token = String(rows[0]?.devicetoken ?? "").trim();
+  if (!token) return;
+  await sendFcmForActivities(token, VENDOR_PURCHASE_TITLE, VENDOR_PURCHASE_MESSAGE, null, {
+    type: "order",
+    order_id: sourceId,
+  });
 }
 
 async function clearCartForUser(userId: number): Promise<void> {
@@ -92,9 +126,17 @@ function metadataOrdersFromVerifyData(data: Record<string, unknown>): Array<{
   const meta = data.metadata && typeof data.metadata === "object"
     ? (data.metadata as Record<string, unknown>)
     : {};
-  const rawOrders = Array.isArray(meta.orders) ? meta.orders : [];
+  let rawOrders: unknown = meta.orders;
+  if (typeof rawOrders === "string" && rawOrders.trim()) {
+    try {
+      rawOrders = JSON.parse(rawOrders);
+    } catch {
+      rawOrders = [];
+    }
+  }
+  const orderList = Array.isArray(rawOrders) ? rawOrders : [];
 
-  return rawOrders
+  return orderList
     .filter((order): order is Record<string, unknown> => !!order && typeof order === "object")
     .map((order) => {
       const items = Array.isArray(order.items) ? order.items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object") : [];
@@ -209,24 +251,81 @@ export async function confirmCartCheckoutAndCreateChatRoom(
     }
 
     if (metadataOrders.length) {
-      const metadataTotalNaira = metadataOrders.reduce((sum, order) => {
+      const goodsNaira = metadataOrders.reduce((sum, order) => {
         const itemsTotal = order.items.reduce((innerSum, item) => {
           const qty = Number(item.unit ?? item.quantity ?? 0);
           const unitPrice = Number(item.unit_price ?? 0);
           const total = Number(item.total ?? (qty * unitPrice));
           return innerSum + (Number.isFinite(total) ? total : 0);
         }, 0);
-        return sum + Math.max(0, Number(order.subtotal ?? itemsTotal)) + Number(order.shipping_fee ?? 0);
+        return sum + Math.max(0, Number(order.subtotal ?? itemsTotal));
       }, 0);
-      const expectedKobo = Math.round((metadataTotalNaira + ship) * 100);
+      const metadataShip = metadataOrders.reduce(
+        (sum, order) => sum + Math.max(0, Number(order.shipping_fee ?? 0)),
+        0,
+      );
+      const shippingNaira = metadataShip > 0 ? metadataShip : ship;
+      const escrowNaira = 200;
+      const expectedKobo = Math.round((goodsNaira + shippingNaira + escrowNaira) * 100);
       if (Math.abs(amountKobo - expectedKobo) <= 150) {
-        const roomRows = metadataOrders.map((order) => ({
-          id: txnId,
-          shop_id: order.shop_id ?? 0,
-        }));
-        const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, roomRows, txnId, false);
+        const meta = d.metadata && typeof d.metadata === "object"
+          ? (d.metadata as Record<string, unknown>)
+          : {};
+        const address = String(meta.shipping_address ?? "").trim();
+        for (const order of metadataOrders) {
+          const newOrder: NewOrder = {
+            customer_id: String(buyerUserId),
+            shop_id: String(order.shop_id ?? 0),
+            amount_paid: order.subtotal,
+            shipping_fee: order.shipping_fee,
+            tax: 0,
+            charges: 0,
+            total_paid: order.subtotal,
+            currency: "NGN",
+            fulfillment_status: "payment_received",
+            escrow_status: "held",
+            payment_status: "success",
+            shipping_address: address,
+            payment_reference: ref,
+            shipping_method: String(meta.delivery_location ?? ""),
+            tracking_number: "",
+          };
+          const orderId = await OrderHandler.newOrder(newOrder);
+          await notifyVendorOfPurchase(order.shop_id, orderId);
+          await OrderHandler.orderEvent({
+            order_id: String(orderId),
+            event_type: "payment",
+            stage: "payment_received",
+            actor_type: "customer",
+            actor_id: String(buyerUserId),
+            outcome: "success",
+            notes: `Payment received via Paystack - Reference: ${ref}`,
+            meta: JSON.stringify({ paystack_charge_id: txnId }),
+          });
+          for (const item of order.items) {
+            const qty = Number(item.unit ?? item.quantity ?? 0);
+            const unitPrice = Number(item.unit_price ?? 0);
+            const total = Number(item.total ?? (qty * unitPrice));
+            await OrderHandler.orderedTtem({
+              order_id: String(orderId),
+              item_id: String(item.item_id ?? item.product_id ?? ""),
+              units: qty,
+              unit_price: unitPrice,
+              total_price: Number.isFinite(total) ? total : 0,
+            });
+            const cartId = item.cart_id;
+            if (cartId != null && String(cartId).trim() !== "") {
+              await OrderHandler.removeItemFromCart(cartId as string | number);
+            }
+          }
+        }
+
+        const { rows: created } = await (await db()).query(
+          `SELECT * FROM orders WHERE payment_reference = $1`,
+          [ref],
+        );
+        const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, created, txnId, false);
         if (rooms.length) {
-          await clearCartForUser(buyerUserId);
           return { rooms, transaction_id: txnId };
         }
       }

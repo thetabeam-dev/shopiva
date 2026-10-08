@@ -33,4 +33,4 @@ UserRouter.put('/user/photo/update/:id', authenticate, UpdatePhotoController);
 UserRouter.put('/user/profile/update/:id', authenticate, UpdateProfileController);
 UserRouter.put('/user/password/update/:id', authenticate, UpdatePasswordController);
 UserRouter.get('/notifications', authenticate, ListNotificationsController);
-UserRouter.post('/notifications/:id/read', authenticate, MarkNotificationReadController);
+UserRouter.post('/notifications/:notificationId/read', authenticate, MarkNotificationReadController);

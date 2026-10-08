@@ -126,7 +126,13 @@ export class chatModel {
     ): Promise<ChatRoomRecord[]> => {
       if (participantRole === "buyer" || participantRole === "seller") {
         const { rows } = await (await db()).query<ChatRoomRecord>(
-          `SELECT cr.id, cr.order_id, cr.initiator, cr.last_message, cr.created_at, cr.updated_at
+          `SELECT cr.id, cr.order_id, cr.initiator, cr.last_message, cr.created_at, cr.updated_at,
+            (
+              SELECT COUNT(*)::int
+              FROM chat_messages m
+              LEFT JOIN chat_message_reads r ON r.message_id = m.id AND r.user_id = $1
+              WHERE m.room_id = cr.id AND m.sender <> $1 AND r.id IS NULL
+            ) AS unread_count
            FROM chat_rooms cr
            INNER JOIN chat_room_participants p ON p.room_id = cr.id AND p.user_id = $1 AND p.role = $2
            ORDER BY cr.updated_at DESC`,
@@ -135,7 +141,13 @@ export class chatModel {
         return rows;
       }
       const { rows } = await (await db()).query<ChatRoomRecord>(
-        `SELECT cr.id, cr.order_id, cr.initiator, cr.last_message, cr.created_at, cr.updated_at
+        `SELECT cr.id, cr.order_id, cr.initiator, cr.last_message, cr.created_at, cr.updated_at,
+          (
+            SELECT COUNT(*)::int
+            FROM chat_messages m
+            LEFT JOIN chat_message_reads r ON r.message_id = m.id AND r.user_id = $1
+            WHERE m.room_id = cr.id AND m.sender <> $1 AND r.id IS NULL
+          ) AS unread_count
          FROM chat_rooms cr
          INNER JOIN chat_room_participants p ON p.room_id = cr.id AND p.user_id = $1
          ORDER BY cr.updated_at DESC`,
@@ -257,6 +269,22 @@ export class chatModel {
         [input.room_id, preview]
       );
       return msg;
+    }
+  );
+
+  static markRoomRead = withErrorHandling(
+    async (room_id: string, user_id: number): Promise<void> => {
+      const ok = await chatModel.isParticipant(room_id, user_id);
+      if (!ok) return;
+      await (await db()).query(
+        `INSERT INTO chat_message_reads (message_id, user_id, read_at)
+         SELECT m.id, $2, now()
+         FROM chat_messages m
+         WHERE m.room_id = $1 AND m.sender <> $2
+         ON CONFLICT (message_id, user_id)
+         DO UPDATE SET read_at = EXCLUDED.read_at`,
+        [room_id, user_id]
+      );
     }
   );
 

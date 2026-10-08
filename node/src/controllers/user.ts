@@ -335,7 +335,7 @@ export async function MarkNotificationReadController(req: Request, res: Response
     try {
         const user = (req as AuthRequest).user;
         const userId = Number(user?.id);
-        const notificationId = Number(req.params.id);
+        const notificationId = Number(req.params.notificationId);
         if (!Number.isFinite(userId) || userId <= 0) {
             res.status(401).json({ error: "Unauthorized" });
             return;
