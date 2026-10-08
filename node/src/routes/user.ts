@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
-import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController } from "../controllers/user.js";
+import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController } from "../controllers/user.js";
 import { UploadUserPhotoController, userPhotoUploadMiddleware } from "../controllers/userPhotoUpload.js";
 
 export const UserRouter = express.Router();
@@ -32,3 +32,5 @@ UserRouter.post("/user/photo/upload", authenticate, userPhotoUploadMiddleware, U
 UserRouter.put('/user/photo/update/:id', authenticate, UpdatePhotoController);
 UserRouter.put('/user/profile/update/:id', authenticate, UpdateProfileController);
 UserRouter.put('/user/password/update/:id', authenticate, UpdatePasswordController);
+UserRouter.get('/notifications', authenticate, ListNotificationsController);
+UserRouter.post('/notifications/:id/read', authenticate, MarkNotificationReadController);

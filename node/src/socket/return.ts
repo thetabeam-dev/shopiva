@@ -4,6 +4,7 @@ import { returnTransformer } from "../transformers/business/return.js";
 import { returnsTransformer as vendorReturnsTransformer } from "../transformers/business/returns.js";
 import { returnsTransformer as customerReturnsTransformer } from "../transformers/buyer/returns.js";
 import { notifyUser } from "../services/socketBroadcast.js";
+import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 
 
@@ -88,7 +89,8 @@ function emitReturnUpdateToUser(
     event: string,
     result: unknown,
     list: unknown[],
-    returnId: string | any
+    returnId: string | any,
+    notificationRole: unknown,
 ): void {
     const id = parseRecipientUserId(userId);
     if (id == null) {
@@ -96,6 +98,18 @@ function emitReturnUpdateToUser(
         return;
     }
     notifyUser(id, event, { result, list });
+    const role = appRoleToNotificationRole(notificationRole);
+    const sourceId = Number(returnId);
+    if (role && Number.isFinite(sourceId) && sourceId > 0) {
+        void createAndEmitNotification({
+            recipientId: id,
+            title: "Return update",
+            message: fcmMssg(event),
+            sourceType: "return",
+            sourceId,
+            role,
+        });
+    }
     let msg = fcmMssg(event);
     
     db().then(async(pool) => {
@@ -134,7 +148,7 @@ async function broadcastReturnUpdate(
     const actorList = listForRole(actor, vendorList, customerList);
     const recipientList = listForRole(recipientRole, vendorList, customerList);
 
-    emitReturnUpdateToUser(recipient, event, result, recipientList, returnId);
+    emitReturnUpdateToUser(recipient, event, result, recipientList, returnId, recipientRole);
     // emitReturnUpdateToUser(actorId, event, result, actorList, orderId);
 
     return { result, list: actorList };

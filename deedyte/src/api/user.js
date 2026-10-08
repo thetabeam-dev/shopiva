@@ -297,3 +297,22 @@ export const checkForUpdate = async () => {
     console.error('Failed to check app version:', error);
   }
 };
+
+export function notificationRoleForApp(activeRole) {
+  return activeRole === 'vendor' ? 'vendor' : 'buyer';
+}
+
+export async function listNotifications(activeRole) {
+  const role = notificationRoleForApp(activeRole);
+  const res = await apiFetchAuth(`/notifications?role=${role}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return Array.isArray(data.notifications) ? data.notifications : [];
+}
+
+export async function markNotificationRead(id) {
+  const res = await apiFetchAuth(`/notifications/${id}/read`, { method: 'POST', body: '{}' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data.notification ?? null;
+}

@@ -6,6 +6,11 @@ import {
     VerifyPasswordResetPinService,
 } from "../services/passwordRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
+import {
+    appRoleToNotificationRole,
+    listNotifications,
+    markNotificationRead,
+} from "../services/notifications.js";
 
 export async function SignupController(req: Request, res: Response) {
     try {
@@ -303,5 +308,49 @@ export async function UpdatePasswordController(req: Request, res: Response) {
         res.status(400).json({
             error: err instanceof Error ? err.message : String(err)
         });
+    }
+}
+
+export async function ListNotificationsController(req: Request, res: Response) {
+    try {
+        const user = (req as AuthRequest).user;
+        const userId = Number(user?.id);
+        const role = appRoleToNotificationRole(req.query.role);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        if (!role) {
+            res.status(400).json({ error: "role must be buyer or vendor" });
+            return;
+        }
+        const notifications = await listNotifications(userId, role);
+        res.status(200).json({ notifications });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+export async function MarkNotificationReadController(req: Request, res: Response) {
+    try {
+        const user = (req as AuthRequest).user;
+        const userId = Number(user?.id);
+        const notificationId = Number(req.params.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        if (!Number.isFinite(notificationId)) {
+            res.status(400).json({ error: "Invalid notification id" });
+            return;
+        }
+        const notification = await markNotificationRead(userId, notificationId);
+        if (!notification) {
+            res.status(404).json({ error: "Notification not found" });
+            return;
+        }
+        res.status(200).json({ notification });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
 }

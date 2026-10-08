@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import HomeScreen from "../../pages/vendor/Home"
+import NotificationsScreen from "../../pages/NotificationsScreen";
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
 const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
 // import { set_connect_modal } from '../../redux/modal/connect';
@@ -28,35 +29,23 @@ export function VendorHomeStackScreen(){
           <HomeStack.Screen
             name="Home"
             component={HomeScreen}
-            options={{
+            options={({ navigation }) => ({
               title: 'Home',
               headerBackVisible: false,
               headerShadowVisible: false,
               headerStyle: styles.homeHeaderBar,
-              // headerRight: () => (
-
-              //   <View>
-              //     <HomeStackCartIconButton
-              //         size={24}
-              //         color="#000000"
-              //         style={styles.vendorsHomeHeaderCart}
-              //     />
-              //   </View>
-                  
-              // ),
-              // headerLeft: () => (
-
-              //   <View style={styles.homeHeaderLogoCnt}>
-              //     <Image
-              //       source={DEEDYTE_LOGO}
-              //       style={styles.homeHeaderLogo}
-              //       resizeMode="contain"
-              //       accessibilityIgnoresInvertColors
-              //     />
-              //   </View>
-
-              // ),
-            }}
+              headerRight: () => (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Notifications"
+                  onPress={() => navigation.navigate('Notifications')}
+                  style={{ marginRight: 12 }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Icon name="notifications-outline" size={22} color="#000000" />
+                </TouchableOpacity>
+              ),
+            })}
           />
 
         {/* <HomeStack.Screen
@@ -147,6 +136,11 @@ export function VendorHomeStackScreen(){
             headerStyle: { backgroundColor: '#FFFFFF' },
             }}
         /> */}
+        <HomeStack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: 'Notifications', headerShadowVisible: false }}
+        />
     </HomeStack.Navigator>
     )
 }

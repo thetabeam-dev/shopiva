@@ -9,6 +9,7 @@ import returnInfo from './return';
 import returnList from './returns';
 import categories from './categoriesSlice';
 import logisticsProviders from './logisticsProvidersSlice';
+import notifications from './notifications';
 
 const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ const store = configureStore({
     returnList: returnList,
     categories,
     logisticsProviders,
+    notifications,
   },
 });
 

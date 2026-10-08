@@ -3,7 +3,6 @@ import Icon from 'react-native-vector-icons/Ionicons';
 // import { useSelector } from 'react-redux';
 import React from 'react';
 import {
-  Alert,
   Image,
   Platform,
   StyleSheet,
@@ -19,6 +18,7 @@ import CartScreen from '../../pages/customer/Cart';
 import CartCheckoutScreen from '../../pages/customer/CartCheckoutScreen';
 import PaymentSuccessScreen from '../../pages/customer/PaymentSuccessScreen';
 import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
+import NotificationsScreen from '../../pages/NotificationsScreen';
 import { HomeStackCartIconButton } from '../../components/HomeStackCartButton';
 
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
@@ -62,12 +62,7 @@ const vendorsOpt = (navigation) => ({
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel="Notifications"
-        onPress={() =>
-          Alert.alert(
-            'Notifications',
-            'This feature will be available in a future update.',
-          )
-        }
+        onPress={() => navigation.navigate('Notifications')}
         style={styles.vendorsHeaderFilter}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
@@ -126,6 +121,11 @@ export function HomeStackScreen() {
       <HomeStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt}/>
       <HomeStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt}/>
       <HomeStack.Screen name="Payment-failed" component={PaymentFailedScreen} options={payFailedOpt}/>
+      <HomeStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Notifications', headerShadowVisible: false }}
+      />
     </HomeStack.Navigator>
   );
 }

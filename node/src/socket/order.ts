@@ -3,7 +3,7 @@ import { db } from "../config/database.js";
 import { orderTransformer } from "../transformers/business/order.js";
 import { ordersTransformer as vendorOrdersTransformer } from "../transformers/business/orders.js";
 import { ordersTransformer as customerOrdersTransformer } from "../transformers/buyer/orders.js";
-import { notifyUser } from "../services/socketBroadcast.js";
+import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 
 function fcmMssg(event: string) {
@@ -87,7 +87,8 @@ function emitOrderUpdateToUser(
   result: unknown,
   list: unknown[],
   orderId: string | any,
-  actorId: string | any
+  actorId: string | any,
+  notificationRole: unknown,
 ): void {
   const id = parseRecipientUserId(userId);
   if (id == null) {
@@ -95,6 +96,18 @@ function emitOrderUpdateToUser(
     return;
   }
   notifyUser(id, event, { result, list });
+  const role = appRoleToNotificationRole(notificationRole);
+  const sourceId = Number(orderId);
+  if (role && Number.isFinite(sourceId) && sourceId > 0) {
+    void createAndEmitNotification({
+      recipientId: id,
+      title: "Order update",
+      message: fcmMssg(event),
+      sourceType: "order",
+      sourceId,
+      role,
+    });
+  }
   let msg = fcmMssg(event);
 
   db().then(async (pool) => {
@@ -139,7 +152,7 @@ async function broadcastOrderUpdate(
   const actorList = listForRole(actor, vendorList, customerList);
   const recipientList = listForRole(recipientRole, vendorList, customerList);
 
-  emitOrderUpdateToUser(recipient, event, result, recipientList, orderId, actorId);
+  emitOrderUpdateToUser(recipient, event, result, recipientList, orderId, actorId, recipientRole);
   // emitOrderUpdateToUser(actorId, event, result, actorList, orderId);
 
   return { result, list: actorList };

@@ -1,6 +1,7 @@
 import type { Namespace } from "socket.io";
 import { db } from "../config/database.js";
 import { chatModel, type ParticipantRole } from "../models/chat.js";
+import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { MODERATION_CONFIG } from "../utils/moderationConfig.js";
 import {
   getSessionModerationStrikes,
@@ -264,13 +265,28 @@ export async function handleCreateMessage(
   });
 
   const others = await chatModel.otherParticipantIds(room_id, userId);
-  const targets = [...others, userId];
+  const room = await chatModel.getRoomById(room_id);
+  const orderId = Number(room?.order_id);
   const seen = new Set<number>();
-  for (const uid of targets) {
+  for (const uid of others) {
     if (seen.has(uid)) continue;
     seen.add(uid);
     nsp.to(`user:${uid}`).emit("message_created", { message });
+    const participantRole = await chatModel.getParticipantRole(room_id, uid);
+    const role = appRoleToNotificationRole(participantRole);
+    if (role && Number.isFinite(orderId) && orderId > 0) {
+      const preview = String(content ?? "").trim().slice(0, 140) || "New chat message";
+      void createAndEmitNotification({
+        recipientId: uid,
+        title: "New message",
+        message: preview,
+        sourceType: "chat",
+        sourceId: orderId,
+        role,
+      });
+    }
   }
+  nsp.to(`user:${userId}`).emit("message_created", { message });
 }
 
 export async function handleTyping(

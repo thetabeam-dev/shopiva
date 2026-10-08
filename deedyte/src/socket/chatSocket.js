@@ -257,6 +257,19 @@ function ensureDomainListeners(socket) {
     };
     DISPUTE_SOCKET_EVENTS.forEach((event) => socket.on(event, onDisputeUpdate));
   }
+
+  if (!socket.__notificationListenerBound) {
+    socket.__notificationListenerBound = true;
+    socket.on('notification_created', (payload) => {
+      const row = payload?.notification;
+      if (!row) return;
+      const store = require('../../redux/store').default;
+      const activeRole = store.getState()?.auth?.activeRole;
+      const expected = activeRole === 'vendor' ? 'vendor' : 'buyer';
+      if (row.role !== expected) return;
+      store.dispatch({ type: 'notifications/push_notification', payload: row });
+    });
+  }
 }
 
 /**

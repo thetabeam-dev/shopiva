@@ -2,6 +2,7 @@ import type { Namespace } from "socket.io";
 import { db } from "../config/database.js";
 import { dispute as disputeModel } from "../models/buyer/dispute.js";
 import { notifyUser } from "../services/socketBroadcast.js";
+import { createAndEmitNotification } from "../services/notifications.js";
 import {
   CreateBuyerDisputeService,
   parseRaiseDisputePayload,
@@ -120,6 +121,14 @@ async function broadcastDisputeUpdate(
     notifyUser(recipient, event, {
       actor: { coi, col, cdl, cdi },
     });
+    void createAndEmitNotification({
+      recipientId: Number(recipient),
+      title: "Dispute update",
+      message: fcmMssg(event),
+      sourceType: "dispute",
+      sourceId: Number(disputeId),
+      role: "buyer",
+    });
     // notifyUser(actorId, event, {
     //   actor: { voi, vol, vdl, vdi },
     // });
@@ -140,6 +149,14 @@ async function broadcastDisputeUpdate(
   } else {
     notifyUser(recipient, event, {
       actor: { voi, vol, vdl, vdi },
+    });
+    void createAndEmitNotification({
+      recipientId: Number(recipient),
+      title: "Dispute update",
+      message: fcmMssg(event),
+      sourceType: "dispute",
+      sourceId: Number(disputeId),
+      role: "vendor",
     });
     // notifyUser(actorId, event, {
     //   actor: { coi, col, cdl, cdi },
