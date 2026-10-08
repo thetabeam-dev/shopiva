@@ -14,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Dropdown } from 'react-native-element-dropdown';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -28,6 +27,7 @@ import {
   reverseGeocodeToPlace,
 } from '../utils/deviceLocation';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
+import { formatMvpCategoryLabel } from '../utils/mvpCategory';
 import {
   selectCategoriesError,
   selectCategoriesLoading,
@@ -59,7 +59,8 @@ export default function ProfileSettings() {
   const categoryOptions = useSelector(selectCategoryOptions);
   const categoriesLoading = useSelector(selectCategoriesLoading);
   const categoriesError = useSelector(selectCategoriesError);
-  const [category, setCategory] = useState(/** @type {string | null} */ (null));
+  const [categories, setCategories] = useState(/** @type {string[]} */ ([]));
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
@@ -155,9 +156,8 @@ export default function ProfileSettings() {
       Alert.alert('Shop name', 'Enter a valid shop name.');
       return;
     }
-    const categoryValue = String(category ?? '').trim();
-    if (!categoryValue) {
-      Alert.alert('Category', 'Select a shop category.');
+    if (!categories.length) {
+      Alert.alert('Category', 'Select at least one shop category.');
       return;
     }
     const hasTypedLocation =
@@ -176,7 +176,7 @@ export default function ProfileSettings() {
       await createVendorShop({
         name,
         vendorType,
-        category: categoryValue,
+        category: categories,
         location: {
           address: address.trim() || undefined,
           city: city.trim() || undefined,
@@ -329,26 +329,25 @@ export default function ProfileSettings() {
               </View>
 
               <Text style={styles.label}>
-                Category <Text style={styles.required}>*</Text>
+                Categories <Text style={styles.required}>*</Text>
               </Text>
-              <Dropdown
+              <Pressable
                 style={styles.dropdown}
-                containerStyle={styles.dropdownList}
-                placeholderStyle={styles.dropdownPlaceholder}
-                selectedTextStyle={styles.dropdownSelectedText}
-                itemTextStyle={styles.dropdownItemText}
-                inputSearchStyle={styles.dropdownSearch}
-                data={categoryOptions}
-                search
-                maxHeight={260}
-                labelField="label"
-                valueField="value"
-                placeholder={categoriesLoading ? 'Loading categories...' : 'Select a category'}
-                searchPlaceholder="Search categories..."
-                value={category}
-                onChange={(item) => setCategory(item.value)}
-                disable={submittingSetup || categoriesLoading || categoryOptions.length === 0}
-              />
+                onPress={() => setCategoryPickerVisible(true)}
+                disabled={submittingSetup || categoriesLoading || categoryOptions.length === 0}
+              >
+                <Text
+                  style={categories.length ? styles.dropdownSelectedText : styles.dropdownPlaceholder}
+                  numberOfLines={2}
+                >
+                  {categoriesLoading
+                    ? 'Loading categories...'
+                    : categories.length
+                      ? categories.map(value => formatMvpCategoryLabel(value)).join(', ')
+                      : 'Select categories'}
+                </Text>
+                <Icon name="chevron-down" size={18} color={MUTED} />
+              </Pressable>
               {categoriesError ? <Text style={styles.locationHint}>{categoriesError}</Text> : null}
 
               <View style={styles.locationHeaderRow}>
@@ -392,6 +391,49 @@ export default function ProfileSettings() {
             </TouchableOpacity>
           </View>
           </FormKeyboardAvoiding>
+        </View>
+      </Modal>
+      <Modal
+        visible={categoryPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCategoryPickerVisible(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setCategoryPickerVisible(false)} />
+          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8, maxHeight: '70%' }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Categories</Text>
+            <Text style={styles.sheetSub}>Select every category this shop sells.</Text>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {categoryOptions.map(opt => {
+                const selected = categories.includes(opt.value);
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.pickerItem, selected && styles.pickerItemSelected]}
+                    onPress={() =>
+                      setCategories(current =>
+                        selected
+                          ? current.filter(item => item !== opt.value)
+                          : [...current, opt.value],
+                      )
+                    }
+                  >
+                    <Text style={styles.pickerItemText}>{opt.label}</Text>
+                    {selected ? <Icon name="checkmark-circle" size={22} color={BRAND} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() => setCategoryPickerVisible(false)}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.primaryBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </>
@@ -599,24 +641,48 @@ const styles = StyleSheet.create({
     color: '#C62828',
     fontWeight: '700',
   },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E4E4E7',
+  },
+  pickerItemSelected: {
+    backgroundColor: '#F3FAF7',
+  },
+  pickerItemText: {
+    fontSize: 15,
+    color: '#222222',
+    flex: 1,
+    paddingRight: 12,
+  },
   dropdown: {
-    height: 46,
+    minHeight: 46,
     borderWidth: 1,
     borderColor: '#E4E4E7',
     borderRadius: 10,
     paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#FFFFFF',
     marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   dropdownList: {
     borderRadius: 10,
     borderColor: '#E4E4E7',
   },
   dropdownPlaceholder: {
+    flex: 1,
     fontSize: 14,
     color: '#A0A0A0',
   },
   dropdownSelectedText: {
+    flex: 1,
     fontSize: 14,
     color: '#111111',
   },

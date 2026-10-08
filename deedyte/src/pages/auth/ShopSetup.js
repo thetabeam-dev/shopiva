@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Dropdown } from 'react-native-element-dropdown';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -24,6 +25,7 @@ import {
 } from '../../utils/deviceLocation';
 import FormKeyboardAvoiding from '../../components/FormKeyboardAvoiding';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../../auth/session';
+import { formatMvpCategoryLabel } from '../../utils/mvpCategory';
 import {
   selectCategoriesError,
   selectCategoriesLoading,
@@ -52,7 +54,8 @@ export default function ShopSetupScreen() {
   const categoryOptions = useSelector(selectCategoryOptions);
   const categoriesLoading = useSelector(selectCategoriesLoading);
   const categoriesError = useSelector(selectCategoriesError);
-  const [category, setCategory] = useState(/** @type {string | null} */ (null));
+  const [categories, setCategories] = useState(/** @type {string[]} */ ([]));
+  const [categoryModal, setCategoryModal] = useState(false);
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
@@ -162,9 +165,8 @@ export default function ShopSetupScreen() {
       Alert.alert('Shop name', 'Enter a valid shop name.');
       return;
     }
-    const categoryValue = String(category ?? '').trim();
-    if (!categoryValue) {
-      Alert.alert('Category', 'Select a shop category.');
+    if (!categories.length) {
+      Alert.alert('Category', 'Select at least one shop category.');
       return;
     }
     const hasTypedLocation =
@@ -186,7 +188,7 @@ export default function ShopSetupScreen() {
       await createVendorShop({
         name,
         vendorType,
-        category: categoryValue,
+        category: categories,
         location: {
           address: address.trim() || undefined,
           city: city.trim() || undefined,
@@ -230,6 +232,7 @@ export default function ShopSetupScreen() {
   }
 
   return (
+    <>
     <FormKeyboardAvoiding offset={0} style={styles.flex}>
       <ScrollView
         style={styles.flex}
@@ -320,26 +323,24 @@ export default function ShopSetupScreen() {
         </View>
 
         <Text style={styles.label}>
-          Category <Text style={styles.required}>*</Text>
+          Categories <Text style={styles.required}>*</Text>
         </Text>
-        <Dropdown
+        <Pressable
           style={styles.dropdown}
-          containerStyle={styles.dropdownList}
-          placeholderStyle={styles.dropdownPlaceholder}
-          selectedTextStyle={styles.dropdownSelectedText}
-          itemTextStyle={styles.dropdownItemText}
-          inputSearchStyle={styles.dropdownSearch}
-          data={categoryOptions}
-          search
-          maxHeight={260}
-          labelField="label"
-          valueField="value"
-          placeholder={categoriesLoading ? 'Loading categories...' : 'Select a category'}
-          searchPlaceholder="Search categories..."
-          value={category}
-          onChange={item => setCategory(item.value)}
-          disable={submittingSetup || categoriesLoading || categoryOptions.length === 0}
-        />
+          onPress={() => setCategoryModal(true)}
+          disabled={submittingSetup || categoriesLoading}
+        >
+          <Text
+            style={categories.length ? styles.dropdownSelectedText : styles.dropdownPlaceholder}
+            numberOfLines={1}
+          >
+            {categoriesLoading
+              ? 'Loading categories...'
+              : categories.length
+                ? categories.map(value => formatMvpCategoryLabel(value)).join(', ')
+                : 'Select categories'}
+          </Text>
+        </Pressable>
         {categoriesError ? <Text style={styles.meta}>{categoriesError}</Text> : null}
 
         <View style={styles.locationHeaderRow}>
@@ -410,6 +411,51 @@ export default function ShopSetupScreen() {
         </TouchableOpacity>
       </ScrollView>
     </FormKeyboardAvoiding>
+    <Modal
+      visible={categoryModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setCategoryModal(false)}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setCategoryModal(false)} />
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Categories</Text>
+          <Text style={styles.meta}>Select every category this shop sells.</Text>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            {categoryOptions.map(opt => {
+              const selected = categories.includes(opt.value);
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[styles.pickerItem, selected && styles.pickerItemSelected]}
+                  onPress={() =>
+                    setCategories(current =>
+                      selected
+                        ? current.filter(item => item !== opt.value)
+                        : [...current, opt.value],
+                    )
+                  }
+                >
+                  <Text style={styles.pickerItemText}>{opt.label}</Text>
+                  {selected ? (
+                    <Icon name="checkmark-circle" size={22} color={BRAND} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => setCategoryModal(false)}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.primaryBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -489,6 +535,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
     marginBottom: 12,
+    justifyContent: 'center',
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: BLACK,
+    marginBottom: 6,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E4E4E7',
+  },
+  pickerItemSelected: {
+    backgroundColor: '#F3FAF7',
+  },
+  pickerItemText: {
+    fontSize: 15,
+    color: '#222222',
+    flex: 1,
+    paddingRight: 12,
   },
   dropdownList: {
     borderRadius: 10,

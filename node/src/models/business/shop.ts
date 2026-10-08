@@ -743,8 +743,12 @@ export class shop{
                       FROM UNNEST($1::text[]) AS u(v)
                       WHERE regexp_replace(lower(trim(p.category)), '[^a-z0-9]+', '_', 'g') =
                             regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
-                         OR regexp_replace(lower(trim(s.category)), '[^a-z0-9]+', '_', 'g') =
-                            regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
+                         OR EXISTS (
+                           SELECT 1
+                           FROM unnest(COALESCE(s.category, ARRAY[]::text[])) AS sc(cat)
+                           WHERE regexp_replace(lower(trim(sc.cat)), '[^a-z0-9]+', '_', 'g') =
+                                 regexp_replace(lower(trim(v)), '[^a-z0-9]+', '_', 'g')
+                         )
                     )
                   )
               )

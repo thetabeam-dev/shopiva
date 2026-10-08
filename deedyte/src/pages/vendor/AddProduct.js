@@ -51,6 +51,7 @@ import {
   isGenderDrivenCategory,
   mvpCategoryRootKeys,
 } from '../../utils/mvpCategory';
+import { parseShopCategories } from '../../utils/shopCategories';
 import {
   buildColorOptionsFromJson,
   buildVariantSnapshot,
@@ -222,20 +223,17 @@ export default function VendorCreateProductScreen() {
   const [showFinishSheet, setShowFinishSheet] = useState(false);
   const [loadingExistingProduct, setLoadingExistingProduct] = useState(false);
 
-  const categoryRoots = useMemo(
-    () =>
-      mvpCategoryRootKeys(
-        /** @type {Record<string, unknown>} */ (reduxCategoryKeys),
-      ),
-    [reduxCategoryKeys],
+  const shopCategories = useMemo(
+    () => parseShopCategories(shopDetails?.category),
+    [shopDetails],
   );
-  const savedShopCategory = useMemo(() => {
-    const raw = String(shopDetails?.category ?? '').trim();
-    return raw ? raw.toLowerCase() : defaultCategory;
-  }, [defaultCategory, shopDetails]);
-  const categoryKey =
-    String(category || savedShopCategory || defaultCategory).trim() ||
-    defaultCategory;
+  const categoryKey = String(category || shopCategories[0] || '').trim();
+  const productCategoryOptions = useMemo(() => {
+    if (categoryKey && !shopCategories.includes(categoryKey)) {
+      return [categoryKey, ...shopCategories];
+    }
+    return shopCategories;
+  }, [categoryKey, shopCategories]);
   const { subCategories, typesBySubCategory } = useMemo(
     () =>
       buildMvpCategoryFilters(
@@ -389,10 +387,8 @@ export default function VendorCreateProductScreen() {
             const shop = await fetchShopDetails(sid, uid);
             if (!cancelled) {
               setShopDetails(shop);
-              const savedCategory = String(shop?.category ?? '').trim();
-              setCategory(
-                savedCategory ? savedCategory.toLowerCase() : defaultCategory,
-              );
+              const savedCategories = parseShopCategories(shop?.category);
+              setCategory(savedCategories[0] || '');
             }
           } catch {
             if (!cancelled) {
@@ -852,7 +848,7 @@ export default function VendorCreateProductScreen() {
     if (picker === 'category') {
       return {
         title: 'Category',
-        options: categoryRoots,
+        options: productCategoryOptions,
         formatLabel: formatMvpCategoryLabel,
         swatchByValue: undefined,
       };
@@ -921,7 +917,7 @@ export default function VendorCreateProductScreen() {
     };
   }, [
     picker,
-    categoryRoots,
+    productCategoryOptions,
     subCategories,
     typeOptions,
     colorPickerValues,
@@ -1243,16 +1239,19 @@ export default function VendorCreateProductScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Category</Text>
+          <Text style={[styles.label, fieldInvalid('Category') && styles.labelError]}>Category</Text>
           <SelectField
-            value={formatMvpCategoryLabel(categoryKey)}
-            onPress={() => undefined}
-            disabled
+            value={categoryKey ? formatMvpCategoryLabel(categoryKey) : 'Select a category'}
+            onPress={() => setPicker('category')}
+            disabled={productCategoryOptions.length === 0}
+            invalid={fieldInvalid('Category')}
           />
           <Text style={styles.infoText}>
             <Text style={styles.infoPrefix}>info:</Text>{' '}
             <Text style={styles.infoTextItalic}>
-              Category can only be set in the shop settings.
+              {productCategoryOptions.length
+                ? 'These are the categories selected for this shop.'
+                : 'Add categories in shop settings before creating a product.'}
             </Text>
           </Text>
           {isGenderCategory ? (
