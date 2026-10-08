@@ -23,7 +23,16 @@ export async function requestLocationPermission() {
       return false;
     }
   }
-  // iOS: permission prompt runs when getCurrentPosition is called (requires Info.plist string).
+  // iOS shows the system prompt from requestAuthorization, or from the first location read.
+  const geo = /** @type {{ requestAuthorization?: (level?: string) => void }} */ (Geolocation);
+  if (typeof geo.requestAuthorization === 'function') {
+    geo.requestAuthorization('whenInUse');
+  }
+  Geolocation.getCurrentPosition(
+    () => {},
+    () => {},
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+  );
   return true;
 }
 

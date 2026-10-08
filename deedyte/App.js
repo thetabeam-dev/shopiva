@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { DEFAULT_API_BASE_URL } from './src/api/config';
 import { checkForUpdate } from './src/api';
+import { requestLocationPermission } from './src/utils/deviceLocation';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -81,6 +82,7 @@ function App() {
       void clearAllDeedyteStorage();
     }
     warnIfPaystackLiveInDev();
+    void requestLocationPermission();
   }, []);
 
   useEffect(() => {
