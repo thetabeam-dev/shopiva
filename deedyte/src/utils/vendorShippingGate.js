@@ -35,7 +35,7 @@ export async function getVendorShippingCreateGate(shopId, userId) {
   const hasFeeModel = Boolean(status?.hasFeeModel);
   const hasZones = Boolean(status?.hasZones);
   return {
-    ready: hasFeeModel && hasZones,
+    ready: hasZones,
     hasFeeModel,
     hasZones,
     status: String(status?.status ?? 'not_set'),

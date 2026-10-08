@@ -12,6 +12,7 @@
  */
 
 import { shop } from "../../models/business/shop.js";
+import { shipping } from "../../models/business/shipping.js";
 import type { NewPayoutAccount, NewShopDocument, ShopDocument, ShopPolicies, TransferRecipientResponse } from "../../types/business.js";
 import { paystack } from "../paystack.js";
 
@@ -22,6 +23,11 @@ export async function CreateShopService(payload: NewShopDocument) {
     const result = await shop.createShop(payload);
     if (result == null) {
         throw new Error("Failed to create shop");
+    }
+    const shopId = Number((result as { id?: unknown }).id);
+    if (Number.isFinite(shopId) && shopId > 0) {
+        await shipping.upsertShippingFeeModel(shopId, "multi_item_discount", 0, 50);
+        await shipping.upsertShippingMultiItemDiscount(shopId, 0, 50);
     }
     return result;
 }

@@ -14,7 +14,7 @@ const TEXT = '#111111';
 const MUTED = '#6B7280';
 
 /**
- * Blocks product creation until shipping model + zones are configured.
+ * Blocks product creation until shipping zones are configured.
  *
  * @param {{
  *   visible: boolean;
@@ -28,7 +28,6 @@ const MUTED = '#6B7280';
 export default function ShippingSetupRequiredModal({
   visible,
   busy = false,
-  hasFeeModel = false,
   hasZones = false,
   onClose,
   onGoToSetup,
@@ -54,19 +53,11 @@ export default function ShippingSetupRequiredModal({
               </View>
               <Text style={styles.title}>Complete shipping setup</Text>
               <Text style={styles.body}>
-                Before you create a product, finish your shop shipping setup so
+                Before you create a product, set shipping prices for your delivery zones so
                 customers can get accurate delivery fees.
               </Text>
 
               <View style={styles.checklist}>
-                <View style={styles.checkRow}>
-                  <Icon
-                    name={hasFeeModel ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={20}
-                    color={hasFeeModel ? '#16A34A' : '#B45309'}
-                  />
-                  <Text style={styles.checkText}>Shipping Model</Text>
-                </View>
                 <View style={styles.checkRow}>
                   <Icon
                     name={hasZones ? 'checkmark-circle' : 'ellipse-outline'}

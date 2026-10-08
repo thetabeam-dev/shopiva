@@ -1152,29 +1152,6 @@ export default function ProfileShopInfoScreen() {
               <Text style={styles.policyLabel}>Delivery/Logistics</Text>
             </View>
             <View style={styles.shippingCardsWrap}>
-              <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("shipping-fee-model", { shopId: activeShopId, userId: uid })} activeOpacity={0.85}>
-                <View style={[styles.optionIcon, styles.optionIconBrand]}>
-                  <Icon name="options-outline" size={22} color="#00926e" />
-                </View>
-                <View style={styles.optionBody}>
-                  <Text style={styles.optionTitle}>Shipping Model</Text>
-                  <Text style={styles.optionDesc}>Choose how shipping fees are calculated for orders.</Text>
-                </View>
-                <View style={{ alignItems: 'center', gap: 6 }}>
-                  {shippingConfigStatus.hasFeeModel ? (
-                    <View style={styles.statusBadgeSet}>
-                      <Icon name="checkmark-circle" size={16} color="#16A34A" />
-                      <Text style={styles.statusBadgeText}>Set</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.statusBadgeNotSet}>
-                      <Icon name="alert-circle-outline" size={16} color="#B45309" />
-                      <Text style={styles.statusBadgeTextNotSet}>Not set</Text>
-                    </View>
-                  )}
-                  <Icon name="chevron-forward" size={18} color="#9CA3AF" />
-                </View>
-              </TouchableOpacity>
               <TouchableOpacity style={[styles.optionRow, { marginBottom: 0 }]} onPress={() => navigation.navigate("shipping-zones", { shopId: activeShopId, userId: uid })} activeOpacity={0.85}>
                 <View style={[styles.optionIcon, styles.optionIconBrand]}>
                   <Icon name="map-outline" size={22} color="#00926e" />
@@ -2224,8 +2201,8 @@ const styles = StyleSheet.create({
   shippingCardsWrap: {
     backgroundColor: '#EFEFEF',
     width: '100%',
-    paddingHorizontal: 5,
-    paddingVertical: 5,
+    // paddingHorizontal: 5,
+    // paddingVertical: 5,
     borderRadius: 7,
     marginBottom: 7,
     flexDirection: 'column',
