@@ -3,19 +3,21 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { connectChatSocket, emitChatSocketAck, getChatSocket } from '../socket/chatSocket';
 
-/** @type {Record<string, number>} */
-let byOrder = {};
+/** @type {{ customer: Record<string, number>, vendor: Record<string, number> }} */
+let byRole = { customer: {}, vendor: {} };
 /** @type {Set<() => void>} */
 const listeners = new Set();
-let loadedRole = '';
 
-function publish(next) {
-  byOrder = next;
+function roleKey(activeRole) {
+  return activeRole === 'vendor' ? 'vendor' : 'customer';
+}
+
+function publish() {
   listeners.forEach((listener) => listener());
 }
 
 export async function refreshUnreadChats(activeRole) {
-  const role = activeRole === 'vendor' ? 'vendor' : 'customer';
+  const role = roleKey(activeRole);
   const out = await emitChatSocketAck('get_rooms', { app_role: role });
   const rooms = Array.isArray(out?.result?.rooms) ? out.result.rooms : [];
   /** @type {Record<string, number>} */
@@ -26,34 +28,57 @@ export async function refreshUnreadChats(activeRole) {
     if (!orderId || !Number.isFinite(count) || count <= 0) continue;
     next[orderId] = (next[orderId] ?? 0) + count;
   }
-  loadedRole = role;
-  publish(next);
+  byRole = { ...byRole, [role]: next };
+  publish();
 }
 
-function watchMessages(activeRole) {
+function watchMessages() {
   connectChatSocket().then((socket) => {
     if (!socket || socket.__unreadChatsBound) return;
     socket.__unreadChatsBound = true;
     socket.on('message_created', () => {
-      const role = loadedRole || (activeRole === 'vendor' ? 'vendor' : 'customer');
-      refreshUnreadChats(role).catch(() => {});
+      refreshUnreadChats('customer').catch(() => {});
+      refreshUnreadChats('vendor').catch(() => {});
     });
   });
+}
+
+function totalFor(activeRole) {
+  return Object.values(byRole[roleKey(activeRole)] ?? {}).reduce(
+    (acc, count) => acc + Number(count || 0),
+    0,
+  );
+}
+
+export function useUnreadChatTotal() {
+  const { activeRole } = useAuth();
+  const [total, setTotal] = useState(() => totalFor(activeRole));
+
+  useEffect(() => {
+    const sync = () => setTotal(totalFor(activeRole));
+    listeners.add(sync);
+    sync();
+    refreshUnreadChats(activeRole).catch(() => {});
+    watchMessages();
+    return () => {
+      listeners.delete(sync);
+    };
+  }, [activeRole]);
+
+  return total;
 }
 
 export function useUnreadMessageCount(orderId) {
   const { activeRole } = useAuth();
   const key = String(orderId ?? '');
-  const [count, setCount] = useState(key ? byOrder[key] ?? 0 : 0);
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const sync = () => setCount(key ? byOrder[key] ?? 0 : 0);
+    const sync = () => setCount(key ? Number(byRole[roleKey(activeRole)]?.[key] ?? 0) : 0);
     listeners.add(sync);
     sync();
-    if (loadedRole !== (activeRole === 'vendor' ? 'vendor' : 'customer')) {
-      refreshUnreadChats(activeRole).catch(() => {});
-    }
-    watchMessages(activeRole);
+    refreshUnreadChats(activeRole).catch(() => {});
+    watchMessages();
     return () => {
       listeners.delete(sync);
     };

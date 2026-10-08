@@ -146,36 +146,34 @@ export default function NotificationsScreen() {
           <ActivityIndicator size="large" color="#FFFFFF" />
         </View>
       </Modal>
+      <View style={styles.filtersWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+        >
+          {FILTERS.map((option) => {
+            const selected = filter === option.key;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                onPress={() => setFilter(option.key)}
+                style={[styles.chip, selected && styles.chipSelected]}
+              >
+                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
       <FlatList
       data={visibleItems}
       keyExtractor={(item) => String(item.id)}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load('refresh')} />}
-      contentContainerStyle={visibleItems.length === 0 ? styles.center : styles.list}
-      ListHeaderComponent={
-        <View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filters}
-          >
-            {FILTERS.map((option) => {
-              const selected = filter === option.key;
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  onPress={() => setFilter(option.key)}
-                  style={[styles.chip, selected && styles.chipSelected]}
-                >
-                  <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
-      }
+      contentContainerStyle={visibleItems.length === 0 ? styles.emptyList : styles.list}
       ListEmptyComponent={<Text style={styles.empty}>No notifications yet</Text>}
       renderItem={({ item }) => {
         const unread = item.status !== 'read';
@@ -211,7 +209,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   list: { backgroundColor: '#FFFFFF', paddingBottom: 8 },
-  filters: { paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
+  filters: { paddingHorizontal: 12, paddingVertical: 12, alignItems: 'center' },
+  emptyList: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,

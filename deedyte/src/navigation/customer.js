@@ -1,19 +1,49 @@
 import * as React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { HomeStackScreen } from '../stacks/customer/Home';
 import { ProfileStackScreen } from '../stacks/customer/Profile';
 import { CartStackScreen } from '../stacks/customer/Cart';
 import { ActivitiesStackScreen } from '../stacks/customer/Activities';
 import { ProfileProvider } from '../context/ProfileContext';
 import { useAuth } from '../hooks/useAuth';
+import { useUnreadChatTotal } from '../components/UnreadMessageBadge';
+import { listNotifications } from '../api/user';
+import { set_notifications } from '../../redux/notifications';
 
 const Tab = createBottomTabNavigator();
+
+function useActivitiesBadge() {
+  const dispatch = useDispatch();
+  const { activeRole } = useAuth();
+  const chatTotal = useUnreadChatTotal();
+  const items = useSelector((state) => state.notifications?.items ?? []);
+
+  React.useEffect(() => {
+    listNotifications(activeRole)
+      .then((rows) => dispatch(set_notifications(rows)))
+      .catch(() => {});
+  }, [activeRole, dispatch]);
+
+  const role = activeRole === 'vendor' ? 'vendor' : 'buyer';
+  const changes = items.filter((item) => {
+    if (String(item?.status ?? '').toLowerCase() === 'read') return false;
+    const source = String(item?.source_type ?? '').toLowerCase();
+    if (!['order', 'return', 'dispute'].includes(source)) return false;
+    const itemRole = String(item?.role ?? '').toLowerCase();
+    if (role === 'vendor') return itemRole === 'vendor' || itemRole === 'seller';
+    return itemRole === 'buyer' || itemRole === 'customer';
+  }).length;
+
+  const total = changes + chatTotal;
+  return total > 0 ? total : undefined;
+}
 
 export default function CustomerTab() {
   const { nested_nav } = useSelector(s => s?.nested_nav);
   const { isGuest } = useAuth();
+  const activitiesBadge = useActivitiesBadge();
   const [tabBarStyle, setTabBarStyle] = React.useState('flex');
 
   React.useEffect(() => {
@@ -51,7 +81,13 @@ export default function CustomerTab() {
         })}
       >
         <Tab.Screen name="Home" component={HomeStackScreen} />
-        {isGuest ? null : <Tab.Screen name="Activities" component={ActivitiesStackScreen} />}
+        {isGuest ? null : (
+          <Tab.Screen
+            name="Activities"
+            component={ActivitiesStackScreen}
+            options={{ tabBarBadge: activitiesBadge }}
+          />
+        )}
         {isGuest ? null : <Tab.Screen name="Cart" component={CartStackScreen} />}
         <Tab.Screen name="Profile" component={ProfileStackScreen} />
       </Tab.Navigator>

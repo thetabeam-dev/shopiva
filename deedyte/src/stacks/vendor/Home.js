@@ -42,7 +42,7 @@ export function VendorHomeStackScreen(){
               headerRight: () => (
                 <NotificationBell
                   onPress={() => navigation.navigate('Notifications')}
-                  style={{ marginRight: 16 }}
+                  style={{ marginTop: 10 }}
                 />
               ),
             })}
