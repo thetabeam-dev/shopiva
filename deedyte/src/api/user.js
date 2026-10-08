@@ -260,6 +260,21 @@ export async function pingApi() {
 
 
 
+/** Public gate from GET /config/customer-access. */
+export async function getCustomerAccess() {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/config/customer-access`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error('Could not check customer access.');
+  }
+  return {
+    enabled: data?.enabled !== false,
+    title: String(data?.title ?? '').trim(),
+    message: String(data?.message ?? '').trim(),
+  };
+}
+
 export const checkForUpdate = async () => {
   try {
     const base = getApiBaseUrl();
