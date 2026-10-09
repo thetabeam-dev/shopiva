@@ -353,10 +353,31 @@ export function buildStorefrontProductDetail(
   if (invRows.length === 1) {
     const inv = invRows[0]!;
     const stock = availableStock(inv);
+    const invPrice = Number(inv.price) || 0;
+    const onlySpec = specs[0];
+    const attributes = attributesFromSpecVariant(onlySpec);
+    if (onlySpec && Object.keys(attributes).length > 0 && !variantsOnlyPriceAndStock(specs)) {
+      return {
+        ...base,
+        hasVariants: true,
+        variants: [
+          {
+            id: String(inv.id),
+            attributes,
+            price: priceFromSpecVariant(onlySpec, invPrice),
+            stock,
+          },
+        ],
+        price: invPrice,
+        stock,
+        inventoryId: String(inv.id),
+        allowBackorder: Boolean(inv.allow_backorder),
+      };
+    }
     return {
       ...base,
       hasVariants: false,
-      price: Number(inv.price) || 0,
+      price: invPrice,
       stock,
       inventoryId: String(inv.id),
       allowBackorder: Boolean(inv.allow_backorder),

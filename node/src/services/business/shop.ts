@@ -20,9 +20,6 @@ import { formatPhoneNumber } from "../../utils/phone.js";
  * Create a new shop
  */
 export async function CreateShopService(payload: NewShopDocument) {
-    if (payload.contactPhone != null) {
-        payload.contactPhone = formatPhoneNumber(payload.contactPhone);
-    }
     const result = await shop.createShop(payload);
     if (result == null) {
         throw new Error("Failed to create shop");

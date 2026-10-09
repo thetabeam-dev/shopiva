@@ -52,7 +52,7 @@ function SpecTile({ label, value }) {
  *   onPress: () => void;
  * }} p
  */
-function VariantCard({ variant, index, attrKeys, selected, disabled, onPress }) {
+function VariantCard({ variant, index, attrKeys, selected, disabled, onPress, showPrice = true }) {
   const a =
     variant.attributes && typeof variant.attributes === 'object'
       ? /** @type {Record<string, string>} */ (variant.attributes)
@@ -82,7 +82,7 @@ function VariantCard({ variant, index, attrKeys, selected, disabled, onPress }) 
         {attrKeys.map((key) => (
           <SpecTile key={key} label={formatAttributeLabel(key).toUpperCase()} value={a[key] != null && String(a[key]).trim() ? String(a[key]) : '—'} />
         ))}
-        <SpecTile label="PRICE" value={priceLabel} />
+        {showPrice ? <SpecTile label="PRICE" value={priceLabel} /> : null}
       </View>
     </Pressable>
   );
@@ -113,6 +113,21 @@ export default function ProductVariantCardPicker({ attrKeys, variants, selectedV
   const [open, setOpen] = useState(false);
 
   const rows = useMemo(() => (Array.isArray(variants) ? variants : []), [variants]);
+
+  if (rows.length === 1) {
+    const only = /** @type {Record<string, unknown>} */ (rows[0]);
+    return (
+      <VariantCard
+        variant={only}
+        index={0}
+        attrKeys={attrKeys}
+        selected
+        disabled={!isVariantPurchasable(only)}
+        showPrice={false}
+        onPress={() => onSelect(only)}
+      />
+    );
+  }
 
   const summary = useMemo(() => {
     if (!selectedVariant || typeof selectedVariant !== 'object') return '';

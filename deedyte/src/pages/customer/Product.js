@@ -267,10 +267,16 @@ export default function ProductScreen({ route, navigation }) {
       return;
     }
     const init = /** @type {Record<string, string | null>} */ ({});
-    for (const k of attrKeys) init[k] = null;
+    const only = variantsForUi.length === 1 ? variantsForUi[0] : null;
+    const onlyAttrs =
+      only && only.attributes && typeof only.attributes === 'object' ? only.attributes : null;
+    for (const k of attrKeys) {
+      const raw = onlyAttrs ? onlyAttrs[k] : null;
+      init[k] = raw != null && String(raw).trim() ? String(raw).trim() : null;
+    }
     setSelectedAttrs(init);
     setSelectedVariant(null);
-  }, [productIdParam, hasVariants, attrKeys.join('\u0001')]);
+  }, [productIdParam, hasVariants, attrKeys.join('\u0001'), variantsForUi]);
 
   useEffect(() => {
     if (!hasVariants) {
@@ -1117,7 +1123,9 @@ export default function ProductScreen({ route, navigation }) {
           </View>
           {hasVariants && attrKeys.length ? (
             <View style={styles.variantPickersBlock}>
-              <Text style={styles.variantPickersTitle}>Options (variant)</Text>
+              <Text style={styles.variantPickersTitle}>
+                {variantsForUi.length === 1 ? 'Features' : 'Options (variant)'}
+              </Text>
               <ProductVariantCardPicker
                 attrKeys={attrKeys}
                 variants={variantsForUi}

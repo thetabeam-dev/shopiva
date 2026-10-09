@@ -108,8 +108,7 @@ export async function SignupService(payload: NewUserDocument & { src: string; de
     // Check if phone already exists (skip when absent — OAuth / partial profiles)
     const phoneVal = formatPhoneNumber(payload.phone);
     if (phoneVal) {
-        payload.phone = phoneVal as typeof payload.phone;
-        const phoneExists = await model.countPhone(phoneVal as unknown as number);
+        const phoneExists = await model.countPhone(phoneVal);
         if (phoneExists > 0) {
             throw new Error("Phone number already registered");
         }

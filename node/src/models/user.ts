@@ -65,7 +65,7 @@ export class model{
         return rows[0].count;
     })
 
-    static countPhone = withErrorHandling(async (phone: number) => {
+    static countPhone = withErrorHandling(async (phone: string | number) => {
         const { rows } = await (await db()).query(
             `SELECT COUNT(*) AS count FROM users WHERE phone = $1`,
             [phone]
