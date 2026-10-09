@@ -79,6 +79,7 @@ function attributesFromSpecVariant(spec: unknown): Record<string, string> {
     const value = String(r.value ?? "").trim();
     if (!value) continue;
     const key = label ? attrKeyFromLabel(label) : "option";
+    if (isPriceOrStockLabel(label) || isPriceOrStockLabel(key)) continue;
     out[key] = value;
   }
   return out;
@@ -130,8 +131,34 @@ function availableStock(inv: InventoryRow): number {
   return Math.max(0, qty - reserved);
 }
 
+const HIDDEN_VARIANT_ATTR_KEYS = new Set([
+  "price",
+  "unit_price",
+  "unitprice",
+  "base_price",
+  "baseprice",
+  "compare_at_price",
+  "compareat_price",
+  "compareatprice",
+  "amount",
+  "cost",
+  "stock",
+  "quantity",
+  "qty",
+  "inventory_quantity",
+  "inventoryquantity",
+  "available",
+  "sku",
+  "barcode",
+  "inventory_id",
+  "inventoryid",
+  "wholesale",
+  "msrp",
+]);
+
 function isPriceOrStockLabel(label: string): boolean {
-  return /^(price|unit\s*price|amount|cost|stock|quantity|qty)$/i.test(label.trim());
+  const key = label.trim().toLowerCase().replace(/\s+/g, "_");
+  return HIDDEN_VARIANT_ATTR_KEYS.has(key);
 }
 
 function inferListingFilters(p: ProductRow): {
@@ -212,6 +239,40 @@ export function buildStorefrontListingProducts(
   return out;
 }
 
+/** True when every variant detail is a price or stock field, so the PDP should show one price. */
+function variantsOnlyPriceAndStock(specs: unknown[]): boolean {
+  if (!specs.length) return false;
+  let sawDetail = false;
+  for (const spec of specs) {
+    if (!spec || typeof spec !== "object") return false;
+    const details = (spec as { details?: unknown }).details;
+    if (!Array.isArray(details) || details.length === 0) return false;
+    for (const detail of details) {
+      if (!detail || typeof detail !== "object") continue;
+      const label = String((detail as { label?: unknown }).label ?? "").trim();
+      const value = String((detail as { value?: unknown }).value ?? "").trim();
+      if (!label && !value) continue;
+      sawDetail = true;
+      if (!isPriceOrStockLabel(label)) return false;
+    }
+  }
+  return sawDetail;
+}
+
+function simpleProductDetail(
+  base: Record<string, unknown>,
+  inv: InventoryRow
+): Record<string, unknown> {
+  return {
+    ...base,
+    hasVariants: false,
+    price: Number(inv.price) || 0,
+    stock: availableStock(inv),
+    inventoryId: String(inv.id),
+    allowBackorder: Boolean(inv.allow_backorder),
+  };
+}
+
 function findSpecForInventory(specs: unknown[], invId: number, invIndex: number, inventoryRowCount: number): unknown | null {
   const linked = specs.find((s) => {
     if (!s || typeof s !== "object") return false;
@@ -266,18 +327,18 @@ export function buildStorefrontProductDetail(
     const stock = availableStock(inv);
     const invPrice = Number(inv.price) || 0;
     const variants: StorefrontVariantDto[] = specs.map((spec, index) => {
-      let attributes = attributesFromSpecVariant(spec);
-      if (!Object.keys(attributes).length) {
-        attributes = { option: `Option ${index + 1}` };
-      }
+      const attributes = attributesFromSpecVariant(spec);
       const rowPrice = priceFromSpecVariant(spec, invPrice);
       return {
         id: String(inv.id),
-        attributes,
+        attributes: Object.keys(attributes).length ? attributes : { option: `Option ${index + 1}` },
         price: rowPrice,
         stock,
       };
     });
+    if (variantsOnlyPriceAndStock(specs)) {
+      return simpleProductDetail(base, inv);
+    }
     return {
       ...base,
       hasVariants: true,
@@ -300,6 +361,10 @@ export function buildStorefrontProductDetail(
       inventoryId: String(inv.id),
       allowBackorder: Boolean(inv.allow_backorder),
     };
+  }
+
+  if (variantsOnlyPriceAndStock(specs)) {
+    return simpleProductDetail(base, invRows[0]!);
   }
 
   const variants: StorefrontVariantDto[] = invRows.map((inv, index) => {
