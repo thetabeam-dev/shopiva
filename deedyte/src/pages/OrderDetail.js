@@ -21,6 +21,9 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePaystack } from 'react-native-paystack-webview';
+import { useProfile } from '../context/ProfileContext';
+import { payAcceptedOrder } from '../api/buyer';
 import { formatNaira } from '../utils/formatNaira';
 import {
   fetchBuyerOrder,
@@ -197,6 +200,8 @@ function SummaryRow({ icon, label, value, last }) {
       <View style={styles.summaryValue}>
         {typeof value === 'string' || typeof value === 'number' ? (
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={[
               styles.summaryValueText,
               {
@@ -206,7 +211,6 @@ function SummaryRow({ icon, label, value, last }) {
                     : 'capitalize',
               },
             ]}
-            // numberOfLines={1}
           >
             {String(value)}
           </Text>
@@ -253,6 +257,11 @@ export default function OrderDetailScreen() {
     orderInfo?.order?.id ?? orderInfo?.order?.order_id ?? orderIdParam,
   );
   const dispatch = useDispatch();
+  const { popup } = usePaystack();
+  const { user } = useProfile();
+  const awaitingBuyerPayment =
+    statusKey === 'order_accepted' &&
+    String(orderInfo?.order?.payment_status ?? '').toLowerCase() === 'unpaid';
 
   useEffect(() => {
     connectChatSocket();
@@ -375,8 +384,25 @@ export default function OrderDetailScreen() {
     }
   }, [orderIdParam, auth.activeRole, dispatch]);
 
-  const payKey = String(order?.paymentStatus ?? 'paid').toLowerCase();
-  const payTheme = PAY_THEME[payKey] ?? PAY_THEME.paid;
+  const rawPaymentStatus = String(
+    orderInfo?.order?.payment_status ??
+      order?.payment_status ??
+      order?.paymentStatus ??
+      '',
+  )
+    .trim()
+    .toLowerCase();
+  const payKey =
+    rawPaymentStatus === 'unpaid' || rawPaymentStatus === 'pending'
+      ? 'unpaid'
+      : rawPaymentStatus === 'refunded'
+        ? 'refunded'
+        : rawPaymentStatus === 'cancelled' || rawPaymentStatus === 'canceled'
+          ? 'cancelled'
+          : rawPaymentStatus === 'success' || rawPaymentStatus === 'paid'
+            ? 'paid'
+            : 'unpaid';
+  const payTheme = PAY_THEME[payKey] ?? PAY_THEME.unpaid;
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -478,16 +504,12 @@ export default function OrderDetailScreen() {
       orderInfo?.order?.total_paid ?? orderInfo?.order?.amount_paid;
     const num = Number(rawTotal);
     const valueText = Number.isFinite(num) ? fmt(num) : '—';
-    const cur = orderInfo?.order?.currency;
-    const suffix =
-      cur != null && String(cur).trim() ? ` ${String(cur).trim()}` : '';
-    return { theme, amountLabel, amountValue: `${valueText}${suffix}` };
+    return { theme, amountLabel, amountValue: valueText };
   }, [
     fmt,
     orderInfo?.order?.escrow_status,
     orderInfo?.order?.total_paid,
     orderInfo?.order?.amount_paid,
-    orderInfo?.order?.currency,
   ]);
 
   /** Vendor: delivery address from order + user. Customer: shop premises from {@link orderInfo.shop.location}. */
@@ -610,8 +632,14 @@ export default function OrderDetailScreen() {
 
 
   const onMail = () => {
-    console.log('counterpartEmail:', orderInfo);
     if (blockIfCancelled()) return;
+    if (payKey !== 'paid') {
+      Alert.alert(
+        'Chat unavailable',
+        'A chat room is allowed only after payment.',
+      );
+      return;
+    }
     navigation.navigate('Inbox', {
       chat: { roomId: orderInfo.room.id, name: `Order #${orderInfo.order.id}` }
     });
@@ -674,8 +702,10 @@ export default function OrderDetailScreen() {
       const totalPaid = Number(
         orderInfo.order.total_paid ?? orderInfo.order.amount_paid ?? 0,
       );
-      const postShipment = (orderInfo.order_events?.length ?? 0) > 3;
-      const restockingFee = orderInfo.order.shipping_fee;
+      const paymentStatus = String(orderInfo.order.payment_status ?? '').trim().toLowerCase();
+      const unpaid = paymentStatus === 'unpaid' || paymentStatus === 'pending' || paymentStatus === '';
+      const postShipment = !unpaid && (orderInfo.order_events?.length ?? 0) > 3;
+      const restockingFee = unpaid ? 0 : Number(orderInfo.order.shipping_fee || 0);
 
       navigation.navigate('Order-action', {
         action: 'cancellation',
@@ -688,7 +718,8 @@ export default function OrderDetailScreen() {
           outcome: 'success',
           notes: '',
           recipient: vendorId,
-          post_shipment: true,
+          unpaid,
+          post_shipment: postShipment,
           order_total: totalPaid,
           restocking_fee: restockingFee,
         },
@@ -976,7 +1007,9 @@ export default function OrderDetailScreen() {
     if (auth.activeRole === 'vendor') {
       switch (statusKey) {
         case 'order_accepted':
-          message = 'Start processing';
+          message = awaitingBuyerPayment
+            ? 'Waiting for buyer to make payment.'
+            : 'Start processing';
           break;
         case 'order_processing':
           message = 'Start shipping';
@@ -1004,8 +1037,11 @@ export default function OrderDetailScreen() {
       }
     } else {
       switch (statusKey) {
+        case 'unpaid':
+          message = 'Awaiting vendor shipping quote';
+          break;
         case 'order_accepted':
-          message = 'Processing order';
+          message = awaitingBuyerPayment ? 'Make payment now!' : 'Processing order';
           break;
         case 'order_processing':
           message = 'Shipping in progress';
@@ -1031,6 +1067,52 @@ export default function OrderDetailScreen() {
     }
 
     return message;
+  };
+
+  const onMakePayment = () => {
+    const email = String(user?.email ?? '').trim();
+    const total = Number(orderInfo?.order?.total_paid ?? 0);
+    const orderId = orderInfo?.order?.id;
+    if (!email) {
+      Alert.alert('Email required', 'Add an email to your profile before paying.');
+      return;
+    }
+    if (!Number.isFinite(total) || total <= 0 || orderId == null) {
+      Alert.alert('Payment unavailable', 'This order does not have an amount to pay.');
+      return;
+    }
+    const reference = `deedyte_order_${orderId}_${Date.now()}`;
+    popup.checkout({
+      email,
+      amount: total,
+      reference,
+      metadata: {
+        order_id: String(orderId),
+        customer_id: String(user?.id ?? ''),
+      },
+      onSuccess: async (res) => {
+        const refStr =
+          res && typeof res === 'object' && 'reference' in res
+            ? String(res.reference)
+            : reference;
+        try {
+          const body = await payAcceptedOrder(orderId, refStr);
+          if (body?.order) dispatch(set_orderInfo(body.order));
+          Alert.alert('Payment successful', 'The seller can now start processing your order.');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'We could not confirm this payment yet.';
+          Alert.alert('Payment received', msg);
+        }
+      },
+      onCancel: () => {},
+      onError: (err) => {
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String(err.message)
+            : String(err || 'Something went wrong');
+        Alert.alert('Payment error', msg);
+      },
+    });
   };
 
   return (
@@ -1099,20 +1181,24 @@ export default function OrderDetailScreen() {
 
         {orderInfo?.order_events?.length > 1 && (
           <View style={styles.card}>
-            <SectionLabel>Escrow summary</SectionLabel>
-            <View style={styles.escrowStatusRow}>
-              <Text style={styles.escrowStatusLabel}>Escrow status</Text>
-              <StatusPill theme={escrowInfo.theme} />
-            </View>
-            <View style={styles.escrowAmountRow}>
-              <Text style={styles.escrowAmountLabel}>
-                {escrowInfo.amountLabel}
-              </Text>
-              <Text style={styles.escrowAmountValue}>
-                {escrowInfo.amountValue}
-              </Text>
-            </View>
-            <Text style={styles.escrowCaption}>{escrowInfo.theme.caption}</Text>
+            {payKey === 'paid' ? (
+              <>
+                <SectionLabel>Escrow summary</SectionLabel>
+                <View style={styles.escrowStatusRow}>
+                  <Text style={styles.escrowStatusLabel}>Escrow status</Text>
+                  <StatusPill theme={escrowInfo.theme} />
+                </View>
+                <View style={styles.escrowAmountRow}>
+                  <Text style={styles.escrowAmountLabel}>
+                    {escrowInfo.amountLabel}
+                  </Text>
+                  <Text style={styles.escrowAmountValue}>
+                    {escrowInfo.amountValue}
+                  </Text>
+                </View>
+                <Text style={styles.escrowCaption}>{escrowInfo.theme.caption}</Text>
+              </>
+            ) : null}
             {isOrderCancelled ? (
               <View style={styles.cancelledBanner}>
                 <Icon name="close-circle-outline" size={20} color="#C62828" />
@@ -1354,40 +1440,31 @@ export default function OrderDetailScreen() {
 
         <View style={styles.card}>
           <SectionLabel>Payment</SectionLabel>
-
-          <MoneyRow
-            label="Subtotal"
-            value={
-              Array.isArray(orderInfo?.order_items) &&
-              orderInfo?.order_items?.reduce(
-                (acc, curr) => acc + parseInt(curr.total_price),
-                0,
-              )
-            }
-            muted
-          />
-          <MoneyRow label="Discount" value={fmt(0)} muted />
-          <MoneyRow
-            label="Shipping Cost"
-            value={
-              orderInfo?.order?.shipping_fee &&
-              fmt(orderInfo.order.shipping_fee)
-            }
-            muted
-          />
-          <MoneyRow label="Tax" value={fmt(0)} muted />
-          <View style={styles.moneyDivider} />
-          <MoneyRow
-            label="Total"
-            value={fmt(
-              orderInfo?.order?.shipping_fee &&
-              orderInfo.order_items.reduce(
-                (acc, curr) => acc + parseInt(curr.total_price),
-                0,
-              ) + Number(orderInfo?.order?.shipping_fee || 0),
-            )}
-            bold
-          />
+          {(() => {
+            const subtotal = Array.isArray(orderInfo?.order_items)
+              ? orderInfo.order_items.reduce(
+                  (acc, curr) => acc + Number(curr.total_price || 0),
+                  0,
+                )
+              : 0;
+            const showEscrowFee = auth.activeRole !== 'vendor';
+            const escrowFee = showEscrowFee ? 200 : 0;
+            const shipping = Number(orderInfo?.order?.shipping_fee || 0);
+            const total = subtotal + escrowFee + shipping;
+            return (
+              <>
+                <MoneyRow label="Subtotal" value={fmt(subtotal)} muted />
+                {showEscrowFee ? (
+                  <MoneyRow label="Escrow Fee" value={fmt(200)} muted />
+                ) : null}
+                <MoneyRow label="Discount" value={fmt(0)} muted />
+                <MoneyRow label="Shipping Cost" value={fmt(shipping)} muted />
+                <MoneyRow label="Tax" value={fmt(0)} muted />
+                <View style={styles.moneyDivider} />
+                <MoneyRow label="Total" value={fmt(total)} bold />
+              </>
+            );
+          })()}
         </View>
       </ScrollView>
 
@@ -1467,6 +1544,10 @@ export default function OrderDetailScreen() {
           ) : (
             <Pressable
               onPress={() => {
+                if (awaitingBuyerPayment) {
+                  Alert.alert('Waiting for buyer to make payment.');
+                  return;
+                }
                 if (blockIfCancelled()) return;
                 // Terminal / waiting statuses — explain instead of navigating.
                 if (
@@ -1492,7 +1573,8 @@ export default function OrderDetailScreen() {
               }}
               style={({ pressed }) => [
                 styles.btnPrimary,
-                pressed && styles.btnPrimaryPressed,
+                pressed && !awaitingBuyerPayment && styles.btnPrimaryPressed,
+                awaitingBuyerPayment && styles.btnPrimaryDisabled,
                 {
                   backgroundColor: STATUS_THEME[statusKey]?.dot,
                 },
@@ -1512,6 +1594,17 @@ export default function OrderDetailScreen() {
           <Pressable
             onPress={e => {
               if (blockIfCancelled()) return;
+              if (statusKey === 'unpaid') {
+                Alert.alert(
+                  'Awaiting shipping quote',
+                  'This order is awaiting a shipping quote from the vendor.',
+                );
+                return;
+              }
+              if (awaitingBuyerPayment) {
+                onMakePayment();
+                return;
+              }
               setStatusInfoOpen(true);
             }}
             style={({ pressed }) => [
@@ -1812,19 +1905,20 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   summaryLabel: {
-    flex: 1,
     fontSize: 11,
     color: COLOR.TEXT,
+    marginRight: 12,
   },
   summaryValue: {
+    flex: 1,
+    minWidth: 0,
     alignItems: 'flex-end',
-    flexShrink: 0,
   },
   summaryValueText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLOR.DARK,
-    // width: "auto",
+    textAlign: 'right',
     textTransform: 'capitalize',
   },
   escrowStatusRow: {
@@ -2275,6 +2369,9 @@ const styles = StyleSheet.create({
   },
   btnPrimaryPressed: {
     backgroundColor: COLOR.BRAND_COLOR_LITE,
+  },
+  btnPrimaryDisabled: {
+    opacity: 0.45,
   },
   btnPrimaryText: {
     fontSize: 13,

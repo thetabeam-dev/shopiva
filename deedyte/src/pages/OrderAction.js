@@ -150,6 +150,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
   const [confirmPerformancePolicy, setConfirmPerformancePolicy] =
     useState(false);
   const [fulfillmentDuration, setFulfillmentDuration] = useState(null);
+  const [shippingFee, setShippingFee] = useState('');
 
   const navigation = useNavigation();
   useEffect(() => {
@@ -315,7 +316,30 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
               ]}
             >
               <View style={styles.processingCard}>
-                <Text style={styles.processingSectionTitle}>Accept order</Text>
+                <Text style={styles.processingSectionTitle}>Delivery destination</Text>
+                <Text style={styles.processingSectionSubtitle}>
+                  {String(data?.shipping_address ?? '').trim() || 'No delivery address was provided.'}
+                </Text>
+                <Text style={styles.processingFieldHint}>
+                  Buyer&apos;s full delivery address and landmark
+                </Text>
+              </View>
+
+              <View style={styles.processingCard}>
+                <Text style={styles.processingSectionTitle}>Set shipping quote</Text>
+                <Text style={styles.processingFieldLabel}>Shipping fee (₦)</Text>
+                <TextInput
+                  value={shippingFee}
+                  onChangeText={txt => setShippingFee(txt.replace(/[^\d.]/g, ''))}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor="#AAA"
+                  style={[styles.textInput, styles.acceptanceFormInput]}
+                  accessibilityLabel="Shipping fee"
+                />
+              </View>
+
+              <View style={styles.processingCard}>
                 <Text style={styles.processingSectionSubtitle}>
                   Confirm each statement. The customer is notified as soon as
                   you accept.
@@ -437,6 +461,14 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                     );
                     return;
                   }
+                  const shippingFeeAmount = Number(shippingFee);
+                  if (!Number.isFinite(shippingFeeAmount) || shippingFeeAmount < 0 || shippingFee.trim() === '') {
+                    Alert.alert(
+                      'Shipping fee required',
+                      'Enter the shipping fee for this delivery address.',
+                    );
+                    return;
+                  }
                   setLoading(!loading);
                   const u = await getStoredUser();
                   
@@ -457,6 +489,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                         fulfillment_duration_label: FULFILLMENT_TIMEFRAME_OPTIONS.find(
                           o => o.value === fulfillmentDuration
                         )?.label ?? null,
+                        shipping_fee: shippingFeeAmount,
                       },
                       notes: note,
                       actor_id: u.id,
@@ -1876,6 +1909,7 @@ function CancelOrder({ data }) {
   const [submitting, setSubmitting] = useState(false);
 
   const postShipment = Boolean(data?.post_shipment);
+  const unpaid = Boolean(data?.unpaid);
   const orderTotal = Number(data?.order_total ?? 0);
   const restockingFee = Number(data?.restocking_fee ?? 0);
   const refundAmount = Math.max(0, orderTotal - restockingFee);
@@ -1923,6 +1957,7 @@ function CancelOrder({ data }) {
           reason,
           cancel_reason_code: cancelReason,
           post_shipment: postShipment,
+          unpaid,
           order_total: orderTotal,
           restocking_fee: restockingFee,
           refund_amount: refundAmount,
@@ -1954,6 +1989,22 @@ function CancelOrder({ data }) {
 
   const onPressConfirm = () => {
     if (!validate()) return;
+
+    if (unpaid) {
+      Alert.alert(
+        'Cancel order',
+        'You have not paid for this order. Cancelling it will close the order, and no refund is due.',
+        [
+          { text: 'Keep order', style: 'cancel' },
+          {
+            text: 'Confirm cancellation',
+            style: 'destructive',
+            onPress: submitCancellation,
+          },
+        ],
+      );
+      return;
+    }
 
     if (postShipment) {
       Alert.alert(
@@ -2009,9 +2060,11 @@ function CancelOrder({ data }) {
                 Order cancellation
               </Text>
               <Text style={styles.processingSectionSubtitle}>
-                {postShipment
-                  ? 'This order is already in transit. Cancelling may reduce your refund.'
-                  : 'Tell us why you want to cancel. The vendor will be notified.'}
+                {unpaid
+                  ? 'You have not paid for this order yet. Cancelling it will close the order. No refund is due.'
+                  : postShipment
+                    ? 'This order is already in transit. Cancelling may reduce your refund.'
+                    : 'Tell us why you want to cancel. The vendor will be notified.'}
               </Text>
             </View>
 
@@ -2077,7 +2130,11 @@ function CancelOrder({ data }) {
                 <ConfirmCheckbox
                   checked={confirmCancel}
                   onToggle={setConfirmCancel}
-                  label="I understand this order will be cancelled and I may receive a partial refund depending on order status."
+                  label={
+                    unpaid
+                      ? 'I understand this unpaid order will be cancelled. No payment has been made, so no refund is due.'
+                      : 'I understand this order will be cancelled and I may receive a partial refund depending on order status.'
+                  }
                   rowStyle={styles.processingCheckboxRow}
                 />
               </View>

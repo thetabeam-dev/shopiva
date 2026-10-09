@@ -146,7 +146,7 @@ function parseBigDataCloudResponse(data) {
  * OpenStreetMap Nominatim — better street / suburb detail when BigDataCloud omits them.
  * @param {number} latitude
  * @param {number} longitude
- * @returns {Promise<{ street: string; town: string; city: string; state: string; country: string; zip: string }>}
+ * @returns {Promise<{ street: string; town: string; suburb: string; neighbourhood: string; city: string; state: string; country: string; zip: string }>}
  */
 async function reverseGeocodeNominatim(latitude, longitude) {
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
@@ -164,7 +164,7 @@ async function reverseGeocodeNominatim(latitude, longitude) {
   const data = await res.json();
   const addr = data?.address;
   if (!addr || typeof addr !== 'object') {
-    return { street: '', town: '', city: '', state: '', country: '' };
+    return { street: '', town: '', suburb: '', neighbourhood: '', city: '', state: '', country: '', zip: '' };
   }
 
   const house = String(addr.house_number ?? '').trim();
@@ -188,7 +188,16 @@ async function reverseGeocodeNominatim(latitude, longitude) {
   const country = String(addr.country ?? '').trim();
   const zip = String(addr.postcode ?? '').trim();
 
-  return { street, town, city, state, country, zip };
+  return {
+    street,
+    town,
+    suburb: String(addr.suburb ?? addr.city_district ?? '').trim(),
+    neighbourhood: String(addr.neighbourhood ?? addr.quarter ?? '').trim(),
+    city,
+    state,
+    country,
+    zip,
+  };
 }
 
 /**
@@ -225,12 +234,12 @@ export async function reverseGeocodeToPlace(latitude, longitude) {
   const bdc =
     bdcResult.status === 'fulfilled'
       ? parseBigDataCloudResponse(bdcResult.value)
-      : { street: '', town: '', city: '', state: '', country: '', zip: '' };
+      : { street: '', town: '', suburb: '', neighbourhood: '', city: '', state: '', country: '', zip: '' };
 
   const nom =
     nomResult.status === 'fulfilled'
       ? nomResult.value
-      : { street: '', town: '', city: '', state: '', country: '', zip: '' };
+      : { street: '', town: '', suburb: '', neighbourhood: '', city: '', state: '', country: '', zip: '' };
 
   const city = pickField(bdc.city, nom.city);
   const state = pickField(bdc.state, nom.state);
@@ -248,6 +257,8 @@ export async function reverseGeocodeToPlace(latitude, longitude) {
   return {
     street: pickField(bdc.street, nom.street),
     town,
+    suburb: pickField(nom.suburb, town),
+    neighbourhood: pickField(nom.neighbourhood, ''),
     city,
     state,
     country,

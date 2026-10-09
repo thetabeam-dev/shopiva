@@ -7,10 +7,10 @@ import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 
-function fcmMssg(event: string) {
+function fcmMssg(event: string, shipping_fee?: string) {
   switch (event) {
     case "order_acceptance":
-      return "Good news! The seller has accepted your order and will begin processing it soon.";
+      return `The seller has accepted your order and set the shipping fee at ₦${shipping_fee}. Complete your payment to enable the seller to begin processing your order.`;
 
     case "order_processing":
       return "Your order is being prepared by the seller. We’ll keep you updated on its progress.";
@@ -99,19 +99,30 @@ function emitOrderUpdateToUser(
   notifyUser(id, event, { result, list });
   const role = appRoleToNotificationRole(notificationRole);
   const sourceId = Number(orderId);
-  if (role && Number.isFinite(sourceId) && sourceId > 0) {
-    void createAndEmitNotification({
-      recipientId: id,
-      title: "Order update",
-      message: fcmMssg(event),
-      sourceType: "order",
-      sourceId,
-      role,
-    });
-  }
-  let msg = fcmMssg(event);
 
   db().then(async (pool) => {
+    let shipping_fee: string | undefined;
+    if (event === "order_acceptance") {
+      const { rows } = await pool.query<{ shipping_fee: string | number | null }>(
+        `SELECT shipping_fee FROM orders WHERE id = $1`,
+        [orderId],
+      );
+      const fee = Number(rows[0]?.shipping_fee ?? 0);
+      shipping_fee = Number.isFinite(fee)
+        ? fee.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : "0.00";
+    }
+    const msg = fcmMssg(event, shipping_fee);
+    if (role && Number.isFinite(sourceId) && sourceId > 0) {
+      void createAndEmitNotification({
+        recipientId: id,
+        title: "Order update",
+        message: msg,
+        sourceType: "order",
+        sourceId,
+        role,
+      });
+    }
 
     const { rows: [{ devicetoken: customerDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
     sendFcmForActivities(
@@ -211,6 +222,17 @@ export const handleOrderAcceptance = async (
       const fulfillment_duration = metaObj?.fulfillment_duration ?? null;
       if (fulfillment_duration != null) {
         await updateShipping(fulfillment_duration, order_id);
+      }
+      const shippingFee = Number(metaObj?.shipping_fee);
+      if (Number.isFinite(shippingFee) && shippingFee >= 0) {
+        await p.query(
+          `UPDATE orders
+           SET shipping_fee = $1,
+               total_paid = COALESCE(amount_paid, 0) + $1,
+               updated_at = NOW()
+           WHERE id = $2`,
+          [shippingFee, order_id],
+        );
       }
       const orderPayload = await broadcastOrderUpdate(
         "order_acceptance",

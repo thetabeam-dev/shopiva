@@ -30,6 +30,13 @@ export const PAY_THEME = {
   },
 };
 export const STATUS_THEME = {
+  unpaid: {
+    bg: '#FEFCE8',
+    dot: '#CA8A04',
+    text: '#854D0E',
+    label: 'Unpaid',
+  },
+
   payment_received: {
     bg: '#ECFDF5',
     dot: '#059669',

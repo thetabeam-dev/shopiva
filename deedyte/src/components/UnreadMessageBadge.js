@@ -109,13 +109,12 @@ export function MessageIconBadge({ count }) {
 const styles = StyleSheet.create({
   pill: {
     alignSelf: 'flex-start',
-    marginTop: 4,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#2563EB',
   },
-  pillText: { fontSize: 11, fontWeight: '700', color: '#B91C1C' },
+  pillText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
   dot: {
     position: 'absolute',
     top: -6,

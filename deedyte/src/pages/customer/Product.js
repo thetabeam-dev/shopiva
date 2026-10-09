@@ -41,6 +41,7 @@ import {
   addBuyerCartLine,
   deleteBuyerCartLine,
   fetchBuyerCart,
+  fetchAwaitingShippingQuote,
   patchBuyerCartLine,
 } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
@@ -74,6 +75,7 @@ export default function ProductScreen({ route, navigation }) {
   const routeProductId = route.params?.productId;
 
   const [qty, setQty] = useState(1);
+  const [awaitingShippingQuote, setAwaitingShippingQuote] = useState(false);
   const [loading, setLoading] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
@@ -551,11 +553,25 @@ export default function ProductScreen({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       void syncCartMembership();
+      const productId = productIdParam != null ? String(productIdParam).trim() : '';
+      let cancelled = false;
+      if (loggedIn && productId) {
+        void fetchAwaitingShippingQuote(productId)
+          .then((body) => {
+            if (!cancelled) setAwaitingShippingQuote(Boolean(body?.awaiting));
+          })
+          .catch(() => {
+            if (!cancelled) setAwaitingShippingQuote(false);
+          });
+      } else if (!cancelled) {
+        setAwaitingShippingQuote(false);
+      }
       return () => {
+        cancelled = true;
         setOverflowMenuOpen(false);
         setDeliveryPolicyModalVisible(false);
       };
-    }, [syncCartMembership]),
+    }, [syncCartMembership, loggedIn, productIdParam]),
   );
 
   useEffect(() => {
@@ -1113,10 +1129,10 @@ export default function ProductScreen({ route, navigation }) {
           style={[
             styles.addCart,
             selectedLineInCart && styles.addCartOutlined,
-            cartToggleBusy && styles.addCartBusy,
+            (cartToggleBusy || awaitingShippingQuote) && styles.addCartBusy,
           ]}
-          activeOpacity={cartToggleBusy ? 1 : 0.88}
-          disabled={cartToggleBusy}
+          activeOpacity={cartToggleBusy || awaitingShippingQuote ? 1 : 0.88}
+          disabled={cartToggleBusy || awaitingShippingQuote}
           onPress={() => {
             if (!ensureReadyForCartOrCheckout()) return;
             if (selectedLineInCart) {
@@ -1127,7 +1143,11 @@ export default function ProductScreen({ route, navigation }) {
           }}
           accessibilityRole="button"
           accessibilityLabel={
-            selectedLineInCart ? 'Remove from cart' : 'Add to cart'
+            awaitingShippingQuote
+              ? 'Awaiting shipping quote'
+              : selectedLineInCart
+                ? 'Remove from cart'
+                : 'Add to cart'
           }
         >
           <Text
@@ -1136,26 +1156,34 @@ export default function ProductScreen({ route, navigation }) {
               selectedLineInCart && styles.addCartTextOutlined,
             ]}
           >
-            {selectedLineInCart ? 'Remove from cart' : 'Add to cart'}
+            {awaitingShippingQuote
+              ? 'Awaiting shipping quote'
+              : selectedLineInCart
+                ? 'Remove from cart'
+                : 'Add to cart'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.buyNow}
-          activeOpacity={0.88}
-          disabled={cartToggleBusy}
+          style={[styles.buyNow, awaitingShippingQuote && styles.addCartBusy]}
+          activeOpacity={awaitingShippingQuote ? 1 : 0.88}
+          disabled={cartToggleBusy || awaitingShippingQuote}
           onPress={() => {
             void handleBuyNow();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Buy now and go to checkout"
+          accessibilityLabel={awaitingShippingQuote ? 'Awaiting shipping quote' : 'Buy now and go to checkout'}
         >
-          <Text style={styles.buyNowText}>Buy now</Text>
-          <Icon
-            name="bag-check-outline"
-            size={22}
-            color="#FFFFFF"
-            style={styles.buyNowIcon}
-          />
+          <Text style={styles.buyNowText}>
+            {awaitingShippingQuote ? 'Awaiting shipping quote' : 'Buy now'}
+          </Text>
+          {awaitingShippingQuote ? null : (
+            <Icon
+              name="bag-check-outline"
+              size={22}
+              color="#FFFFFF"
+              style={styles.buyNowIcon}
+            />
+          )}
         </TouchableOpacity>
         <Text style={styles.sectionHeading}>Description</Text>
         <Text style={styles.descriptionBody}>

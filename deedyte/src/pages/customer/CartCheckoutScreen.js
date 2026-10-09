@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -18,7 +19,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../../context/ProfileContext';
-import { fetchBuyerCart, fetchBuyerCartProductShopId } from '../../api/buyer';
+import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder } from '../../api/buyer';
 import { getStorefrontShopDelivery } from '../../api/storefront';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
@@ -34,6 +35,54 @@ import {
   normalizeShopDelivery,
   parseShopId,
 } from '../../utils/vendorDelivery';
+import zones from '../../json/zones.json';
+
+/** @param {string} raw */
+function matchNgState(raw) {
+  const value = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+state$/, '')
+    .replace(/\s+/g, ' ');
+  if (!value) return '';
+  if (value === 'fct' || value === 'abuja' || value === 'federal capital territory') {
+    return zones.find((zone) => zone.name === 'FCT')?.name ?? '';
+  }
+  return zones.find((zone) => zone.name.toLowerCase() === value)?.name ?? '';
+}
+
+/** @param {string} stateName */
+function citiesForState(stateName) {
+  return zones.find((zone) => zone.name === stateName)?.cities ?? [];
+}
+
+/**
+ * @param {string} stateName
+ * @param {string} raw
+ */
+function matchCity(stateName, raw) {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (!value) return '';
+  return citiesForState(stateName).find((city) => city.toLowerCase() === value) ?? '';
+}
+
+/** @param {string} stateName @param {string[]} candidates */
+function matchCityLoose(stateName, candidates) {
+  const cities = citiesForState(stateName);
+  const values = candidates.map((item) => String(item ?? '').trim().toLowerCase()).filter(Boolean);
+  for (const value of values) {
+    const exact = cities.find((city) => city.toLowerCase() === value);
+    if (exact) return exact;
+  }
+  for (const value of values) {
+    const close = cities.find((city) => {
+      const name = city.toLowerCase();
+      return name.includes(value) || value.includes(name);
+    });
+    if (close) return close;
+  }
+  return '';
+}
 
 const PRIMARY = '#00926e';
 const BRAND = '#0D4F3C';
@@ -151,7 +200,7 @@ export default function CartCheckoutScreen({ navigation }) {
 
   const [cartLoading, setCartLoading] = useState(true);
   const [checkoutLines, setCheckoutLines] = useState(
-    /** @type {Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string; shop_id?: number | null; cartItemId?: number; inventoryId?: number; productId?: number }>} */ ([]),
+    /** @type {Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string; shop_id?: number | null; cartItemId?: number; inventoryId?: number; productId?: number }>} */([]),
   );
 
   const [fullName, setFullName] = useState('');
@@ -160,12 +209,16 @@ export default function CartCheckoutScreen({ navigation }) {
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
-  const [country, setCountry] = useState('Nigeria');
-  const [selectedDeliveryKey, setSelectedDeliveryKey] = useState(/** @type {string | null} */ (null));
+  const [area1, setArea1] = useState('');
+  const [area2, setArea2] = useState('');
+  const [country, setCountry] = useState('');
+  const [statePickerOpen, setStatePickerOpen] = useState(false);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [selectedDeliveryKey, setSelectedDeliveryKey] = useState(/** @type {string | null} */(null));
   const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const [shopDeliveries, setShopDeliveries] = useState(
-    /** @type {Map<number, NonNullable<ReturnType<typeof normalizeShopDelivery>>>} */ (new Map()),
+    /** @type {Map<number, NonNullable<ReturnType<typeof normalizeShopDelivery>>>} */(new Map()),
   );
   const [isLocating, setIsLocating] = useState(false);
 
@@ -189,7 +242,7 @@ export default function CartCheckoutScreen({ navigation }) {
           .filter((x) => x != null);
         if (!cancelled) {
 
-          setCheckoutLines(/** @type {typeof checkoutLines} */ (normalized));
+          setCheckoutLines(/** @type {typeof checkoutLines} */(normalized));
           setCartLoading(false);
         }
         return () => {
@@ -240,7 +293,7 @@ export default function CartCheckoutScreen({ navigation }) {
               }
             }),
           );
-          if (!cancelled) setCheckoutLines(/** @type {typeof checkoutLines} */ (withShops));
+          if (!cancelled) setCheckoutLines(/** @type {typeof checkoutLines} */(withShops));
         } catch {
           if (!cancelled) setCheckoutLines([]);
         } finally {
@@ -259,7 +312,10 @@ export default function CartCheckoutScreen({ navigation }) {
       setFullName((prev) => (prev.trim() ? prev : user.displayName || ''));
       setEmail((prev) => (prev.trim() ? prev : user.email || ''));
       setPhone((prev) => (prev.trim() ? prev : user.phone || ''));
-      setCity((prev) => (prev.trim() ? prev : user.locationObj?.city || ''));
+      const nextState = matchNgState(user.locationObj?.state || '');
+      const nextCity = nextState ? matchCity(nextState, user.locationObj?.city || '') : '';
+      if (nextState) setCountry((prev) => (prev.trim() ? prev : nextState));
+      if (nextCity) setCity((prev) => (prev.trim() ? prev : nextCity));
     }, [user]),
   );
 
@@ -356,20 +412,17 @@ export default function CartCheckoutScreen({ navigation }) {
     else if (!isValidPhone(phone)) e.phone = 'Enter a valid phone number.';
     if (!street.trim()) e.street = 'Street address is required.';
     else if (!isValidStreet(street)) e.street = 'Enter a complete street address.';
-    if (!city.trim()) e.city = 'Enter your city.';
-    if (deliveryLocations.length > 0 && !selectedDelivery) {
-      e.delivery = 'Select a delivery location.';
-    } else if (!deliveryLoading && checkoutLines.length > 0 && deliveryLocations.length === 0) {
-      e.delivery = 'These vendors do not share a common delivery location.';
-    }
+    if (!area1.trim()) e.area1 = 'Area 1 is required.';
+    if (!matchCity(country, city)) e.city = 'Select a city.';
+    if (!matchNgState(country)) e.country = 'Select a state.';
     return e;
-  }, [fullName, email, phone, street, city, deliveryLocations, selectedDelivery, deliveryLoading, checkoutLines.length]);
+  }, [fullName, email, phone, street, area1, city, country]);
 
   const showErrors = touchedSubmit;
   const hasBlockingErrors = Object.keys(errors).length > 0;
   const hasEmptyRequiredFields = useMemo(
-    () => !fullName.trim() || !email.trim() || !phone.trim() || !street.trim(),
-    [fullName, email, phone, street, city],
+    () => !fullName.trim() || !email.trim() || !phone.trim() || !street.trim() || !area1.trim(),
+    [fullName, email, phone, street, area1],
   );
 
   const showBottomToast = useCallback((message) => {
@@ -395,16 +448,27 @@ export default function CartCheckoutScreen({ navigation }) {
       const { latitude, longitude } = await getCurrentCoordinates();
       const place = await reverseGeocodeToPlace(latitude, longitude);
       const nextStreet = String(place?.street ?? '').trim();
-      const nextCity = String(place?.city ?? place?.town ?? '').trim();
       const nextZip = String(place?.zip ?? '').trim();
-      const nextCountry = String(place?.country ?? '').trim();
+      const nextState = matchNgState(String(place?.state ?? ''));
+      const nextCity = nextState
+        ? matchCityLoose(nextState, [place?.suburb, place?.town, place?.city, place?.neighbourhood])
+        : '';
+      const areaCandidates = [place?.suburb, place?.town, place?.neighbourhood, place?.city]
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean);
+      const nextArea1 = areaCandidates.find((item) => item.toLowerCase() !== nextCity.toLowerCase()) || areaCandidates[0] || '';
+      const nextArea2 = areaCandidates.find(
+        (item) => item.toLowerCase() !== nextArea1.toLowerCase() && item.toLowerCase() !== nextCity.toLowerCase(),
+      ) || '';
 
       if (nextStreet) setStreet(nextStreet);
-      if (nextCity) setCity(nextCity);
+      if (nextArea1) setArea1(nextArea1);
+      if (nextArea2) setArea2(nextArea2);
       if (nextZip) setZip(nextZip);
-      if (nextCountry) setCountry(nextCountry);
+      if (nextState) setCountry(nextState);
+      if (nextCity) setCity(nextCity);
 
-      if (!nextStreet && !nextCity && !nextZip && !nextCountry) {
+      if (!nextStreet && !nextArea1 && !nextCity && !nextZip && !nextState) {
         setFormBanner('We found your location, but could not extract an address. Please fill it in manually.');
         return;
       }
@@ -458,7 +522,9 @@ export default function CartCheckoutScreen({ navigation }) {
     const reference = `deedyte_cart_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const firstLine = checkoutLines[0];
 
-    const shippingSummary = `${street.trim()}, ${city.trim()}, ${zip.trim()}, ${country}`;
+    const shippingSummary = [street.trim(), area1.trim(), area2.trim(), city.trim(), zip.trim(), country.trim()]
+      .filter(Boolean)
+      .join(', ');
     const uid = Number(user?.id);
     if (!Number.isFinite(uid) || uid <= 0) {
       setFormBanner('You must be signed in to pay.');
@@ -498,7 +564,7 @@ export default function CartCheckoutScreen({ navigation }) {
         const sid = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
         acc[sid] = true;
         return acc;
-      }, /** @type {Record<string, boolean>} */ ({})),
+      }, /** @type {Record<string, boolean>} */({})),
     ).length;
 
     // Group items by shop_id to create orders array
@@ -515,7 +581,7 @@ export default function CartCheckoutScreen({ navigation }) {
         cart_id: line.cartItemId,
       });
       return acc;
-    }, /** @type {Record<string, Array<{ item_id: string; unit: number; unit_price: number; total: number; cart_id?: number }>>} */ ({}));
+    }, /** @type {Record<string, Array<{ item_id: string; unit: number; unit_price: number; total: number; cart_id?: number }>>} */({}));
 
     // Build orders array with proper structure
     const ordersArray = Object.entries(ordersByShop).map(([shopId, items]) => {
@@ -558,9 +624,9 @@ export default function CartCheckoutScreen({ navigation }) {
         setOrderSummaryOpen(false);
         const refStr =
           res && typeof res === 'object' && 'reference' in res
-            ? String(/** @type {{ reference?: string }} */ (res).reference)
+            ? String(/** @type {{ reference?: string }} */(res).reference)
             : reference;
-            console.log("reference", reference)
+        console.log("reference", reference)
         navigation.replace('Payment-success', {
           reference: refStr,
           subtotal,
@@ -584,7 +650,7 @@ export default function CartCheckoutScreen({ navigation }) {
         setOrderSummaryOpen(false);
         const msg =
           err && typeof err === 'object' && 'message' in err
-            ? String(/** @type {{ message?: string }} */ (err).message)
+            ? String(/** @type {{ message?: string }} */(err).message)
             : String(err || 'Something went wrong');
         navigation.replace('payment-failed', {
           reason: msg,
@@ -607,6 +673,8 @@ export default function CartCheckoutScreen({ navigation }) {
     street,
     city,
     zip,
+    area1,
+    area2,
     country,
     fullName,
     phone,
@@ -615,7 +683,7 @@ export default function CartCheckoutScreen({ navigation }) {
     navigation,
   ]);
 
-  const onContinue = useCallback(() => {
+  const onContinue = useCallback(async () => {
     setTouchedSubmit(true);
     setFormBanner('');
     if (subtotal <= 0) {
@@ -626,33 +694,71 @@ export default function CartCheckoutScreen({ navigation }) {
       showBottomToast('Please fill in all required fields.');
       return;
     }
-    if (deliveryLocations.length > 0 && !selectedDelivery) {
-      setDeliveryModalVisible(true);
-      showBottomToast('Select a delivery location to continue.');
-      return;
-    }
     if (hasBlockingErrors) {
       setFormBanner('Please complete all fields correctly before continuing.');
       return;
     }
-    setOrderSummaryOpen(true);
+
+    const shippingAddress = [street.trim(), area1.trim(), area2.trim(), city.trim(), zip.trim(), country.trim()]
+      .filter(Boolean)
+      .join(', ');
+    const ordersByShop = checkoutLines.reduce((acc, line) => {
+      const shopId = String(parseShopId(line.shop_id) || line.shop_id || '');
+      if (!shopId) return acc;
+      if (!acc[shopId]) acc[shopId] = [];
+      acc[shopId].push({
+        item_id: String(line.productId),
+        unit: line.qty,
+        unit_price: line.unitPrice,
+        total: line.unitPrice * line.qty,
+        cart_id: line.cartItemId,
+      });
+      return acc;
+    }, /** @type {Record<string, Array<Record<string, unknown>>>} */ ({}));
+
+    setIsPaying(true);
+    try {
+      await createUnpaidCheckoutOrder({
+        shipping_address: shippingAddress,
+        use_cart: !(Array.isArray(route.params?.checkoutLines) && route.params.checkoutLines.length > 0),
+        orders: Object.entries(ordersByShop).map(([shopId, items]) => ({ shop_id: shopId, items })),
+      });
+      Alert.alert(
+        'Order sent',
+        'Your order was sent as unpaid. The seller will set the shipping quote, then you can complete payment.',
+      );
+      navigation.goBack();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not place the order.';
+      setFormBanner(msg);
+    } finally {
+      setIsPaying(false);
+    }
   }, [
     subtotal,
     hasEmptyRequiredFields,
     hasBlockingErrors,
     showBottomToast,
-    deliveryLocations.length,
-    selectedDelivery,
+    street,
+    area1,
+    area2,
+    city,
+    zip,
+    country,
+    checkoutLines,
+    route.params?.checkoutLines,
+    navigation,
   ]);
 
   const onConfirmDeliveryLocation = useCallback(() => {
     if (!selectedDeliveryKey) return;
     const loc = deliveryLocations.find((l) => l.key === selectedDeliveryKey);
-    if (loc?.name && !city.trim()) {
-      setCity(loc.name);
+    const matchedCity = matchCity(country, loc?.name || '');
+    if (matchedCity && !city.trim()) {
+      setCity(matchedCity);
     }
     setDeliveryModalVisible(false);
-  }, [selectedDeliveryKey, deliveryLocations, city]);
+  }, [selectedDeliveryKey, deliveryLocations, city, country]);
 
   const continueToPayment = useCallback(() => {
     setOrderSummaryOpen(false);
@@ -763,16 +869,58 @@ export default function CartCheckoutScreen({ navigation }) {
                   accessibilityLabel="Street address"
                 />
                 {showErrors && errors.street ? <Text style={styles.errorText}>{errors.street}</Text> : null}
-
-                <Text style={styles.label}>City</Text>
+                <Text style={styles.label}>Area 1 (e.g: Junction/Landmark)</Text>
                 <TextInput
-                  value={city}
-                  onChangeText={setCity}
-                  placeholder="City"
+                  value={area1}
+                  onChangeText={setArea1}
+                  placeholder="Estate, landmark, or nearest bus stop"
                   placeholderTextColor="#AAA"
-                  style={inputStyle('city')}
-                  accessibilityLabel="City"
+                  style={inputStyle('area1')}
+                  accessibilityLabel="Area 1"
                 />
+                {showErrors && errors.area1 ? <Text style={styles.errorText}>{errors.area1}</Text> : null}
+
+                <Text style={styles.label}>Area 2 (optional)</Text>
+                <TextInput
+                  value={area2}
+                  onChangeText={setArea2}
+                  placeholder="Extra landmark or direction"
+                  placeholderTextColor="#AAA"
+                  style={inputStyle('area2')}
+                  accessibilityLabel="Area 2"
+                />
+
+                <Text style={styles.label}>State</Text>
+                <Pressable
+                  onPress={() => setStatePickerOpen(true)}
+                  style={[styles.countryBox, styles.statePicker, showErrors && errors.country ? styles.inputError : null]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select state"
+                >
+                  <Text style={country ? styles.countryText : styles.statePlaceholder}>
+                    {country || 'Select a state'}
+                  </Text>
+                  <Icon name="chevron-down" size={18} color={MUTED} />
+                </Pressable>
+                {showErrors && errors.country ? <Text style={styles.errorText}>{errors.country}</Text> : null}
+                <Text style={styles.label}>City</Text>
+                <Pressable
+                  onPress={() => {
+                    if (!country) {
+                      setFormBanner('Select a state before choosing a city.');
+                      return;
+                    }
+                    setCityPickerOpen(true);
+                  }}
+                  style={[styles.countryBox, styles.statePicker, showErrors && errors.city ? styles.inputError : null]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select city"
+                >
+                  <Text style={city ? styles.countryText : styles.statePlaceholder}>
+                    {city || (country ? 'Select a city' : 'Select a state first')}
+                  </Text>
+                  <Icon name="chevron-down" size={18} color={MUTED} />
+                </Pressable>
                 {showErrors && errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
 
                 <Text style={styles.label}>ZIP / Postal code (optional)</Text>
@@ -787,13 +935,10 @@ export default function CartCheckoutScreen({ navigation }) {
                 />
                 {showErrors && errors.zip ? <Text style={styles.errorText}>{errors.zip}</Text> : null}
 
-                <Text style={styles.label}>Country</Text>
-                <View style={styles.countryBox}>
-                  <Text style={styles.countryText}>{country}</Text>
-                </View>
+
               </View>
 
-              <View style={styles.card}>
+              {/* <View style={styles.card}>
                 <Text style={styles.sectionHeading}>Delivery location</Text>
                 <Text style={styles.deliveryHint}>
                   Choose where this order should be delivered. The fee is based on the vendor&apos;s shipping zones.
@@ -836,7 +981,7 @@ export default function CartCheckoutScreen({ navigation }) {
                 {showErrors && errors.delivery ? (
                   <Text style={styles.errorText}>{errors.delivery}</Text>
                 ) : null}
-              </View>
+              </View> */}
 
               {/* <Text style={styles.sectionHeading}>Payment method</Text> */}
               {/* <View style={styles.payRow}>
@@ -848,7 +993,7 @@ export default function CartCheckoutScreen({ navigation }) {
 
         {subtotal > 0 && !cartLoading ? (
           <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 14) }]}>
-            <View style={styles.footerRow}>
+            {/* <View style={styles.footerRow}>
               <Text style={styles.footerMuted}>Shipping</Text>
               <Text style={styles.footerMuted}>{shippingLabel}</Text>
             </View>
@@ -859,14 +1004,22 @@ export default function CartCheckoutScreen({ navigation }) {
             <View style={styles.footerRowTotal}>
               <Text style={styles.totalWord}>Total</Text>
               <Text style={styles.totalAmount}>{formatNaira(total)}</Text>
-            </View>
+            </View> */}
+            {/* <Pressable
+              style={[styles.continueBtn, isPaying ? styles.payBtnDisabled : null]}
+              onPress={onContinue}
+              disabled={isPaying}
+              accessibilityRole="button"
+            >
+              <Text style={styles.continueBtnText}>{isPaying ? 'Sending order…' : 'Request shipping quote'}</Text>
+            </Pressable> */}
             <Pressable
               style={[styles.continueBtn, isPaying ? styles.payBtnDisabled : null]}
               onPress={onContinue}
               disabled={isPaying}
               accessibilityRole="button"
             >
-              <Text style={styles.continueBtnText}>{isPaying ? 'Processing payment…' : 'Continue to payment'}</Text>
+              <Text style={styles.continueBtnText}>Request Shipping Qouta</Text>
             </Pressable>
           </View>
         ) : null}
@@ -928,6 +1081,83 @@ export default function CartCheckoutScreen({ navigation }) {
               >
                 <Text style={styles.orderModalCloseLinkText}>Close</Text>
               </Pressable>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={cityPickerOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setCityPickerOpen(false)}
+        >
+          <View style={styles.orderModalRoot}>
+            <Pressable style={styles.orderModalBackdrop} onPress={() => setCityPickerOpen(false)} accessibilityLabel="Close city list" />
+            <View style={[styles.orderModalSheet, { paddingBottom: Math.max(insets.bottom, 16), maxHeight: '70%' }]}>
+              <View style={styles.orderModalGrabberWrap}>
+                <View style={styles.orderModalGrabber} />
+              </View>
+              <Text style={styles.orderModalTitle}>Select city</Text>
+              <FlatList
+                data={citiesForState(country)}
+                keyExtractor={(item) => item}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => {
+                  const selected = item === city;
+                  return (
+                    <Pressable
+                      onPress={() => {
+                        setCity(item);
+                        setCityPickerOpen(false);
+                      }}
+                      style={styles.stateRow}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[styles.stateRowText, selected ? styles.stateRowTextSelected : null]}>{item}</Text>
+                      {selected ? <Icon name="checkmark" size={18} color={PRIMARY} /> : null}
+                    </Pressable>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={statePickerOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setStatePickerOpen(false)}
+        >
+          <View style={styles.orderModalRoot}>
+            <Pressable style={styles.orderModalBackdrop} onPress={() => setStatePickerOpen(false)} accessibilityLabel="Close state list" />
+            <View style={[styles.orderModalSheet, { paddingBottom: Math.max(insets.bottom, 16), maxHeight: '70%' }]}>
+              <View style={styles.orderModalGrabberWrap}>
+                <View style={styles.orderModalGrabber} />
+              </View>
+              <Text style={styles.orderModalTitle}>Select state</Text>
+              <FlatList
+                data={zones.map((zone) => zone.name)}
+                keyExtractor={(item) => item}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => {
+                  const selected = item === country;
+                  return (
+                    <Pressable
+                      onPress={() => {
+                        setCountry(item);
+                        setCity((prev) => matchCity(item, prev));
+                        setStatePickerOpen(false);
+                      }}
+                      style={styles.stateRow}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[styles.stateRowText, selected ? styles.stateRowTextSelected : null]}>{item}</Text>
+                      {selected ? <Icon name="checkmark" size={18} color={PRIMARY} /> : null}
+                    </Pressable>
+                  );
+                }}
+              />
             </View>
           </View>
         </Modal>
@@ -1127,6 +1357,22 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   countryText: { fontSize: 16, color: '#111' },
+  statePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statePlaceholder: { fontSize: 16, color: '#AAA' },
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  stateRowText: { fontSize: 16, color: '#111' },
+  stateRowTextSelected: { color: PRIMARY, fontWeight: '700' },
   sectionHeading: {
     fontSize: 17,
     fontWeight: '700',

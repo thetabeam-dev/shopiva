@@ -9,6 +9,7 @@ import { sendFcmForActivities } from "../firebaseConfig.js";
 import { GetShopOwnerByShopIdService } from "../business/shop.js";
 import { OrderHandler } from "../webhook/paystack.js";
 import type { NewOrder } from "../../types/paystack.js";
+import { sendNotificationEmail } from "../email.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -38,6 +39,161 @@ async function cartVendorIdsForUser(userId: number): Promise<number[]> {
 function formatNaira(amount: number): string {
   const value = Number.isFinite(amount) ? amount : 0;
   return `₦${value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+type UnpaidOrderItem = {
+  item_id: string;
+  unit: number;
+  unit_price: number;
+  total: number;
+  cart_id?: string | number | null;
+};
+
+type UnpaidOrderInput = {
+  shop_id: string;
+  items: UnpaidOrderItem[];
+};
+
+async function notifyVendorOfUnpaidOrder(
+  shopId: unknown,
+  orderId: unknown,
+  itemCount: number,
+  goodsTotal: number,
+): Promise<void> {
+  try {
+    const owner = await GetShopOwnerByShopIdService(Number(shopId));
+    const vendorId = Number(owner?.id);
+    const sourceId = Number(orderId);
+    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(sourceId) || sourceId <= 0) return;
+
+    const count = Math.max(0, Math.round(itemCount));
+    const label = count === 1 ? "item" : "items";
+    const title = "Unpaid Order";
+    const message = `You have a new unpaid order for ${count} ${label} totaling ${formatNaira(goodsTotal)}. Please update the shipping quote so the buyer can complete payment.`;
+
+    await createAndEmitNotification({
+      recipientId: vendorId,
+      title,
+      message,
+      sourceType: "order",
+      sourceId,
+      role: "vendor",
+    });
+
+    const pool = await db();
+    const { rows } = await pool.query<{ devicetoken: string | null; email: string | null; fname: string | null }>(
+      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
+      [vendorId],
+    );
+    const token = String(rows[0]?.devicetoken ?? "").trim();
+    if (token) {
+      await sendFcmForActivities(token, title, message, null, {
+        type: "order",
+        order_id: sourceId,
+      });
+    }
+    const email = String(rows[0]?.email ?? owner.email ?? "").trim();
+    if (email) {
+      await sendNotificationEmail(email, {
+        fname: String(rows[0]?.fname ?? owner.fname ?? "there"),
+        title,
+        message,
+      });
+    }
+  } catch (err) {
+    console.error("notifyVendorOfUnpaidOrder failed", err);
+  }
+}
+
+export async function createUnpaidCheckoutOrders(
+  buyerUserId: number,
+  shippingAddress: string,
+  clientOrders: UnpaidOrderInput[],
+  useCart = true,
+): Promise<{ order_ids: number[] }> {
+  const address = String(shippingAddress ?? "").trim();
+  if (!address) throw new Error("Shipping address is required");
+
+  const cartLines = useCart ? await listCartLinesForUser(buyerUserId) : [];
+  const grouped = new Map<string, UnpaidOrderItem[]>();
+
+  if (cartLines.length) {
+    for (const line of cartLines) {
+      const shopId = String(line.shop_id);
+      const qty = Number(line.quantity);
+      const unitPrice = Number(line.unit_price);
+      const items = grouped.get(shopId) ?? [];
+      items.push({
+        item_id: String(line.product_id),
+        unit: qty,
+        unit_price: unitPrice,
+        total: qty * unitPrice,
+        cart_id: line.cart_item_id,
+      });
+      grouped.set(shopId, items);
+    }
+  } else {
+    for (const order of clientOrders) {
+      const shopId = String(order.shop_id ?? "").trim();
+      if (!shopId || shopId === "default-shop") continue;
+      const items = (order.items ?? []).filter((item) => Number(item.unit) > 0);
+      if (items.length) grouped.set(shopId, items);
+    }
+  }
+
+  if (!grouped.size) throw new Error("Your cart is empty.");
+
+  const reference = `unpaid_${Date.now()}_${buyerUserId}`;
+  const orderIds: number[] = [];
+
+  for (const [shopId, items] of grouped) {
+    const subtotal = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const itemCount = items.reduce((sum, item) => sum + Number(item.unit || 0), 0);
+    const newOrder: NewOrder = {
+      customer_id: String(buyerUserId),
+      shop_id: shopId,
+      amount_paid: subtotal,
+      shipping_fee: 0,
+      tax: 0,
+      charges: 0,
+      total_paid: subtotal,
+      currency: "NGN",
+      fulfillment_status: "unpaid",
+      escrow_status: "locked",
+      payment_status: "unpaid",
+      shipping_address: address,
+      payment_reference: reference,
+      shipping_method: "",
+      tracking_number: "",
+    };
+    const orderId = await OrderHandler.newOrder(newOrder);
+    await OrderHandler.orderEvent({
+      order_id: String(orderId),
+      event_type: "checkout",
+      stage: "unpaid",
+      actor_type: "customer",
+      actor_id: String(buyerUserId),
+      outcome: "success",
+      notes: "Buyer placed an unpaid order and is waiting for a shipping quote.",
+      meta: JSON.stringify({}),
+    });
+    for (const item of items) {
+      await OrderHandler.orderedTtem({
+        order_id: String(orderId),
+        item_id: String(item.item_id),
+        units: Number(item.unit),
+        unit_price: Number(item.unit_price),
+        total_price: Number(item.total),
+      });
+      if (item.cart_id != null && String(item.cart_id).trim() !== "") {
+        await OrderHandler.removeItemFromCart(item.cart_id);
+      }
+    }
+    orderIds.push(Number(orderId));
+    await notifyVendorOfUnpaidOrder(shopId, orderId, itemCount, subtotal);
+  }
+
+  return { order_ids: orderIds };
 }
 
 function newOrderPushBody(itemCount: number, orderTotal: number): string {

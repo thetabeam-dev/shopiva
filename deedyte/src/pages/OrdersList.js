@@ -51,8 +51,12 @@ function statusThemeFor(raw) {
   return STATUS_THEME.payment_received;
 }
 
-function OrderCard({ item, onPress }) {
-  const t = statusThemeFor(item.status);
+function OrderCard({ item, onPress, isVendor }) {
+  const rawStatus = String(item.status ?? '').toLowerCase().trim();
+  const notAccepted = Boolean(isVendor) && (rawStatus === 'unpaid' || rawStatus === '');
+  const t = notAccepted
+    ? { bg: '#FEF3C7', dot: '#D97706', text: '#92400E', label: 'Not accepted' }
+    : statusThemeFor(item.status);
   const title = item.customer || item.vendor || item.shop_name || 'Order';
   const placed = item.dateLabel || item.date || item.created_at;
   const placedLabel = placed ? String(placed).slice(0, 12) : '—';
@@ -69,8 +73,15 @@ function OrderCard({ item, onPress }) {
         <View style={styles.cardTitleCol}>
           <Text style={styles.orderId} numberOfLines={1}>{title}</Text>
           <Text style={styles.vendorLine}>#{item.order_id}</Text>
-          <ActivityBadge sourceType="order" sourceId={item.order_id ?? item.id} />
-          <UnreadMessageBadge orderId={item.order_id ?? item.id} />
+          <View style={styles.badgeRow}>
+            <ActivityBadge sourceType="order" sourceId={item.order_id ?? item.id} />
+            {String(item.payment ?? item.payment_status ?? '').trim().toLowerCase() === 'unpaid' ? (
+              <View style={styles.unpaidBadge}>
+                <Text style={styles.unpaidBadgeText}>Unpaid</Text>
+              </View>
+            ) : null}
+            <UnreadMessageBadge orderId={item.order_id ?? item.id} />
+          </View>
         </View>
         <View style={[styles.statusPill, { backgroundColor: t.bg }]}>
           <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
@@ -154,6 +165,7 @@ export default function OrderListScreen() {
     ({ item }) => (
       <OrderCard
         item={item}
+        isVendor={auth.activeRole === 'vendor'}
         onPress={() => {
           dismissUpdatedActivity('order', item.order_id ?? item.id);
           navigation.navigate('Order-detail', {
@@ -162,7 +174,7 @@ export default function OrderListScreen() {
         }}
       />
     ),
-    [navigation],
+    [navigation, auth.activeRole],
   );
 
   const listHeader = useMemo(
@@ -345,6 +357,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLOR.MUTED,
     marginTop: 2,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  unpaidBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: '#DC2626',
+  },
+  unpaidBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   grid: {
     flexDirection: 'row',

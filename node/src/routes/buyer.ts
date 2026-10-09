@@ -1,6 +1,6 @@
 import express from "express";
 import { verifyToken } from "../middleware/auth.js";
-import { GetBuyerOrdersController, GetBuyerOrderByIdController } from "../controllers/buyer/orders.js";
+import { GetBuyerOrdersController, GetBuyerOrderByIdController, GetBuyerAwaitingShippingQuoteController, PostBuyerPayAcceptedOrderController } from "../controllers/buyer/orders.js";
 import { GetBuyerReturnsController, GetBuyerReturnByIdController } from "../controllers/buyer/returns.js";
 import {
   BackfillBuyerDisputesFromOrdersController,
@@ -15,7 +15,7 @@ import {
   PatchBuyerCartLineController,
   PostBuyerCartController,
 } from "../controllers/buyer/cart.js";
-import { PostBuyerCheckoutConfirmPaymentController } from "../controllers/buyer/checkout.js";
+import { PostBuyerCheckoutConfirmPaymentController, PostBuyerUnpaidOrderController } from "../controllers/buyer/checkout.js";
 import {
   PostBuyerShopReviewController,
   GetBuyerProductPendingReviewsController,
@@ -34,9 +34,12 @@ BuyerRouter.post("/buyer/cart", verifyToken, PostBuyerCartController);
 BuyerRouter.patch("/buyer/cart/:cartItemId", verifyToken, PatchBuyerCartLineController);
 BuyerRouter.delete("/buyer/cart/:cartItemId", verifyToken, DeleteBuyerCartLineController);
 
+BuyerRouter.post("/buyer/checkout/unpaid-order", verifyToken, PostBuyerUnpaidOrderController);
 BuyerRouter.post("/buyer/checkout/confirm-payment", verifyToken, PostBuyerCheckoutConfirmPaymentController);
 
+BuyerRouter.post("/buyer/orders/:orderId/pay", verifyToken, PostBuyerPayAcceptedOrderController);
 BuyerRouter.get("/buyer/orders", verifyToken, GetBuyerOrdersController);
+BuyerRouter.get("/buyer/products/:productId/awaiting-shipping-quote", verifyToken, GetBuyerAwaitingShippingQuoteController);
 BuyerRouter.get("/buyer/orders/:orderId", verifyToken, GetBuyerOrderByIdController);
 BuyerRouter.get("/buyer/returns", verifyToken, GetBuyerReturnsController);
 BuyerRouter.get("/buyer/returns/:returnId", verifyToken, GetBuyerReturnByIdController);

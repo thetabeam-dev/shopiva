@@ -109,6 +109,19 @@ export async function createBuyerDispute(body) {
   return readJson(res);
 }
 
+export async function payAcceptedOrder(orderId, reference) {
+  const res = await apiFetchAuth(`/buyer/orders/${encodeURIComponent(orderId)}/pay`, {
+    method: 'POST',
+    body: JSON.stringify({ reference }),
+  });
+  return readJson(res);
+}
+
+export async function fetchAwaitingShippingQuote(productId) {
+  const res = await apiFetchAuth(`/buyer/products/${encodeURIComponent(productId)}/awaiting-shipping-quote`);
+  return readJson(res);
+}
+
 /** @returns {Promise<{ lines: unknown[] }>} */
 export async function fetchBuyerCart() {
   const res = await apiFetchAuth('/buyer/cart');
@@ -128,6 +141,18 @@ export async function fetchBuyerCartProductShopId(productId) {
  */
 export async function confirmCheckoutPayment(body) {
   const res = await apiFetchAuth('/buyer/checkout/confirm-payment', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return readJson(res);
+}
+
+/**
+ * Place an unpaid order so the vendor can set a shipping quote.
+ * @param {{ shipping_address: string; orders: Array<Record<string, unknown>> }} body
+ */
+export async function createUnpaidCheckoutOrder(body) {
+  const res = await apiFetchAuth('/buyer/checkout/unpaid-order', {
     method: 'POST',
     body: JSON.stringify(body),
   });
