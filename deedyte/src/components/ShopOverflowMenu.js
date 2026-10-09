@@ -143,7 +143,7 @@ export function ShopOverflowMenu({
                 </TouchableOpacity>
               </>
             ) : null} */}
-            {typeof onDeliveryPolicy === 'function' ? (
+            {/* {typeof onDeliveryPolicy === 'function' ? (
               <>
                 <View style={styles.rowSep} />
                 <TouchableOpacity
@@ -160,8 +160,7 @@ export function ShopOverflowMenu({
                   <Text style={styles.rowLabel}>Delivery details</Text>
                 </TouchableOpacity>
               </>
-            ) : null}
-            <View style={styles.rowSep} />
+            ) : null} */}
             {/* <TouchableOpacity
               style={styles.row}
               onPress={onNotInterested}
@@ -175,7 +174,6 @@ export function ShopOverflowMenu({
               />
               <Text style={styles.rowLabel}>Not interested</Text>
             </TouchableOpacity> */}
-            <View style={styles.rowSep} />
             {/* <TouchableOpacity style={styles.row} onPress={onReport} activeOpacity={0.75}>
               <Icon name="alert-circle-outline" size={22} color="#C62828" style={styles.rowIcon} />
               <Text style={[styles.rowLabel, styles.rowLabelDanger]}>{reportLabel}</Text>
