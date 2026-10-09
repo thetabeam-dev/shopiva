@@ -175,7 +175,7 @@ function App() {
     <>
 
       {
-        !versionCheck.isLatest &&
+        versionCheck.isLatest &&
         <SafeAreaView
           style={{
             flex: 1,
@@ -246,7 +246,7 @@ function App() {
       }
 
       {
-        versionCheck.isLatest &&
+        !versionCheck.isLatest &&
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider style={{ flex: 1 }}>
             {PaystackProvider ? (

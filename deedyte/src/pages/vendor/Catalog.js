@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import {
   Alert,
   ScrollView,
@@ -9,13 +9,8 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ShippingSetupRequiredModal from '../../components/ShippingSetupRequiredModal';
 import { useProfile } from '../../context/ProfileContext';
-import {
-  getVendorShippingCreateGate,
-  navigateToShopShippingSetup,
-  resolvePrimaryShopId,
-} from '../../utils/vendorShippingGate';
+import { resolvePrimaryShopId } from '../../utils/vendorShippingGate';
 
 /**
  * Entry for the Products tab: nested destinations + create product.
@@ -23,12 +18,6 @@ import {
 export default function CatalogScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useProfile();
-  const [shippingModalVisible, setShippingModalVisible] = useState(false);
-  const [shippingGateBusy, setShippingGateBusy] = useState(false);
-  const [shippingGate, setShippingGate] = useState({
-    hasFeeModel: false,
-    hasZones: false,
-  });
 
   const goCatalog = useCallback(() => {
     navigation.navigate('ProductList');
@@ -44,48 +33,13 @@ export default function CatalogScreen({ navigation }) {
       Alert.alert('Sign in required', 'Sign in as a vendor to create products.');
       return;
     }
-
-    setShippingGateBusy(true);
-    setShippingModalVisible(true);
-    try {
-      const shopId = await resolvePrimaryShopId(uid);
-      if (!shopId) {
-        setShippingModalVisible(false);
-        Alert.alert('No shop', 'Create a shop in settings before adding products.');
-        return;
-      }
-
-      const gate = await getVendorShippingCreateGate(shopId, uid);
-      if (gate.ready) {
-        setShippingModalVisible(false);
-        navigation.navigate('AddProduct');
-        return;
-      }
-
-      setShippingGate({
-        hasFeeModel: gate.hasFeeModel,
-        hasZones: gate.hasZones,
-      });
-    } catch (e) {
-      setShippingModalVisible(false);
-      Alert.alert(
-        'Could not verify shipping setup',
-        e instanceof Error ? e.message : 'Try again in a moment.',
-      );
-    } finally {
-      setShippingGateBusy(false);
+    const shopId = await resolvePrimaryShopId(uid);
+    if (!shopId) {
+      Alert.alert('No shop', 'Create a shop in settings before adding products.');
+      return;
     }
+    navigation.navigate('AddProduct');
   }, [navigation, user?.id]);
-
-  const goShippingSetup = useCallback(() => {
-    setShippingModalVisible(false);
-    navigateToShopShippingSetup(navigation);
-  }, [navigation]);
-
-  const closeShippingModal = useCallback(() => {
-    if (shippingGateBusy) return;
-    setShippingModalVisible(false);
-  }, [shippingGateBusy]);
 
   return (
     <View style={[styles.root, { paddingTop: 15 }]}>
@@ -142,15 +96,6 @@ export default function CatalogScreen({ navigation }) {
           <Icon name="chevron-forward" size={22} color="#9CA3AF" />
         </TouchableOpacity> */}
       </ScrollView>
-
-      <ShippingSetupRequiredModal
-        visible={shippingModalVisible}
-        busy={shippingGateBusy}
-        hasFeeModel={shippingGate.hasFeeModel}
-        hasZones={shippingGate.hasZones}
-        onClose={closeShippingModal}
-        onGoToSetup={goShippingSetup}
-      />
     </View>
   );
 }
