@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db } from "../config/database.js";
 import type { PoolClient } from "pg";
+import { formatPhoneNumber } from "../utils/phone.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 const SALT_ROUNDS = 10;
@@ -105,9 +106,10 @@ export async function SignupService(payload: NewUserDocument & { src: string; de
     }
 
     // Check if phone already exists (skip when absent — OAuth / partial profiles)
-    const phoneVal = payload.phone;
-    if (phoneVal !== undefined && phoneVal !== null && String(phoneVal).trim() !== "") {
-        const phoneExists = await model.countPhone(phoneVal as number);
+    const phoneVal = formatPhoneNumber(payload.phone);
+    if (phoneVal) {
+        payload.phone = phoneVal as typeof payload.phone;
+        const phoneExists = await model.countPhone(phoneVal as unknown as number);
         if (phoneExists > 0) {
             throw new Error("Phone number already registered");
         }
@@ -280,7 +282,7 @@ export async function UpdateEmailService(id: number, email: string) {
 }
 
 export async function UpdatePhoneService(id: number, phone: string | number) {
-    const phoneNorm = typeof phone === "number" ? String(phone) : String(phone ?? "").trim();
+    const phoneNorm = formatPhoneNumber(phone) ?? "";
 
     const existing = await model.findUserById(id);
     if (!existing || existing.length === 0) {

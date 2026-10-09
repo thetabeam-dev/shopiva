@@ -14,11 +14,15 @@
 import { shop } from "../../models/business/shop.js";
 import type { NewPayoutAccount, NewShopDocument, ShopDocument, ShopPolicies, TransferRecipientResponse } from "../../types/business.js";
 import { paystack } from "../paystack.js";
+import { formatPhoneNumber } from "../../utils/phone.js";
 
 /**
  * Create a new shop
  */
 export async function CreateShopService(payload: NewShopDocument) {
+    if (payload.contactPhone != null) {
+        payload.contactPhone = formatPhoneNumber(payload.contactPhone);
+    }
     const result = await shop.createShop(payload);
     if (result == null) {
         throw new Error("Failed to create shop");
@@ -30,6 +34,9 @@ export async function CreateShopService(payload: NewShopDocument) {
  * Update an existing shop
  */
 export async function UpdateShopService(payload: ShopDocument) {
+    if (payload.contactPhone != null) {
+        payload.contactPhone = formatPhoneNumber(payload.contactPhone);
+    }
     const result = await shop.updateShop(payload);
     
     if (result === 0) {

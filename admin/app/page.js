@@ -211,7 +211,7 @@ export default function Dashboard() {
   const [activePage, setActivePage] = useState("Home");
 
   const pageComponents = {
-    Home: <Home />,
+    Home: <Home onNavigate={setActivePage} />,
     Users: <Users />,
     Products: <ResourcePage {...pages.Products} />,
     Inventory: <ResourcePage {...pages.Inventory} />,
@@ -226,11 +226,17 @@ export default function Dashboard() {
 
   return (
     <div className="shadow-sm admin-shell">
-      <header>
-        <h4>Admin</h4>
+      <header className="admin-topbar">
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true">S</span>
+          <div>
+            <span className="brand-eyebrow">SHOPIVA</span>
+            <h4>Commerce console</h4>
+          </div>
+        </div>
         <span className="active-page-label">{activePage}</span>
       </header>
-      <main className="shadow-sm">
+      <main className="admin-main">
         <div className="aside-cnt">
           <Aside activePage={activePage} onSelect={setActivePage} />
         </div>
@@ -340,13 +346,25 @@ function ResourcePage({ title, description, endpoint, columns, filters, rowActio
               )}
             </div>
           ))}
+          <div className="resource-filter-actions">
+            <button
+              type="button"
+              className="filter-reset-button"
+              onClick={() => setFilterValues(Object.fromEntries(filters.map((filter) => [
+                filter.name,
+                filter.type === 'select' ? 'All' : '',
+              ])))}
+            >
+              Reset filters
+            </button>
+          </div>
         </div>
       )}
 
-      {error && <div className="resource-alert">{error}</div>}
+      {error && <div className="resource-alert" role="alert">{error}</div>}
 
       <div className="resource-table-card">
-        <table className="resource-table">
+        <table className="resource-table" aria-busy={loading}>
           <thead>
             <tr>
               {columns.map((column) => (
@@ -360,7 +378,7 @@ function ResourcePage({ title, description, endpoint, columns, filters, rowActio
               <tr key={row.id ?? JSON.stringify(row)}>
                 {columns.map((column) => (
                   <td key={column.accessor}>
-                    {column.render ? column.render(row) : String(row[column.accessor] ?? '')}
+                    {column.render ? column.render(row) : renderCellValue(row[column.accessor], column.accessor)}
                   </td>
                 ))}
                 {rowActions ? (
@@ -386,9 +404,46 @@ function ResourcePage({ title, description, endpoint, columns, filters, rowActio
                 </td>
               </tr>
             )}
+            {loading && rows.length === 0 && (
+              <tr>
+                <td colSpan={columns.length + (rowActions ? 1 : 0)} className="empty-row loading-row">
+                  Loading {title.toLowerCase()}…
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
     </section>
   );
+}
+
+function renderCellValue(value, accessor) {
+  if (value === null || value === undefined || value === '') return '';
+
+  const booleanValue = value === true || value === 'true' ? true : value === false || value === 'false' ? false : null;
+  if (booleanValue !== null) {
+    return (
+      <span className={`data-boolean ${booleanValue ? 'data-boolean--yes' : 'data-boolean--no'}`}>
+        {booleanValue ? 'Yes' : 'No'}
+      </span>
+    );
+  }
+
+  if (accessor.toLowerCase().includes('status')) {
+    const status = String(value).toLowerCase();
+    const statusClass = status.replace(/[^a-z0-9]+/g, '-');
+    return <span className={`data-status data-status--${statusClass}`}>{String(value).replaceAll('_', ' ')}</span>;
+  }
+
+  const isDate = accessor.toLowerCase().includes('date') || accessor.endsWith('At');
+  if (isDate) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      const options = accessor.endsWith('At') ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' };
+      return <time dateTime={String(value)}>{new Intl.DateTimeFormat(undefined, options).format(date)}</time>;
+    }
+  }
+
+  return String(value);
 }

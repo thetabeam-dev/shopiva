@@ -1,4 +1,5 @@
 import { getPool } from '../../../lib/db';
+import Link from 'next/link';
 import ReviewActions from './ReviewActions';
 import '../../styles/style.css';
 
@@ -69,6 +70,8 @@ export default async function ShopKycReviewPage({ params }) {
     <section className="resource-page review-page">
       <div className="resource-header review-header">
         <div>
+          <Link className="back-link" href="/">&larr; Back to dashboard</Link>
+          <span className="section-kicker">SHOP VERIFICATION</span>
           <h1>Shop KYC Review</h1>
           <p>Review uploaded business documents, ID verification, and proof of address for {shop.name}.</p>
         </div>
