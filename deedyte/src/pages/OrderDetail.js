@@ -3,6 +3,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -252,6 +253,7 @@ export default function OrderDetailScreen() {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [cancelledModalOpen, setCancelledModalOpen] = useState(false);
   const [statusInfoOpen, setStatusInfoOpen] = useState(false);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
   const { orderInfo } = useSelector(s => s.orderInfo);
   const unreadMessages = useUnreadMessageCount(
     orderInfo?.order?.id ?? orderInfo?.order?.order_id ?? orderIdParam,
@@ -262,6 +264,16 @@ export default function OrderDetailScreen() {
   const awaitingBuyerPayment =
     statusKey === 'order_accepted' &&
     String(orderInfo?.order?.payment_status ?? '').toLowerCase() === 'unpaid';
+  const autoPayStarted = useRef(false);
+  const onMakePaymentRef = useRef(() => {});
+
+  useEffect(() => {
+    if (!route.params?.autoPay || autoPayStarted.current) return;
+    if (!awaitingBuyerPayment) return;
+    if (String(orderInfo?.order?.id ?? '') !== String(orderIdParam ?? '')) return;
+    autoPayStarted.current = true;
+    onMakePaymentRef.current();
+  }, [route.params?.autoPay, awaitingBuyerPayment, orderInfo?.order?.id, orderIdParam]);
 
   useEffect(() => {
     connectChatSocket();
@@ -640,6 +652,13 @@ export default function OrderDetailScreen() {
       );
       return;
     }
+    if (!orderInfo?.room?.id) {
+      Alert.alert(
+        'Chat unavailable',
+        'The chat room for this order is not ready yet. Try again in a moment.',
+      );
+      return;
+    }
     navigation.navigate('Inbox', {
       chat: { roomId: orderInfo.room.id, name: `Order #${orderInfo.order.id}` }
     });
@@ -676,7 +695,7 @@ export default function OrderDetailScreen() {
             text: 'Raise Dispute',
             onPress: () => {
               navigation.navigate('Open-dispute', {
-                orderId: order.id,
+                orderId: order?.id ?? orderIdParam,
               });
             },
           },
@@ -745,7 +764,8 @@ export default function OrderDetailScreen() {
     auth.activeRole,
     blockIfCancelled,
     navigation,
-    order.id,
+    order?.id,
+    orderIdParam,
     orderInfo,
     statusKey,
   ]);
@@ -1090,19 +1110,23 @@ export default function OrderDetailScreen() {
         order_id: String(orderId),
         customer_id: String(user?.id ?? ''),
       },
-      onSuccess: async (res) => {
+      onSuccess: (res) => {
         const refStr =
           res && typeof res === 'object' && 'reference' in res
             ? String(res.reference)
             : reference;
-        try {
-          const body = await payAcceptedOrder(orderId, refStr);
-          if (body?.order) dispatch(set_orderInfo(body.order));
-          Alert.alert('Payment successful', 'The seller can now start processing your order.');
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'We could not confirm this payment yet.';
-          Alert.alert('Payment received', msg);
-        }
+        setConfirmingPayment(true);
+        void payAcceptedOrder(orderId, refStr)
+          .then((body) => {
+            if (body?.order) dispatch(set_orderInfo(body.order));
+            setConfirmingPayment(false);
+            Alert.alert('Payment successful', 'The seller can now start processing your order.');
+          })
+          .catch((err) => {
+            setConfirmingPayment(false);
+            const msg = err instanceof Error ? err.message : 'We could not confirm this payment yet.';
+            Alert.alert('Payment received', msg);
+          });
       },
       onCancel: () => {},
       onError: (err) => {
@@ -1115,8 +1139,16 @@ export default function OrderDetailScreen() {
     });
   };
 
+  onMakePaymentRef.current = onMakePayment;
+
   return (
     <View style={[styles.root, { paddingTop: 0 }]}>
+      <Modal visible={confirmingPayment} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.paymentOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.paymentOverlayText}>Confirming your payment…</Text>
+        </View>
+      </Modal>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -1777,6 +1809,20 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLOR.NEUTRAL,
+  },
+  paymentOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  paymentOverlayText: {
+    marginTop: 16,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   headerBar: {
     flexDirection: 'row',

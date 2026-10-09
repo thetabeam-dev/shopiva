@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -226,6 +227,7 @@ export default function CartCheckoutScreen({ navigation }) {
   const [formBanner, setFormBanner] = useState('');
   const [orderSummaryOpen, setOrderSummaryOpen] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
   const [bottomToast, setBottomToast] = useState('');
   const toastTimerRef = useRef((null));
 
@@ -684,6 +686,7 @@ export default function CartCheckoutScreen({ navigation }) {
   ]);
 
   const onContinue = useCallback(async () => {
+    if (sendingQuote) return;
     setTouchedSubmit(true);
     setFormBanner('');
     if (subtotal <= 0) {
@@ -716,7 +719,7 @@ export default function CartCheckoutScreen({ navigation }) {
       return acc;
     }, /** @type {Record<string, Array<Record<string, unknown>>>} */ ({}));
 
-    setIsPaying(true);
+    setSendingQuote(true);
     try {
       await createUnpaidCheckoutOrder({
         shipping_address: shippingAddress,
@@ -732,7 +735,7 @@ export default function CartCheckoutScreen({ navigation }) {
       const msg = err instanceof Error ? err.message : 'Could not place the order.';
       setFormBanner(msg);
     } finally {
-      setIsPaying(false);
+      setSendingQuote(false);
     }
   }, [
     subtotal,
@@ -748,6 +751,7 @@ export default function CartCheckoutScreen({ navigation }) {
     checkoutLines,
     route.params?.checkoutLines,
     navigation,
+    sendingQuote,
   ]);
 
   const onConfirmDeliveryLocation = useCallback(() => {
@@ -777,6 +781,12 @@ export default function CartCheckoutScreen({ navigation }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
       <View style={[styles.root, { paddingTop: 5 }]}>
+        <Modal visible={sendingQuote} transparent animationType="fade" onRequestClose={() => {}}>
+          <View style={styles.quoteOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.quoteOverlayText}>Sending your shipping quote request…</Text>
+          </View>
+        </Modal>
         <StatusBar barStyle="dark-content" backgroundColor={CARD_BG} />
 
         <ScrollView
@@ -1014,9 +1024,9 @@ export default function CartCheckoutScreen({ navigation }) {
               <Text style={styles.continueBtnText}>{isPaying ? 'Sending order…' : 'Request shipping quote'}</Text>
             </Pressable> */}
             <Pressable
-              style={[styles.continueBtn, isPaying ? styles.payBtnDisabled : null]}
+              style={[styles.continueBtn, (isPaying || sendingQuote) ? styles.payBtnDisabled : null]}
               onPress={onContinue}
-              disabled={isPaying}
+              disabled={isPaying || sendingQuote}
               accessibilityRole="button"
             >
               <Text style={styles.continueBtnText}>Request Shipping Qouta</Text>
@@ -1186,6 +1196,20 @@ export default function CartCheckoutScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  quoteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  quoteOverlayText: {
+    marginTop: 16,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   root: {
     flex: 1,
     backgroundColor: PAGE_BG,

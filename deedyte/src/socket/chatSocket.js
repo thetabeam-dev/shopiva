@@ -17,6 +17,7 @@ let connectPromise = null;
 
 /** Server push + client ack events that update order Redux. */
 const ORDER_SOCKET_EVENTS = [
+  'unpaid_order',
   'payment_received',
   'order_acceptance',
   'order_processing',

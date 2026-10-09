@@ -71,6 +71,22 @@ async function buildOrderLists(orderId: unknown): Promise<{
   return { result, vendorList, customerList };
 }
 
+/** Tell the vendor a buyer created an unpaid order waiting on a shipping quote. */
+export async function emitUnpaidOrderToVendor(orderId: unknown, vendorUserId: unknown): Promise<void> {
+  const vendorId = Number(vendorUserId);
+  if (!Number.isFinite(vendorId) || vendorId <= 0) return;
+  const { result, vendorList } = await buildOrderLists(orderId);
+  notifyUser(vendorId, "unpaid_order", { result, list: vendorList });
+}
+
+/** Tell the vendor the buyer paid, using the same payload shape as other order events. */
+export async function emitBuyerPaymentToVendor(orderId: unknown, vendorUserId: unknown): Promise<void> {
+  const vendorId = Number(vendorUserId);
+  if (!Number.isFinite(vendorId) || vendorId <= 0) return;
+  const { result, vendorList } = await buildOrderLists(orderId);
+  notifyUser(vendorId, "payment_received", { result, list: vendorList });
+}
+
 function listForRole(
   role: string,
   vendorList: unknown[],

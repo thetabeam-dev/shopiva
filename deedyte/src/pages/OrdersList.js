@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../utils/formatNaira';
 import { fetchBuyerOrders } from '../api/buyer';
@@ -114,44 +115,45 @@ export default function OrderListScreen() {
   const auth = useSelector(s => s.auth)
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const { orderList } = useSelector(s => s.orderList);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        let { id: userId } = await getStoredUser();
-
-        let shopId;
-
-        if (auth.activeRole !== "customer") {
-          let shop = await fetchOwnerShops(userId);
-          if (!shop) {
-            Alert.alert("no shops")
-            return;
-          }
-          shopId = shop[0].id;
+  const loadOrders = useCallback(async (mode) => {
+    if (mode === 'initial') setLoading(true);
+    else if (mode === 'pull') setRefreshing(true);
+    setError('');
+    try {
+      const { id: userId } = await getStoredUser();
+      let shopId;
+      if (auth.activeRole !== 'customer') {
+        const shop = await fetchOwnerShops(userId);
+        if (!shop) {
+          Alert.alert('no shops');
+          return;
         }
-        const data = auth.activeRole === "customer" ? await fetchBuyerOrders() : await fetchShopOrders(shopId, userId);
-        if (cancelled) return;
-
-        dispatch(set_orderList(Array.isArray(data) ? data : data.orders))
-      } catch (e) {
-        if (!cancelled) {
-          dispatch(set_orderList([]))
-          setError(e instanceof Error ? e.message : String(e));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        shopId = shop[0].id;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      const data = auth.activeRole === 'customer'
+        ? await fetchBuyerOrders()
+        : await fetchShopOrders(shopId, userId);
+      dispatch(set_orderList(Array.isArray(data) ? data : data.orders));
+    } catch (e) {
+      dispatch(set_orderList([]));
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [auth.activeRole, dispatch]);
+
+  const loadedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      void loadOrders(loadedOnce.current ? 'focus' : 'initial');
+      loadedOnce.current = true;
+    }, [loadOrders]),
+  );
 
   const data = useMemo(() => {
     const list = Array.isArray(orderList) ? orderList : [];
@@ -229,6 +231,14 @@ export default function OrderListScreen() {
         data={data}
         keyExtractor={(item) => String(item?.id ?? item?.order_id)}
         renderItem={renderItem}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { void loadOrders('pull'); }}
+            tintColor="#00926e"
+            colors={['#00926e']}
+          />
+        }
         ListHeaderComponent={listHeader}
         contentContainerStyle={[
           styles.listContent,

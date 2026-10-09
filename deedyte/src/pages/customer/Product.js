@@ -26,6 +26,7 @@ import ProductVariantCardPicker from '../../components/ProductVariantCardPicker'
 import ProductReviewsSection from '../../components/ProductReviewsSection';
 import RatingRow from '../../components/RatingRow';
 import { getStorefrontProduct, getStorefrontShopDelivery } from '../../api/storefront';
+import { connectChatSocket } from '../../socket/chatSocket';
 import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
 import {
   formatAttributeLabel,
@@ -76,6 +77,7 @@ export default function ProductScreen({ route, navigation }) {
 
   const [qty, setQty] = useState(1);
   const [awaitingShippingQuote, setAwaitingShippingQuote] = useState(false);
+  const [readyToPayOrderId, setReadyToPayOrderId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
@@ -550,29 +552,52 @@ export default function ProductScreen({ route, navigation }) {
     }
   }, [loggedIn, selectedInventoryId]);
 
+  const refreshProductOrderState = useCallback(() => {
+    const productId = productIdParam != null ? String(productIdParam).trim() : '';
+    if (!loggedIn || !productId) {
+      setAwaitingShippingQuote(false);
+      setReadyToPayOrderId(null);
+      return;
+    }
+    void fetchAwaitingShippingQuote(productId)
+      .then((body) => {
+        setAwaitingShippingQuote(Boolean(body?.awaiting));
+        setReadyToPayOrderId(body?.readyToPay && body?.orderId ? body.orderId : null);
+      })
+      .catch(() => {
+        setAwaitingShippingQuote(false);
+        setReadyToPayOrderId(null);
+      });
+  }, [loggedIn, productIdParam]);
+
   useFocusEffect(
     useCallback(() => {
       void syncCartMembership();
-      const productId = productIdParam != null ? String(productIdParam).trim() : '';
-      let cancelled = false;
-      if (loggedIn && productId) {
-        void fetchAwaitingShippingQuote(productId)
-          .then((body) => {
-            if (!cancelled) setAwaitingShippingQuote(Boolean(body?.awaiting));
-          })
-          .catch(() => {
-            if (!cancelled) setAwaitingShippingQuote(false);
-          });
-      } else if (!cancelled) {
-        setAwaitingShippingQuote(false);
-      }
+      refreshProductOrderState();
       return () => {
-        cancelled = true;
         setOverflowMenuOpen(false);
         setDeliveryPolicyModalVisible(false);
       };
-    }, [syncCartMembership, loggedIn, productIdParam]),
+    }, [syncCartMembership, refreshProductOrderState]),
   );
+
+  useEffect(() => {
+    let alive = true;
+    /** @type {import('socket.io-client').Socket | null} */
+    let socket = null;
+    const onOrderChange = () => refreshProductOrderState();
+    void connectChatSocket().then((next) => {
+      if (!alive || !next) return;
+      socket = next;
+      next.on('order_acceptance', onOrderChange);
+      next.on('payment_received', onOrderChange);
+    });
+    return () => {
+      alive = false;
+      socket?.off('order_acceptance', onOrderChange);
+      socket?.off('payment_received', onOrderChange);
+    };
+  }, [refreshProductOrderState]);
 
   useEffect(() => {
     void syncCartMembership();
@@ -1128,12 +1153,16 @@ export default function ProductScreen({ route, navigation }) {
         <TouchableOpacity
           style={[
             styles.addCart,
-            selectedLineInCart && styles.addCartOutlined,
+            selectedLineInCart && !readyToPayOrderId && styles.addCartOutlined,
             (cartToggleBusy || awaitingShippingQuote) && styles.addCartBusy,
           ]}
           activeOpacity={cartToggleBusy || awaitingShippingQuote ? 1 : 0.88}
           disabled={cartToggleBusy || awaitingShippingQuote}
           onPress={() => {
+            if (readyToPayOrderId) {
+              navigation.navigate('Order-detail', { orderId: readyToPayOrderId, autoPay: true });
+              return;
+            }
             if (!ensureReadyForCartOrCheckout()) return;
             if (selectedLineInCart) {
               void performRemoveFromCart();
@@ -1143,7 +1172,9 @@ export default function ProductScreen({ route, navigation }) {
           }}
           accessibilityRole="button"
           accessibilityLabel={
-            awaitingShippingQuote
+            readyToPayOrderId
+              ? 'Make payment to continue'
+              : awaitingShippingQuote
               ? 'Awaiting shipping quote'
               : selectedLineInCart
                 ? 'Remove from cart'
@@ -1153,10 +1184,12 @@ export default function ProductScreen({ route, navigation }) {
           <Text
             style={[
               styles.addCartText,
-              selectedLineInCart && styles.addCartTextOutlined,
+              selectedLineInCart && !readyToPayOrderId && styles.addCartTextOutlined,
             ]}
           >
-            {awaitingShippingQuote
+            {readyToPayOrderId
+              ? 'Make payment to continue'
+              : awaitingShippingQuote
               ? 'Awaiting shipping quote'
               : selectedLineInCart
                 ? 'Remove from cart'
@@ -1164,19 +1197,33 @@ export default function ProductScreen({ route, navigation }) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.buyNow, awaitingShippingQuote && styles.addCartBusy]}
-          activeOpacity={awaitingShippingQuote ? 1 : 0.88}
-          disabled={cartToggleBusy || awaitingShippingQuote}
+          style={[styles.buyNow, awaitingShippingQuote && !readyToPayOrderId && styles.addCartBusy]}
+          activeOpacity={awaitingShippingQuote && !readyToPayOrderId ? 1 : 0.88}
+          disabled={cartToggleBusy || (awaitingShippingQuote && !readyToPayOrderId)}
           onPress={() => {
+            if (readyToPayOrderId) {
+              navigation.navigate('Order-detail', { orderId: readyToPayOrderId, autoPay: true });
+              return;
+            }
             void handleBuyNow();
           }}
           accessibilityRole="button"
-          accessibilityLabel={awaitingShippingQuote ? 'Awaiting shipping quote' : 'Buy now and go to checkout'}
+          accessibilityLabel={
+            readyToPayOrderId
+              ? 'Make payment to continue'
+              : awaitingShippingQuote
+                ? 'Awaiting shipping quote'
+                : 'Buy now and go to checkout'
+          }
         >
           <Text style={styles.buyNowText}>
-            {awaitingShippingQuote ? 'Awaiting shipping quote' : 'Buy now'}
+            {readyToPayOrderId
+              ? 'Make payment to continue'
+              : awaitingShippingQuote
+                ? 'Awaiting shipping quote'
+                : 'Buy now'}
           </Text>
-          {awaitingShippingQuote ? null : (
+          {awaitingShippingQuote || readyToPayOrderId ? null : (
             <Icon
               name="bag-check-outline"
               size={22}

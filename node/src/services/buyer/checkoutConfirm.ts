@@ -10,6 +10,7 @@ import { GetShopOwnerByShopIdService } from "../business/shop.js";
 import { OrderHandler } from "../webhook/paystack.js";
 import type { NewOrder } from "../../types/paystack.js";
 import { sendNotificationEmail } from "../email.js";
+import { emitUnpaidOrderToVendor } from "../../socket/order.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -100,6 +101,7 @@ async function notifyVendorOfUnpaidOrder(
         message,
       });
     }
+    await emitUnpaidOrderToVendor(sourceId, vendorId);
   } catch (err) {
     console.error("notifyVendorOfUnpaidOrder failed", err);
   }
@@ -356,6 +358,19 @@ async function createCheckoutRoomsForOrderRows(
   }
 
   return results;
+}
+
+export async function ensurePaidOrderChatRoom(
+  buyerUserId: number,
+  orderId: number,
+  shopId: unknown,
+): Promise<void> {
+  await createCheckoutRoomsForOrderRows(
+    buyerUserId,
+    [{ id: orderId, shop_id: shopId }],
+    orderId,
+    false,
+  );
 }
 
 function metadataOrdersFromVerifyData(data: Record<string, unknown>): Array<{
