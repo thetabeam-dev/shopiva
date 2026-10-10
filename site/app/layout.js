@@ -21,9 +21,9 @@ export async function generateMetadata() {
   const imageUrl = "https://www.deedyte.com/api/logo";
 
   return {
+    metadataBase: new URL("https://www.deedyte.com"),
     title: "DeeDyte Nigeria | Trusted Online Marketplace For Anyone",
     description: "Enjoy Free Commerce From The Comfort Of Your Home.",
-    alternates: { canonical: "https://www.deedyte.com" },
     robots: { index: true, follow: true },
     openGraph: {
       title: "DeeDyte Nigeria | Trusted Online Marketplace Anyone",

@@ -1,6 +1,6 @@
 import { query } from "./api/lib/database";
 
-const SITE = "https://deedyte.com";
+const SITE = "https://www.deedyte.com";
 
 /** Public pages. Account, cart, checkout, and vendor dashboard routes stay out. */
 const STATIC_PATHS = [
@@ -11,9 +11,7 @@ const STATIC_PATHS = [
   "/legal",
   "/privacy-policy",
   "/terms-of-use",
-  "/auth/login",
-  "/auth/signup",
-  "/entrepreneur/ng",
+  "/contact",
 ];
 
 function entry(path, lastModified = new Date()) {
@@ -58,7 +56,7 @@ async function storefrontEntries() {
 
   const productEntries = products.rows.map((product) =>
     entry(
-      `/store/${encodeURIComponent(product.slug)}/product/${product.id}`,
+      `/store/${encodeURIComponent(product.slug)}/${product.id}`,
       product.updated_at ? new Date(product.updated_at) : new Date(),
     ),
   );
