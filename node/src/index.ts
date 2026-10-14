@@ -6,12 +6,14 @@ import cors from "cors";
 import morgan from "morgan";
 import swaggerUi from "swagger-ui-express";
 import { UserRouter } from "./routes/user.js";
+import { AdminEmailAutomationRouter } from "./routes/adminEmailAutomation.js";
 import bodyParser from "body-parser";
 import BusinessRouter from "./routes/business/shop.js";
 import BuyerRouter from "./routes/buyer.js";
 import StorefrontRouter from "./routes/storefront.js";
 import { swaggerSpec } from "./config/swagger.js";
 import { PaystackWebhookController } from "./controllers/webhooks/paystack.js";
+import { WhatsAppWebhookController, WhatsAppWebhookVerificationController } from "./controllers/webhooks/whatsapp.js";
 import passport from "passport";
 import { configurePassport } from "./config/passport.js";
 import { OAuthRouter } from "./routes/oauth.js";
@@ -46,6 +48,12 @@ app.post(
   "/webhooks/paystack",
   express.raw({ type: "application/json" }),
   PaystackWebhookController,
+);
+app.get("/webhooks/whatsapp", WhatsAppWebhookVerificationController);
+app.post(
+  "/webhooks/whatsapp",
+  express.raw({ type: "application/json" }),
+  WhatsAppWebhookController,
 );
 
 // Middleware (must come BEFORE routes)
@@ -221,6 +229,7 @@ app.post("/update-fcm", async (req, res) => {
 // Routes
 app.use("/api/oauth", OAuthRouter);
 app.use(UserRouter);
+app.use(AdminEmailAutomationRouter);
 app.use(BusinessRouter);
 app.use(BuyerRouter);
 app.use(StorefrontRouter);
@@ -293,7 +302,7 @@ const server = app.listen(process.env.PORT, () => {
 
     const { rows: payouts } = await pool.query(
       `SELECT * FROM shop_payouts WHERE status = $1`,
-      ["pending"],
+      ["processing"],
     );
 
     for (const payout of payouts) {

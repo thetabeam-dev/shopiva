@@ -18,17 +18,27 @@ export class UserModel {
     async (
       payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string }
     ) => {
-      const { role, fname, lname, email, provider, password, src, deviceId, deviceToken } = payload;
+      const { role, fname, lname, email, provider, password, src, deviceId, deviceToken, whatsappMarketingConsent } = payload;
+      const notificationPreferences = {
+        email: { enabled: true, marketing: false, updates: true },
+        sms: { enabled: true, critical: true },
+        push: { enabled: true, marketing: false },
+        whatsapp: {
+          enabled: true,
+          marketing: whatsappMarketingConsent === true,
+          marketingConsentAt: whatsappMarketingConsent === true ? new Date().toISOString() : null,
+        },
+      };
 
       const columns =
         src === "web"
-          ? ["role", "fname", "lname", "email","provider", "password", "createdAt"]
-          : ["role", "fname", "lname", "email","provider", "password", "createdAt", "deviceId", "deviceToken"];
+          ? ["role", "fname", "lname", "email","provider", "password", "createdAt", "notificationPreferences"]
+          : ["role", "fname", "lname", "email","provider", "password", "createdAt", "deviceId", "deviceToken", "notificationPreferences"];
 
       const values =
         src === "web"
-          ? [role, fname, lname, email, provider, password, new Date()]
-          : [role, fname, lname, email, provider, password, new Date(), JSON.stringify([deviceId]), JSON.stringify([deviceToken])];
+          ? [role, fname, lname, email, provider, password, new Date(), JSON.stringify(notificationPreferences)]
+          : [role, fname, lname, email, provider, password, new Date(), JSON.stringify([deviceId]), JSON.stringify([deviceToken]), JSON.stringify(notificationPreferences)];
 
       const placeholders = values.map((_, i) => `$${i + 1}`).join(",");
 
@@ -266,8 +276,9 @@ export class UserModel {
       lname: string;
       provider: string;
       role: string;
+      whatsappMarketingConsent?: boolean;
     }) => {
-      const { email, fname, lname, provider, role } = payload;
+      const { email, fname, lname, provider, role, whatsappMarketingConsent } = payload;
 
       // Check if user exists
       const existingUsers = await UserModel.findUserByEmail(email);
@@ -288,13 +299,23 @@ export class UserModel {
       }
 
       // Create new user for OAuth
+      const notificationPreferences = {
+        email: { enabled: true, marketing: false, updates: true },
+        sms: { enabled: true, critical: true },
+        push: { enabled: true, marketing: false },
+        whatsapp: {
+          enabled: true,
+          marketing: whatsappMarketingConsent === true,
+          marketingConsentAt: whatsappMarketingConsent === true ? new Date().toISOString() : null,
+        },
+      };
       const { rows } = await query(
         `
-          INSERT INTO users (role, fname, lname, email, password, provider, createdAt, isEmailVerified)
-          VALUES ($1, $2, $3, $4, $5, $6, NOW(), true)
+          INSERT INTO users (role, fname, lname, email, password, provider, createdAt, isEmailVerified, notificationPreferences)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), true, $7)
           RETURNING *
         `,
-        [role, fname, lname, email, "oauth_" + provider, provider]
+        [role, fname, lname, email, "oauth_" + provider, provider, JSON.stringify(notificationPreferences)]
       );
 
       return rows[0];

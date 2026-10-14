@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       deviceId = "null",
       deviceToken = "null",
       provider = "local",
+      whatsappMarketingConsent = false,
     } = body;
 
     // Handle OAuth providers (Google, Apple, Facebook)
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
         lname: lname || "",
         provider,
         role,
+        whatsappMarketingConsent: whatsappMarketingConsent === true,
       });
 
       if (!user) {
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
       src,
       deviceId,
       deviceToken,
+      whatsappMarketingConsent: whatsappMarketingConsent === true,
     });
 
     if (!user) {

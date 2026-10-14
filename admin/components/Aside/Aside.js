@@ -6,6 +6,7 @@ import "./style.css";
 const menuItems = [
     { label: "Home", svg: "", countKey: null },
     { label: "Users", svg: "", countKey: "users" },
+    { label: "Vendor Activation", svg: "", countKey: null },
     { label: "Products", svg: "", countKey: "products" },
     { label: "Inventory", svg: "", countKey: "inventory" },
     { label: "Shops", svg: "", countKey: "shops" },

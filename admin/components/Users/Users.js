@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import './style.css'
 
-const ROLES = ["All", "admin", "support", "manager"]
+const ROLES = ["All", "customer", "entrepreneur"]
 const OSS = ["All", "Windows", "macOS", "Linux"]
 
 export default function Users() {
@@ -11,6 +11,7 @@ export default function Users() {
   const [selectedOs, setSelectedOs] = useState('All')
   const [filterEmail, setFilterEmail] = useState('')
   const [filterPhone, setFilterPhone] = useState('')
+  const [createdWithinDays, setCreatedWithinDays] = useState('')
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -25,6 +26,7 @@ export default function Users() {
       if (selectedOs && selectedOs !== 'All') params.set('os', selectedOs)
       if (filterEmail) params.set('email', filterEmail)
       if (filterPhone) params.set('phone', filterPhone)
+      if (createdWithinDays) params.set('createdWithinDays', createdWithinDays)
       try {
         const res = await fetch(`/api/users?${params.toString()}`)
         const json = await res.json()
@@ -38,7 +40,7 @@ export default function Users() {
     }
     fetchUsers()
     return () => { isMounted = false }
-  }, [selectedRole, selectedOs, filterEmail, filterPhone])
+  }, [selectedRole, selectedOs, filterEmail, filterPhone, createdWithinDays])
 
   return (
     <section className="users-page">
@@ -76,6 +78,15 @@ export default function Users() {
           <label htmlFor="phone-filter">Phone</label>
           <input id="phone-filter" type="text" placeholder="Filter by phone" value={filterPhone} onChange={(e) => setFilterPhone(e.target.value)} />
         </div>
+        <div>
+          <label htmlFor="created-within-filter">Registration date</label>
+          <select id="created-within-filter" value={createdWithinDays} onChange={(event) => setCreatedWithinDays(event.target.value)}>
+            <option value="">Any time</option>
+            <option value="30">Last 30 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="2">Last 2 days</option>
+          </select>
+        </div>
         <button
           type="button"
           className="filter-reset-button"
@@ -84,6 +95,7 @@ export default function Users() {
             setSelectedOs('All')
             setFilterEmail('')
             setFilterPhone('')
+            setCreatedWithinDays('')
           }}
         >
           Clear filters

@@ -7,6 +7,7 @@
  */
 
 export interface NewUserDocument {
+    whatsappMarketingConsent?: boolean;
   fname: string,
   lname: string,
   email: string,
@@ -81,6 +82,11 @@ export interface NotificationPreferences {
   push: {
     enabled: boolean;
     marketing: boolean;
+  };
+  whatsapp: {
+    enabled: boolean;
+    marketing: boolean;
+    marketingConsentAt?: string | null;
   };
 }
 

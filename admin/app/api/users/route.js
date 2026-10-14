@@ -8,6 +8,11 @@ export async function GET(request) {
     const os = url.searchParams.get('os') || undefined;
     const email = url.searchParams.get('email') || undefined;
     const phone = url.searchParams.get('phone') || undefined;
+    const createdWithinDays = url.searchParams.get('createdWithinDays') || undefined;
+
+    if (createdWithinDays && !['2', '7', '30'].includes(createdWithinDays)) {
+      return NextResponse.json({ error: 'Date filter must be 2, 7, or 30 days.' }, { status: 400 });
+    }
 
     const where = [];
     const params = [];
@@ -28,6 +33,10 @@ export async function GET(request) {
     if (phone) {
       where.push(`phone LIKE $${idx++}`);
       params.push(`%${phone}%`);
+    }
+    if (createdWithinDays) {
+      where.push(`createdAt >= NOW() - ($${idx++} * INTERVAL '1 day')`);
+      params.push(Number(createdWithinDays));
     }
 
     const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';

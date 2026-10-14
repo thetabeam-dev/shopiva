@@ -1,7 +1,12 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import ProductDetail from "./product"; // Client component
+import nextDynamic from "next/dynamic";
+
+const ProductDetail = nextDynamic(() => import("./product"), {
+  ssr: false,
+  loading: () => <div>Loading product…</div>,
+});
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/$/, "");
 

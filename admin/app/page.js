@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Aside from "../components/Aside/Aside";
 import Home from "../components/Home/Home";
 import Users from "../components/Users/Users";
+import VendorActivation from "../components/VendorActivation/VendorActivation";
 import "./styles/style.css";
 
 const pages = {
@@ -213,6 +214,7 @@ export default function Dashboard() {
   const pageComponents = {
     Home: <Home onNavigate={setActivePage} />,
     Users: <Users />,
+    "Vendor Activation": <VendorActivation />,
     Products: <ResourcePage {...pages.Products} />,
     Inventory: <ResourcePage {...pages.Inventory} />,
     Shops: <ResourcePage {...pages.Shops} />,
