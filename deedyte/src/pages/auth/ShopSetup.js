@@ -16,7 +16,7 @@ import { CommonActions, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useAuth } from '../../hooks/useAuth';
-import { createVendorShop, hasVendorShop } from '../../api/shop';
+import { createVendorShop, fetchOwnerShops, hasVendorShop, updateVendorShop } from '../../api/shop';
 import { fetchCurrentUserOrStatus, updateUserRole } from '../../api/user';
 import {
   getCurrentCoordinates,
@@ -26,6 +26,7 @@ import {
 import FormKeyboardAvoiding from '../../components/FormKeyboardAvoiding';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../../auth/session';
 import { formatMvpCategoryLabel } from '../../utils/mvpCategory';
+import { shopLocationReady, shopRecordHasLocation } from '../../utils/shopLocation';
 import {
   selectCategoriesError,
   selectCategoriesLoading,
@@ -66,6 +67,7 @@ export default function ShopSetupScreen() {
   );
   const [locating, setLocating] = useState(false);
   const [submittingSetup, setSubmittingSetup] = useState(false);
+  const [existingShopId, setExistingShopId] = useState(/** @type {number | null} */ (null));
 
   const setupHint = useMemo(() => {
     if (coords) {
@@ -73,7 +75,7 @@ export default function ShopSetupScreen() {
         4,
       )}, ${coords.longitude.toFixed(4)}`;
     }
-    return 'No device coordinates yet. You can still type location manually.';
+    return 'Location is required. Allow device location, or enter the city and state.';
   }, [coords]);
 
   useEffect(() => {
@@ -92,14 +94,48 @@ export default function ShopSetupScreen() {
         const hasShop = await hasVendorShop();
         if (cancelled) return;
         if (hasShop) {
-          await setActiveRole('vendor');
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'home' }],
-            }),
-          );
-          return;
+          const stored = await getStoredUser();
+          const uid = Number(stored?.id);
+          const shops = Number.isFinite(uid) ? await fetchOwnerShops(uid).catch(() => []) : [];
+          const shop = Array.isArray(shops) ? shops[0] : null;
+          if (shop && shopRecordHasLocation(shop)) {
+            await setActiveRole('vendor');
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'home' }],
+              }),
+            );
+            return;
+          }
+          const shopId = Number(shop?.id ?? shop?.shop_id);
+          if (Number.isFinite(shopId) && shopId > 0) setExistingShopId(shopId);
+          if (shop?.name) setShopName(String(shop.name));
+          void requestLocationPermission().then(async granted => {
+            if (!granted || cancelled) {
+              Alert.alert(
+                'Shop location',
+                'Allow location to set your shop, or enter the city and state below.',
+              );
+              return;
+            }
+            try {
+              const c = await getCurrentCoordinates();
+              if (!cancelled) setCoords(c);
+            } catch {
+              /* manual entry remains available */
+            }
+          });
+        } else {
+          void requestLocationPermission().then(async granted => {
+            if (!granted || cancelled) return;
+            try {
+              const c = await getCurrentCoordinates();
+              if (!cancelled) setCoords(c);
+            } catch {
+              /* manual entry remains available */
+            }
+          });
         }
       } catch {
         /* show form */
@@ -161,45 +197,45 @@ export default function ShopSetupScreen() {
 
     const user = await getStoredUser();
     const name = shopName.trim();
-    if (name.length < 2) {
+    if (!existingShopId && name.length < 2) {
       Alert.alert('Shop name', 'Enter a valid shop name.');
       return;
     }
-    if (!categories.length) {
+    if (!existingShopId && !categories.length) {
       Alert.alert('Category', 'Select at least one shop category.');
       return;
     }
-    const hasTypedLocation =
-      address.trim().length > 0 ||
-      city.trim().length > 0 ||
-      stateName.trim().length > 0 ||
-      country.trim().length > 0 ||
-      zipcode.trim().length > 0;
-    if (!coords && !hasTypedLocation) {
+    if (!shopLocationReady(coords, city, stateName)) {
       Alert.alert(
-        'Location',
-        'Use device location or enter your location details manually.',
+        'Shop location',
+        'Allow device location, or enter the city and state.',
       );
       return;
     }
 
     setSubmittingSetup(true);
     try {
-      await createVendorShop({
-        name,
-        vendorType,
-        category: categories,
-        location: {
-          address: address.trim() || undefined,
-          city: city.trim() || undefined,
-          state: stateName.trim() || undefined,
-          country: country.trim() || undefined,
-          zipcode: zipcode.trim() || undefined,
-          ...(coords && {
-            coordinates: { lat: coords.latitude, lng: coords.longitude },
-          }),
-        },
-      });
+      const location = {
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: stateName.trim() || undefined,
+        country: country.trim() || undefined,
+        zipcode: zipcode.trim() || undefined,
+        ...(coords && {
+          coordinates: { lat: coords.latitude, lng: coords.longitude },
+        }),
+      };
+      if (existingShopId) {
+        const uid = Number(user?.id);
+        await updateVendorShop(existingShopId, uid, { location });
+      } else {
+        await createVendorShop({
+          name,
+          vendorType,
+          category: categories,
+          location,
+        });
+      }
 
       const uid = Number(user?.id);
       if (!Number.isNaN(uid) && uid > 0) {

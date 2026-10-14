@@ -1,7 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
@@ -346,8 +345,17 @@ function VendorCard({
         </View>
 
         {pv.loading ? (
-          <View style={[styles.carouselLoading, { minHeight: PRODUCT_W }]}>
-            <ActivityIndicator color={isDark ? '#fff' : '#00926e'} />
+          <View style={styles.carouselSkeleton}>
+            {[0, 1, 2].map(slot => (
+              <View
+                key={slot}
+                style={[
+                  styles.productCell,
+                  styles.bone,
+                  { width: PRODUCT_W, backgroundColor: isDark ? 'rgba(255,255,255,0.16)' : '#ECECEC' },
+                ]}
+              />
+            ))}
           </View>
         ) : carouselItems.length === 0 ? (
           <Text style={[styles.carouselEmpty, { color: t.secondaryText }]}>
@@ -556,8 +564,6 @@ export default function VendorScreen({ route, navigation }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const vendorsRef = useRef(vendors);
-  vendorsRef.current = vendors;
   const vendorRequestId = useRef(0);
   const [error, setError] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
@@ -630,11 +636,9 @@ export default function VendorScreen({ route, navigation }) {
     }
   }, [category]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadVendors(vendorsRef.current.length > 0);
-    }, [loadVendors]),
-  );
+  useEffect(() => {
+    loadVendors(false).catch(() => {});
+  }, [loadVendors]);
 
   const onRefreshVendors = useCallback(() => {
     loadVendors(true);
@@ -934,25 +938,6 @@ export default function VendorScreen({ route, navigation }) {
     setFilterVisible(false);
   }, []);
 
-  const searchBar = (
-    <View style={styles.searchSection}>
-      <View style={styles.searchField}>
-        <Icon name="search-outline" size={18} color="#8A8A8A" />
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search shops"
-          placeholderTextColor="#8A8A8A"
-          style={styles.searchInput}
-          autoCorrect={false}
-          autoCapitalize="none"
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
-      </View>
-    </View>
-  );
-
   const filterSheet = (
     <VendorLocationSheet
       visible={filterVisible}
@@ -966,10 +951,25 @@ export default function VendorScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.flexFill}>
-        {searchBar}
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#00926e" />
-          <Text style={styles.muted}>Loading vendors…</Text>
+        <View style={[styles.list, { paddingTop: 12 }]}>
+          {[0, 1, 2].map(index => (
+            <View key={index} style={[styles.card, styles.vendorSkeleton]}>
+              <View style={styles.cardInner}>
+                <View style={styles.headerRow}>
+                  <View style={styles.skeletonAvatar} />
+                  <View style={styles.headerText}>
+                    <View style={[styles.boneLine, { width: '70%' }]} />
+                    <View style={[styles.boneLine, { width: '46%', marginTop: 8 }]} />
+                  </View>
+                </View>
+                <View style={styles.carouselSkeleton}>
+                  {[0, 1, 2].map(slot => (
+                    <View key={slot} style={[styles.productCell, styles.bone, { width: PRODUCT_W }]} />
+                  ))}
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
         {filterSheet}
         {vendorMenuSheet}
@@ -981,7 +981,6 @@ export default function VendorScreen({ route, navigation }) {
   if (error) {
     return (
       <View style={styles.flexFill}>
-        {searchBar}
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>
         </View>
@@ -994,7 +993,6 @@ export default function VendorScreen({ route, navigation }) {
 
   return (
     <View style={styles.flexFill}>
-      {searchBar}
       <View style={styles.screen}>
         <FlatList
           data={displayedVendors}
@@ -1035,7 +1033,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#EFEFEF',
-    paddingTop: 20,
+    paddingTop: 10,
   },
   searchSection: {
     backgroundColor: '#EFEFEF',
@@ -1200,6 +1198,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingTop: Platform.OS === 'ios' ? 1 : 0,
   },
+  bone: { backgroundColor: '#ECECEC' },
+  boneLine: { height: 14, borderRadius: 6, backgroundColor: '#E4E4E4' },
+  vendorSkeleton: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F0F0F0' },
+  skeletonAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#E4E4E4' },
+  carouselSkeleton: { flexDirection: 'row', paddingTop: 12 },
   carouselLoading: {
     justifyContent: 'center',
     alignItems: 'center',

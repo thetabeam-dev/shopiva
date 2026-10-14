@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   headerAction: {
-    marginRight: 4,
+    // marginRight: 4,
     paddingVertical: 6,
     paddingHorizontal: 4,
     justifyContent: 'center',

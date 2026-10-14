@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Platform,
   RefreshControl,
@@ -227,7 +226,20 @@ export default function HomeScreen() {
       </View> */}
 
       {loading ? (
-        <ActivityIndicator color="#111111" style={{ marginTop: 24 }} />
+        <View style={styles.grid}>
+          {Array.from({ length: 6 }, (_, index) => (
+            <View key={index} style={styles.card}>
+              <View style={[styles.cardImage, styles.bone]} />
+              <View style={[styles.boneLine, { width: '92%', marginTop: 8 }]} />
+              <View style={[styles.boneLine, { width: '64%', marginTop: 6 }]} />
+              <View style={[styles.boneLine, { width: '48%', marginTop: 8, height: 12 }]} />
+              <View style={styles.priceRow}>
+                <View style={[styles.boneLine, { width: '42%', height: 16 }]} />
+                <View style={styles.boneCart} />
+              </View>
+            </View>
+          ))}
+        </View>
       ) : (
         <View style={styles.grid}>
           {visibleArrivals.map(item => {
@@ -344,6 +356,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
+  bone: { backgroundColor: '#ECECEC' },
+  boneLine: { height: 14, borderRadius: 6, backgroundColor: '#ECECEC' },
+  boneCart: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ECECEC' },
   card: { width: '48%', marginBottom: 18 },
   cardImage: {
     width: '100%',
