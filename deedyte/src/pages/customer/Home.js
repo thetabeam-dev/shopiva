@@ -158,7 +158,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === "ios" ? 10 : 40 }]}>
         <View style={styles.identity}>
           {user?.avatarUrl ? (
             <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
@@ -178,21 +178,6 @@ export default function HomeScreen() {
         />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 28 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              loadArrivals({ refresh: true }).catch(() => {});
-            }}
-            tintColor="#00926E"
-            colors={['#00926E']}
-          />
-        }
-      >
       <ScrollView
         horizontal
         nestedScrollEnabled
@@ -217,14 +202,29 @@ export default function HomeScreen() {
         })}
       </ScrollView>
 
-      <View style={styles.promo}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 28 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              loadArrivals({ refresh: true }).catch(() => {});
+            }}
+            tintColor="#00926E"
+            colors={['#00926E']}
+          />
+        }
+      >
+      {/* <View style={styles.promo}>
         <Icon name="checkmark" size={16} color="#1F8A4C" />
         <Text style={styles.promoText}>Free shipping</Text>
         <Text style={styles.promoDivider}>|</Text>
         <Icon name="checkmark" size={16} color="#1F8A4C" />
         <Text style={styles.promoText}>Price adjustment within 30 days</Text>
         <Icon name="chevron-forward" size={16} color="#8A8A8A" />
-      </View>
+      </View> */}
 
       {loading ? (
         <ActivityIndicator color="#111111" style={{ marginTop: 24 }} />
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 0,
   },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F2F2F2' },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipRow: { height: 48, flexGrow: 0, marginTop: 8 },
+  chipRow: { height: 48, flexGrow: 0, marginTop: 8, backgroundColor: '#FFFFFF' },
   chips: { paddingHorizontal: 16, alignItems: 'flex-end', gap: 18 },
   chip: { alignItems: 'center', paddingBottom: 6 },
   chipText: { fontSize: 16, color: '#8A8A8A' },
