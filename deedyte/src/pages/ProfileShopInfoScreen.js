@@ -50,7 +50,7 @@ import {
 import { useSelector } from 'react-redux';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
 import { parseShopCategories } from '../utils/shopCategories';
-import { selectCategoryKeys } from '../../redux/categoriesSlice';
+import { selectCategoryOptions } from '../../redux/categoriesSlice';
 import geoZones from '../json/zones.json';
 import { formatPriceInput } from '../utils/variantOptions';
 
@@ -346,6 +346,28 @@ function bvnVerificationStatus(bvn) {
   return { label: 'Not submitted', passed: false, pending: false };
 }
 
+function categoryMatchKey(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function categoryHasPublishedProduct(products, categoryName) {
+  const wanted = categoryMatchKey(categoryName);
+  if (!wanted) return false;
+  return products.some(product => {
+    const published =
+      product?.is_published === true ||
+      product?.isPublished === true ||
+      ['active', 'published'].includes(String(product?.status ?? '').trim().toLowerCase());
+    return published && categoryMatchKey(product?.category) === wanted;
+  });
+}
+
 export default function ProfileShopInfoScreen() {
   const insets = useSafeAreaInsets();
   const { user, refresh } = useProfile();
@@ -367,6 +389,7 @@ export default function ProfileShopInfoScreen() {
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(/** @type {string[]} */ ([]));
+  const [shopProducts, setShopProducts] = useState(/** @type {Record<string, unknown>[]} */ ([]));
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [locationState, setLocationState] = useState({ ...DEFAULT_LOCATION });
@@ -443,6 +466,7 @@ export default function ProfileShopInfoScreen() {
       setActiveShopId(nextId);
       if (!nextId) {
         setShopRow(null);
+        setShopProducts([]);
         setMetrics({ revenue: 0, orders: 0, products: 0 });
         return;
       }
@@ -452,6 +476,7 @@ export default function ProfileShopInfoScreen() {
       setSlug(pickStr(detail, 'slug', 'Slug'));
       setDescription(pickStr(detail, 'description', 'Description'));
       setCategory(parseShopCategories(detail?.category ?? detail?.Category));
+      setShopProducts([]);
       setContactEmail(pickStr(detail, 'contactEmail', 'contactemail'));
       setContactPhone(pickStr(detail, 'contactPhone', 'contactphone'));
       const loc = {
@@ -481,6 +506,7 @@ export default function ProfileShopInfoScreen() {
         ? productsRes.products
         : [];
       setMetrics({ revenue, orders: ordersArr.length, products: prods.length });
+      setShopProducts(prods);
 
       // Load shipping configuration status
       try {
@@ -909,7 +935,7 @@ export default function ProfileShopInfoScreen() {
   );
   const bvnSt = bvnVerificationStatus(verDocs.bvn);
 
-  const categoryOptions = useSelector(selectCategoryKeys);
+  const categoryOptions = useSelector(selectCategoryOptions);
 
   if (!isVendorAccountRole(user?.roleRaw)) {
     return (
@@ -1351,25 +1377,42 @@ export default function ProfileShopInfoScreen() {
           <Text style={styles.placeholderLine}>No categories available.</Text>
         ) : (
           categoryOptions.map(opt => {
-            const selected = category.some(item => item.toLowerCase() === opt.toLowerCase());
+            const selected = category.some(item => item.toLowerCase() === opt.value.toLowerCase());
             return (
               <Pressable
-                key={opt}
+                key={opt.value}
                 style={[
                   styles.pickerItem,
                   selected && styles.pickerItemSelected,
                 ]}
-                onPress={() =>
+                onPress={() => {
+                  if (!selected && category.length >= 3) {
+                    Alert.alert(
+                      'Category limit',
+                      'A shop can have at most 3 categories. Remove one before adding another.',
+                    );
+                    return;
+                  }
+                  if (selected && categoryHasPublishedProduct(shopProducts, opt.value)) {
+                    Alert.alert(
+                      'Category in use',
+                      'This category still has a published product. Delete that product before you can remove the category.',
+                    );
+                    return;
+                  }
                   setCategory(current =>
                     selected
-                      ? current.filter(item => item.toLowerCase() !== opt.toLowerCase())
-                      : [...current, opt],
-                  )
-                }
+                      ? current.filter(item => item.toLowerCase() !== opt.value.toLowerCase())
+                      : [...current, opt.value],
+                  );
+                }}
               >
-                <Text style={styles.pickerItemText}>
-                  {formatMvpCategoryLabel(opt)}
-                </Text>
+                <View style={styles.pickerItemCopy}>
+                  <Text style={styles.pickerItemText}>{opt.label}</Text>
+                  {opt.productTypes ? (
+                    <Text style={styles.pickerItemHint}>{opt.productTypes}</Text>
+                  ) : null}
+                </View>
                 {selected ? (
                   <Icon name="checkmark-circle" size={22} color={BRAND} />
                 ) : null}
@@ -1769,7 +1812,14 @@ function FormModal({ visible, title, children, onClose, onSave, saving }) {
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.formModalCard}>
           <Text style={styles.modalTitle}>{title}</Text>
-          {children}
+          <ScrollView
+            style={styles.formModalScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+            nestedScrollEnabled
+          >
+            {children}
+          </ScrollView>
           <View style={styles.modalActions}>
             <Pressable
               onPress={onClose}
@@ -2292,13 +2342,17 @@ const styles = StyleSheet.create({
   pickerItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 14,
+    paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BORDER,
+    gap: 12,
   },
   pickerItemSelected: { backgroundColor: 'rgba(13,79,60,0.05)' },
+  pickerItemCopy: { flex: 1 },
   pickerItemText: { fontSize: 16, color: BLACK },
+  pickerItemHint: { marginTop: 4, fontSize: 12, lineHeight: 16, color: '#6B7280' },
   formModalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -2310,6 +2364,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     padding: 20,
     paddingBottom: 28,
+    maxHeight: '85%',
+  },
+  formModalScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    maxHeight: 460,
   },
   modalLabel: {
     fontSize: 12,

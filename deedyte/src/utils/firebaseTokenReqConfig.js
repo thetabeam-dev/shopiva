@@ -233,10 +233,8 @@ export function handleNotificationOpen(remoteMessage) {
  * Foreground message — show a system notification. A tap opens the same screen as a background notification.
  * @param {import('@react-native-firebase/messaging').FirebaseMessagingTypes.RemoteMessage} remoteMessage
  */
-export async function handleForegroundMessage(remoteMessage) {
+async function showAndroidNotification(remoteMessage) {
   const parsed = parseFcmMessage(remoteMessage);
-  console.log('[fcm] foreground message:', parsed);
-
   if (!parsed.title && !parsed.body) return;
 
   await notifee.createChannel({
@@ -256,7 +254,45 @@ export async function handleForegroundMessage(remoteMessage) {
     },
     android: {
       channelId: 'deedyte',
+      smallIcon: 'ic_stat_deedyte',
+      largeIcon: 'ic_deedyte_logo',
+      circularLargeIcon: true,
+      color: '#00926E',
       pressAction: { id: 'default' },
+    },
+  });
+}
+
+function openNotifeeNotification(detail) {
+  const raw = detail?.notification?.data?.payload;
+  if (typeof raw !== 'string' || !raw) return;
+  try {
+    handleNotificationOpen(JSON.parse(raw));
+  } catch {
+    /* ignore a notification that has no navigation payload */
+  }
+}
+
+/**
+ * Foreground message — show a system notification. A tap opens the same screen as a background notification.
+ * @param {import('@react-native-firebase/messaging').FirebaseMessagingTypes.RemoteMessage} remoteMessage
+ */
+export async function handleForegroundMessage(remoteMessage) {
+  const parsed = parseFcmMessage(remoteMessage);
+  console.log('[fcm] foreground message:', parsed);
+  if (!parsed.title && !parsed.body) return;
+  if (Platform.OS === 'android') {
+    await showAndroidNotification(remoteMessage);
+    return;
+  }
+  await notifee.displayNotification({
+    title: parsed.title || 'Deedyte',
+    body: parsed.body || '',
+    data: {
+      payload: JSON.stringify({
+        notification: { title: parsed.title, body: parsed.body },
+        data: parsed.data,
+      }),
     },
   });
 }
@@ -267,19 +303,21 @@ export async function handleForegroundMessage(remoteMessage) {
  */
 export function setupFcmListeners() {
   const unsubOnMessage = messaging().onMessage(async (remoteMessage) => {
-    handleForegroundMessage(remoteMessage);
+    try {
+      await handleForegroundMessage(remoteMessage);
+    } catch (error) {
+      console.warn('[fcm] foreground handler failed:', error instanceof Error ? error.message : String(error));
+    }
   });
 
   const unsubNotify = notifee.onForegroundEvent(({ type, detail }) => {
     if (type !== EventType.PRESS) return;
-    const raw = detail.notification?.data?.payload;
-    if (typeof raw !== 'string' || !raw) return;
-    try {
-      handleNotificationOpen(JSON.parse(raw));
-    } catch {
-      /* ignore a notification that has no navigation payload */
-    }
+    openNotifeeNotification(detail);
   });
+
+  notifee.getInitialNotification().then((initial) => {
+    if (initial) openNotifeeNotification(initial);
+  }).catch(() => {});
 
   const unsubOpened = messaging().onNotificationOpenedApp((remoteMessage) => {
     handleNotificationOpen(remoteMessage);
@@ -313,7 +351,19 @@ export function setupFcmListeners() {
  */
 export function registerFcmBackgroundHandler() {
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-    console.log('[fcm] background message:', parseFcmMessage(remoteMessage));
+    try {
+      console.log('[fcm] background message:', parseFcmMessage(remoteMessage));
+      if (Platform.OS === 'android') {
+        await showAndroidNotification(remoteMessage);
+      }
+    } catch (error) {
+      console.warn('[fcm] background handler failed:', error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type !== EventType.PRESS) return;
+    openNotifeeNotification(detail);
   });
 }
 

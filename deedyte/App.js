@@ -119,12 +119,16 @@ function App() {
 
   useEffect(() => {
     (async () => {
-      const data = await checkForUpdate();
-      if (data && typeof data === 'object') {
-        setVersionCheck({
-          isLatest: Boolean(data.isLatest),
-          storeUrl: typeof (data.storeUrl) === 'string' ? data.storeUrl : '',
-        });
+      try {
+        const data = await checkForUpdate();
+        if (data && typeof data === 'object') {
+          setVersionCheck({
+            isLatest: Boolean(data.isLatest),
+            storeUrl: typeof (data.storeUrl) === 'string' ? data.storeUrl : '',
+          });
+        }
+      } catch (error) {
+        console.warn('[app] version check failed:', error instanceof Error ? error.message : String(error));
       }
     })();
   }, []);

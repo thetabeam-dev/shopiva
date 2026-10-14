@@ -8,6 +8,7 @@
   "main": "index.ts",
   "scripts": {
     "build": "tsc --skipLibCheck && node scripts/copy-tsx-files.js",
+    "test": "npm run build && node --test test/*.test.mjs",
     "lint": "eslint \"src\" --fix",
     "start": "tsc && node scripts/copy-tsx-files.js && pm2-runtime start ecosystem.config.cjs --env production",
     "dev": "tsc && node scripts/copy-tsx-files.js && pm2-runtime start ecosystem.config.cjs --env development --watch",

@@ -7,7 +7,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ProductReviews from "@/components/customers/Review";
 import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 import Link from "next/link";
-import { usePaystackPayment } from "react-paystack";
+import dynamic from "next/dynamic";
+
+const PaystackBinder = dynamic(() => import("./paystackBinder"), { ssr: false });
 
 const AUTH_URL = "/api/user/authorization";
 
@@ -228,7 +230,7 @@ export default function ProductDetail({ product, slug }) {
         []
     );
 
-    const initializePayment = usePaystackPayment(paystackBase);
+    const paymentRef = useRef(null);
 
     const loadCustomerSession = useCallback(async () => {
         try {
@@ -504,6 +506,12 @@ export default function ProductDetail({ product, slug }) {
         const firstname = nameParts[0] ?? email.split("@")[0];
         const lastname = nameParts.slice(1).join(" ") || firstname;
 
+        const initializePayment = paymentRef.current;
+        if (!initializePayment) {
+            setPayMessage("Payment is still loading. Try again.");
+            return;
+        }
+
         initializePayment({
             onSuccess: onPaystackSuccess,
             onClose: onPaystackClose,
@@ -537,6 +545,7 @@ export default function ProductDetail({ product, slug }) {
     }, [])
     return (
         <div className="shop-page pdp-page">
+            <PaystackBinder config={paystackBase} paymentRef={paymentRef} />
             <header className="pdp-header" style={{
                 position: "fixed",
                 top: "0",

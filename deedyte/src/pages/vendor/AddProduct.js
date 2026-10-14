@@ -48,6 +48,7 @@ import {
   buildMvpCategoryFilters,
   formatMvpCategoryLabel,
   getGenderDrivenTypeOptions,
+  categoryRowUsesGender,
   isGenderDrivenCategory,
   mvpCategoryRootKeys,
 } from '../../utils/mvpCategory';
@@ -112,6 +113,54 @@ function normalizeVariantRecord(rawVariant, index) {
     details,
     stock: Number.isFinite(stockValue) ? stockValue : 0,
   };
+}
+
+const PRICE_STOCK_LABELS = new Set(['price', 'stock', 'quantity', 'qty']);
+
+function variantPriceNumber(variant) {
+  const details = Array.isArray(variant?.details) ? variant.details : [];
+  const priceLine = details.find(
+    detail => String(detail?.label ?? '').trim().toLowerCase() === 'price',
+  );
+  const numeric = Number(
+    String(priceLine?.value ?? '')
+      .replace(/[^\d.]/g, '')
+      .replace(/\.(?=.*\.)/g, ''),
+  );
+  return Number.isFinite(numeric) ? numeric : NaN;
+}
+
+function optionalVariantSignature(variant) {
+  const details = Array.isArray(variant?.details) ? variant.details : [];
+  return details
+    .filter(detail => {
+      const label = String(detail?.label ?? '').trim().toLowerCase();
+      const value = String(detail?.value ?? '').trim();
+      return Boolean(label) && Boolean(value) && !PRICE_STOCK_LABELS.has(label);
+    })
+    .map(detail => {
+      const label = String(detail.label).trim().toLowerCase();
+      const value = String(detail.value).trim().toLowerCase();
+      return `${label}=${value}`;
+    })
+    .sort()
+    .join('|');
+}
+
+function variantListIssue(variants) {
+  if (!Array.isArray(variants) || variants.length <= 1) return '';
+  const prices = variants.map(variantPriceNumber);
+  if (prices.some(price => !Number.isFinite(price) || price <= 0)) {
+    return 'Each variant must have a price greater than 0.';
+  }
+  if (new Set(prices.map(price => String(price))).size !== prices.length) {
+    return 'Each variant must have a different price.';
+  }
+  const signatures = variants.map(optionalVariantSignature).filter(Boolean);
+  if (new Set(signatures).size !== signatures.length) {
+    return 'Variants that include an optional option must differ in at least one of those options, such as color, size, or material.';
+  }
+  return '';
 }
 
 const VARIANT_FORM_WARNING =
@@ -344,17 +393,23 @@ export default function VendorCreateProductScreen() {
     return fromCategory.length ? fromCategory : GENDER_OPTIONS;
   }, [categoryKey, reduxCategoryState.categories]);
 
+  const categoryRow = useMemo(
+    () => reduxCategoryState.categories.find(item => item.category === categoryKey),
+    [categoryKey, reduxCategoryState.categories],
+  );
+  const isGenderCategory =
+    isGenderDrivenCategory(categoryKey) || categoryRowUsesGender(categoryRow?.productType);
+
   const typeOptions = useMemo(() => {
-    if (isGenderDrivenCategory(categoryKey)) {
-      const row = reduxCategoryState.categories.find(item => item.category === categoryKey);
-      const fromCategory = row?.productType?.[String(gender).trim().toLowerCase()];
+    if (isGenderCategory) {
+      const fromCategory = categoryRow?.productType?.[String(gender).trim().toLowerCase()];
       if (Array.isArray(fromCategory) && fromCategory.length) return fromCategory;
       return getGenderDrivenTypeOptions(categoryKey, gender);
     }
     const sub = String(subCategory || '').trim();
     if (!sub) return [];
     return typesBySubCategory.get(sub) ?? [];
-  }, [categoryKey, gender, reduxCategoryState.categories, subCategory, typesBySubCategory]);
+  }, [categoryKey, categoryRow, gender, isGenderCategory, subCategory, typesBySubCategory]);
 
   /** MVP: single shop — always the first shop returned for the signed-in owner. */
   useEffect(() => {
@@ -447,18 +502,22 @@ export default function VendorCreateProductScreen() {
         ? clothingSubTypeConfig.options
         : sizeConfig.options;
     const sizeFieldLabel =
-      sizeConfig.key === 'clothing' && clothingSubTypeConfig
-        ? `${clothingSubTypeConfig.label} size`
-        : sizeConfig.label.replace(/s$/i, '');
+      sizeConfig.key === 'shoes'
+        ? 'Size'
+        : sizeConfig.key === 'clothing' && clothingSubTypeConfig
+          ? `${clothingSubTypeConfig.label} size`
+          : sizeConfig.label.replace(/s$/i, '');
     const materialStrings = materialStringsForSizeKey(sizeConfig.key);
     const materialFieldLabel =
       sizeConfig.key === 'food' ? 'Packaging' : 'Material';
     const materialPlaceholder =
       sizeConfig.key === 'food' ? 'Select packaging' : 'Select a material';
     const sizePlaceholder =
-      sizeConfig.key === 'clothing' && clothingSubTypeConfig
-        ? `Select a ${clothingSubTypeConfig.label.toLowerCase()} size`
-        : `Select ${sizeConfig.label.toLowerCase()}`;
+      sizeConfig.key === 'shoes'
+        ? 'Select a size'
+        : sizeConfig.key === 'clothing' && clothingSubTypeConfig
+          ? `Select a ${clothingSubTypeConfig.label.toLowerCase()} size`
+          : `Select ${sizeConfig.label.toLowerCase()}`;
     return {
       sizeConfigKey: sizeConfig.key,
       resolvedSizeOptions,
@@ -504,7 +563,6 @@ export default function VendorCreateProductScreen() {
   );
   const isPriceValid = hasVariantsList ? variantPriceTotal : false;
   const isQuantityValid = hasVariantsList ? variantStockTotal > 0 : false;
-  const isGenderCategory = isGenderDrivenCategory(categoryKey);
   const hasFashionGender = !isGenderCategory || gender.trim().length > 0;
   const hasCoreFields =
     title.trim().length > 1 &&
@@ -528,6 +586,8 @@ export default function VendorCreateProductScreen() {
     if (uploadedMedia.length === 0) missing.push('Product image');
     if (!hasVariantsList) {
       missing.push('At least one variant');
+    } else if (variantListIssue(savedVariants)) {
+      missing.push('Variant options');
     } else {
       if (!isQuantityValid) missing.push('Variant quantity');
       if (!isPriceValid) missing.push('Variant price');
@@ -542,6 +602,7 @@ export default function VendorCreateProductScreen() {
     productType,
     uploadedMedia.length,
     hasVariantsList,
+    savedVariants,
     isQuantityValid,
     isPriceValid,
   ]);
@@ -550,7 +611,8 @@ export default function VendorCreateProductScreen() {
   const variantSectionInvalid =
     fieldInvalid('At least one variant') ||
     fieldInvalid('Variant quantity') ||
-    fieldInvalid('Variant price');
+    fieldInvalid('Variant price') ||
+    fieldInvalid('Variant options');
 
   const handleRemoveMedia = useCallback(mediaId => {
     setUploadedMedia(prev => prev.filter(item => item.id !== mediaId));
@@ -681,6 +743,7 @@ export default function VendorCreateProductScreen() {
     });
 
     const dynamicDetails = dynamicVariantEntries.flatMap(([fieldKey, fieldOptions]) => {
+      if (fieldKey === 'color' || fieldKey === 'size' || fieldKey === 'material') return [];
       if (!Array.isArray(fieldOptions) || fieldOptions.length === 0) return [];
       const selectedValue =
         fieldKey === 'color'
@@ -704,6 +767,16 @@ export default function VendorCreateProductScreen() {
       details,
       stock: Number(variantStock),
     };
+    const comparedVariants = editingVariantId
+      ? savedVariants
+          .filter(item => item.id !== editingVariantId)
+          .concat(nextVariant)
+      : savedVariants.concat(nextVariant);
+    const listIssue = variantListIssue(comparedVariants);
+    if (listIssue) {
+      setVariantError(listIssue);
+      return;
+    }
     setSavedVariants(prev =>
       editingVariantId
         ? prev.map(item => (item.id === editingVariantId ? nextVariant : item))
@@ -724,6 +797,7 @@ export default function VendorCreateProductScreen() {
     variantCtx.materialFieldLabel,
     clearVariantFields,
     editingVariantId,
+    savedVariants,
   ]);
 
   const closeVariantEditor = useCallback(() => {
@@ -803,7 +877,7 @@ export default function VendorCreateProductScreen() {
           break;
         case 'type':
           setProductType(s);
-          if (isGenderDrivenCategory(categoryKey)) {
+          if (isGenderCategory) {
             setSubCategory(s);
           }
           break;
@@ -833,7 +907,7 @@ export default function VendorCreateProductScreen() {
           break;
       }
     },
-    [picker, colorByValue, variantFields, categoryKey],
+    [picker, colorByValue, variantFields, categoryKey, isGenderCategory],
   );
 
   const optionPickerProps = useMemo(() => {
@@ -978,6 +1052,11 @@ export default function VendorCreateProductScreen() {
         'Complete the form',
         'Each saved variant must have a valid price greater than 0.',
       );
+      return;
+    }
+    const listIssue = variantListIssue(savedVariants);
+    if (listIssue) {
+      Alert.alert('Complete the form', listIssue);
       return;
     }
     // if (!isPriceValid) {
@@ -1468,7 +1547,13 @@ export default function VendorCreateProductScreen() {
                     </View>
                   </View>
                   <View style={styles.savedVariantGrid}>
-                    {chunkArray(variant.details, 4).map((row, rowIndex) => (
+                    {chunkArray(
+                      variant.details.filter(detail => {
+                        const label = String(detail?.label ?? '').trim().toLowerCase();
+                        return label !== 'shoe size' && label !== 'shoe sizes';
+                      }),
+                      4,
+                    ).map((row, rowIndex) => (
                       <View
                         style={styles.savedVariantGridRow}
                         key={`${variant.id}-row-${rowIndex}`}

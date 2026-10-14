@@ -4,6 +4,7 @@ import React, { useCallback, useEffect } from 'react';
 import RootNavigator from './authentication';
 import {
   Alert,
+  AppState,
   Linking,
   SafeAreaView,
   StatusBar,
@@ -69,8 +70,12 @@ function NavigationTree() {
   }, [handleOAuthUrl]);
 
   useEffect(() => {
-    if (status !== 'signedIn') return;
-    connectChatSocket();
+    if (status !== 'signedIn') return undefined;
+    connectChatSocket().catch(() => {});
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') connectChatSocket().catch(() => {});
+    });
+    return () => sub.remove();
   }, [status]);
 
   useEffect(() => {
@@ -130,7 +135,8 @@ function NavigationTree() {
             "Activities",
             "Cart",
             "Catalog",
-            "Profile"
+            "Profile",
+            "Explore"
             // 'home',
             // 'profile-main',
             // 'chat-list',

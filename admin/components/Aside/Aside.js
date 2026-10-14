@@ -6,6 +6,7 @@ import "./style.css";
 const menuItems = [
     { label: "Home", svg: "", countKey: null },
     { label: "Users", svg: "", countKey: "users" },
+    { label: "Vendor Activation", svg: "", countKey: null },
     { label: "Products", svg: "", countKey: "products" },
     { label: "Inventory", svg: "", countKey: "inventory" },
     { label: "Shops", svg: "", countKey: "shops" },
@@ -60,14 +61,10 @@ export default function Aside({ activePage, onSelect }) {
                         <button
                             type="button"
                             className="aside-link"
+                            aria-current={activePage === menu.label ? 'page' : undefined}
                             onClick={() => onSelect(menu.label)}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                    onSelect(menu.label)
-                                }
-                            }}
                         >
-                            <span className="aside-icon">{menu.svg || menu.label.charAt(0)}</span>
+                            <span className="aside-icon" aria-hidden="true">{menu.svg || menu.label.charAt(0)}</span>
                             <span>{menu.label}</span>
                             {menu.countKey ? (
                                 <span className="aside-count">

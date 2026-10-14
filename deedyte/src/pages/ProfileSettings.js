@@ -405,22 +405,39 @@ export default function ProfileSettings() {
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Categories</Text>
             <Text style={styles.sheetSub}>Select every category this shop sells.</Text>
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={styles.sheetScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+            >
               {categoryOptions.map(opt => {
                 const selected = categories.includes(opt.value);
                 return (
                   <Pressable
                     key={opt.value}
                     style={[styles.pickerItem, selected && styles.pickerItemSelected]}
-                    onPress={() =>
+                    onPress={() => {
+                      if (!selected && categories.length >= 3) {
+                        Alert.alert(
+                          'Category limit',
+                          'A shop can have at most 3 categories. Remove one before adding another.',
+                        );
+                        return;
+                      }
                       setCategories(current =>
                         selected
                           ? current.filter(item => item !== opt.value)
                           : [...current, opt.value],
-                      )
-                    }
+                      );
+                    }}
                   >
-                    <Text style={styles.pickerItemText}>{opt.label}</Text>
+                    <View style={styles.pickerItemCopy}>
+                      <Text style={styles.pickerItemText}>{opt.label}</Text>
+                      {opt.productTypes ? (
+                        <Text style={styles.pickerItemHint}>{opt.productTypes}</Text>
+                      ) : null}
+                    </View>
                     {selected ? <Icon name="checkmark-circle" size={22} color={BRAND} /> : null}
                   </Pressable>
                 );
@@ -576,6 +593,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
   },
+  sheetScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    maxHeight: 460,
+  },
   sheetHandle: {
     width: 40,
     height: 4,
@@ -643,20 +665,26 @@ const styles = StyleSheet.create({
   },
   pickerItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E4E4E7',
+    gap: 12,
   },
   pickerItemSelected: {
     backgroundColor: '#F3FAF7',
   },
+  pickerItemCopy: { flex: 1 },
   pickerItemText: {
     fontSize: 15,
     color: '#222222',
-    flex: 1,
-    paddingRight: 12,
+  },
+  pickerItemHint: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#6B7280',
   },
   dropdown: {
     minHeight: 46,

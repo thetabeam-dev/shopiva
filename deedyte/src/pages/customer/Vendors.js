@@ -26,27 +26,13 @@ import {
 } from '../../api';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { extractCustomerPolicySections } from '../../utils/shopPoliciesForCustomer';
 import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
-import { useSelector } from 'react-redux';
-import {
-  selectCategoriesError,
-  selectCategoriesLoading,
-  selectCategoryKeys,
-  selectCategoryRows,
-} from '../../../redux/categoriesSlice';
-
 const ALL_CATEGORY = '__all__';
 
 const WINDOW_W = Dimensions.get('window').width;
 const WINDOW_H = Dimensions.get('window').height;
-
-function formatCategoryLabel(category) {
-  return String(category ?? '')
-    .split(' ')
-    .map(word => word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}` : word)
-    .join(' ');
-}
 
 /** @type {readonly string[]} Nigeria states + FCT (canonical labels). */
 const NG_STATES = Object.freeze([
@@ -403,21 +389,7 @@ function VendorCard({
                   });
                 }}
               >
-                {p.uri ? (
-                  <Image
-                    source={{ uri: p.uri }}
-                    style={styles.productImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={[styles.productImage, styles.productImagePh]}>
-                    <Icon
-                      name="image-outline"
-                      size={28}
-                      color={isDark ? '#00897B' : '#999'}
-                    />
-                  </View>
-                )}
+                <ProductCardMedia uri={p.uri} style={styles.productImage} />
                 <View
                   style={[styles.priceBadge, { backgroundColor: t.priceBadge }]}
                 >
@@ -579,23 +551,8 @@ function VendorLocationSheet({
  * @param {{ route: import('@react-navigation/native').RouteProp<Record<string, object | undefined>, 'vendors'>; navigation: import('@react-navigation/native').NativeStackNavigationProp<Record<string, object | undefined>, 'vendors'> }} props
  */
 export default function VendorScreen({ route, navigation }) {
-  const routeCategory = String(route.params?.category ?? '').trim().toLowerCase();
-  const categoryRows = useSelector(selectCategoryRows);
-  const categories = useSelector(selectCategoryKeys);
-  const categoriesLoading = useSelector(selectCategoriesLoading);
-  const categoriesError = useSelector(selectCategoriesError) ?? '';
-  const visibleCategories = useMemo(
-    () => [
-      ALL_CATEGORY,
-      ...categoryRows
-        .filter(row => Number(row?.existingProductCount ?? 0) > 0)
-        .map(row => String(row?.category ?? '').trim().toLowerCase())
-        .filter(Boolean),
-    ],
-    [categoryRows],
-  );
-  const [selectedCategory, setSelectedCategory] = useState(routeCategory || ALL_CATEGORY);
-  const category = selectedCategory;
+  const category = ALL_CATEGORY;
+  const [searchQuery, setSearchQuery] = useState('');
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -628,25 +585,6 @@ export default function VendorScreen({ route, navigation }) {
   const [vendorDeliveryMethod, setVendorDeliveryMethod] = useState(
     /** @type {{ title?: string; description?: string } | undefined} */ (undefined),
   );
-
-  useEffect(() => {
-    if (!visibleCategories.length) {
-      setSelectedCategory('');
-      return;
-    }
-
-    setSelectedCategory((current) => {
-      const currentKey = String(current ?? '').trim().toLowerCase();
-      if (currentKey === ALL_CATEGORY) return ALL_CATEGORY;
-      if (currentKey) {
-        const existing = visibleCategories.find((option) => option === currentKey);
-        if (existing) return existing;
-      }
-
-      const routeMatch = visibleCategories.find((option) => option === routeCategory);
-      return routeMatch ?? ALL_CATEGORY;
-    });
-  }, [routeCategory, visibleCategories]);
 
   const loadVendors = useCallback(async (isRefresh) => {
     const requestId = vendorRequestId.current + 1;
@@ -979,43 +917,39 @@ export default function VendorScreen({ route, navigation }) {
   }, []);
 
   const displayedVendors = useMemo(() => {
-    if (locationFilter == null) return vendors;
-    return vendors.filter(
-      v => normalizeVendorState(vendorStateRaw(v)) === locationFilter,
-    );
-  }, [vendors, locationFilter]);
+    const query = searchQuery.trim().toLowerCase();
+    return vendors.filter(v => {
+      if (locationFilter != null && normalizeVendorState(vendorStateRaw(v)) !== locationFilter) {
+        return false;
+      }
+      if (!query) return true;
+      const name = String(v?.name ?? '').toLowerCase();
+      const city = String(v?.city ?? v?.location?.city ?? '').toLowerCase();
+      return name.includes(query) || city.includes(query);
+    });
+  }, [vendors, locationFilter, searchQuery]);
 
   const handleSelectLocation = useCallback(stateName => {
     setLocationFilter(stateName);
     setFilterVisible(false);
   }, []);
 
-  const categorySlider = (
-    <View style={styles.categorySliderSection}>
-      <FlatList
-        horizontal
-        data={visibleCategories}
-        keyExtractor={item => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categorySliderContent}
-        renderItem={({ item }) => {
-          const selected = item === selectedCategory;
-          return (
-            <TouchableOpacity
-              style={[styles.categoryChip, selected && styles.categoryChipSelected]}
-              onPress={() => setSelectedCategory(item)}
-              activeOpacity={0.82}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`Show ${item === ALL_CATEGORY ? 'all' : formatCategoryLabel(item)} shops`}
-            >
-              <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
-                {item === ALL_CATEGORY ? 'All' : formatCategoryLabel(item)}
-              </Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
+  const searchBar = (
+    <View style={styles.searchSection}>
+      <View style={styles.searchField}>
+        <Icon name="search-outline" size={18} color="#8A8A8A" />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search shops"
+          placeholderTextColor="#8A8A8A"
+          style={styles.searchInput}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+      </View>
     </View>
   );
 
@@ -1032,8 +966,7 @@ export default function VendorScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.flexFill}>
-        {categorySlider}
-        {categoriesError ? <Text style={styles.error}>{categoriesError}</Text> : null}
+        {searchBar}
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#00926e" />
           <Text style={styles.muted}>Loading vendors…</Text>
@@ -1048,8 +981,7 @@ export default function VendorScreen({ route, navigation }) {
   if (error) {
     return (
       <View style={styles.flexFill}>
-        {categorySlider}
-        {categoriesError ? <Text style={styles.error}>{categoriesError}</Text> : null}
+        {searchBar}
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>
         </View>
@@ -1062,9 +994,7 @@ export default function VendorScreen({ route, navigation }) {
 
   return (
     <View style={styles.flexFill}>
-      {categorySlider}
-      {categoriesLoading ? <ActivityIndicator color="#00926e" /> : null}
-      {categoriesError ? <Text style={styles.error}>{categoriesError}</Text> : null}
+      {searchBar}
       <View style={styles.screen}>
         <FlatList
           data={displayedVendors}
@@ -1082,9 +1012,11 @@ export default function VendorScreen({ route, navigation }) {
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListEmptyComponent={
             <Text style={styles.muted}>
-              {locationFilter
-                ? `No vendors in ${locationFilter} for this category.`
-                : 'No vendors found for this category.'}
+              {searchQuery.trim()
+                ? `No shops match “${searchQuery.trim()}”.`
+                : locationFilter
+                  ? `No vendors in ${locationFilter}.`
+                  : 'No vendors found.'}
             </Text>
           }
         />
@@ -1104,6 +1036,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#EFEFEF',
     paddingTop: 20,
+  },
+  searchSection: {
+    backgroundColor: '#EFEFEF',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E1E3E6',
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#202124',
+    paddingVertical: 0,
   },
   categorySliderSection: {
     backgroundColor: '#EFEFEF',

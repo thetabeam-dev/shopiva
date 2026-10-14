@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import './style.css'
 
-const ROLES = ["All", "admin", "support", "manager"]
+const ROLES = ["All", "customer", "entrepreneur"]
 const OSS = ["All", "Windows", "macOS", "Linux"]
 
 export default function Users() {
@@ -11,42 +11,46 @@ export default function Users() {
   const [selectedOs, setSelectedOs] = useState('All')
   const [filterEmail, setFilterEmail] = useState('')
   const [filterPhone, setFilterPhone] = useState('')
+  const [createdWithinDays, setCreatedWithinDays] = useState('')
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     let isMounted = true;
     const fetchUsers = async () => {
       setLoading(true)
+      setError('')
       const params = new URLSearchParams()
       if (selectedRole && selectedRole !== 'All') params.set('role', selectedRole)
       if (selectedOs && selectedOs !== 'All') params.set('os', selectedOs)
       if (filterEmail) params.set('email', filterEmail)
       if (filterPhone) params.set('phone', filterPhone)
+      if (createdWithinDays) params.set('createdWithinDays', createdWithinDays)
       try {
         const res = await fetch(`/api/users?${params.toString()}`)
         const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || 'Unable to load users.')
         if (isMounted && Array.isArray(json.users)) setUsers(json.users)
       } catch (err) {
-        console.error(err)
+        if (isMounted) setError(err.message || 'Unable to load users.')
       } finally {
         if (isMounted) setLoading(false)
       }
     }
     fetchUsers()
     return () => { isMounted = false }
-  }, [selectedRole, selectedOs, filterEmail, filterPhone])
-
-  const filteredUsers = useMemo(() => users, [users])
+  }, [selectedRole, selectedOs, filterEmail, filterPhone, createdWithinDays])
 
   return (
     <section className="users-page">
       <div className="users-summary">
         <div>
+          <span className="section-kicker">PEOPLE</span>
           <h1>Registered users</h1>
           <p>Filter users by role and operating system to review active accounts and system usage.</p>
         </div>
-        <div className="users-count">Total registered users: <strong>{users.length}</strong></div>
+        <div className="users-count"><strong>{users.length}</strong><span>users found</span></div>
       </div>
 
       <div className="users-filters">
@@ -74,14 +78,38 @@ export default function Users() {
           <label htmlFor="phone-filter">Phone</label>
           <input id="phone-filter" type="text" placeholder="Filter by phone" value={filterPhone} onChange={(e) => setFilterPhone(e.target.value)} />
         </div>
+        <div>
+          <label htmlFor="created-within-filter">Registration date</label>
+          <select id="created-within-filter" value={createdWithinDays} onChange={(event) => setCreatedWithinDays(event.target.value)}>
+            <option value="">Any time</option>
+            <option value="30">Last 30 days</option>
+            <option value="7">Last 7 days</option>
+            <option value="2">Last 2 days</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          className="filter-reset-button"
+          onClick={() => {
+            setSelectedRole('All')
+            setSelectedOs('All')
+            setFilterEmail('')
+            setFilterPhone('')
+            setCreatedWithinDays('')
+          }}
+        >
+          Clear filters
+        </button>
       </div>
+
+      {error && <div className="resource-alert" role="alert">{error}</div>}
 
       <div className="users-table-card">
         <div className="users-table-header">
-          <span>{loading ? 'Loading…' : `${filteredUsers.length} users shown`}</span>
+          <span aria-live="polite">{loading ? 'Loading users…' : `${users.length} users shown`}</span>
           <span>{selectedRole !== 'All' ? `${selectedRole} role selected` : 'All roles'}</span>
         </div>
-        <table className="users-table">
+        <table className="users-table" aria-busy={loading}>
           <thead>
             <tr>
               <th>Name</th>
@@ -92,7 +120,7 @@ export default function Users() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {users.map((user) => (
               <tr key={user.id}>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
@@ -101,7 +129,7 @@ export default function Users() {
                 <td>{user.phone || ''}</td>
               </tr>
             ))}
-            {filteredUsers.length === 0 && !loading && (
+            {users.length === 0 && !loading && (
               <tr>
                 <td colSpan="5" className="empty-row">No users match the selected filters.</td>
               </tr>

@@ -56,6 +56,7 @@ export default function AuthSignupPage() {
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
+  const [whatsappMarketingConsent, setWhatsappMarketingConsent] = useState(false);
   const [provider, setProvider] = useState("local");
   const [duplicateErr, setDuplicateErr] = useState("");
 
@@ -68,6 +69,8 @@ export default function AuthSignupPage() {
     if (typeof window === "undefined" || window.sessionStorage?.getItem("auth_oauth_pending") !== "true") return;
 
     window.sessionStorage.removeItem("auth_oauth_pending");
+    const acceptedWhatsAppMarketing = window.sessionStorage.getItem("whatsapp_marketing_consent") === "true";
+    window.sessionStorage.removeItem("whatsapp_marketing_consent");
 
     const nameParts = (session.data?.user?.name || "").split(" ");
     fetch(REGISTRATION_ENDPOINT, {
@@ -85,6 +88,7 @@ export default function AuthSignupPage() {
         deviceId: "null",
         deviceToken: "fcm-token",
         provider: session.data?.provider,
+        whatsappMarketingConsent: acceptedWhatsAppMarketing,
       }),
     })
       .then(async (result) => {
@@ -182,6 +186,7 @@ export default function AuthSignupPage() {
           role,
           src: "web",
           provider,
+          whatsappMarketingConsent,
         }),
       })
         .then(async (result) => {
@@ -216,13 +221,13 @@ export default function AuthSignupPage() {
             Sign up as {role === ROLES.entrepreneur ? "Entrepreneur" : "Customer"}
           </p>
           <div style={{ display: "flex", width: "auto", gap: "10px", marginTop: 12 }}>
-            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("auth_oauth_pending", "true"); setProvider("google"); signIn("google", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
+            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("whatsapp_marketing_consent", String(whatsappMarketingConsent)); sessionStorage.setItem("auth_oauth_pending", "true"); setProvider("google"); signIn("google", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
               <span><img src={gg_svg.src} style={{ height: "20px", width: "20px" }} alt="Google" /></span>
             </button>
-            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("auth_oauth_pending", "true"); setProvider("apple"); signIn("apple", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
+            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("whatsapp_marketing_consent", String(whatsappMarketingConsent)); sessionStorage.setItem("auth_oauth_pending", "true"); setProvider("apple"); signIn("apple", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
               <span><img src={a_svg.src} style={{ height: "25px", width: "25px" }} alt="Apple" /></span>
             </button>
-            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("auth_oauth_pending", "true"); setProvider("facebook"); signIn("facebook", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
+            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("whatsapp_marketing_consent", String(whatsappMarketingConsent)); sessionStorage.setItem("auth_oauth_pending", "true"); setProvider("facebook"); signIn("facebook", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
               <span><img src={fb_svg.src} style={{ height: "20px", width: "20px" }} alt="Facebook" /></span>
             </button>
           </div>
@@ -253,6 +258,15 @@ export default function AuthSignupPage() {
               <label htmlFor="confirm-password">Confirm Password</label>
               <input style={{ color: "#000", width: "100%" }} onInput={(e) => setConfirmPwd(e.target.value)} type="password" placeholder="Confirm Password" name="confirm-password" id="confirm-password" />
             </div>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "9px", marginTop: "12px", fontSize: "13px", lineHeight: 1.4 }}>
+              <input
+                type="checkbox"
+                checked={whatsappMarketingConsent}
+                onChange={(event) => setWhatsappMarketingConsent(event.target.checked)}
+                style={{ marginTop: "2px" }}
+              />
+              <span>I agree to receive DeeDyte product setup messages on WhatsApp. I can opt out at any time.</span>
+            </label>
             <div className="input-cnt" style={{ marginTop: "20px" }}>
               <button style={{ borderRadius: "8px" }} onClick={(e) => { setProvider("local"); handleRegistration(e); }}>Register</button>
             </div>

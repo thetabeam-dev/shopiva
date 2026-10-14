@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { getStoredAccessToken, getStoredActiveRole } from '../auth/session';
+import { notifyUnauthorized } from '../auth/unauthorized';
 import { getApiBaseUrl } from '../api/config';
 import store from '../../redux/store';
 import { set_orderInfo } from '../../redux/order';
@@ -353,7 +354,16 @@ export async function connectChatSocket() {
       socketSingleton = io(getApiBaseUrl(), {
         autoConnect: false,
         transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
         auth: { token },
+      });
+      socketSingleton.on('connect_error', (error) => {
+        const message = String(error?.message ?? '');
+        if (/unauthorized|invalid or missing token|jwt expired/i.test(message)) {
+          socketSingleton?.disconnect();
+          notifyUnauthorized();
+        }
       });
     } else {
       socketSingleton.auth = { token };

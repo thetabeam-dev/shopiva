@@ -114,6 +114,7 @@ export default function ProductScreen({ route, navigation }) {
   const [selectedAttrs, setSelectedAttrs] = useState(
     /** @type {Record<string, string | null>} */({}),
   );
+  const [pickedVariantId, setPickedVariantId] = useState(/** @type {string | null} */ (null));
   /** Cart line for the currently selected inventory row (if any). */
   const [cartLineForSelection, setCartLineForSelection] = useState(
     /** @type {{ cartItemId: number; qty: number } | null} */(null),
@@ -230,7 +231,7 @@ export default function ProductScreen({ route, navigation }) {
         attributes: { option: `Option ${i + 1}` },
       }));
     /** Coerce attribute values to strings so chip labels and equality checks match API numbers/objects. */
-    return base.map(v => {
+    return base.map((v, index) => {
       if (!v || typeof v !== 'object') return v;
       const raw =
         v.attributes && typeof v.attributes === 'object'
@@ -240,7 +241,11 @@ export default function ProductScreen({ route, navigation }) {
       for (const k of Object.keys(raw)) {
         attributes[k] = String(raw[k] ?? '').trim();
       }
-      return { ...v, attributes };
+      return {
+        ...v,
+        attributes,
+        optionKey: `${String(v.id ?? 'variant')}-${index}`,
+      };
     });
   }, [variants]);
 
@@ -267,15 +272,31 @@ export default function ProductScreen({ route, navigation }) {
       return;
     }
     const init = /** @type {Record<string, string | null>} */ ({});
-    for (const k of attrKeys) init[k] = null;
+    const only = variantsForUi.length === 1 ? variantsForUi[0] : null;
+    const onlyAttrs =
+      only && only.attributes && typeof only.attributes === 'object' ? only.attributes : null;
+    for (const k of attrKeys) {
+      const raw = onlyAttrs ? onlyAttrs[k] : null;
+      init[k] = raw != null && String(raw).trim() ? String(raw).trim() : null;
+    }
     setSelectedAttrs(init);
     setSelectedVariant(null);
-  }, [productIdParam, hasVariants, attrKeys.join('\u0001')]);
+    setPickedVariantId(null);
+  }, [productIdParam, hasVariants, attrKeys.join('\u0001'), variantsForUi]);
 
   useEffect(() => {
     if (!hasVariants) {
       setSelectedVariant(null);
       return;
+    }
+    if (pickedVariantId) {
+      const picked = variantsForUi.find(
+        variant => String(variant?.optionKey ?? variant?.id ?? '') === pickedVariantId,
+      );
+      if (picked && isVariantPurchasable(/** @type {Record<string, unknown>} */ (picked))) {
+        setSelectedVariant(/** @type {Record<string, unknown>} */ (picked));
+        return;
+      }
     }
     const resolved = resolveVariantSelection(
       variantsForUi,
@@ -283,7 +304,7 @@ export default function ProductScreen({ route, navigation }) {
       selectedAttrs,
     );
     setSelectedVariant(resolved);
-  }, [hasVariants, variantsForUi, attrKeys, selectedAttrs]);
+  }, [hasVariants, variantsForUi, attrKeys, selectedAttrs, pickedVariantId]);
 
   const mergedProduct = useMemo(() => {
     const p = routeProduct || {};
@@ -428,6 +449,9 @@ export default function ProductScreen({ route, navigation }) {
         next[k] = raw != null && String(raw).trim() ? String(raw).trim() : null;
       }
       setSelectedAttrs(next);
+      setPickedVariantId(
+        v.optionKey != null ? String(v.optionKey) : v.id != null ? String(v.id) : null,
+      );
     },
     [attrKeys],
   );
@@ -1117,7 +1141,9 @@ export default function ProductScreen({ route, navigation }) {
           </View>
           {hasVariants && attrKeys.length ? (
             <View style={styles.variantPickersBlock}>
-              <Text style={styles.variantPickersTitle}>Options (variant)</Text>
+              <Text style={styles.variantPickersTitle}>
+                {variantsForUi.length === 1 ? 'Features' : 'Options (variant)'}
+              </Text>
               <ProductVariantCardPicker
                 attrKeys={attrKeys}
                 variants={variantsForUi}
@@ -1232,6 +1258,38 @@ export default function ProductScreen({ route, navigation }) {
             />
           )}
         </TouchableOpacity>
+        {selectedVariant ? (
+          <View style={styles.selectedVariantCard}>
+            <Text style={styles.selectedVariantTitle}>Selected variant</Text>
+            <View style={styles.selectedVariantGrid}>
+              {Object.entries(
+                selectedVariant.attributes && typeof selectedVariant.attributes === 'object'
+                  ? selectedVariant.attributes
+                  : {},
+              )
+                .filter(([, value]) => {
+                  const text = String(value ?? '').trim();
+                  return text && text !== '—' && text !== '-';
+                })
+                .map(([key, value]) => (
+                  <View key={key} style={styles.selectedVariantTile}>
+                    <Text style={styles.selectedVariantLabel}>
+                      {formatAttributeLabel(key).toUpperCase()}
+                    </Text>
+                    <Text style={styles.selectedVariantValue}>{String(value)}</Text>
+                  </View>
+                ))}
+              <View style={styles.selectedVariantTile}>
+                <Text style={styles.selectedVariantLabel}>PRICE</Text>
+                <Text style={styles.selectedVariantValue}>
+                  {Number.isFinite(getVariantRowPrice(selectedVariant))
+                    ? formatNaira(getVariantRowPrice(selectedVariant))
+                    : '—'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
         <Text style={styles.sectionHeading}>Description</Text>
         <Text style={styles.descriptionBody}>
           {typeof product?.description === 'string' &&
@@ -1738,6 +1796,42 @@ const styles = StyleSheet.create({
     color: '#444',
     lineHeight: 22,
     marginBottom: 14,
+  },
+  selectedVariantCard: {
+    backgroundColor: '#F4F4F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#00926E',
+    padding: 12,
+    marginBottom: 16,
+  },
+  selectedVariantTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111111',
+    marginBottom: 10,
+  },
+  selectedVariantGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  selectedVariantTile: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 10,
+  },
+  selectedVariantLabel: {
+    fontSize: 11,
+    color: '#8A8A8A',
+    letterSpacing: 0.4,
+  },
+  selectedVariantValue: {
+    marginTop: 4,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111111',
   },
   visitPill: {
     flexDirection: 'row',

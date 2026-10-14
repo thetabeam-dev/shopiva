@@ -19,24 +19,34 @@ export class model{
     static createUserDoc = withErrorHandling(async (
     payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string }
     ) => {
-        const { role, fname, lname, email, provider, password, src, deviceId, deviceToken } = payload;
+        const { role, fname, lname, email, provider, password, src, deviceId, deviceToken, whatsappMarketingConsent } = payload;
         const pool = await db();
+        const notificationPreferences = {
+            email: { enabled: true, marketing: false, updates: true },
+            sms: { enabled: true, critical: true },
+            push: { enabled: true, marketing: false },
+            whatsapp: {
+                enabled: true,
+                marketing: whatsappMarketingConsent === true,
+                marketingConsentAt: whatsappMarketingConsent === true ? new Date().toISOString() : null,
+            },
+        };
 
         if (src === "web") {
             const { rows } = await pool.query(
-                `INSERT INTO users (role, fname, lname, email, provider, password, createdAt)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `INSERT INTO users (role, fname, lname, email, provider, password, createdAt, notificationPreferences)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                  RETURNING *`,
-                [role, fname, lname, email, provider, password, new Date()]
+                [role, fname, lname, email, provider, password, new Date(), JSON.stringify(notificationPreferences)]
             );
             return rows[0];
         }
 
         const { rows } = await pool.query(
-            `INSERT INTO users (role, fname, lname, email, provider, password, createdAt, deviceId)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `INSERT INTO users (role, fname, lname, email, provider, password, createdAt, deviceId, notificationPreferences)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING *`,
-            [role, fname, lname, email, provider, password, new Date(), deviceId]
+            [role, fname, lname, email, provider, password, new Date(), deviceId, JSON.stringify(notificationPreferences)]
         );
         return rows[0];
     });
@@ -65,7 +75,7 @@ export class model{
         return rows[0].count;
     })
 
-    static countPhone = withErrorHandling(async (phone: number) => {
+    static countPhone = withErrorHandling(async (phone: string | number) => {
         const { rows } = await (await db()).query(
             `SELECT COUNT(*) AS count FROM users WHERE phone = $1`,
             [phone]

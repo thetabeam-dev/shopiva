@@ -14,6 +14,14 @@ export function isGenderDrivenCategory(categoryKey) {
   return GENDER_DRIVEN_CATEGORY_KEYS.has(String(categoryKey ?? '').trim().toLowerCase());
 }
 
+/** True when the categories table stores types under male/female, same shape as apparel. */
+export function categoryRowUsesGender(productType) {
+  if (!productType || typeof productType !== 'object') return false;
+  return ['male', 'female'].some(
+    key => Array.isArray(productType[key]) && productType[key].length > 0,
+  );
+}
+
 export function getGenderDrivenTypeOptions(categoryKey, gender) {
   const key = String(categoryKey ?? '').trim().toLowerCase();
   const normalizedGender = String(gender ?? '').trim().toLowerCase();

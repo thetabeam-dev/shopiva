@@ -129,6 +129,10 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
             res.status(400).json({ success: false, error: "Select at least one category." });
             return;
         }
+        if (categories.length > 3) {
+            res.status(400).json({ success: false, error: "A shop can have at most 3 categories." });
+            return;
+        }
         const existingName = await GetShopByNameService(nameStr);
         if (existingName?.length > 0) {
             res.status(409).json({ success: false, error: "A shop with this name already exists. Please choose another name." });
@@ -267,6 +271,10 @@ export async function UpdateShopController(req: Request, res: Response) {
         const categories = category == null ? category : normalizeShopCategories(category);
         if (Array.isArray(categories) && categories.length === 0) {
             res.status(400).json({ error: "Select at least one category." });
+            return;
+        }
+        if (Array.isArray(categories) && categories.length > 3) {
+            res.status(400).json({ error: "A shop can have at most 3 categories." });
             return;
         }
 

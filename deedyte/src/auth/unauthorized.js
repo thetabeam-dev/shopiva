@@ -15,9 +15,16 @@ export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn;
 }
 
+let signingOut = false;
+
 export function notifyUnauthorized() {
-  if (suppress401) return;
+  if (suppress401 || signingOut) return;
   const fn = onUnauthorized;
   if (!fn) return;
-  void Promise.resolve(fn()).catch(() => {});
+  signingOut = true;
+  void Promise.resolve(fn())
+    .catch(() => {})
+    .finally(() => {
+      signingOut = false;
+    });
 }

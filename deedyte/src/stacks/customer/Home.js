@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import HomeScreen from "../../pages/customer/Home";
-import VendorsScreen from "../../pages/customer/Vendors";
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
 import CartScreen from '../../pages/customer/Cart';
@@ -48,29 +47,6 @@ const homeOpt = (styles) => ({
   // ),
   
 });
-const vendorsOpt = (navigation) => ({
-  title: 'Home',
-  headerRight: () => (
-    <View style={styles.vendorsHeaderRight}>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Select location"
-        onPress={() =>
-          navigation.setParams({ openVendorFilter: Date.now() })
-        }
-        style={styles.vendorsHeaderFilter}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Icon name="location-outline" size={22} color="#000000" />
-      </TouchableOpacity>
-
-      <NotificationBell
-        onPress={() => navigation.navigate('Notifications')}
-        style={styles.vendorsHeaderFilter}
-      />
-    </View>
-  ),
-})
 const vendorOpt={
   header: () => (
     <View style={styles.hiddenHeader} />
@@ -106,21 +82,19 @@ const payFailedOpt = {
   headerStyle: { backgroundColor: '#FFFFFF' },
 }
 export function HomeStackScreen() {
-  // const { user } = useSelector(s => s?.user ?? {});
-  // const dispatch = useDispatch();
   return (
     <HomeStack.Navigator>
       <HomeStack.Screen
         name="Home"
-        component={VendorsScreen}
-        options={({ navigation }) => vendorsOpt(navigation)}
+        component={HomeScreen}
+        options={{ headerShown: false }}
       />
       <HomeStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
-      <HomeStack.Screen name="Product" component={ProductScreen} options={{   headerShown: false, }} />
-      <HomeStack.Screen name="Cart" component={CartScreen} options={cartOpt}/>
-      <HomeStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt}/>
-      <HomeStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt}/>
-      <HomeStack.Screen name="Payment-failed" component={PaymentFailedScreen} options={payFailedOpt}/>
+      <HomeStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />
+      <HomeStack.Screen name="Cart" component={CartScreen} options={cartOpt} />
+      <HomeStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt} />
+      <HomeStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt} />
+      <HomeStack.Screen name="Payment-failed" component={PaymentFailedScreen} options={payFailedOpt} />
       <HomeStack.Screen
         name="Notifications"
         component={NotificationsScreen}
