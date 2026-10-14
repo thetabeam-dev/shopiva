@@ -14,6 +14,7 @@ export type StorefrontListingProduct = {
   gender: string;
   subCategory: string;
   type: string;
+  category: string;
   /** Variant labels from specifications, lowercased, excluding price and stock. */
   filters: Record<string, string[]>;
 };
@@ -233,6 +234,7 @@ export function buildStorefrontListingProducts(
       gender: f.gender,
       subCategory: f.subCategory,
       type: f.type,
+      category: String(p.category ?? "").trim().toLowerCase(),
       filters: f.filters,
     });
   }

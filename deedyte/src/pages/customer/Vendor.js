@@ -392,7 +392,7 @@ export default function VendorShopScreen({ route, navigation }) {
       >
         <Icon name="cart-outline" size={20} color="#000000" />
       </TouchableOpacity>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={[styles.circleBrown, styles.heroIconGap]}
         onPress={openDeliveryDetails}
         activeOpacity={0.85}
@@ -400,7 +400,7 @@ export default function VendorShopScreen({ route, navigation }) {
         accessibilityLabel="Delivery details"
       >
         <Icon name="car-outline" size={20} color="#000000" />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </>
   );
 

@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSelector, useDispatch } from 'react-redux';
 import { HomeStackScreen } from '../stacks/customer/Home';
+import { ExploreStackScreen } from '../stacks/customer/Explore';
 import { ProfileStackScreen } from '../stacks/customer/Profile';
 import { CartStackScreen } from '../stacks/customer/Cart';
 import { ActivitiesStackScreen } from '../stacks/customer/Activities';
@@ -11,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useUnreadChatTotal } from '../components/UnreadMessageBadge';
 import { listNotifications } from '../api/user';
 import { refreshPendingReviewCount, usePendingReviewCount } from '../hooks/usePendingReviewCount';
+import { set_notifications } from '../../redux/notifications';
 
 const Tab = createBottomTabNavigator();
 
@@ -64,6 +66,8 @@ export default function CustomerTab() {
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'Explore') {
+              iconName = focused ? 'compass' : 'compass-outline';
             } else if (route.name === 'Cart') {
               iconName = focused ? 'cart' : 'cart-outline';
             } else if (route.name === 'Activities') {
@@ -82,6 +86,7 @@ export default function CustomerTab() {
         })}
       >
         <Tab.Screen name="Home" component={HomeStackScreen} />
+        <Tab.Screen name="Explore" component={ExploreStackScreen} />
         {isGuest ? null : (
           <Tab.Screen
             name="Activities"

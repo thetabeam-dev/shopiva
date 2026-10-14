@@ -69,6 +69,29 @@ function normalizeRows(rows) {
   return normalized;
 }
 
+function productTypeLabels(productType) {
+  const names = [];
+  const seen = new Set();
+  const push = (value) => {
+    const text = String(value ?? '').trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) return;
+    seen.add(key);
+    names.push(toCategoryLabel(text));
+  };
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(push);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      Object.values(node).forEach(walk);
+    }
+  };
+  walk(productType);
+  return names.join(', ');
+}
+
 function toMvpCompatibleTree(rows) {
   /** @type {Record<string, Array<Record<string, Record<string, Record<string, never>>>>>} */
   const tree = {};
@@ -107,6 +130,7 @@ export const fetchCategories = createAsyncThunk('categories/fetchAll', async () 
     options: normalizedRows.map((row) => ({
       value: row.category,
       label: toCategoryLabel(row.category),
+      productTypes: productTypeLabels(row.productType),
     })),
   };
 });
@@ -116,7 +140,7 @@ const categoriesSlice = createSlice({
   initialState: {
     /** @type {{ id: number | null; category: string; variants: string[]; productType: Record<string, string[]>; existingProductCount: number }[]} */
     categories: [],
-    /** @type {{ value: string; label: string }[]} */
+    /** @type {{ value: string; label: string; productTypes: string }[]} */
     options: [],
     /** @type {Record<string, Array<Record<string, Record<string, Record<string, never>>>>>} */
     categoryTree: {},

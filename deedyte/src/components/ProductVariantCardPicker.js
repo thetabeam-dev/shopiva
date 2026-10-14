@@ -77,12 +77,21 @@ function VariantCard({ variant, index, attrKeys, selected, disabled, onPress, sh
     >
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{variantTitle(index)}</Text>
+        {selected ? <Icon name="checkmark-circle" size={22} color={PURPLE} /> : null}
       </View>
       <View style={styles.tileGrid}>
-        {attrKeys.map((key) => (
-          <SpecTile key={key} label={formatAttributeLabel(key).toUpperCase()} value={a[key] != null && String(a[key]).trim() ? String(a[key]) : '—'} />
-        ))}
-        {showPrice ? <SpecTile label="PRICE" value={priceLabel} /> : null}
+        {attrKeys.map((key) => {
+          const raw = a[key] != null ? String(a[key]).trim() : '';
+          if (!raw || raw === '—' || raw === '-') return null;
+          return (
+            <SpecTile
+              key={key}
+              label={formatAttributeLabel(key).toUpperCase()}
+              value={raw}
+            />
+          );
+        })}
+        {showPrice && priceLabel !== '—' ? <SpecTile label="PRICE" value={priceLabel} /> : null}
       </View>
     </Pressable>
   );
@@ -97,12 +106,13 @@ function VariantCard({ variant, index, attrKeys, selected, disabled, onPress, sh
  *   onSelect: (variant: Record<string, unknown>) => void;
  * }} props
  */
-function variantMatchesSelection(v, selected, keys) {
+function variantMatchesSelection(v, selected) {
   if (!selected || typeof selected !== 'object' || !v || typeof v !== 'object') return false;
-  if (String(v.id ?? '') !== String(selected.id ?? '')) return false;
-  const va = v.attributes && typeof v.attributes === 'object' ? v.attributes : {};
-  const sa = selected.attributes && typeof selected.attributes === 'object' ? selected.attributes : {};
-  return keys.every((k) => String(va[k] ?? '') === String(sa[k] ?? ''));
+  if (v.optionKey != null && selected.optionKey != null) {
+    return String(v.optionKey) === String(selected.optionKey);
+  }
+  if (v.id != null && selected.id != null) return String(v.id) === String(selected.id);
+  return false;
 }
 
 /**
@@ -181,7 +191,6 @@ export default function ProductVariantCardPicker({ attrKeys, variants, selectedV
                 const selected = variantMatchesSelection(
                   /** @type {Record<string, unknown>} */ (v),
                   /** @type {Record<string, unknown> | null} */ (selectedVariant),
-                  attrKeys,
                 );
                 const purchasable = isVariantPurchasable(/** @type {Record<string, unknown>} */ (v));
                 const id = v && typeof v === 'object' && v.id != null ? String(v.id) : '';

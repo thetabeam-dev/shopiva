@@ -7,10 +7,27 @@ import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 
-function fcmMssg(event: string, shipping_fee?: string) {
+const ESCROW_FEE = 200;
+
+function naira(amount: number) {
+  return amount.toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function fcmMssg(
+  event: string,
+  amounts?: { shipping: number; goods: number },
+  role?: string | null,
+) {
   switch (event) {
-    case "order_acceptance":
-      return `The seller has accepted your order and set the shipping fee at ₦${shipping_fee}. Complete your payment to enable the seller to begin processing your order.`;
+    case "order_acceptance": {
+      const shipping = Number(amounts?.shipping ?? 0);
+      const goods = Number(amounts?.goods ?? 0);
+      const total = shipping + goods + ESCROW_FEE;
+      return `The seller has accepted your order and set the shipping fee at ₦${naira(shipping)}. Your total payable amount is ₦${naira(total)}. Complete your payment to allow the seller to begin processing your order.`;
+    }
 
     case "order_processing":
       return "Your order is being prepared by the seller. We’ll keep you updated on its progress.";
@@ -25,7 +42,10 @@ function fcmMssg(event: string, shipping_fee?: string) {
       return "Your order has been marked as delivered. Please confirm that you have received it.";
 
     case "order_confirmed":
-      return "You’ve confirmed that you received your order. The transaction is now complete.";
+      if (role === "vendor") {
+        return "The buyer has confirmed receipt of your order. Please wait for the buyer to confirm their satisfaction before your payment is released.";
+      }
+      return "Your order has been confirmed as delivered. You have 48 hours to confirm your satisfaction with the order. If you do not respond within this period, the payment will be automatically released to the vendor.";
 
     case "order_disputed":
       return "A dispute has been raised for this order. We’ll review the matter and keep you informed.";
@@ -117,18 +137,23 @@ function emitOrderUpdateToUser(
   const sourceId = Number(orderId);
 
   db().then(async (pool) => {
-    let shipping_fee: string | undefined;
+    let amounts: { shipping: number; goods: number } | undefined;
     if (event === "order_acceptance") {
-      const { rows } = await pool.query<{ shipping_fee: string | number | null }>(
-        `SELECT shipping_fee FROM orders WHERE id = $1`,
+      const { rows } = await pool.query<{
+        shipping_fee: string | number | null;
+        amount_paid: string | number | null;
+      }>(
+        `SELECT shipping_fee, amount_paid FROM orders WHERE id = $1`,
         [orderId],
       );
       const fee = Number(rows[0]?.shipping_fee ?? 0);
-      shipping_fee = Number.isFinite(fee)
-        ? fee.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : "0.00";
+      const goods = Number(rows[0]?.amount_paid ?? 0);
+      amounts = {
+        shipping: Number.isFinite(fee) ? fee : 0,
+        goods: Number.isFinite(goods) ? goods : 0,
+      };
     }
-    const msg = fcmMssg(event, shipping_fee);
+    const msg = fcmMssg(event, amounts, role);
     if (role && Number.isFinite(sourceId) && sourceId > 0) {
       void createAndEmitNotification({
         recipientId: id,
@@ -181,7 +206,9 @@ async function broadcastOrderUpdate(
   const recipientList = listForRole(recipientRole, vendorList, customerList);
 
   emitOrderUpdateToUser(recipient, event, result, recipientList, orderId, actorId, recipientRole);
-  // emitOrderUpdateToUser(actorId, event, result, actorList, orderId);
+  if (event === "order_confirmed") {
+    emitOrderUpdateToUser(actorId, event, result, actorList, orderId, actorId, actor);
+  }
 
   return { result, list: actorList };
 }

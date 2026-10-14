@@ -422,22 +422,39 @@ export default function ShopSetupScreen() {
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Categories</Text>
           <Text style={styles.meta}>Select every category this shop sells.</Text>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={styles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+            nestedScrollEnabled
+          >
             {categoryOptions.map(opt => {
               const selected = categories.includes(opt.value);
               return (
                 <Pressable
                   key={opt.value}
                   style={[styles.pickerItem, selected && styles.pickerItemSelected]}
-                  onPress={() =>
+                  onPress={() => {
+                    if (!selected && categories.length >= 3) {
+                      Alert.alert(
+                        'Category limit',
+                        'A shop can have at most 3 categories. Remove one before adding another.',
+                      );
+                      return;
+                    }
                     setCategories(current =>
                       selected
                         ? current.filter(item => item !== opt.value)
                         : [...current, opt.value],
-                    )
-                  }
+                    );
+                  }}
                 >
-                  <Text style={styles.pickerItemText}>{opt.label}</Text>
+                  <View style={styles.pickerItemCopy}>
+                    <Text style={styles.pickerItemText}>{opt.label}</Text>
+                    {opt.productTypes ? (
+                      <Text style={styles.pickerItemHint}>{opt.productTypes}</Text>
+                    ) : null}
+                  </View>
                   {selected ? (
                     <Icon name="checkmark-circle" size={22} color={BRAND} />
                   ) : null}
@@ -552,7 +569,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 24,
-    maxHeight: '70%',
+    maxHeight: '85%',
+  },
+  modalScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    maxHeight: 460,
   },
   modalTitle: {
     fontSize: 18,
@@ -562,20 +584,26 @@ const styles = StyleSheet.create({
   },
   pickerItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E4E4E7',
+    gap: 12,
   },
   pickerItemSelected: {
     backgroundColor: '#F3FAF7',
   },
+  pickerItemCopy: { flex: 1 },
   pickerItemText: {
     fontSize: 15,
     color: '#222222',
-    flex: 1,
-    paddingRight: 12,
+  },
+  pickerItemHint: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#6B7280',
   },
   dropdownList: {
     borderRadius: 10,

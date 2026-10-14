@@ -108,18 +108,11 @@ function buildDisplayMessage(
 
   return {
     token,
-    notification: {
-      title: safeTitle,
-      body: safeBody,
-    },
     data,
+    // Android draws its own tray entry from a notification payload and drops the color logo.
+    // Title and body travel in `data`; the app displays them with Notifee.
     android: {
       priority: "high" as const,
-      notification: {
-        title: safeTitle,
-        body: safeBody,
-        sound: "default",
-      },
     },
     apns: {
       headers: {

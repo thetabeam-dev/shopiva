@@ -7,7 +7,9 @@ const notificationsSlice = createSlice({
   },
   reducers: {
     set_notifications(state, action) {
-      const incoming = Array.isArray(action.payload) ? action.payload : [];
+      const incoming = Array.isArray(action.payload)
+        ? action.payload.filter(item => item && item.id != null)
+        : [];
       const incomingIds = new Set(incoming.map((item) => item.id));
       const newerLocal = state.items.filter((item) => !incomingIds.has(item.id));
       const merged = [...newerLocal, ...incoming];
