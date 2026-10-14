@@ -341,7 +341,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   return (
     <>
     {
-      Platform.OS === 'andorid' &&
+      Platform.OS === 'android' &&
       <SafeAreaView style={styles.flex} edges={['top', 'left', 'right', 'bottom']}>
         <KeyboardAvoidingView
           style={styles.flex}

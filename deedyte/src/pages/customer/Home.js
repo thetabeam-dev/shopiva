@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -144,7 +145,7 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={{ paddingTop: 10, paddingBottom: 28 }}
+      contentContainerStyle={{ paddingTop: Platform.OS === "ios" ? 10 : 40, paddingBottom: 28 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
