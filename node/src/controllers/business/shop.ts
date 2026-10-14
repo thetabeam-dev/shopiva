@@ -61,6 +61,37 @@ function splitCategoryList(raw: string): string[] {
     return [text];
 }
 
+function normalizeShopLocation(locationPayload: unknown): Record<string, unknown> | null {
+    if (!locationPayload || typeof locationPayload !== "object") return null;
+    const loc = locationPayload as Record<string, unknown>;
+    const text = (value: unknown, max: number) =>
+        typeof value === "string" ? value.trim().slice(0, max) : "";
+    const city = text(loc.city, 255);
+    const state = text(loc.state, 255);
+    const coords = loc.coordinates;
+    let lat: number | null = null;
+    let lng: number | null = null;
+    if (coords && typeof coords === "object") {
+        const pair = coords as { lat?: unknown; lng?: unknown };
+        const parsedLat = typeof pair.lat === "number" ? pair.lat : typeof pair.lat === "string" ? parseFloat(pair.lat) : NaN;
+        const parsedLng = typeof pair.lng === "number" ? pair.lng : typeof pair.lng === "string" ? parseFloat(pair.lng) : NaN;
+        if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+            lat = parsedLat;
+            lng = parsedLng;
+        }
+    }
+    const hasCoords = lat != null && lng != null;
+    if (!hasCoords && !(city && state)) return null;
+    return {
+        address: text(loc.address, 500) || null,
+        city: city || null,
+        state: state || null,
+        country: text(loc.country, 255) || null,
+        zipcode: text(loc.zipcode, 50) || null,
+        ...(hasCoords ? { coordinates: { lat, lng } } : {}),
+    };
+}
+
 function normalizeShopCategories(raw: unknown): string[] {
     const list = Array.isArray(raw)
         ? raw.flatMap(item => splitCategoryList(String(item ?? "")))
@@ -150,21 +181,13 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
             typeof vendorTypeBody === "string" && allowedVendorTypes.includes(vendorTypeBody as typeof allowedVendorTypes[number])
                 ? (vendorTypeBody as typeof allowedVendorTypes[number])
                 : "reseller";
-        let locationJson: Record<string, unknown> | null = null;
-        if (locationPayload != null && typeof locationPayload === "object" && locationPayload.coordinates) {
-            const coords = locationPayload.coordinates as { lat?: number; lng?: number };
-            const lat = typeof coords?.lat === "number" ? coords.lat : typeof coords?.lat === "string" ? parseFloat(coords.lat) : null;
-            const lng = typeof coords?.lng === "number" ? coords.lng : typeof coords?.lng === "string" ? parseFloat(coords.lng) : null;
-            if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-                locationJson = {
-                    address: typeof locationPayload.address === "string" ? locationPayload.address.slice(0, 500) : null,
-                    city: typeof locationPayload.city === "string" ? locationPayload.city.slice(0, 255) : null,
-                    state: typeof locationPayload.state === "string" ? locationPayload.state.slice(0, 255) : null,
-                    country: typeof locationPayload.country === "string" ? locationPayload.country.slice(0, 255) : null,
-                    zipcode: typeof locationPayload.zipcode === "string" ? locationPayload.zipcode.slice(0, 50) : null,
-                    coordinates: { lat, lng },
-                };
-            }
+        const locationJson = normalizeShopLocation(locationPayload);
+        if (!locationJson) {
+            res.status(400).json({
+                success: false,
+                error: "Set your shop location with device location, or enter the city and state.",
+            });
+            return;
         }
         const created = await CreateShopService({
             ownerId: user.id,

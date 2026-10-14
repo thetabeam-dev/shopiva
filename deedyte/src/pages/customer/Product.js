@@ -878,6 +878,65 @@ export default function ProductScreen({ route, navigation }) {
         loading && <Spinner />
       }
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View style={[styles.vendorHeader, { paddingTop: Platform.OS === 'android' ? insets.top : 15 }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerBack}
+          hitSlop={{ top: 8, bottom: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Icon name="chevron-back" size={26} color="#000000" />
+        </TouchableOpacity>
+        <View style={styles.vendorLeft}>
+          <View style={styles.vendorAvatar}>
+            {String(vendor?.logo ?? '').trim() ? (
+              <Image
+                source={{ uri: String(vendor.logo).trim() }}
+                style={styles.vendorAvatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.vendorAvatarLetter}>
+                {shopName.charAt(0).toUpperCase()}
+              </Text>
+            )}
+          </View>
+          <View style={styles.vendorTextCol}>
+            <Text style={styles.vendorName} numberOfLines={1}>
+              {shopName}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={[styles.headerCartHit, !loggedIn && styles.headerLoginHit]}
+          onPress={() => {
+            if (loggedIn) {
+              navigation.navigate('Cart');
+            } else {
+              void signOut();
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={loggedIn ? 'Open cart' : 'Login'}
+        >
+          {loggedIn ? (
+            <Icon name="cart-outline" size={24} color="#000000" />
+          ) : (
+            <Text style={styles.headerLoginText}>Login</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.moreHit}
+          onPress={() => setOverflowMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Product options"
+        >
+          <Icon name="ellipsis-vertical" size={22} color="#000000" />
+        </TouchableOpacity>
+      </View>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -896,65 +955,6 @@ export default function ProductScreen({ route, navigation }) {
           ) : undefined
         }
       >
-        <View style={[styles.vendorHeader, { paddingTop: Platform.OS === 'android' ? insets.top : 15 }]}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.headerBack}
-            hitSlop={{ top: 8, bottom: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Icon name="chevron-back" size={26} color="#000000" />
-          </TouchableOpacity>
-          <View style={styles.vendorLeft}>
-            <View style={styles.vendorAvatar}>
-              {String(vendor?.logo ?? '').trim() ? (
-                <Image
-                  source={{ uri: String(vendor.logo).trim() }}
-                  style={styles.vendorAvatarImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text style={styles.vendorAvatarLetter}>
-                  {shopName.charAt(0).toUpperCase()}
-                </Text>
-              )}
-            </View>
-            <View style={styles.vendorTextCol}>
-              <Text style={styles.vendorName} numberOfLines={1}>
-                {shopName}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={[styles.headerCartHit, !loggedIn && styles.headerLoginHit]}
-            onPress={() => {
-              if (loggedIn) {
-                navigation.navigate('Cart');
-              } else {
-                void signOut();
-              }
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={loggedIn ? 'Open cart' : 'Login'}
-          >
-            {loggedIn ? (
-              <Icon name="cart-outline" size={24} color="#000000" />
-            ) : (
-              <Text style={styles.headerLoginText}>Login</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={styles.moreHit}
-            onPress={() => setOverflowMenuOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Product options"
-          >
-            <Icon name="ellipsis-vertical" size={22} color="#000000" />
-          </TouchableOpacity>
-        </View>
         {!d && !detailLoading && detailError.trim() ? (
           <View
             style={styles.detailFailBanner}
@@ -1407,7 +1407,10 @@ const styles = StyleSheet.create({
   vendorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: PAD,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+    zIndex: 2,
   },
   headerBack: {
     width: 40,

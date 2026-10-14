@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../context/ProfileContext';
-import { createVendorShop, hasVendorShop } from '../api/shop';
+import { createVendorShop, fetchOwnerShops, hasVendorShop, updateVendorShop } from '../api/shop';
 import { updateUserRole } from '../api/user';
 import {
   getCurrentCoordinates,
@@ -28,6 +28,7 @@ import {
 } from '../utils/deviceLocation';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
+import { shopLocationReady, shopRecordHasLocation } from '../utils/shopLocation';
 import {
   selectCategoriesError,
   selectCategoriesLoading,
@@ -54,6 +55,7 @@ export default function ProfileSettings() {
   const vendorMode = activeRole === 'vendor';
   const [switchBusy, setSwitchBusy] = useState(false);
   const [setupVisible, setSetupVisible] = useState(false);
+  const [existingShopId, setExistingShopId] = useState(/** @type {number | null} */ (null));
   const [shopName, setShopName] = useState('');
   const [vendorType, setVendorType] = useState(/** @type {'reseller' | 'dropshipper' | 'manufacturer'} */ ('reseller'));
   const categoryOptions = useSelector(selectCategoryOptions);
@@ -73,7 +75,7 @@ export default function ProfileSettings() {
     if (coords) {
       return `Using device coordinates: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`;
     }
-    return 'No device coordinates yet. You can still type location manually.';
+    return 'Location is required. Allow device location, or enter the city and state.';
   }, [coords]);
 
   const onAuthAction = () => {
@@ -92,6 +94,30 @@ export default function ProfileSettings() {
       },
     ]);
   };
+
+  useEffect(() => {
+    if (!setupVisible || coords) return;
+    let cancelled = false;
+    (async () => {
+      const granted = await requestLocationPermission();
+      if (!granted) {
+        Alert.alert(
+          'Shop location',
+          'Allow location to set your shop, or enter the city and state below.',
+        );
+        return;
+      }
+      try {
+        const c = await getCurrentCoordinates();
+        if (!cancelled) setCoords(c);
+      } catch {
+        /* manual entry remains available */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setupVisible, coords]);
 
   const onUseMyLocation = async () => {
     setLocating(true);
@@ -139,9 +165,20 @@ export default function ProfileSettings() {
     try {
       const hasShop = await hasVendorShop();
       if (hasShop) {
-        await setActiveRole('vendor');
+        const uid = Number(user?.id);
+        const shops = Number.isFinite(uid) ? await fetchOwnerShops(uid).catch(() => []) : [];
+        const shop = Array.isArray(shops) ? shops[0] : null;
+        if (shop && shopRecordHasLocation(shop)) {
+          await setActiveRole('vendor');
+          return;
+        }
+        const shopId = Number(shop?.id ?? shop?.shop_id);
+        setExistingShopId(Number.isFinite(shopId) && shopId > 0 ? shopId : null);
+        if (shop?.name) setShopName(String(shop.name));
+        setSetupVisible(true);
         return;
       }
+      setExistingShopId(null);
       setSetupVisible(true);
     } catch (e) {
       Alert.alert('Vendor setup', e instanceof Error ? e.message : String(e));
@@ -152,45 +189,44 @@ export default function ProfileSettings() {
 
   const onCompleteVendorSetup = async () => {
     const name = shopName.trim();
-    if (name.length < 2) {
+    if (!existingShopId && name.length < 2) {
       Alert.alert('Shop name', 'Enter a valid shop name.');
       return;
     }
-    if (!categories.length) {
+    if (!existingShopId && !categories.length) {
       Alert.alert('Category', 'Select at least one shop category.');
       return;
     }
-    const hasTypedLocation =
-      address.trim().length > 0 ||
-      city.trim().length > 0 ||
-      stateName.trim().length > 0 ||
-      country.trim().length > 0 ||
-      zipcode.trim().length > 0;
-    if (!coords && !hasTypedLocation) {
-      Alert.alert('Location', 'Use device location or enter your location details manually.');
+    if (!shopLocationReady(coords, city, stateName)) {
+      Alert.alert('Shop location', 'Allow device location, or enter the city and state.');
       return;
     }
 
     setSubmittingSetup(true);
     try {
-      await createVendorShop({
-        name,
-        vendorType,
-        category: categories,
-        location: {
-          address: address.trim() || undefined,
-          city: city.trim() || undefined,
-          state: stateName.trim() || undefined,
-          country: country.trim() || undefined,
-          zipcode: zipcode.trim() || undefined,
-          ...(coords && {
-            coordinates: { lat: coords.latitude, lng: coords.longitude },
-          }),
-        },
-      });
-
+      const location = {
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: stateName.trim() || undefined,
+        country: country.trim() || undefined,
+        zipcode: zipcode.trim() || undefined,
+        ...(coords && {
+          coordinates: { lat: coords.latitude, lng: coords.longitude },
+        }),
+      };
       const uid = Number(user?.id);
-      if (!Number.isNaN(uid) && uid > 0) {
+      if (existingShopId) {
+        await updateVendorShop(existingShopId, uid, { location });
+      } else {
+        await createVendorShop({
+          name,
+          vendorType,
+          category: categories,
+          location,
+        });
+      }
+
+      if (!existingShopId && !Number.isNaN(uid) && uid > 0) {
         await updateUserRole(uid, 'vendor');
       }
       await refresh().catch(() => {});
