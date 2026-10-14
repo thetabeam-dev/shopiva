@@ -81,12 +81,12 @@ function normalizeShopLocation(locationPayload: unknown): Record<string, unknown
         }
     }
     const hasCoords = lat != null && lng != null;
-    if (!hasCoords && !(city && state)) return null;
+    if (!city || !state) return null;
     return {
         address: text(loc.address, 500) || null,
         city: city || null,
         state: state || null,
-        country: text(loc.country, 255) || null,
+        country: text(loc.country, 255) || "Nigeria",
         zipcode: text(loc.zipcode, 50) || null,
         ...(hasCoords ? { coordinates: { lat, lng } } : {}),
     };
@@ -185,7 +185,7 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
         if (!locationJson) {
             res.status(400).json({
                 success: false,
-                error: "Set your shop location with device location, or enter the city and state.",
+                error: "Enter the city and state for your shop location. Zip code is optional.",
             });
             return;
         }

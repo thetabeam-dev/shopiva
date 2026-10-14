@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import CategoryKnowMore from '../components/CategoryKnowMore';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -28,7 +29,7 @@ import {
 } from '../utils/deviceLocation';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
-import { shopLocationReady, shopRecordHasLocation } from '../utils/shopLocation';
+import { shopRecordHasLocation } from '../utils/shopLocation';
 import {
   selectCategoriesError,
   selectCategoriesLoading,
@@ -66,7 +67,7 @@ export default function ProfileSettings() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('Nigeria');
   const [zipcode, setZipcode] = useState('');
   const [coords, setCoords] = useState(/** @type {{ latitude: number; longitude: number } | null} */ (null));
   const [locating, setLocating] = useState(false);
@@ -197,8 +198,8 @@ export default function ProfileSettings() {
       Alert.alert('Category', 'Select at least one shop category.');
       return;
     }
-    if (!shopLocationReady(coords, city, stateName)) {
-      Alert.alert('Shop location', 'Allow device location, or enter the city and state.');
+    if (!city.trim() || !stateName.trim()) {
+      Alert.alert('Shop location', 'Enter the city and state. Zip code is optional.');
       return;
     }
 
@@ -405,8 +406,8 @@ export default function ProfileSettings() {
               <Text style={styles.locationHint}>{setupHint}</Text>
 
               <LabeledInput label="Address (optional)" value={address} onChangeText={setAddress} placeholder="Street address" />
-              <LabeledInput label="City" value={city} onChangeText={setCity} placeholder="City" />
-              <LabeledInput label="State" value={stateName} onChangeText={setStateName} placeholder="State" />
+              <LabeledInput label="City" required value={city} onChangeText={setCity} placeholder="City" />
+              <LabeledInput label="State" required value={stateName} onChangeText={setStateName} placeholder="State" />
               <LabeledInput label="Country" value={country} onChangeText={setCountry} placeholder="Country" />
               <LabeledInput label="Zip code (optional)" value={zipcode} onChangeText={setZipcode} placeholder="Zip code" />
             </ScrollView>
@@ -450,32 +451,32 @@ export default function ProfileSettings() {
               {categoryOptions.map(opt => {
                 const selected = categories.includes(opt.value);
                 return (
-                  <Pressable
+                  <View
                     key={opt.value}
                     style={[styles.pickerItem, selected && styles.pickerItemSelected]}
-                    onPress={() => {
-                      if (!selected && categories.length >= 3) {
-                        Alert.alert(
-                          'Category limit',
-                          'A shop can have at most 3 categories. Remove one before adding another.',
-                        );
-                        return;
-                      }
-                      setCategories(current =>
-                        selected
-                          ? current.filter(item => item !== opt.value)
-                          : [...current, opt.value],
-                      );
-                    }}
                   >
-                    <View style={styles.pickerItemCopy}>
+                    <Pressable
+                      style={styles.pickerItemCopy}
+                      onPress={() => {
+                        if (!selected && categories.length >= 3) {
+                          Alert.alert(
+                            'Category limit',
+                            'A shop can have at most 3 categories. Remove one before adding another.',
+                          );
+                          return;
+                        }
+                        setCategories(current =>
+                          selected
+                            ? current.filter(item => item !== opt.value)
+                            : [...current, opt.value],
+                        );
+                      }}
+                    >
                       <Text style={styles.pickerItemText}>{opt.label}</Text>
-                      {opt.productTypes ? (
-                        <Text style={styles.pickerItemHint}>{opt.productTypes}</Text>
-                      ) : null}
-                    </View>
+                    </Pressable>
+                    <CategoryKnowMore label={opt.label} productTypes={opt.productTypes} />
                     {selected ? <Icon name="checkmark-circle" size={22} color={BRAND} /> : null}
-                  </Pressable>
+                  </View>
                 );
               })}
             </ScrollView>
@@ -493,10 +494,13 @@ export default function ProfileSettings() {
   );
 }
 
-function LabeledInput({ label, value, onChangeText, placeholder }) {
+function LabeledInput({ label, required, value, onChangeText, placeholder }) {
   return (
     <View style={styles.inputBlock}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={styles.required}> *</Text> : null}
+      </Text>
       <TextInput
         style={styles.input}
         value={value}
@@ -701,12 +705,12 @@ const styles = StyleSheet.create({
   },
   pickerItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E4E4E7',
-    gap: 12,
+    gap: 8,
   },
   pickerItemSelected: {
     backgroundColor: '#F3FAF7',
@@ -715,12 +719,6 @@ const styles = StyleSheet.create({
   pickerItemText: {
     fontSize: 15,
     color: '#222222',
-  },
-  pickerItemHint: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 16,
-    color: '#6B7280',
   },
   dropdown: {
     minHeight: 46,

@@ -43,7 +43,7 @@ export default function OnboardingProfileScreen({ navigation }) {
   const [gender, setGender] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('Nigeria');
   const [submitting, setSubmitting] = useState(false);
   /** Set when GPS + geocode succeeds — included in saved `location`; cleared when user edits fields manually. */
   const [deviceCoords, setDeviceCoords] = useState(
