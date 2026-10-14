@@ -32,6 +32,15 @@ function categoryKey(value) {
     .trim();
 }
 
+function shopRating(shop) {
+  const rating = Number(shop?.ratingAverage ?? shop?.average_rating ?? shop?.averageRating ?? 0);
+  const count = Number(shop?.reviewCount ?? shop?.review_count ?? 0);
+  return {
+    rating: Number.isFinite(rating) && rating > 0 ? rating : 0,
+    count: Number.isFinite(count) && count > 0 ? Math.round(count) : 0,
+  };
+}
+
 function formatCategoryLabel(category) {
   return String(category ?? '')
     .split(' ')
@@ -80,13 +89,6 @@ export default function HomeScreen() {
     if (!stillListed) setSelectedCategory('all');
   }, [categories, selectedCategory]);
 
-  const openExplore = useCallback((category) => {
-    navigation.getParent()?.navigate('Explore', {
-      screen: 'Vendors',
-      params: category ? { category } : {},
-    });
-  }, [navigation]);
-
   const loadArrivals = useCallback(async ({ refresh = false } = {}) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
@@ -107,6 +109,7 @@ export default function HomeScreen() {
                 title: String(product.name ?? 'Product'),
                 uri: getProductImageUri(product),
                 price: Number(product.minPrice ?? product.price) || 0,
+                comparePrice: Number(product.maxPrice) || 0,
                 category: String(product?.category ?? '').trim().toLowerCase(),
                 shop,
                 product,
@@ -137,27 +140,24 @@ export default function HomeScreen() {
     return arrivals.filter(item => categoryKey(item.category) === wanted);
   }, [arrivals, selectedCategory]);
 
-  const name = user?.displayName || 'Guest';
-  const place = locationLabel(user);
-  const heroImage = visibleArrivals.find(item => item.uri)?.uri;
+  const openProduct = useCallback((item) => {
+    navigation.navigate('Product', {
+      vendor: item.shop,
+      productId: item.id,
+      shop_id: item.shop?.id,
+      product: {
+        id: item.id,
+        title: item.title,
+        uri: item.uri,
+        priceUsd: item.price,
+        currency: 'NGN',
+      },
+    });
+  }, [navigation]);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingTop: 10, paddingBottom: 28 }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            loadArrivals({ refresh: true }).catch(() => {});
-          }}
-          tintColor="#00926E"
-          colors={['#00926E']}
-        />
-      }
-    >
-      <View style={styles.header}>
+    <View style={styles.screen}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.identity}>
           {user?.avatarUrl ? (
             <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
@@ -167,8 +167,8 @@ export default function HomeScreen() {
             </View>
           )}
           <View>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.place}>{place}</Text>
+            <Text style={styles.name}>{user?.displayName || 'Guest'}</Text>
+            <Text style={styles.place}>{locationLabel(user)}</Text>
           </View>
         </View>
         <NotificationBell
@@ -177,25 +177,21 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View style={styles.hero}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroTitle}>New Collection</Text>
-          <Text style={styles.heroBody}>
-            Discover shops and products from vendors near you.
-          </Text>
-          <TouchableOpacity style={styles.exploreBtn} onPress={() => openExplore()} activeOpacity={0.85}>
-            <Text style={styles.exploreBtnText}>Explore</Text>
-          </TouchableOpacity>
-        </View>
-        <ProductCardMedia uri={heroImage} style={styles.heroImage} />
-      </View>
-
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Category</Text>
-        <TouchableOpacity onPress={() => setSelectedCategory('all')}>
-          <Text style={styles.viewAll}>View all</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 28 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              loadArrivals({ refresh: true }).catch(() => {});
+            }}
+            tintColor="#00926E"
+            colors={['#00926E']}
+          />
+        }
+      >
       <ScrollView
         horizontal
         nestedScrollEnabled
@@ -208,54 +204,75 @@ export default function HomeScreen() {
           return (
             <TouchableOpacity
               key={item}
-              style={[styles.chip, selected && styles.chipSelected]}
+              style={styles.chip}
               onPress={() => setSelectedCategory(item)}
             >
               <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                 {item === 'all' ? 'All' : formatCategoryLabel(item)}
               </Text>
+              {selected ? <View style={styles.chipUnderline} /> : <View style={styles.chipUnderlineSpacer} />}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>New arrival</Text>
-        <TouchableOpacity onPress={() => openExplore()}>
-          <Text style={styles.viewAll}>View all</Text>
-        </TouchableOpacity>
+      <View style={styles.promo}>
+        <Icon name="checkmark" size={16} color="#1F8A4C" />
+        <Text style={styles.promoText}>Free shipping</Text>
+        <Text style={styles.promoDivider}>|</Text>
+        <Icon name="checkmark" size={16} color="#1F8A4C" />
+        <Text style={styles.promoText}>Price adjustment within 30 days</Text>
+        <Icon name="chevron-forward" size={16} color="#8A8A8A" />
       </View>
+
       {loading ? (
-        <ActivityIndicator color="#00926E" style={{ marginTop: 24 }} />
+        <ActivityIndicator color="#111111" style={{ marginTop: 24 }} />
       ) : (
         <View style={styles.grid}>
-          {visibleArrivals.map(item => (
+          {visibleArrivals.map(item => {
+            const showCompare = item.comparePrice > item.price && item.price > 0;
+            const { rating, count } = shopRating(item.shop);
+            return (
               <TouchableOpacity
                 key={`${item.shop?.id}-${item.id}`}
                 style={styles.card}
                 activeOpacity={0.9}
-                onPress={() =>
-                  navigation.navigate('Product', {
-                    vendor: item.shop,
-                    productId: item.id,
-                    shop_id: item.shop?.id,
-                    product: {
-                      id: item.id,
-                      title: item.title,
-                      uri: item.uri,
-                      priceUsd: item.price,
-                      currency: 'NGN',
-                    },
-                  })
-                }
+                onPress={() => openProduct(item)}
               >
                 <ProductCardMedia uri={item.uri} style={styles.cardImage} />
-                <View style={styles.cardMeta}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.cardPrice}>{formatNaira(item.price)}</Text>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <Icon
+                      key={star}
+                      name={rating >= star ? 'star' : rating >= star - 0.5 ? 'star-half' : 'star-outline'}
+                      size={12}
+                      color={rating > 0 ? '#E8A317' : '#D0D0D0'}
+                    />
+                  ))}
+                  <Text style={styles.ratingText}>
+                    {rating > 0 ? rating.toFixed(1) : 'New'}
+                    {count > 0 ? ` (${count})` : ''}
+                  </Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <View style={styles.priceCopy}>
+                    <Text style={styles.cardPrice}>{formatNaira(item.price)}</Text>
+                    {showCompare ? (
+                      <Text style={styles.comparePrice}>{formatNaira(item.comparePrice)}</Text>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.cartBtn}
+                    onPress={() => openProduct(item)}
+                    hitSlop={6}
+                  >
+                    <Icon name="cart-outline" size={18} color="#111111" />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
-          ))}
+            );
+          })}
         </View>
       )}
       {!loading && visibleArrivals.length === 0 ? (
@@ -266,16 +283,19 @@ export default function HomeScreen() {
         </Text>
       ) : null}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  scroll: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 14,
   },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F2F2F2' },
@@ -290,70 +310,82 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hero: {
-    marginTop: 22,
-    marginHorizontal: 20,
-    backgroundColor: '#3C322F',
-    borderRadius: 22,
-    minHeight: 190,
-    flexDirection: 'row',
-    overflow: 'hidden',
+  chipRow: { height: 48, flexGrow: 0, marginTop: 8 },
+  chips: { paddingHorizontal: 16, alignItems: 'flex-end', gap: 18 },
+  chip: { alignItems: 'center', paddingBottom: 6 },
+  chipText: { fontSize: 16, color: '#8A8A8A' },
+  chipTextSelected: { color: '#111111', fontWeight: '700' },
+  chipUnderline: {
+    marginTop: 6,
+    height: 2,
+    width: '100%',
+    backgroundColor: '#111111',
+    borderRadius: 1,
   },
-  heroCopy: { flex: 1, padding: 22, justifyContent: 'center' },
-  heroTitle: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
-  heroBody: { marginTop: 10, color: '#E7E0DC', fontSize: 15, lineHeight: 21 },
-  exploreBtn: {
-    marginTop: 18,
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-  },
-  exploreBtnText: { fontSize: 16, fontWeight: '600', color: '#111111' },
-  heroImage: { width: 130, height: '100%' },
-  sectionHead: {
-    marginTop: 26,
-    paddingHorizontal: 20,
+  chipUnderlineSpacer: { marginTop: 6, height: 2 },
+  promo: {
+    marginTop: 4,
+    marginHorizontal: 16,
+    backgroundColor: '#F3F8F4',
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
   },
-  sectionTitle: { fontSize: 26, fontWeight: '800', color: '#111111' },
-  viewAll: { fontSize: 15, color: '#B0B0B0' },
-  chipRow: { height: 58, flexGrow: 0 },
-  chips: { paddingHorizontal: 20, paddingTop: 14, gap: 10, alignItems: 'center' },
-  chip: {
-    backgroundColor: '#F3F3F3',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  chipSelected: { backgroundColor: '#111111' },
-  chipText: { fontSize: 15, color: '#222222' },
-  chipTextSelected: { color: '#FFFFFF' },
+  promoText: { fontSize: 13, color: '#222222', flexShrink: 1 },
+  promoDivider: { color: '#C5C5C5', marginHorizontal: 2 },
   grid: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingHorizontal: 12,
+    paddingTop: 12,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    justifyContent: 'space-between',
   },
-  card: { width: '47%' },
+  card: { width: '48%', marginBottom: 18 },
   cardImage: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 18,
+    borderRadius: 8,
     backgroundColor: '#F3F3F3',
   },
-  cardImageEmpty: { alignItems: 'center', justifyContent: 'center' },
-  cardMeta: {
-    marginTop: 10,
+  cardTitle: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#222222',
+    minHeight: 36,
+  },
+  ratingRow: {
+    marginTop: 4,
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  ratingText: { marginLeft: 4, fontSize: 12, color: '#666666' },
+  priceRow: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
   },
-  cardTitle: { flex: 1, fontSize: 15, color: '#222222' },
-  cardPrice: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  priceCopy: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  cardPrice: { fontSize: 16, fontWeight: '800', color: '#111111' },
+  comparePrice: {
+    fontSize: 13,
+    color: '#9A9A9A',
+    textDecorationLine: 'line-through',
+  },
+  cartBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E4E4E4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   empty: { paddingHorizontal: 20, paddingTop: 8, color: '#8A8A8A' },
 });
