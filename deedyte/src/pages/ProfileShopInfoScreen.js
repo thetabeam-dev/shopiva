@@ -19,6 +19,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import CategoryKnowMore from '../components/CategoryKnowMore';
 import {
   errorCodes,
   isErrorWithCode,
@@ -68,7 +69,7 @@ const DEFAULT_LOCATION = {
   address: null,
   city: null,
   state: null,
-  country: null,
+  country: 'Nigeria',
   zipcode: null,
   coordinates: null,
 };
@@ -485,7 +486,10 @@ export default function ProfileShopInfoScreen() {
       };
       const { openingHours: _drop, ...locRest } = loc;
       void _drop;
-      setLocationState(locRest);
+      setLocationState({
+        ...locRest,
+        country: String(locRest.country ?? '').trim() || 'Nigeria',
+      });
       const oh = parseOpeningHours(loc.openingHours);
       setOpeningHours(oh);
       setHoursDraft(oh);
@@ -1379,44 +1383,44 @@ export default function ProfileShopInfoScreen() {
           categoryOptions.map(opt => {
             const selected = category.some(item => item.toLowerCase() === opt.value.toLowerCase());
             return (
-              <Pressable
+              <View
                 key={opt.value}
                 style={[
                   styles.pickerItem,
                   selected && styles.pickerItemSelected,
                 ]}
-                onPress={() => {
-                  if (!selected && category.length >= 3) {
-                    Alert.alert(
-                      'Category limit',
-                      'A shop can have at most 3 categories. Remove one before adding another.',
-                    );
-                    return;
-                  }
-                  if (selected && categoryHasPublishedProduct(shopProducts, opt.value)) {
-                    Alert.alert(
-                      'Category in use',
-                      'This category still has a published product. Delete that product before you can remove the category.',
-                    );
-                    return;
-                  }
-                  setCategory(current =>
-                    selected
-                      ? current.filter(item => item.toLowerCase() !== opt.value.toLowerCase())
-                      : [...current, opt.value],
-                  );
-                }}
               >
-                <View style={styles.pickerItemCopy}>
+                <Pressable
+                  style={styles.pickerItemCopy}
+                  onPress={() => {
+                    if (!selected && category.length >= 3) {
+                      Alert.alert(
+                        'Category limit',
+                        'A shop can have at most 3 categories. Remove one before adding another.',
+                      );
+                      return;
+                    }
+                    if (selected && categoryHasPublishedProduct(shopProducts, opt.value)) {
+                      Alert.alert(
+                        'Category in use',
+                        'This category still has a published product. Delete that product before you can remove the category.',
+                      );
+                      return;
+                    }
+                    setCategory(current =>
+                      selected
+                        ? current.filter(item => item.toLowerCase() !== opt.value.toLowerCase())
+                        : [...current, opt.value],
+                    );
+                  }}
+                >
                   <Text style={styles.pickerItemText}>{opt.label}</Text>
-                  {opt.productTypes ? (
-                    <Text style={styles.pickerItemHint}>{opt.productTypes}</Text>
-                  ) : null}
-                </View>
+                </Pressable>
+                <CategoryKnowMore label={opt.label} productTypes={opt.productTypes} />
                 {selected ? (
                   <Icon name="checkmark-circle" size={22} color={BRAND} />
                 ) : null}
-              </Pressable>
+              </View>
             );
           })
         )}
@@ -2342,17 +2346,16 @@ const styles = StyleSheet.create({
   pickerItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BORDER,
-    gap: 12,
+    gap: 8,
   },
   pickerItemSelected: { backgroundColor: 'rgba(13,79,60,0.05)' },
   pickerItemCopy: { flex: 1 },
   pickerItemText: { fontSize: 16, color: BLACK },
-  pickerItemHint: { marginTop: 4, fontSize: 12, lineHeight: 16, color: '#6B7280' },
   formModalRoot: {
     flex: 1,
     justifyContent: 'flex-end',

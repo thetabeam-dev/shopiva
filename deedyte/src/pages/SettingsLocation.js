@@ -84,7 +84,7 @@ export default function SettingsLocationScreen() {
   const [longitude, setLongitude] = useState(DEFAULT_REGION.longitude);
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('Nigeria');
   const [geocodeBusy, setGeocodeBusy] = useState(false);
   const [locateBusy, setLocateBusy] = useState(false);
 
@@ -101,13 +101,13 @@ export default function SettingsLocationScreen() {
         const addr = data?.address;
         setCity(pickCity(addr));
         setRegion(pickRegion(addr));
-        setCountry(pickCountry(addr));
+        setCountry(pickCountry(addr) || 'Nigeria');
       })
       .catch((e) => {
         if (e?.name === 'AbortError') return;
         setCity('');
         setRegion('');
-        setCountry('');
+        setCountry('Nigeria');
       })
       .finally(() => {
         setGeocodeBusy(false);

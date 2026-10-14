@@ -49,11 +49,16 @@ function formatCategoryLabel(category) {
 }
 
 function locationLabel(user) {
-  const loc = user?.locationDisplay || user?.location;
-  if (typeof loc === 'string' && loc.trim()) return loc.trim();
-  if (loc && typeof loc === 'object') {
-    const parts = [loc.city, loc.state, loc.country].map(part => String(part ?? '').trim()).filter(Boolean);
-    if (parts.length) return parts[0];
+  const loc = user?.location;
+  if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
+    const state = String(loc.state ?? '').trim();
+    if (state) return state;
+  }
+  const display = String(user?.locationDisplay ?? (typeof loc === 'string' ? loc : '')).trim();
+  if (display) {
+    const parts = display.split(',').map(part => part.trim()).filter(Boolean);
+    if (parts.length >= 2) return parts[1];
+    if (parts.length === 1) return parts[0];
   }
   return 'Nigeria';
 }
@@ -166,9 +171,9 @@ export default function HomeScreen() {
               <Icon name="person" size={22} color="#00926E" />
             </View>
           )}
-          <View>
-            <Text style={styles.name}>{user?.displayName || 'Guest'}</Text>
-            <Text style={styles.place}>{locationLabel(user)}</Text>
+          <View style={styles.identityText}>
+            <Text style={styles.name} numberOfLines={1}>{user?.displayName || 'Guest'}</Text>
+            <Text style={styles.place} numberOfLines={1} ellipsizeMode="tail">{locationLabel(user)}</Text>
           </View>
         </View>
         <NotificationBell
@@ -310,7 +315,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 0,
   },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 16, minWidth: 0 },
+  identityText: { flex: 1, minWidth: 0, maxWidth: '72%' },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F2F2F2' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: 18, fontWeight: '700', color: '#111111' },
