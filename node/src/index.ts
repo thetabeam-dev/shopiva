@@ -167,7 +167,6 @@ app.get("/categories", async (req, res) => {
     `SELECT * FROM categories`,
   );
   res.json(rows);
-  console.log("categories: ", rows);
 });
 
 // app.get("/logistics-providers", async (req, res) => {
@@ -239,6 +238,65 @@ function formatNaira(amount: number): string {
   return `₦${value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+
+
+async function notifyVendorToSetupPayout(payout: {
+  shop_id: unknown;
+  order_id: unknown;
+}): Promise<void> {
+  try {
+    const owner = await GetShopOwnerByShopIdService(Number(payout.shop_id));
+    const vendorId = Number(owner?.id);
+    const orderId = Number(payout.order_id);
+    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(orderId) || orderId <= 0) return;
+
+    const pool = await db();
+    const title = "Set up your payout";
+    const existing = await pool.query(
+      `SELECT id FROM notifications
+       WHERE recipient_id = $1 AND role = 'vendor' AND source_type = 'order'
+         AND source_id = $2 AND title = $3
+       LIMIT 1`,
+      [vendorId, orderId, title],
+    );
+    if (existing.rows.length > 0) return;
+
+    const message = `A payout for order #${orderId} is waiting. Add your bank account in shop settings so we can send it.`;
+
+    await createAndEmitNotification({
+      recipientId: vendorId,
+      title,
+      message,
+      sourceType: "order",
+      sourceId: orderId,
+      role: "vendor",
+    });
+
+    const { rows } = await pool.query<{ devicetoken: string | null; email: string | null; fname: string | null }>(
+      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
+      [vendorId],
+    );
+    const token = String(rows[0]?.devicetoken ?? "").trim();
+    if (token) {
+      await sendFcmForActivities(token, title, message, null, {
+        type: "order",
+        order_id: orderId,
+      });
+    }
+
+    const email = String(rows[0]?.email ?? owner.email ?? "").trim();
+    if (email) {
+      await sendNotificationEmail(email, {
+        fname: String(rows[0]?.fname ?? owner.fname ?? "there"),
+        title,
+        message,
+      });
+    }
+  } catch (err) {
+    console.error("notifyVendorToSetupPayout failed", err);
+  }
+}
+
 async function notifyShopOfPayout(payout: {
   shop_id: unknown;
   order_id: unknown;
@@ -302,13 +360,23 @@ const server = app.listen(process.env.PORT, () => {
 
     const { rows: payouts } = await pool.query(
       `SELECT * FROM shop_payouts WHERE status = $1`,
-      ["processing"],
+      ["pending"],
     );
 
     for (const payout of payouts) {
       try {
         let sid = payout.shop_id;
+        let order_id = payout.order_id;
         let ref = paystack.generateRefId();
+
+
+        const { rows: agedOrders } = await pool.query(
+          `SELECT updated_at FROM orders
+           WHERE id = $1 AND updated_at <= NOW() - INTERVAL '48 hours'`,
+          [order_id],
+        );
+        if (agedOrders.length === 0) continue;
+
         const {
           rows: [shop_payout_accounts],
         } = await pool.query(
@@ -316,15 +384,21 @@ const server = app.listen(process.env.PORT, () => {
           [sid],
         );
 
+        const recipientId = String(shop_payout_accounts?.provider_recipient_id ?? "").trim();
+        if (!recipientId) {
+          await notifyVendorToSetupPayout(payout);
+          continue;
+        }
+
         await escrow.update({
           status: "processing",
-          id: payout.order_id
+          id: order_id
         });
 
         const {status, message} = await (await paystack.initiateTransfer({
           amount: Number((payout.net_amount)),
-          recipient: shop_payout_accounts.provider_recipient_id,
-          reason: `Deedyte Payout for Order #${payout.order_id}`,
+          recipient: recipientId,
+          reason: `Deedyte Payout for Order #${order_id}`,
           reference: ref,
         })) as any;
 
@@ -334,7 +408,7 @@ const server = app.listen(process.env.PORT, () => {
           await escrow.finalize({
             status: "queued",
             transfer_reference: ref,
-            id: payout.order_id,
+            id: order_id,
           });
           await notifyShopOfPayout(payout);
         }
