@@ -65,6 +65,17 @@ const CART_TOAST_MS = 2400;
 /**
  * @param {{ route: { params?: { product?: object; vendor?: { id: number; name?: string; slug?: string }; category?: string } }; navigation: import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> }} props
  */
+function unitPriceForBulk(base, tiers, quantity) {
+  const qty = Math.max(1, Math.trunc(Number(quantity) || 1));
+  let chosen = null;
+  for (const tier of tiers) {
+    if (tier.minQuantity <= qty) chosen = tier;
+  }
+  if (!chosen) return base;
+  const unit = chosen.totalPrice / chosen.minQuantity;
+  return Number.isFinite(unit) && unit > 0 ? unit : base;
+}
+
 export default function ProductScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, signOut } = useAuth();
@@ -641,21 +652,30 @@ export default function ProductScreen({ route, navigation }) {
     void syncCartMembership();
   }, [syncCartMembership]);
 
+  const checkoutUnitPrice = useMemo(() => {
+    if (!d) {
+      const fallback = Number(routeProduct?.priceUsd);
+      return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+    }
+    let base = 0;
+    if (!hasVariants) base = Number(d.price) || 0;
+    else if (selectedVariant) {
+      const pv = getVariantRowPrice(
+        /** @type {Record<string, unknown>} */(selectedVariant),
+      );
+      base = Number.isFinite(pv) ? pv : 0;
+    }
+    return unitPriceForBulk(base, bulkTiers, qty);
+  }, [d, hasVariants, selectedVariant, routeProduct?.priceUsd, bulkTiers, qty]);
+
   const performAddToCart = useCallback(
     /** @returns {Promise<boolean>} */
     async inventoryId => {
       setCartToggleBusy(true);
       try {
-        let cartOpts = /** @type {{ unitPrice?: number }} */ ({});
-        if (hasVariants && selectedVariant) {
-          const vp = getVariantRowPrice(
-            /** @type {Record<string, unknown>} */(selectedVariant),
-          );
-          if (Number.isFinite(vp)) cartOpts = { unitPrice: vp };
-        } else if (d && !hasVariants) {
-          const p = Number(d.price) || 0;
-          if (p > 0) cartOpts = { unitPrice: p };
-        }
+        const cartOpts = Number.isFinite(checkoutUnitPrice) && checkoutUnitPrice > 0
+          ? { unitPrice: checkoutUnitPrice }
+          : {};
         await addBuyerCartLine(inventoryId, qty, cartOpts);
         showCartToast('Added to your cart.');
         await syncCartMembership();
@@ -675,7 +695,7 @@ export default function ProductScreen({ route, navigation }) {
         setCartToggleBusy(false);
       }
     },
-    [qty, showCartToast, syncCartMembership, hasVariants, selectedVariant, d],
+    [qty, showCartToast, syncCartMembership, checkoutUnitPrice],
   );
 
   const performRemoveFromCart = useCallback(async () => {
@@ -720,21 +740,6 @@ export default function ProductScreen({ route, navigation }) {
       .map(k => `${formatAttributeLabel(k)}: ${a[k]}`)
       .join(' · ');
   }, [hasVariants, selectedVariant]);
-
-  const checkoutUnitPrice = useMemo(() => {
-    if (!d) {
-      const fallback = Number(routeProduct?.priceUsd);
-      return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
-    }
-    if (!hasVariants) return Number(d.price) || 0;
-    if (selectedVariant) {
-      const pv = getVariantRowPrice(
-        /** @type {Record<string, unknown>} */(selectedVariant),
-      );
-      return Number.isFinite(pv) ? pv : 0;
-    }
-    return 0;
-  }, [d, hasVariants, selectedVariant, routeProduct?.priceUsd]);
 
   const anyVariantInStock = variantsForUi.some(v =>
     isVariantPurchasable(/** @type {Record<string, unknown>} */(v)),
@@ -1134,7 +1139,16 @@ export default function ProductScreen({ route, navigation }) {
           </View>
           <View style={styles.priceRow}>
             <View>
-              <Text style={styles.price}>{priceDisplayLabel}</Text>
+              <Text style={styles.price}>
+                {checkoutUnitPrice > 0 && (!hasVariants || selectedVariant)
+                  ? formatNaira(checkoutUnitPrice)
+                  : priceDisplayLabel}
+              </Text>
+              {bulkTiers.length > 0 && checkoutUnitPrice > 0 && (!hasVariants || selectedVariant) ? (
+                <Text style={styles.bulkApplied}>
+                  {formatNaira(checkoutUnitPrice * qty)} for {qty}
+                </Text>
+              ) : null}
               {hasVariants && !selectedVariant ? (
                 <Text style={styles.variantPriceRangeHint} numberOfLines={2}>
                   Choose an option [variant] to see the exact price
@@ -1153,6 +1167,23 @@ export default function ProductScreen({ route, navigation }) {
               />
             </View>
           </View>
+          {bulkTiers.length > 0 ? (
+            <View style={styles.bulkBlock}>
+              <Text style={styles.sectionHeading}>Bulk discount</Text>
+              <Text style={styles.bulkHint}>Buy more and pay less per item.</Text>
+              {bulkTiers.map(tier => (
+                <View key={`${tier.minQuantity}-${tier.totalPrice}`} style={styles.bulkRow}>
+                  <Text style={styles.bulkQty}>Buy {tier.minQuantity}</Text>
+                  <View style={styles.bulkPrices}>
+                    <Text style={styles.bulkTotal}>{formatNaira(tier.totalPrice)}</Text>
+                    <Text style={styles.bulkEach}>
+                      {formatNaira(tier.totalPrice / tier.minQuantity)} each
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {hasVariants && attrKeys.length ? (
             <View style={styles.variantPickersBlock}>
               <Text style={styles.variantPickersTitle}>
@@ -1302,23 +1333,6 @@ export default function ProductScreen({ route, navigation }) {
                 </Text>
               </View>
             </View>
-          </View>
-        ) : null}
-        {bulkTiers.length > 0 ? (
-          <View style={styles.bulkBlock}>
-            <Text style={styles.sectionHeading}>Bulk discount</Text>
-            <Text style={styles.bulkHint}>Buy more and pay less per item.</Text>
-            {bulkTiers.map(tier => (
-              <View key={`${tier.minQuantity}-${tier.totalPrice}`} style={styles.bulkRow}>
-                <Text style={styles.bulkQty}>Buy {tier.minQuantity}</Text>
-                <View style={styles.bulkPrices}>
-                  <Text style={styles.bulkTotal}>{formatNaira(tier.totalPrice)}</Text>
-                  <Text style={styles.bulkEach}>
-                    {formatNaira(tier.totalPrice / tier.minQuantity)} each
-                  </Text>
-                </View>
-              </View>
-            ))}
           </View>
         ) : null}
         <Text style={styles.sectionHeading}>Description</Text>
@@ -1843,6 +1857,7 @@ const styles = StyleSheet.create({
   bulkPrices: { alignItems: 'flex-end' },
   bulkTotal: { fontSize: 15, fontWeight: '800', color: '#111111' },
   bulkEach: { marginTop: 2, fontSize: 12, color: '#6B7280' },
+  bulkApplied: { marginTop: 4, fontSize: 13, fontWeight: '600', color: '#047857' },
   descriptionBody: {
     fontSize: 15,
     color: '#444',

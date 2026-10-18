@@ -1,5 +1,5 @@
 import { db } from "../../config/database.js";
-import { buildStorefrontProductDetail } from "../business/storefrontProductDto.js";
+import { buildStorefrontProductDetail, unitPriceForBulkQuantity } from "../business/storefrontProductDto.js";
 import { inventory, product } from "../../models/business/product.js";
 import type { InventoryRow, ProductRow } from "../../models/business/product.js";
 
@@ -91,29 +91,33 @@ export async function addOrIncrementCartLine(
   inventoryId: number,
   addQty: number,
   clientUnitPrice?: number | null
-): Promise<{ cart_item_id: number; quantity: number }> {
+): Promise<{ cart_item_id: number; quantity: number; unit_price: number }> {
   if (!Number.isFinite(inventoryId) || inventoryId <= 0) throw new Error("Invalid inventory_id");
   const q = Math.min(99, Math.max(1, Math.trunc(addQty) || 1));
 
-  const inv = await (await db()).query<{ id: number }>(
-    `SELECT i.id FROM inventory i INNER JOIN products p ON p.id = i.product_id WHERE i.id = $1`,
-    [inventoryId]
-  );
-  if (!inv.rows[0]) throw new Error("Inventory item not found");
+  const invRow = await inventory.getById(inventoryId);
+  if (!invRow) throw new Error("Inventory item not found");
+  const prod = await product.getById(invRow.product_id);
+  if (!prod) throw new Error("Product not found");
+  const invRows = await inventory.getByProductId(invRow.product_id);
+  const allowed = collectAllowedCartUnitPrices(prod, invRows, inventoryId);
+  const catalogPrice = Number(invRow.price);
+  let baseUnit = Number.isFinite(catalogPrice) && catalogPrice >= 0 ? catalogPrice : 0;
+  if (clientUnitPrice != null && Number.isFinite(Number(clientUnitPrice)) && clientUnitPriceAllowed(Number(clientUnitPrice), allowed)) {
+    baseUnit = Number(clientUnitPrice);
+  }
 
-  let snapshotPrice: number | null = null;
+  const existing = await (await db()).query<{ quantity: number }>(
+    `SELECT quantity FROM cart_items WHERE user_id = $1 AND inventory_id = $2`,
+    [userId, inventoryId]
+  );
+  const nextQty = Math.min(99, (Number(existing.rows[0]?.quantity) || 0) + q);
+  const snapshotPrice = unitPriceForBulkQuantity(prod.specifications, baseUnit, nextQty);
   if (clientUnitPrice != null && Number.isFinite(Number(clientUnitPrice))) {
-    const invRow = await inventory.getById(inventoryId);
-    if (!invRow) throw new Error("Inventory item not found");
-    const prod = await product.getById(invRow.product_id);
-    if (!prod) throw new Error("Product not found");
-    const invRows = await inventory.getByProductId(invRow.product_id);
-    const allowed = collectAllowedCartUnitPrices(prod, invRows, inventoryId);
     const client = Number(clientUnitPrice);
-    if (!clientUnitPriceAllowed(client, allowed)) {
+    if (!clientUnitPriceAllowed(client, allowed) && !priceNear(client, snapshotPrice)) {
       throw new Error("Price for this option is out of date. Refresh the product page and try again.");
     }
-    snapshotPrice = client;
   }
 
   const { rows } = await (await db()).query<{ id: number; quantity: number }>(
@@ -121,32 +125,55 @@ export async function addOrIncrementCartLine(
      VALUES ($1, $2, $3, $4)
      ON CONFLICT (user_id, inventory_id)
      DO UPDATE SET
-       quantity = LEAST(cart_items.quantity + EXCLUDED.quantity, 99),
-       unit_price_snapshot = COALESCE(EXCLUDED.unit_price_snapshot, cart_items.unit_price_snapshot),
+       quantity = $3,
+       unit_price_snapshot = $4,
        updated_at = now()
      RETURNING id, quantity`,
-    [userId, inventoryId, q, snapshotPrice]
+    [userId, inventoryId, nextQty, snapshotPrice]
   );
   const row = rows[0];
   if (!row) throw new Error("Could not update cart");
-  return { cart_item_id: row.id, quantity: row.quantity };
+  return { cart_item_id: row.id, quantity: row.quantity, unit_price: snapshotPrice };
 }
 
 export async function setCartLineQuantity(
   userId: number,
   cartItemId: number,
   quantity: number
-): Promise<{ cart_item_id: number; quantity: number } | null> {
+): Promise<{ cart_item_id: number; quantity: number; unit_price: number } | null> {
   const q = Math.min(99, Math.max(1, Math.trunc(quantity) || 1));
+  const current = await (await db()).query<{ inventory_id: number; quantity: number; unit_price_snapshot: number | null }>(
+    `SELECT inventory_id, quantity, unit_price_snapshot FROM cart_items WHERE id = $1 AND user_id = $2`,
+    [cartItemId, userId]
+  );
+  const line = current.rows[0];
+  if (!line) return null;
+  const invRow = await inventory.getById(line.inventory_id);
+  const prod = invRow ? await product.getById(invRow.product_id) : null;
+  const catalogPrice = Number(invRow?.price);
+  let baseUnit = Number.isFinite(catalogPrice) && catalogPrice >= 0 ? catalogPrice : Number(line.unit_price_snapshot) || 0;
+  if (prod && invRow) {
+    const invRows = await inventory.getByProductId(invRow.product_id);
+    const allowed = collectAllowedCartUnitPrices(prod, invRows, line.inventory_id);
+    const snap = Number(line.unit_price_snapshot);
+    const matched = allowed.find((price) =>
+      priceNear(snap, price) || priceNear(snap, unitPriceForBulkQuantity(prod.specifications, price, line.quantity))
+    );
+    if (matched != null) baseUnit = matched;
+  }
+  const snapshotPrice = prod
+    ? unitPriceForBulkQuantity(prod.specifications, baseUnit, q)
+    : baseUnit;
   const { rows } = await (await db()).query<{ id: number; quantity: number }>(
-    `UPDATE cart_items SET quantity = $3, updated_at = now()
+    `UPDATE cart_items
+     SET quantity = $3, unit_price_snapshot = $4, updated_at = now()
      WHERE id = $1 AND user_id = $2
      RETURNING id, quantity`,
-    [cartItemId, userId, q]
+    [cartItemId, userId, q, snapshotPrice]
   );
   const row = rows[0];
   if (!row) return null;
-  return { cart_item_id: row.id, quantity: row.quantity };
+  return { cart_item_id: row.id, quantity: row.quantity, unit_price: snapshotPrice };
 }
 
 export async function deleteCartLine(userId: number, cartItemId: number): Promise<boolean> {

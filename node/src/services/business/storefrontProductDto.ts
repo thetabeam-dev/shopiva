@@ -45,6 +45,39 @@ function coerceSpecifications(specifications: unknown): Record<string, unknown> 
   return {};
 }
 
+export function unitPriceForBulkQuantity(
+  specifications: unknown,
+  baseUnit: number,
+  quantity: number
+): number {
+  const specs = coerceSpecifications(specifications);
+  const bulkRaw = specs.bulk_discount;
+  const tiers = bulkRaw && typeof bulkRaw === "object" && !Array.isArray(bulkRaw)
+    && Boolean((bulkRaw as { enabled?: unknown }).enabled)
+    && Array.isArray((bulkRaw as { tiers?: unknown }).tiers)
+    ? ((bulkRaw as { tiers: unknown[] }).tiers)
+        .map((tier) => {
+          if (!tier || typeof tier !== "object") return null;
+          const row = tier as { minQuantity?: unknown; minQty?: unknown; totalPrice?: unknown };
+          const minQuantity = Number(String(row.minQuantity ?? row.minQty ?? "").replace(/[^\d]/g, ""));
+          const totalPrice = Number(String(row.totalPrice ?? "").replace(/[^\d.]/g, "").replace(/\.(?=.*\.)/g, ""));
+          if (!Number.isFinite(minQuantity) || minQuantity < 1) return null;
+          if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
+          return { minQuantity, totalPrice };
+        })
+        .filter((tier): tier is { minQuantity: number; totalPrice: number } => tier != null)
+        .sort((a, b) => a.minQuantity - b.minQuantity)
+    : [];
+  const qty = Math.max(1, Math.trunc(Number(quantity) || 1));
+  let chosen: { minQuantity: number; totalPrice: number } | null = null;
+  for (const tier of tiers) {
+    if (tier.minQuantity <= qty) chosen = tier;
+  }
+  if (!chosen) return baseUnit;
+  const unit = chosen.totalPrice / chosen.minQuantity;
+  return Number.isFinite(unit) && unit > 0 ? unit : baseUnit;
+}
+
 function parseSpecVariants(specifications: unknown): unknown[] {
   const root = coerceSpecifications(specifications);
   if (!Object.keys(root).length) return [];

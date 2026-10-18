@@ -155,8 +155,13 @@ export default function CartScreen({ navigation }) {
     if (!line || !Number.isFinite(line.cartItemId)) return;
     const nextQty = Math.min(99, Math.max(1, line.qty + delta));
     try {
-      await patchBuyerCartLine(line.cartItemId, nextQty);
-      setLines((prev) => prev.map((l) => (l.id !== id ? l : { ...l, qty: nextQty })));
+      const updated = await patchBuyerCartLine(line.cartItemId, nextQty);
+      const nextUnit = Number(updated?.unit_price);
+      setLines((prev) => prev.map((l) => (
+        l.id !== id
+          ? l
+          : { ...l, qty: nextQty, unitPrice: Number.isFinite(nextUnit) ? nextUnit : l.unitPrice }
+      )));
     } catch {
       /* keep server qty on failure */
     }
