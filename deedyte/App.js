@@ -115,6 +115,7 @@ function App() {
   const [versionCheck, setVersionCheck] = useState({
     isLatest: true,
     storeUrl: '',
+    isUpdating: false
   });
 
   useEffect(() => {
@@ -176,100 +177,127 @@ function App() {
   );
 
   return (
+
     <>
 
-      {
-        !versionCheck.isLatest &&
-        <SafeAreaView
-          style={{
-            flex: 1,
-            backgroundColor: '#FFFFFF',
-            justifyContent: 'center',
-            paddingHorizontal: 28,
-          }}
-        >
-          <TouchableOpacity onPress={openStore}
-            // disabled={!versionCheck.storeUrl?.trim()}
-            activeOpacity={0.85}
-            accessibilityRole="link"
-            accessibilityLabel={
-              Platform.OS === 'ios'
-                ? 'Open App Store to download latest version'
-                : 'Open Play Store to download latest version'
-            }>
-            <View style={{ alignItems: 'center' }}>
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: '800',
-                  color: '#111111',
-                  textAlign: 'center',
-                  marginBottom: 10,
-                }}
-              >
-                Update required
-              </Text>
-              <Text
-                style={{
-                  fontSize: 15,
-                  lineHeight: 22,
-                  color: '#555555',
-                  textAlign: 'center',
-                  marginBottom: 20,
-                }}
-              >
-                Your app is outdated. Install the latest version to keep using Deedyte.
-              </Text>
-              <TouchableOpacity
-                onPress={openStore}
-                // disabled={!versionCheck.storeUrl?.trim()}
-                activeOpacity={0.85}
-                accessibilityRole="link"
-                accessibilityLabel={
-                  Platform.OS === 'ios'
-                    ? 'Open App Store to download latest version'
-                    : 'Open Play Store to download latest version'
-                }
-              >
+      <>
+        (!isUpdating &&{
+          !versionCheck.isLatest &&
+          <SafeAreaView
+            style={{
+              flex: 1,
+              backgroundColor: '#FFFFFF',
+              justifyContent: 'center',
+              paddingHorizontal: 28,
+            }}
+          >
+            <TouchableOpacity onPress={openStore}
+              // disabled={!versionCheck.storeUrl?.trim()}
+              activeOpacity={0.85}
+              accessibilityRole="link"
+              accessibilityLabel={
+                Platform.OS === 'ios'
+                  ? 'Open App Store to download latest version'
+                  : 'Open Play Store to download latest version'
+              }>
+              <View style={{ alignItems: 'center' }}>
                 <Text
                   style={{
-                    fontSize: 16,
-                    fontWeight: '700',
-                    color: '#00926e',
+                    fontSize: 22,
+                    fontWeight: '800',
+                    color: '#111111',
                     textAlign: 'center',
-                    cursor: "pointer"
-                    // opacity: versionCheck.storeUrl?.trim() ? 1 : 0.5,
+                    marginBottom: 10,
                   }}
                 >
-                  Click Here To Download The Latest Version
+                  Update required
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </SafeAreaView>
-      }
+                <Text
+                  style={{
+                    fontSize: 15,
+                    lineHeight: 22,
+                    color: '#555555',
+                    textAlign: 'center',
+                    marginBottom: 20,
+                  }}
+                >
+                  Your app is outdated. Install the latest version to keep using Deedyte.
+                </Text>
+                <TouchableOpacity
+                  onPress={openStore}
+                  // disabled={!versionCheck.storeUrl?.trim()}
+                  activeOpacity={0.85}
+                  accessibilityRole="link"
+                  accessibilityLabel={
+                    Platform.OS === 'ios'
+                      ? 'Open App Store to download latest version'
+                      : 'Open Play Store to download latest version'
+                  }
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '700',
+                      color: '#00926e',
+                      textAlign: 'center',
+                      cursor: "pointer"
+                      // opacity: versionCheck.storeUrl?.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    Click Here To Download The Latest Version
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </SafeAreaView>
+        }
 
-      {
-        versionCheck.isLatest &&
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider style={{ flex: 1 }}>
-            {PaystackProvider ? (
-              <PaystackProvider
-                publicKey={paystackPublicKey}
-                currency="NGN"
-                defaultChannels={['card', 'ussd', 'bank']}
-                debug={__DEV__}
-              >
-                {appBody}
-              </PaystackProvider>
-            ) : (
-              appBody
-            )}
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      }
+        {
+          versionCheck.isLatest &&
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider style={{ flex: 1 }}>
+              {PaystackProvider ? (
+                <PaystackProvider
+                  publicKey={paystackPublicKey}
+                  currency="NGN"
+                  defaultChannels={['card', 'ussd', 'bank']}
+                  debug={__DEV__}
+                >
+                  {appBody}
+                </PaystackProvider>
+              ) : (
+                appBody
+              )}
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        })
+      </>
+
+      <>
+        {
+          isUpdating &&
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider style={{ flex: 1 }}>
+              {PaystackProvider ? (
+                <PaystackProvider
+                  publicKey={paystackPublicKey}
+                  currency="NGN"
+                  defaultChannels={['card', 'ussd', 'bank']}
+                  debug={__DEV__}
+                >
+                  {appBody}
+                </PaystackProvider>
+              ) : (
+                appBody
+              )}
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        }
+      </>
 
     </>
+
+
   );
 }
 

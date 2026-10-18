@@ -1082,7 +1082,7 @@ export default function OrderDetailScreen() {
     } else {
       switch (statusKey) {
         case 'unpaid':
-          message = 'Awaiting vendor shipping quote';
+          message = 'Awaiting vendor"s shipping fee';
           break;
         case 'order_accepted':
           message = awaitingBuyerPayment ? 'Make payment now!' : 'Processing order';
@@ -1659,8 +1659,8 @@ export default function OrderDetailScreen() {
               if (blockIfCancelled()) return;
               if (statusKey === 'unpaid') {
                 Alert.alert(
-                  'Awaiting shipping quote',
-                  'This order is awaiting a shipping quote from the vendor.',
+                  'Awaiting shipping fee',
+                  'This order is awaiting the vendor to set the shipping fee.',
                 );
                 return;
               }

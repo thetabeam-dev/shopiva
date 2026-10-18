@@ -70,7 +70,7 @@ async function notifyVendorOfUnpaidOrder(
     const count = Math.max(0, Math.round(itemCount));
     const label = count === 1 ? "item" : "items";
     const title = "Unpaid Order";
-    const message = `You have a new unpaid order for ${count} ${label} totaling ${formatNaira(goodsTotal)}. Please update the shipping quote so the buyer can complete payment.`;
+    const message = `You have a new unpaid order for ${count} ${label} totaling ${formatNaira(goodsTotal)}. Please set the shipping fee based on the buyer’s delivery location so they can proceed to complete payment..`;
 
     await createAndEmitNotification({
       recipientId: vendorId,
@@ -176,7 +176,7 @@ export async function createUnpaidCheckoutOrders(
       actor_type: "customer",
       actor_id: String(buyerUserId),
       outcome: "success",
-      notes: "Buyer placed an unpaid order and is waiting for a shipping quote.",
+      notes: "The buyer has placed an unpaid order and is waiting for you to set the shipping fee..",
       meta: JSON.stringify({}),
     });
     for (const item of items) {

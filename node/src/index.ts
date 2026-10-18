@@ -106,11 +106,10 @@ app.get("/config/customer-access", (_req, res) => {
 app.get("/config/app-version", (req, res) => {
   const { _v, _os } = req.query;
   console.log(req.query);
-
   if (_os === "ios") {
     let latestVersion = process.env.IOS_LATEST_VERSION;
     let storeUrl = process.env.IOS_STORE_URL;
-
+    let isIosUpdating = process.env.IS_IOS_UPDATING;
     console.log("latestVersion: ", latestVersion === _v);
 
     if (_v === latestVersion) {
@@ -118,29 +117,34 @@ app.get("/config/app-version", (req, res) => {
         isLatest: true,
         storeUrl: "",
         os: _os,
+        isUpdating: isIosUpdating
       });
     } else {
       res.json({
         isLatest: false,
         storeUrl: storeUrl,
         os: _os,
+        isUpdating: isIosUpdating
       });
     }
   } else if (_os === "android") {
     let latestVersion = process.env.ANDROID_LATEST_VERSION;
     let storeUrl = process.env.ANDROID_STORE_URL;
+    let isAndroidUpdating = process.env.IS_ANDROID_UPDATING;
 
     if (_v?.toString() === latestVersion?.toString()) {
       res.json({
         isLatest: true,
         storeUrl: "",
         os: _os,
+        isUpdating: isAndroidUpdating
       });
     } else {
       res.json({
         isLatest: false,
         storeUrl: storeUrl,
         os: _os,
+        isUpdating: isAndroidUpdating
       });
     }
   }

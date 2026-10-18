@@ -1201,7 +1201,7 @@ export default function ProductScreen({ route, navigation }) {
             readyToPayOrderId
               ? 'Make payment to continue'
               : awaitingShippingQuote
-              ? 'Awaiting shipping quote'
+              ? 'Awaiting shipping fee'
               : selectedLineInCart
                 ? 'Remove from cart'
                 : 'Add to cart'
@@ -1216,7 +1216,7 @@ export default function ProductScreen({ route, navigation }) {
             {readyToPayOrderId
               ? 'Make payment to continue'
               : awaitingShippingQuote
-              ? 'Awaiting shipping quote'
+              ? 'Awaiting shipping fee'
               : selectedLineInCart
                 ? 'Remove from cart'
                 : 'Add to cart'}
@@ -1238,7 +1238,7 @@ export default function ProductScreen({ route, navigation }) {
             readyToPayOrderId
               ? 'Make payment to continue'
               : awaitingShippingQuote
-                ? 'Awaiting shipping quote'
+                ? 'Awaiting shipping fee'
                 : 'Buy now and go to checkout'
           }
         >
@@ -1246,7 +1246,7 @@ export default function ProductScreen({ route, navigation }) {
             {readyToPayOrderId
               ? 'Make payment to continue'
               : awaitingShippingQuote
-                ? 'Awaiting shipping quote'
+                ? 'Awaiting shipping fee'
                 : 'Buy now'}
           </Text>
           {awaitingShippingQuote || readyToPayOrderId ? null : (

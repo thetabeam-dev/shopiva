@@ -728,7 +728,7 @@ export default function CartCheckoutScreen({ navigation }) {
       });
       Alert.alert(
         'Order sent',
-        'Your order was sent as unpaid. The seller will set the shipping quote, then you can complete payment.',
+        'Your order has been placed successfully without payment. The seller will set the shipping fee, after which you can proceed to pay for your order.',
       );
       navigation.goBack();
     } catch (err) {
@@ -784,7 +784,7 @@ export default function CartCheckoutScreen({ navigation }) {
         <Modal visible={sendingQuote} transparent animationType="fade" onRequestClose={() => {}}>
           <View style={styles.quoteOverlay}>
             <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.quoteOverlayText}>Sending your shipping quote request…</Text>
+            <Text style={styles.quoteOverlayText}>Sending your shipping fee request…</Text>
           </View>
         </Modal>
         <StatusBar barStyle="dark-content" backgroundColor={CARD_BG} />
@@ -1021,7 +1021,7 @@ export default function CartCheckoutScreen({ navigation }) {
               disabled={isPaying}
               accessibilityRole="button"
             >
-              <Text style={styles.continueBtnText}>{isPaying ? 'Sending order…' : 'Request shipping quote'}</Text>
+              <Text style={styles.continueBtnText}>{isPaying ? 'Sending order…' : 'Request shipping fee'}</Text>
             </Pressable> */}
             <Pressable
               style={[styles.continueBtn, (isPaying || sendingQuote) ? styles.payBtnDisabled : null]}
