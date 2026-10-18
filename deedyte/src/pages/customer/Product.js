@@ -214,6 +214,20 @@ export default function ProductScreen({ route, navigation }) {
   }, [productIdParam, detailRetryToken]);
 
   const d = detailProduct;
+  const bulkTiers = useMemo(() => {
+    const raw = d?.bulkDiscount;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map(tier => {
+        if (!tier || typeof tier !== 'object') return null;
+        const minQuantity = Number(String(tier.minQuantity ?? tier.minQty ?? '').replace(/[^\d]/g, ''));
+        const totalPrice = Number(String(tier.totalPrice ?? '').replace(/[^\d.]/g, '').replace(/\.(?=.*\.)/g, ''));
+        if (!Number.isFinite(minQuantity) || minQuantity < 1) return null;
+        if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
+        return { minQuantity, totalPrice };
+      })
+      .filter(Boolean);
+  }, [d?.bulkDiscount]);
   const variants = useMemo(() => {
     const raw = d?.variants;
     return Array.isArray(raw)
@@ -1290,6 +1304,23 @@ export default function ProductScreen({ route, navigation }) {
             </View>
           </View>
         ) : null}
+        {bulkTiers.length > 0 ? (
+          <View style={styles.bulkBlock}>
+            <Text style={styles.sectionHeading}>Bulk discount</Text>
+            <Text style={styles.bulkHint}>Buy more and pay less per item.</Text>
+            {bulkTiers.map(tier => (
+              <View key={`${tier.minQuantity}-${tier.totalPrice}`} style={styles.bulkRow}>
+                <Text style={styles.bulkQty}>Buy {tier.minQuantity}</Text>
+                <View style={styles.bulkPrices}>
+                  <Text style={styles.bulkTotal}>{formatNaira(tier.totalPrice)}</Text>
+                  <Text style={styles.bulkEach}>
+                    {formatNaira(tier.totalPrice / tier.minQuantity)} each
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
         <Text style={styles.sectionHeading}>Description</Text>
         <Text style={styles.descriptionBody}>
           {typeof product?.description === 'string' &&
@@ -1794,6 +1825,24 @@ const styles = StyleSheet.create({
     color: '#111',
     marginBottom: 10,
   },
+  bulkBlock: { marginBottom: 18 },
+  bulkHint: { marginTop: -4, marginBottom: 10, fontSize: 13, color: '#6B7280' },
+  bulkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    backgroundColor: '#F7F8FA',
+  },
+  bulkQty: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  bulkPrices: { alignItems: 'flex-end' },
+  bulkTotal: { fontSize: 15, fontWeight: '800', color: '#111111' },
+  bulkEach: { marginTop: 2, fontSize: 12, color: '#6B7280' },
   descriptionBody: {
     fontSize: 15,
     color: '#444',

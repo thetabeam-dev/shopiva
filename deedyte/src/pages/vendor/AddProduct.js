@@ -160,6 +160,47 @@ function variantListIssue(variants) {
   return '';
 }
 
+function newBulkTier() {
+  return {
+    id: `tier_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    minQty: '',
+    totalPrice: '',
+  };
+}
+
+function bulkDiscountIssue(enabled, tiers) {
+  if (!enabled) return '';
+  const parsed = tiers.map(tier => ({
+    minQty: Number(String(tier.minQty).replace(/[^\d]/g, '')),
+    totalPrice: Number(String(tier.totalPrice).replace(/[^\d.]/g, '')),
+  }));
+  if (parsed.some(tier => !Number.isFinite(tier.minQty) || tier.minQty < 1)) {
+    return 'Each bulk tier needs a minimum quantity of at least 1.';
+  }
+  if (parsed.some(tier => !Number.isFinite(tier.totalPrice) || tier.totalPrice <= 0)) {
+    return 'Each bulk tier needs a total price greater than 0.';
+  }
+  const quantities = parsed.map(tier => tier.minQty);
+  if (new Set(quantities).size !== quantities.length) {
+    return 'Bulk tiers must use different minimum quantities.';
+  }
+  const ordered = [...parsed].sort((a, b) => a.minQty - b.minQty);
+  for (let i = 1; i < ordered.length; i += 1) {
+    const previous = ordered[i - 1].totalPrice / ordered[i - 1].minQty;
+    const current = ordered[i].totalPrice / ordered[i].minQty;
+    if (current >= previous) {
+      return 'A higher quantity tier must cost less per item than the tier below it.';
+    }
+  }
+  return '';
+}
+
+function formatBulkNaira(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return '';
+  return `₦${Math.round(value).toLocaleString('en-NG')}`;
+}
+
 const ADD_PRODUCT_DRAFT_KEY = 'deedyte_add_product_draft';
 
 function addProductDraftKey(userId) {
@@ -264,6 +305,8 @@ export default function VendorCreateProductScreen() {
   const [brandName, setBrandName] = useState('');
   const [allowPickup, setAllowPickup] = useState(false);
   const [allowDelivery, setAllowDelivery] = useState(false);
+  const [bulkEnabled, setBulkEnabled] = useState(false);
+  const [bulkTiers, setBulkTiers] = useState(() => [newBulkTier()]);
   const [uploadedMedia, setUploadedMedia] = useState(
     /** @type {{ id: string; url: string; type: string }[]} */ ([]),
   );
@@ -352,6 +395,8 @@ export default function VendorCreateProductScreen() {
         if (typeof draft.brandName === 'string') setBrandName(draft.brandName);
         if (typeof draft.allowPickup === 'boolean') setAllowPickup(draft.allowPickup);
         if (typeof draft.allowDelivery === 'boolean') setAllowDelivery(draft.allowDelivery);
+        if (typeof draft.bulkEnabled === 'boolean') setBulkEnabled(draft.bulkEnabled);
+        if (Array.isArray(draft.bulkTiers) && draft.bulkTiers.length) setBulkTiers(draft.bulkTiers);
         if (Array.isArray(draft.uploadedMedia)) setUploadedMedia(draft.uploadedMedia);
         if (typeof draft.thumbnailUrl === 'string') setThumbnailUrl(draft.thumbnailUrl);
       } catch {
@@ -394,6 +439,8 @@ export default function VendorCreateProductScreen() {
         brandName,
         allowPickup,
         allowDelivery,
+        bulkEnabled,
+        bulkTiers,
         uploadedMedia,
         thumbnailUrl,
       };
@@ -406,6 +453,7 @@ export default function VendorCreateProductScreen() {
         brandName.trim() ||
         savedVariants.length > 0 ||
         uploadedMedia.length > 0 ||
+        bulkEnabled ||
         variantColor ||
         variantSize ||
         variantMaterial ||
@@ -449,6 +497,8 @@ export default function VendorCreateProductScreen() {
     brandName,
     allowPickup,
     allowDelivery,
+    bulkEnabled,
+    bulkTiers,
     uploadedMedia,
     thumbnailUrl,
   ]);
@@ -502,6 +552,20 @@ export default function VendorCreateProductScreen() {
           : [];
         setUploadedMedia(images);
         setThumbnailUrl(String(product.thumbnail_url ?? images[0]?.url ?? ''));
+        const storedBulk = productSpecs.bulk_discount;
+        if (storedBulk && typeof storedBulk === 'object') {
+          setBulkEnabled(Boolean(storedBulk.enabled));
+          const tiers = Array.isArray(storedBulk.tiers) ? storedBulk.tiers : [];
+          if (tiers.length) {
+            setBulkTiers(
+              tiers.map((tier, index) => ({
+                id: `tier_${editProductId}_${index}`,
+                minQty: String(tier.minQuantity ?? tier.minQty ?? ''),
+                totalPrice: String(tier.totalPrice ?? ''),
+              })),
+            );
+          }
+        }
 
         if (product.weight != null) {
           setWeightKg(String(product.weight));
@@ -1236,6 +1300,11 @@ export default function VendorCreateProductScreen() {
       Alert.alert('Complete the form', listIssue);
       return;
     }
+    const discountIssue = bulkDiscountIssue(bulkEnabled, bulkTiers);
+    if (discountIssue) {
+      Alert.alert('Bulk discount', discountIssue);
+      return;
+    }
     // if (!isPriceValid) {
     //   Alert.alert('Complete the form', 'Enter a valid price.');
     //   return;
@@ -1265,6 +1334,15 @@ export default function VendorCreateProductScreen() {
       productPayload.specifications = {
         ...(productPayload.specifications ?? {}),
         generated_product_id: productId,
+        bulk_discount: bulkEnabled
+          ? {
+              enabled: true,
+              tiers: bulkTiers.map(tier => ({
+                minQuantity: Number(String(tier.minQty).replace(/[^\d]/g, '')),
+                totalPrice: Number(String(tier.totalPrice).replace(/[^\d.]/g, '')),
+              })),
+            }
+          : { enabled: false, tiers: [] },
       };
 
       if (Array.isArray(uploadedMedia) && uploadedMedia.length > 0) {
@@ -1370,6 +1448,8 @@ export default function VendorCreateProductScreen() {
     editProductId,
     existingInventoryIds,
     navigation,
+    bulkEnabled,
+    bulkTiers,
   ]);
 
   return (
@@ -1798,6 +1878,101 @@ export default function VendorCreateProductScreen() {
             onToggle={() => setContinueSelling(v => !v)}
           />
         </View> */}
+
+        <View style={styles.card}>
+          <View style={styles.bulkHeader}>
+            <View style={styles.bulkHeaderCopy}>
+              <Text style={styles.sectionTitle}>Bulk discounts</Text>
+              <Text style={styles.bulkHint}>
+                Encourage customers to buy more by offering a lower total price.
+              </Text>
+            </View>
+            <CheckRow
+              label="Enable bulk discounts"
+              checked={bulkEnabled}
+              onToggle={() => setBulkEnabled(value => !value)}
+            />
+          </View>
+          {bulkEnabled ? (
+            <>
+              {bulkTiers.map((tier, index) => {
+                const qty = Number(String(tier.minQty).replace(/[^\d]/g, ''));
+                const total = Number(String(tier.totalPrice).replace(/[^\d.]/g, ''));
+                const each = qty > 0 && total > 0 ? total / qty : 0;
+                return (
+                  <View key={tier.id} style={styles.bulkTier}>
+                    <View style={styles.bulkTierHeader}>
+                      <Text style={styles.bulkTierTitle}>Price tier {index + 1}</Text>
+                      {bulkTiers.length > 1 ? (
+                        <TouchableOpacity
+                          onPress={() =>
+                            setBulkTiers(current => current.filter(item => item.id !== tier.id))
+                          }
+                          hitSlop={8}
+                          accessibilityLabel={`Remove price tier ${index + 1}`}
+                        >
+                          <Icon name="trash-outline" size={18} color="#DC2626" />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                    <View style={styles.row}>
+                      <View style={styles.half}>
+                        <Text style={styles.dimLabel}>Minimum quantity</Text>
+                        <TextInput
+                          style={styles.input}
+                          keyboardType="number-pad"
+                          value={tier.minQty}
+                          onChangeText={text =>
+                            setBulkTiers(current =>
+                              current.map(item =>
+                                item.id === tier.id
+                                  ? { ...item, minQty: text.replace(/[^\d]/g, '') }
+                                  : item,
+                              ),
+                            )
+                          }
+                          placeholder="1"
+                          placeholderTextColor="#9CA3AF"
+                        />
+                      </View>
+                      <View style={styles.half}>
+                        <Text style={styles.dimLabel}>Total price (₦)</Text>
+                        <TextInput
+                          style={styles.input}
+                          keyboardType="decimal-pad"
+                          value={tier.totalPrice}
+                          onChangeText={text =>
+                            setBulkTiers(current =>
+                              current.map(item =>
+                                item.id === tier.id
+                                  ? { ...item, totalPrice: text.replace(/[^\d.]/g, '') }
+                                  : item,
+                              ),
+                            )
+                          }
+                          placeholder="5000"
+                          placeholderTextColor="#9CA3AF"
+                        />
+                      </View>
+                    </View>
+                    {each > 0 ? (
+                      <Text style={styles.bulkEach}>
+                        Effective price per item: {formatBulkNaira(each)}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+              <TouchableOpacity
+                style={styles.bulkAdd}
+                onPress={() => setBulkTiers(current => [...current, newBulkTier()])}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.bulkAddText}>+ Add another price tier</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+        </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Shipping (Optional)</Text>
@@ -2319,6 +2494,32 @@ const styles = StyleSheet.create({
     color: '#3F3F46',
     marginBottom: 10,
   },
+  bulkHeader: { marginBottom: 4 },
+  bulkHint: { fontSize: 13, lineHeight: 18, color: '#6B7280', marginBottom: 8 },
+  bulkTier: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 12,
+  },
+  bulkTierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  bulkTierTitle: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  bulkEach: { marginTop: 8, fontSize: 13, color: '#374151' },
+  bulkAdd: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  bulkAddText: { fontSize: 15, fontWeight: '600', color: '#111111' },
   labelError: {
     color: '#DC2626',
   },

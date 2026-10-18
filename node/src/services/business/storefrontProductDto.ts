@@ -296,6 +296,25 @@ export function buildStorefrontProductDetail(
     .sort((a, b) => a.id - b.id);
   const specs = parseSpecVariants(coerceSpecifications(product.specifications));
 
+  const specsRoot = coerceSpecifications(product.specifications);
+  const bulkRaw = specsRoot.bulk_discount;
+  const bulkTiers = bulkRaw && typeof bulkRaw === "object" && !Array.isArray(bulkRaw)
+    && Boolean((bulkRaw as { enabled?: unknown }).enabled)
+    && Array.isArray((bulkRaw as { tiers?: unknown }).tiers)
+    ? ((bulkRaw as { tiers: unknown[] }).tiers)
+        .map((tier) => {
+          if (!tier || typeof tier !== "object") return null;
+          const row = tier as { minQuantity?: unknown; minQty?: unknown; totalPrice?: unknown };
+          const minQuantity = Number(String(row.minQuantity ?? row.minQty ?? "").replace(/[^\d]/g, ""));
+          const totalPrice = Number(String(row.totalPrice ?? "").replace(/[^\d.]/g, "").replace(/\.(?=.*\.)/g, ""));
+          if (!Number.isFinite(minQuantity) || minQuantity < 1) return null;
+          if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
+          return { minQuantity, totalPrice };
+        })
+        .filter((tier): tier is { minQuantity: number; totalPrice: number } => tier != null)
+        .sort((a, b) => a.minQuantity - b.minQuantity)
+    : [];
+
   const base = {
     id: String(product.id),
     shop_id: product.shop_id,
@@ -307,6 +326,7 @@ export function buildStorefrontProductDetail(
     images,
     /** Used by storefront controller; must reflect DB or PDP always 404s. */
     is_published: Boolean(product.is_published),
+    bulkDiscount: bulkTiers,
   };
 
   if (invRows.length === 0) {
