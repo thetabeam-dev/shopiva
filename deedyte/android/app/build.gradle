@@ -94,8 +94,8 @@ android {
         applicationId "com.thetabeam.shopiva"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 14
-        versionName "1.5.8"
+        versionCode 15
+        versionName "1.5.9"
     }
     // signingConfigs {
     //     debug {

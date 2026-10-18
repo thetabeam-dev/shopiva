@@ -1029,7 +1029,7 @@ export default function CartCheckoutScreen({ navigation }) {
               disabled={isPaying || sendingQuote}
               accessibilityRole="button"
             >
-              <Text style={styles.continueBtnText}>Request Shipping Qouta</Text>
+              <Text style={styles.continueBtnText}>Ask For Delivery Fee</Text>
             </Pressable>
           </View>
         ) : null}
