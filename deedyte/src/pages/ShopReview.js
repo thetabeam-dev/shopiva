@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -51,6 +51,7 @@ function pickShopLogo(shop) {
  */
 export default function ShopReviewScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef(null);
   const { shop, order } = useRoute()?.params ?? {};
   const [rating, setRating] = useState(0);
   const [reviewType, setReviewType] = useState('');
@@ -102,12 +103,15 @@ export default function ShopReviewScreen({ navigation }) {
     <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top + 56}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.heroCard}>
@@ -192,6 +196,11 @@ export default function ShopReviewScreen({ navigation }) {
               onChangeText={setComment}
               textAlignVertical="top"
               editable={!submitting}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollRef.current?.scrollToEnd({ animated: true });
+                }, 80);
+              }}
             />
             <Text style={styles.charCount}>
               {comment.length}/{COMMENT_MAX}

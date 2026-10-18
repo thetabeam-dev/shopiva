@@ -144,6 +144,14 @@ export async function uploadShopVerificationDocument(shopId, file) {
   return readJson(res);
 }
 
+export async function deleteProductImage(shopId, url, type) {
+  const res = await apiFetchAuth(`/shop/${encodeURIComponent(String(shopId))}/product/media/delete`, {
+    method: 'POST',
+    body: JSON.stringify({ url, type }),
+  });
+  return readJson(res);
+}
+
 export async function uploadProductImage(shopId, file, productId) {
   const form = new FormData();
   form.append('file', file);

@@ -1,45 +1,96 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Alert, Linking, PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
+import DeviceInfo from 'react-native-device-info';
+
+const PERMISSION_RATIONALE = {
+  title: 'Location permission',
+  message:
+    'Deedyte uses your location to fill your address. Allow location access to continue, or enter the address manually.',
+  buttonPositive: 'Allow',
+  buttonNegative: 'Deny',
+  buttonNeutral: 'Cancel',
+};
+
+function openAppLocationSettings() {
+  Alert.alert(
+    'Location permission',
+    'Location access is off for Deedyte. Open settings and allow location so we can use your current location.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Open settings', onPress: () => Linking.openSettings() },
+    ],
+  );
+}
+
+function openDeviceLocationSettings() {
+  Alert.alert(
+    'Device location',
+    'Turn on location on this device, then try again.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      {
+        text: 'Open settings',
+        onPress: () => {
+          if (Platform.OS === 'android') {
+            Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS').catch(() => Linking.openSettings());
+            return;
+          }
+          Linking.openSettings();
+        },
+      },
+    ],
+  );
+}
+
+async function androidLocationGranted(interactive) {
+  const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+  if (await PermissionsAndroid.check(fine)) return true;
+  const result = await PermissionsAndroid.request(fine, PERMISSION_RATIONALE);
+  if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
+  if (interactive && result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) openAppLocationSettings();
+  return false;
+}
+
+function iosLocationGranted(interactive) {
+  return new Promise((resolve) => {
+    const geo = /** @type {{ requestAuthorization?: Function }} */ (Geolocation);
+    if (typeof geo.requestAuthorization !== 'function') {
+      resolve(true);
+      return;
+    }
+    geo.requestAuthorization(
+      () => resolve(true),
+      () => {
+        if (interactive) openAppLocationSettings();
+        resolve(false);
+      },
+    );
+  });
+}
 
 /**
+ * Confirms device location is on, then asks for app access again if it was denied.
+ * @param {{ interactive?: boolean }} [options]
  * @returns {Promise<boolean>}
  */
-export async function requestLocationPermission() {
-  if (Platform.OS === 'android') {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location permission',
-          message:
-            'Deedyte uses your location once to fill your address. You can edit the fields or type them manually if you prefer.',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Deny',
-          buttonNeutral: 'Cancel',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } catch {
+export async function requestLocationPermission(options = {}) {
+  const interactive = options.interactive !== false;
+  try {
+    const servicesOn = await DeviceInfo.isLocationEnabled();
+    if (!servicesOn) {
+      if (interactive) openDeviceLocationSettings();
       return false;
     }
+  } catch {
+    // Continue to the permission prompt if the services check is unavailable.
   }
-  // iOS shows the system prompt from requestAuthorization. The first argument must be a callback.
-  const geo = /** @type {{ requestAuthorization?: (success?: () => void, error?: (err: unknown) => void) => void }} */ (
-    Geolocation
-  );
-  if (typeof geo.requestAuthorization === 'function') {
-    geo.requestAuthorization(
-      () => {},
-      () => {},
-    );
-    return true;
+
+  try {
+    if (Platform.OS === 'android') return await androidLocationGranted(interactive);
+    return await iosLocationGranted(interactive);
+  } catch {
+    return false;
   }
-  Geolocation.getCurrentPosition(
-    () => {},
-    () => {},
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
-  );
-  return true;
 }
 
 /**
@@ -55,7 +106,16 @@ export function getCurrentCoordinates() {
         });
       },
       (err) => {
-        reject(err instanceof Error ? err : new Error(String(err?.message ?? err)));
+        const code = Number(err?.code);
+        if (code === 1) {
+          reject(new Error('Location permission was denied. Allow location access and try again.'));
+          return;
+        }
+        if (code === 2) {
+          reject(new Error('Turn on device location, then try again.'));
+          return;
+        }
+        reject(err instanceof Error ? err : new Error(String(err?.message ?? 'Could not read your location.')));
       },
       {
         enableHighAccuracy: true,

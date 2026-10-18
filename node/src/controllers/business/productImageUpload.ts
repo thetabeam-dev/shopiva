@@ -86,3 +86,59 @@ export async function UploadProductImageController(req: Request, res: Response):
     res.status(500).json({ error: err instanceof Error ? err.message : "Upload failed." });
   }
 }
+
+export async function DeleteProductImageController(req: Request, res: Response): Promise<void> {
+  try {
+    const user = (req as AuthRequest).user;
+    if (!user?.id) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const shopId = parseInt(String(req.params.shopId ?? ""), 10);
+    if (!Number.isFinite(shopId) || shopId <= 0) {
+      res.status(400).json({ error: "Invalid shop ID." });
+      return;
+    }
+
+    const url = String(req.body?.url ?? "").trim();
+    if (!url.startsWith("https://res.cloudinary.com/")) {
+      res.status(400).json({ error: "A Cloudinary image URL is required." });
+      return;
+    }
+
+    const shop = await GetShopService(shopId);
+    const row = shop as Record<string, unknown>;
+    const ownerId = Number(row.ownerid ?? row.ownerId);
+    if (!Number.isFinite(ownerId) || ownerId !== Number(user.id)) {
+      res.status(403).json({ error: "You do not own this shop." });
+      return;
+    }
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (!cloudName || !apiKey || !apiSecret) {
+      res.status(503).json({ error: "Cloudinary is not configured." });
+      return;
+    }
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+
+    const type = String(req.body?.type ?? "").toLowerCase().includes("video") || url.includes("/video/upload/")
+      ? "video"
+      : "image";
+    try {
+      await Cloudinary.deleteAsset({ url, type });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.toLowerCase().includes("not found")) {
+        throw error;
+      }
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Delete product image error:", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "Delete failed." });
+  }
+}

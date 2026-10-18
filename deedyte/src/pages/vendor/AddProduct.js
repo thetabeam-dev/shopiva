@@ -20,16 +20,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import {
-  errorCodes,
-  isErrorWithCode,
-  pick as pickDocument,
-  types as documentPickerTypes,
-} from '@react-native-documents/picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   fetchOwnerShops,
   fetchShopDetails,
   uploadProductImage,
+  deleteProductImage,
 } from '../../api/shop';
 import {
   createInventory,
@@ -768,9 +764,30 @@ export default function VendorCreateProductScreen() {
     fieldInvalid('Variant options');
 
   const handleRemoveMedia = useCallback(mediaId => {
-    setUploadedMedia(prev => prev.filter(item => item.id !== mediaId));
+    const item = uploadedMedia.find(media => media.id === mediaId);
+    if (!item) return;
     setMediaUploadError('');
-  }, []);
+    setMediaUploading(true);
+    const finish = () => {
+      setUploadedMedia(prev => {
+        const next = prev.filter(media => media.id !== mediaId);
+        setThumbnailUrl(current => (current === item.url ? next[0]?.url ?? '' : current));
+        return next;
+      });
+      setMediaUploading(false);
+    };
+    const url = String(item.url ?? '');
+    if (!url.includes('res.cloudinary.com') || !resolvedShopId) {
+      finish();
+      return;
+    }
+    deleteProductImage(resolvedShopId, url, item.type)
+      .then(finish)
+      .catch(err => {
+        setMediaUploading(false);
+        setMediaUploadError(err instanceof Error ? err.message : 'Could not delete the image.');
+      });
+  }, [resolvedShopId, uploadedMedia]);
 
   const handlePickMedia = useCallback(async () => {
     if (!resolvedShopId) {
@@ -784,17 +801,27 @@ export default function VendorCreateProductScreen() {
     try {
       setMediaUploadError('');
       setMediaUploading(true);
-      const fileResult = await pickDocument({
-        type: [documentPickerTypes.images, documentPickerTypes.video],
-        copyTo: 'cachesDirectory',
+      const picked = await launchImageLibrary({
+        mediaType: 'mixed',
+        selectionLimit: 1,
+        quality: 0.8,
+        presentationStyle: 'fullScreen',
       });
-      const file = Array.isArray(fileResult) ? fileResult[0] : fileResult;
+      if (picked.didCancel) return;
+      if (picked.errorCode) {
+        throw new Error(picked.errorMessage || 'Could not open your photos.');
+      }
+      const asset = picked.assets?.[0];
+      if (!asset?.uri) {
+        throw new Error('No photo was selected.');
+      }
 
       const formFile = {
-        uri: file.uri,
-        type: file.type ?? 'application/octet-stream',
+        uri: asset.uri,
+        type: asset.type ?? 'image/jpeg',
         name:
-          file.name || `upload.${String(file.uri).split('.').pop() || 'jpg'}`,
+          asset.fileName ||
+          `upload.${String(asset.uri).split('.').pop() || 'jpg'}`,
       };
 
       const uploadResponse = await uploadProductImage(
@@ -818,9 +845,6 @@ export default function VendorCreateProductScreen() {
       ]);
       setThumbnailUrl(prev => prev || url);
     } catch (err) {
-      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
-        return;
-      }
       setMediaUploadError(
         err instanceof Error ? err.message : 'Upload failed.',
       );

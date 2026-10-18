@@ -37,6 +37,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Deedyte uses your photos so you can add product images and videos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We use your location to help you discover nearby products, calculate delivery availability, and improve your shopping experience.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
