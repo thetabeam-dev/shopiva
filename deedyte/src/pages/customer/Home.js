@@ -365,7 +365,15 @@ const styles = StyleSheet.create({
   bone: { backgroundColor: '#ECECEC' },
   boneLine: { height: 14, borderRadius: 6, backgroundColor: '#ECECEC' },
   boneCart: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ECECEC' },
-  card: { width: '48%', marginBottom: 18 },
+  card: {
+    width: '48%',
+    marginBottom: 14,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 7,
+    // borderWidth: 1,
+    // borderColor: '#D5D8DE',
+    padding: 8,
+  },
   cardImage: {
     width: '100%',
     aspectRatio: 1,

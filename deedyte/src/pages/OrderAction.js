@@ -326,7 +326,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
               </View>
 
               <View style={styles.processingCard}>
-                <Text style={styles.processingSectionTitle}>Set shipping quote</Text>
+                <Text style={styles.processingSectionTitle}>Set Shipping Fee</Text>
                 <Text style={styles.processingFieldLabel}>Shipping fee (₦)</Text>
                 <TextInput
                   value={shippingFee}

@@ -260,6 +260,21 @@ function ensureDomainListeners(socket) {
     DISPUTE_SOCKET_EVENTS.forEach((event) => socket.on(event, onDisputeUpdate));
   }
 
+  if (!socket.__messageSoundBound) {
+    socket.__messageSoundBound = true;
+    socket.on('message_created', async (payload) => {
+      const message = payload?.message;
+      const senderId = Number(message?.sender_id ?? message?.senderId ?? message?.user_id);
+      const selfId = Number(store.getState()?.auth?.user?.id ?? store.getState()?.profile?.user?.id);
+      if (Number.isFinite(senderId) && Number.isFinite(selfId) && senderId === selfId) return;
+      try {
+        await Tools.playSound();
+      } catch {
+        /* sound must not block the chat update */
+      }
+    });
+  }
+
   if (!socket.__notificationListenerBound) {
     socket.__notificationListenerBound = true;
     socket.on('notification_created', (payload) => {

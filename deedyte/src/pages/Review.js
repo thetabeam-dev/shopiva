@@ -1,5 +1,5 @@
 import { useRoute } from '@react-navigation/native';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,7 @@ const REVIEW_OPTIONS = [
  */
 export default function ReviewSubmissionScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef(null);
   const routeParams = useRoute()?.params ?? {};
   const {
     shop,
@@ -132,12 +133,15 @@ export default function ReviewSubmissionScreen({ navigation }) {
     <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top + 56}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.productCard}>
@@ -227,6 +231,11 @@ export default function ReviewSubmissionScreen({ navigation }) {
               onChangeText={setComment}
               textAlignVertical="top"
               editable={!isSubmitting}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollRef.current?.scrollToEnd({ animated: true });
+                }, 80);
+              }}
             />
             <Text style={styles.charCount}>
               {comment.length}/{COMMENT_MAX}

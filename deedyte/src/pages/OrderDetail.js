@@ -236,6 +236,23 @@ function MoneyRow({ label, value, bold, muted }) {
   );
 }
 
+const PAYOUT_HOLD_MS = 48 * 60 * 60 * 1000;
+
+function paymentReleaseLabel(updatedAt, nowMs, fulfillmentStatus) {
+  if (String(fulfillmentStatus ?? '').toLowerCase() === 'order_completed') return 'Completed';
+  const updated = new Date(updatedAt).getTime();
+  if (!Number.isFinite(updated)) return 'Payment releasing';
+  const remaining = updated + PAYOUT_HOLD_MS - nowMs;
+  if (remaining <= 0) return 'Payment releasing';
+  
+  const hours = Math.floor(remaining / (60 * 60 * 1000));
+  const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+  const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+  if (hours > 0) return `Payment releasing in ${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `Payment releasing in ${minutes}m ${seconds}s`;
+  return `Payment releasing in ${seconds}s`;
+}
+
 export default function OrderDetailScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -266,6 +283,13 @@ export default function OrderDetailScreen() {
     String(orderInfo?.order?.payment_status ?? '').toLowerCase() === 'unpaid';
   const autoPayStarted = useRef(false);
   const onMakePaymentRef = useRef(() => {});
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (statusKey !== 'order_confirmed') return undefined;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [statusKey]);
 
   useEffect(() => {
     if (!route.params?.autoPay || autoPayStarted.current) return;
@@ -1058,7 +1082,7 @@ export default function OrderDetailScreen() {
     } else {
       switch (statusKey) {
         case 'unpaid':
-          message = 'Awaiting vendor shipping quote';
+          message = 'Awaiting vendor"s shipping fee';
           break;
         case 'order_accepted':
           message = awaitingBuyerPayment ? 'Make payment now!' : 'Processing order';
@@ -1073,7 +1097,14 @@ export default function OrderDetailScreen() {
           message = 'Out for delivery';
           break;
         case 'order_confirmed':
-          message = 'Payment releasing';
+          message = paymentReleaseLabel(
+            orderInfo?.order?.updated_at,
+            nowMs,
+            orderInfo?.order?.fulfillment_status,
+          );
+          break;
+        case 'order_completed':
+          message = 'Completed';
           break;
         case 'order_cancelled':
           message = 'Order cancelled';
@@ -1628,8 +1659,8 @@ export default function OrderDetailScreen() {
               if (blockIfCancelled()) return;
               if (statusKey === 'unpaid') {
                 Alert.alert(
-                  'Awaiting shipping quote',
-                  'This order is awaiting a shipping quote from the vendor.',
+                  'Awaiting shipping fee',
+                  'This order is awaiting the vendor to set the shipping fee.',
                 );
                 return;
               }

@@ -49,6 +49,7 @@ import {
 } from "../../controllers/business/product.js";
 import {
     UploadProductImageController,
+    DeleteProductImageController,
     productImageUploadMiddleware,
 } from "../../controllers/business/productImageUpload.js";
 import {
@@ -111,6 +112,11 @@ BusinessRouter.post(
   verifyToken,
   productImageUploadMiddleware,
   UploadProductImageController,
+);
+BusinessRouter.post(
+  "/shop/:shopId/product/media/delete",
+  verifyToken,
+  DeleteProductImageController,
 );
 BusinessRouter.post(
   "/shop/delivery-evidence-upload",

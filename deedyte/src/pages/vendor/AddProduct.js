@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,19 +16,16 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import {
-  errorCodes,
-  isErrorWithCode,
-  pick as pickDocument,
-  types as documentPickerTypes,
-} from '@react-native-documents/picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   fetchOwnerShops,
   fetchShopDetails,
   uploadProductImage,
+  deleteProductImage,
 } from '../../api/shop';
 import {
   createInventory,
@@ -163,6 +160,12 @@ function variantListIssue(variants) {
   return '';
 }
 
+const ADD_PRODUCT_DRAFT_KEY = 'deedyte_add_product_draft';
+
+function addProductDraftKey(userId) {
+  return `${ADD_PRODUCT_DRAFT_KEY}:${userId}`;
+}
+
 const VARIANT_FORM_WARNING =
   'Please fill in the variant form. Color, size, stock (greater than 0), and variant price are all required.';
 
@@ -187,7 +190,7 @@ export default function VendorCreateProductScreen() {
     const parsed = Number(rawEditProductId ?? '');
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [rawEditProductId]);
-  const [productId] = useState(
+  const [productId, setProductId] = useState(
     () => `prod_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
   );
   const [saveSubmitting, setSaveSubmitting] = useState(false);
@@ -271,6 +274,8 @@ export default function VendorCreateProductScreen() {
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showFinishSheet, setShowFinishSheet] = useState(false);
   const [loadingExistingProduct, setLoadingExistingProduct] = useState(false);
+  const [draftReady, setDraftReady] = useState(editProductId != null);
+  const keepRestoredDynamicValues = useRef(false);
 
   const shopCategories = useMemo(
     () => parseShopCategories(shopDetails?.category),
@@ -293,7 +298,11 @@ export default function VendorCreateProductScreen() {
   );
 
   useEffect(() => {
-    setDynamicVariantValues({});
+    if (keepRestoredDynamicValues.current) {
+      keepRestoredDynamicValues.current = false;
+    } else {
+      setDynamicVariantValues({});
+    }
     const activeCategory = reduxCategoryState.categories.find(
       item => item.category === categoryKey,
     );
@@ -303,6 +312,146 @@ export default function VendorCreateProductScreen() {
 
     setVariantFields(parsedVariants instanceof Object ? parsedVariants : {});
   }, [categoryKey, reduxCategoryState.categories]);
+
+  useEffect(() => {
+    if (editProductId != null || !user?.id) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(addProductDraftKey(user.id));
+        if (cancelled || !raw) return;
+        const draft = JSON.parse(raw);
+        if (!draft || typeof draft !== 'object') return;
+        if (draft.productId) setProductId(String(draft.productId));
+        if (typeof draft.title === 'string') setTitle(draft.title);
+        if (typeof draft.description === 'string') setDescription(draft.description);
+        if (typeof draft.category === 'string' && draft.category && draft.category !== category) {
+          keepRestoredDynamicValues.current = true;
+          setCategory(draft.category);
+        }
+        if (typeof draft.gender === 'string') setGender(draft.gender);
+        if (typeof draft.subCategory === 'string') setSubCategory(draft.subCategory);
+        if (typeof draft.productType === 'string') setProductType(draft.productType);
+        if (draft.dynamicVariantValues && typeof draft.dynamicVariantValues === 'object') {
+          setDynamicVariantValues(draft.dynamicVariantValues);
+        }
+        setVariantColor(draft.variantColor ?? null);
+        if (typeof draft.variantSize === 'string') setVariantSize(draft.variantSize);
+        if (typeof draft.variantMaterial === 'string') setVariantMaterial(draft.variantMaterial);
+        if (typeof draft.variantStock === 'string') setVariantStock(draft.variantStock);
+        if (typeof draft.variantPrice === 'string') setVariantPrice(draft.variantPrice);
+        if (Array.isArray(draft.savedVariants)) setSavedVariants(draft.savedVariants);
+        if (typeof draft.price === 'string') setPrice(draft.price);
+        if (typeof draft.quantity === 'string') setQuantity(draft.quantity);
+        if (typeof draft.continueSelling === 'boolean') setContinueSelling(draft.continueSelling);
+        if (typeof draft.fragile === 'boolean') setFragile(draft.fragile);
+        if (typeof draft.weightKg === 'string') setWeightKg(draft.weightKg);
+        if (typeof draft.lengthCm === 'string') setLengthCm(draft.lengthCm);
+        if (typeof draft.widthCm === 'string') setWidthCm(draft.widthCm);
+        if (typeof draft.heightCm === 'string') setHeightCm(draft.heightCm);
+        if (typeof draft.brandName === 'string') setBrandName(draft.brandName);
+        if (typeof draft.allowPickup === 'boolean') setAllowPickup(draft.allowPickup);
+        if (typeof draft.allowDelivery === 'boolean') setAllowDelivery(draft.allowDelivery);
+        if (Array.isArray(draft.uploadedMedia)) setUploadedMedia(draft.uploadedMedia);
+        if (typeof draft.thumbnailUrl === 'string') setThumbnailUrl(draft.thumbnailUrl);
+      } catch {
+        // A bad draft should not block a new product.
+      } finally {
+        if (!cancelled) setDraftReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editProductId, user?.id]);
+
+  useEffect(() => {
+    if (!draftReady || editProductId != null || !user?.id) return undefined;
+    const handle = setTimeout(() => {
+      const draft = {
+        productId,
+        title,
+        description,
+        category,
+        gender,
+        subCategory,
+        productType,
+        dynamicVariantValues,
+        variantColor,
+        variantSize,
+        variantMaterial,
+        variantStock,
+        variantPrice,
+        savedVariants,
+        price,
+        quantity,
+        continueSelling,
+        fragile,
+        weightKg,
+        lengthCm,
+        widthCm,
+        heightCm,
+        brandName,
+        allowPickup,
+        allowDelivery,
+        uploadedMedia,
+        thumbnailUrl,
+      };
+      const hasProgress =
+        title.trim() ||
+        description.trim() ||
+        gender ||
+        subCategory ||
+        productType ||
+        brandName.trim() ||
+        savedVariants.length > 0 ||
+        uploadedMedia.length > 0 ||
+        variantColor ||
+        variantSize ||
+        variantMaterial ||
+        variantStock ||
+        variantPrice ||
+        Object.values(dynamicVariantValues).some(value => String(value ?? '').trim());
+      const key = addProductDraftKey(user.id);
+      if (!hasProgress) {
+        AsyncStorage.removeItem(key).catch(() => {});
+        return;
+      }
+      AsyncStorage.setItem(key, JSON.stringify(draft)).catch(() => {});
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [
+    draftReady,
+    editProductId,
+    user?.id,
+    productId,
+    title,
+    description,
+    category,
+    gender,
+    subCategory,
+    productType,
+    dynamicVariantValues,
+    variantColor,
+    variantSize,
+    variantMaterial,
+    variantStock,
+    variantPrice,
+    savedVariants,
+    price,
+    quantity,
+    continueSelling,
+    fragile,
+    weightKg,
+    lengthCm,
+    widthCm,
+    heightCm,
+    brandName,
+    allowPickup,
+    allowDelivery,
+    uploadedMedia,
+    thumbnailUrl,
+  ]);
 
   useEffect(() => {
     if (!resolvedShopId || !user?.id || editProductId == null) return;
@@ -615,9 +764,30 @@ export default function VendorCreateProductScreen() {
     fieldInvalid('Variant options');
 
   const handleRemoveMedia = useCallback(mediaId => {
-    setUploadedMedia(prev => prev.filter(item => item.id !== mediaId));
+    const item = uploadedMedia.find(media => media.id === mediaId);
+    if (!item) return;
     setMediaUploadError('');
-  }, []);
+    setMediaUploading(true);
+    const finish = () => {
+      setUploadedMedia(prev => {
+        const next = prev.filter(media => media.id !== mediaId);
+        setThumbnailUrl(current => (current === item.url ? next[0]?.url ?? '' : current));
+        return next;
+      });
+      setMediaUploading(false);
+    };
+    const url = String(item.url ?? '');
+    if (!url.includes('res.cloudinary.com') || !resolvedShopId) {
+      finish();
+      return;
+    }
+    deleteProductImage(resolvedShopId, url, item.type)
+      .then(finish)
+      .catch(err => {
+        setMediaUploading(false);
+        setMediaUploadError(err instanceof Error ? err.message : 'Could not delete the image.');
+      });
+  }, [resolvedShopId, uploadedMedia]);
 
   const handlePickMedia = useCallback(async () => {
     if (!resolvedShopId) {
@@ -631,17 +801,27 @@ export default function VendorCreateProductScreen() {
     try {
       setMediaUploadError('');
       setMediaUploading(true);
-      const fileResult = await pickDocument({
-        type: [documentPickerTypes.images, documentPickerTypes.video],
-        copyTo: 'cachesDirectory',
+      const picked = await launchImageLibrary({
+        mediaType: 'mixed',
+        selectionLimit: 1,
+        quality: 0.8,
+        presentationStyle: 'fullScreen',
       });
-      const file = Array.isArray(fileResult) ? fileResult[0] : fileResult;
+      if (picked.didCancel) return;
+      if (picked.errorCode) {
+        throw new Error(picked.errorMessage || 'Could not open your photos.');
+      }
+      const asset = picked.assets?.[0];
+      if (!asset?.uri) {
+        throw new Error('No photo was selected.');
+      }
 
       const formFile = {
-        uri: file.uri,
-        type: file.type ?? 'application/octet-stream',
+        uri: asset.uri,
+        type: asset.type ?? 'image/jpeg',
         name:
-          file.name || `upload.${String(file.uri).split('.').pop() || 'jpg'}`,
+          asset.fileName ||
+          `upload.${String(asset.uri).split('.').pop() || 'jpg'}`,
       };
 
       const uploadResponse = await uploadProductImage(
@@ -665,9 +845,6 @@ export default function VendorCreateProductScreen() {
       ]);
       setThumbnailUrl(prev => prev || url);
     } catch (err) {
-      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
-        return;
-      }
       setMediaUploadError(
         err instanceof Error ? err.message : 'Upload failed.',
       );
@@ -1155,6 +1332,9 @@ export default function VendorCreateProductScreen() {
           uid,
           inventoryPayload,
         );
+        if (user?.id) {
+          await AsyncStorage.removeItem(addProductDraftKey(user.id));
+        }
       }
       setShowFinishSheet(false);
       Alert.alert('Saved', 'Product is live as active.', [

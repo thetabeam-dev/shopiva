@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WIPE_STORAGE_ON_LAUNCH } from './src/auth/devAuth';
@@ -82,7 +82,7 @@ function App() {
       void clearAllDeedyteStorage();
     }
     warnIfPaystackLiveInDev();
-    void requestLocationPermission();
+    void requestLocationPermission({ interactive: false });
   }, []);
 
   useEffect(() => {
@@ -115,6 +115,7 @@ function App() {
   const [versionCheck, setVersionCheck] = useState({
     isLatest: true,
     storeUrl: '',
+    isUpdating: false
   });
 
   useEffect(() => {
@@ -125,6 +126,7 @@ function App() {
           setVersionCheck({
             isLatest: Boolean(data.isLatest),
             storeUrl: typeof (data.storeUrl) === 'string' ? data.storeUrl : '',
+            isUpdating: String(data.isUpdating).trim().toLowerCase() === 'true'
           });
         }
       } catch (error) {
@@ -163,7 +165,6 @@ function App() {
     void Linking.openURL(url);
   };
 
-
   const paystackPublicKey = getPaystackPublicKey();
   const paystackReady = isPaystackConfigured();
   const PaystackProvider = paystackReady ? getPaystackProvider() : null;
@@ -177,9 +178,7 @@ function App() {
 
   return (
     <>
-
-      {
-        !versionCheck.isLatest &&
+      {!versionCheck.isUpdating && !versionCheck.isLatest ? (
         <SafeAreaView
           style={{
             flex: 1,
@@ -188,69 +187,23 @@ function App() {
             paddingHorizontal: 28,
           }}
         >
-          <TouchableOpacity onPress={openStore}
-            // disabled={!versionCheck.storeUrl?.trim()}
-            activeOpacity={0.85}
-            accessibilityRole="link"
-            accessibilityLabel={
-              Platform.OS === 'ios'
-                ? 'Open App Store to download latest version'
-                : 'Open Play Store to download latest version'
-            }>
-            <View style={{ alignItems: 'center' }}>
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: '800',
-                  color: '#111111',
-                  textAlign: 'center',
-                  marginBottom: 10,
-                }}
-              >
-                Update required
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#111111', textAlign: 'center', marginBottom: 10 }}>
+              Update required
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555555', textAlign: 'center', marginBottom: 20 }}>
+              Your app is outdated. Install the latest version to keep using Deedyte.
+            </Text>
+            <TouchableOpacity onPress={openStore} activeOpacity={0.85}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#00926e', textAlign: 'center' }}>
+                Click Here To Download The Latest Version
               </Text>
-              <Text
-                style={{
-                  fontSize: 15,
-                  lineHeight: 22,
-                  color: '#555555',
-                  textAlign: 'center',
-                  marginBottom: 20,
-                }}
-              >
-                Your app is outdated. Install the latest version to keep using Deedyte.
-              </Text>
-              <TouchableOpacity
-                onPress={openStore}
-                // disabled={!versionCheck.storeUrl?.trim()}
-                activeOpacity={0.85}
-                accessibilityRole="link"
-                accessibilityLabel={
-                  Platform.OS === 'ios'
-                    ? 'Open App Store to download latest version'
-                    : 'Open Play Store to download latest version'
-                }
-              >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: '700',
-                    color: '#00926e',
-                    textAlign: 'center',
-                    cursor: "pointer"
-                    // opacity: versionCheck.storeUrl?.trim() ? 1 : 0.5,
-                  }}
-                >
-                  Click Here To Download The Latest Version
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
-      }
+      ) : null}
 
-      {
-        versionCheck.isLatest &&
+      {versionCheck.isLatest || versionCheck.isUpdating ? (
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider style={{ flex: 1 }}>
             {PaystackProvider ? (
@@ -267,8 +220,7 @@ function App() {
             )}
           </SafeAreaProvider>
         </GestureHandlerRootView>
-      }
-
+      ) : null}
     </>
   );
 }

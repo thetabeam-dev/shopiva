@@ -45,7 +45,7 @@ function fcmMssg(
       if (role === "vendor") {
         return "The buyer has confirmed receipt of your order. Please wait for the buyer to confirm their satisfaction before your payment is released.";
       }
-      return "Your order has been confirmed as delivered. You have 48 hours to confirm your satisfaction with the order. If you do not respond within this period, the payment will be automatically released to the vendor.";
+      return "Your order has been confirmed as delivered! Please check your order and report any issues within 48 hours. If no issue is reported within this period, payment will be automatically released to the vendor.";
 
     case "order_disputed":
       return "A dispute has been raised for this order. We’ll review the matter and keep you informed.";
@@ -91,7 +91,7 @@ async function buildOrderLists(orderId: unknown): Promise<{
   return { result, vendorList, customerList };
 }
 
-/** Tell the vendor a buyer created an unpaid order waiting on a shipping quote. */
+/** Tell the vendor a buyer created an unpaid order waiting on a shipping fee. */
 export async function emitUnpaidOrderToVendor(orderId: unknown, vendorUserId: unknown): Promise<void> {
   const vendorId = Number(vendorUserId);
   if (!Number.isFinite(vendorId) || vendorId <= 0) return;

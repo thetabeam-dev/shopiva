@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -71,6 +72,18 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   chatRoleVariant = auth.activeRole;
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
   const route = useRoute();
   const { user } = useProfile();
   const chat = route.params?.chat;
@@ -321,11 +334,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     () => [
       styles.inputBar,
       {
-        paddingBottom: Math.max(insets.bottom, 8),
-        paddingTop: 6,
+        paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 8),
+        paddingTop: 8,
       },
     ],
-    [insets.bottom],
+    [insets.bottom, keyboardOpen],
   );
 
   const canSend = input.trim().length > 0 && !moderationComposeLocked;
@@ -342,11 +355,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     <>
     {
       Platform.OS === 'android' &&
-      <SafeAreaView style={styles.flex} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.bottom}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
         >
           <View style={styles.flex}>
             <FlatList
@@ -458,8 +471,8 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       Platform.OS === 'ios' &&
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : insets.bottom}
+        behavior="padding"
+        keyboardVerticalOffset={insets.top + 56}
       >
         <View style={styles.flex}>
           <FlatList
@@ -681,8 +694,8 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
+    alignItems: 'flex-end',
+    gap: 8,
   },
   sideBtn: {
     width: 40,
@@ -697,22 +710,27 @@ const styles = StyleSheet.create({
   inputWrap: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingLeft: 12,
-    paddingRight: 4,
-    paddingVertical: 4,
-    minHeight: 46,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D8D8D8',
+    paddingLeft: 14,
+    paddingRight: 8,
+    minHeight: 48,
     maxHeight: 120,
   },
   input: {
     flex: 1,
     fontSize: 16,
+    lineHeight: 20,
     color: BLACK,
-    maxHeight: 110,
-    paddingVertical: 8,
-    minHeight: 38,
+    maxHeight: 100,
+    minHeight: 40,
+    paddingTop: Platform.OS === 'ios' ? 10 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   inlineIcon: {
     padding: 6,
@@ -721,11 +739,10 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 48,
     height: 48,
-    borderRadius: 10,
+    borderRadius: 24,
     backgroundColor: SEND_GREEN,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
   },
   micBtn: {
     backgroundColor: SEND_GREEN,

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import MapView from 'react-native-maps';
 import Geolocation from '@react-native-community/geolocation';
+import { requestLocationPermission } from '../utils/deviceLocation';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BLACK, MUTED, settingsFormStyles as s } from './settingsFields';
@@ -141,31 +142,39 @@ export default function SettingsLocationScreen() {
 
   const useCurrentLocation = useCallback(() => {
     setLocateBusy(true);
-    Geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        const next = {
-          latitude: lat,
-          longitude: lon,
-          latitudeDelta: 0.06,
-          longitudeDelta: 0.06,
-        };
-        mapRef.current?.animateToRegion(next, 450);
-        setLatitude(lat);
-        setLongitude(lon);
-        scheduleGeocode(lat, lon);
-        setLocateBusy(false);
-      },
-      (err) => {
-        setLocateBusy(false);
-        Alert.alert(
-          'Location',
-          err?.message || 'Could not read your position. Enable location permission or drag the map.',
+    requestLocationPermission()
+      .then(granted => {
+        if (!granted) {
+          setLocateBusy(false);
+          return;
+        }
+        Geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const next = {
+              latitude: lat,
+              longitude: lon,
+              latitudeDelta: 0.06,
+              longitudeDelta: 0.06,
+            };
+            mapRef.current?.animateToRegion(next, 450);
+            setLatitude(lat);
+            setLongitude(lon);
+            scheduleGeocode(lat, lon);
+            setLocateBusy(false);
+          },
+          (err) => {
+            setLocateBusy(false);
+            Alert.alert(
+              'Location',
+              err?.message || 'Could not read your position. Enable location permission or drag the map.',
+            );
+          },
+          { enableHighAccuracy: true, timeout: 18000, maximumAge: 60000 },
         );
-      },
-      { enableHighAccuracy: true, timeout: 18000, maximumAge: 60000 },
-    );
+      })
+      .catch(() => setLocateBusy(false));
   }, [scheduleGeocode]);
 
   const onSave = useCallback(() => {
