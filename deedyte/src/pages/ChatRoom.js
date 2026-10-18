@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   Alert,
   ActivityIndicator,
+  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   Keyboard,
@@ -73,12 +74,23 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardOpen(true);
+      if (Platform.OS !== 'android') return;
+      const screenY = Number(event?.endCoordinates?.screenY);
+      const windowHeight = Dimensions.get('window').height;
+      const overlap = Number.isFinite(screenY) ? Math.max(0, windowHeight - screenY) : Number(event?.endCoordinates?.height) || 0;
+      setKeyboardInset(overlap);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardOpen(false);
+      setKeyboardInset(0);
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -355,7 +367,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     <>
     {
       Platform.OS === 'android' &&
-      <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.flex, keyboardInset > 0 && { paddingBottom: keyboardInset }]} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
