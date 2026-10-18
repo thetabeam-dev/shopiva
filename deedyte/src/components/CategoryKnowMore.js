@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 const BRAND = '#00926E';
 
-/** Info icon that opens a short note of the product types in a category. */
+function splitProductTypes(value) {
+  return String(value ?? '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+/** Info icon that opens a readable list of the product types in a category. */
 export default function CategoryKnowMore({ label, productTypes }) {
   const [open, setOpen] = useState(false);
-  const types = String(productTypes ?? '').trim();
-  if (!types) return null;
+  const types = useMemo(() => splitProductTypes(productTypes), [productTypes]);
+  if (!types.length) return null;
 
   return (
     <>
@@ -25,7 +32,17 @@ export default function CategoryKnowMore({ label, productTypes }) {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.card}>
             <Text style={styles.title}>{label}</Text>
-            <Text style={styles.body}>{types}</Text>
+            <Text style={styles.subtitle}>
+              {types.length} product {types.length === 1 ? 'type' : 'types'} in this category
+            </Text>
+            <ScrollView style={styles.list} showsVerticalScrollIndicator>
+              {types.map(type => (
+                <View key={type} style={styles.row}>
+                  <View style={styles.dot} />
+                  <Text style={styles.type}>{type}</Text>
+                </View>
+              ))}
+            </ScrollView>
             <Pressable style={styles.close} onPress={() => setOpen(false)}>
               <Text style={styles.closeText}>Got it</Text>
             </Pressable>
@@ -46,23 +63,50 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 18,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+    maxHeight: '78%',
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 8,
   },
-  body: {
-    fontSize: 14,
+  subtitle: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  list: {
+    flexGrow: 0,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 7,
+    marginRight: 10,
+    backgroundColor: BRAND,
+  },
+  type: {
+    flex: 1,
+    fontSize: 15,
     lineHeight: 20,
-    color: '#4B5563',
+    color: '#111827',
   },
   close: {
     alignSelf: 'flex-end',
-    marginTop: 14,
-    paddingVertical: 6,
+    marginTop: 8,
+    paddingVertical: 10,
     paddingHorizontal: 4,
   },
   closeText: {
