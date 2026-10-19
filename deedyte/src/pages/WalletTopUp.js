@@ -116,7 +116,10 @@ export default function WalletTopUpScreen() {
 
       <Pressable
         style={styles.button}
-        onPress={() => navigation.goBack()}
+        onPress={() => {
+          setAmount('0');
+          navigation.navigate('Wallet');
+        }}
         accessibilityRole="button"
         accessibilityLabel="I've sent the money"
       >

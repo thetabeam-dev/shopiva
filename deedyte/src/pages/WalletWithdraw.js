@@ -202,7 +202,10 @@ export default function WalletWithdrawScreen() {
               accountNumber,
               accountName,
             });
-            Alert.alert('Withdraw', 'The withdrawal was recorded.');
+            setAmount('');
+            Alert.alert('Withdraw', 'The withdrawal was recorded.', [
+              { text: 'OK', onPress: () => navigation.navigate('Wallet') },
+            ]);
           } catch (error) {
             Alert.alert('Withdraw', error instanceof Error ? error.message : String(error));
           }

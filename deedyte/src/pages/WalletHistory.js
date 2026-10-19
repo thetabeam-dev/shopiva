@@ -3,8 +3,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { fetchWalletTransactions } from '../api/user';
-import { formatNaira } from '../utils/formatNaira';
 import { connectChatSocket } from '../socket/chatSocket';
+import WalletTransactionRow from '../components/WalletTransactionRow';
 
 const TEAL = '#00926e';
 
@@ -53,13 +53,7 @@ export default function WalletHistoryScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       {transactions.map(item => (
-        <View key={String(item.id)} style={styles.row}>
-          <View style={styles.text}>
-            <Text style={styles.title}>{item.description || item.type}</Text>
-            <Text style={styles.hint}>{item.status}</Text>
-          </View>
-          <Text style={styles.amount}>{formatNaira(Number(item.amount_kobo) / 100)}</Text>
-        </View>
+        <WalletTransactionRow key={String(item.id)} item={item} />
       ))}
     </ScrollView>
   );
@@ -75,16 +69,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 7,
-    padding: 14,
-    marginBottom: 8,
-  },
-  text: { flex: 1 },
-  title: { fontSize: 15, fontWeight: '700', color: '#111111' },
-  hint: { marginTop: 4, fontSize: 13, color: '#6B7280' },
-  amount: { fontSize: 15, fontWeight: '800', color: '#111111' },
+  title: { marginTop: 12, fontSize: 16, fontWeight: '800', color: '#111111' },
+  hint: { marginTop: 6, fontSize: 13, lineHeight: 18, color: '#6B7280', textAlign: 'center' },
 });

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { fetchWallet, fetchWalletRecipient, sendWalletMoney } from '../api/user';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
 import WalletPinModals from '../components/WalletPinModals';
@@ -8,6 +8,7 @@ import WalletPinModals from '../components/WalletPinModals';
 const TEAL = '#00926e';
 
 export default function WalletSendScreen() {
+  const navigation = useNavigation();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [remark, setRemark] = useState('');
@@ -146,7 +147,14 @@ export default function WalletSendScreen() {
               remark,
               pin: enteredPin,
             });
-            Alert.alert('Sent', 'The money has been sent.');
+            setRecipient('');
+            setAmount('');
+            setRemark('');
+            setProfile(null);
+            setLookupError('');
+            Alert.alert('Sent', 'The money has been sent.', [
+              { text: 'OK', onPress: () => navigation.navigate('Wallet') },
+            ]);
           } catch (error) {
             Alert.alert('Send', error instanceof Error ? error.message : String(error));
           }

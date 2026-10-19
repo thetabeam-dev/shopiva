@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatNaira } from '../utils/formatNaira';
+import WalletTransactionRow from '../components/WalletTransactionRow';
 import { fetchWallet, fetchWalletTransactions } from '../api/user';
 import { connectChatSocket } from '../socket/chatSocket';
 
@@ -171,10 +172,7 @@ export default function WalletScreen() {
         </View>
       ) : (
         transactions.slice(0, 5).map(item => (
-          <View key={String(item.id)} style={styles.txRow}>
-            <Text style={styles.emptyTitle}>{item.type}</Text>
-            <Text style={styles.value}>{formatNaira(Number(item.amount_kobo) / 100)}</Text>
-          </View>
+          <WalletTransactionRow key={String(item.id)} item={item} />
         ))
       )}
     </ScrollView>
