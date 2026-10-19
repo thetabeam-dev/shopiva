@@ -13,6 +13,7 @@ import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
 import { escrow } from "../../services/escrow.js";
 import { sendFcmForActivities } from "../../services/firebaseConfig.js";
 import { createAndEmitNotification } from "../../services/notifications.js";
+import { creditWalletFromPaystack } from "../../models/wallet.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
 
 export async function PaystackWebhookController(
@@ -53,34 +54,47 @@ export async function PaystackWebhookController(
     const pool = await db();
     const rawEvent = JSON.parse(rawBody.toString());
     const { event: eventType, data: paystackData } = rawEvent;
+    const channel = String(paystackData?.channel ?? "").toLowerCase();
 
-    console.log("testing paystack webhook:", eventType);
     // Process only successful charges
-    if (eventType !== "charge.success") {
-      if (eventType === "transfer.success") {
-        escrow.complete({
-          transfer_reference: paystackData.reference,
+    const dedicatedTopUp = eventType === "charge.success" && channel === "dedicated_nuban";
+    if (dedicatedTopUp || eventType === "transfer.success") {
+      const credit = await creditWalletFromPaystack(paystackData as Record<string, unknown>);
+      if (credit.credited && credit.userId) {
+        io.to(`user:${credit.userId}`).emit("wallet_credited", {
+          balance_kobo: credit.balance_kobo,
+          transactions: credit.transactions ?? [],
         });
-        res.status(200).json({ message: "Payment completed" });
-        return;
-      } else if (eventType === "transfer.failed") {
-        escrow.setTransferStatus({
-          status: "failed",
-          transfer_reference: paystackData.reference,
-        });
-        res.status(200).json({ message: "Payment completed" });
-        return;
-      } else if (eventType === "transfer.reversed") {
-        escrow.setTransferStatus({
-          status: "reversed",
-          transfer_reference: paystackData.reference,
-        });
-        res.status(200).json({ message: "Payment completed" });
-        return;
-      } else {
-        res.status(200).send("Ignored");
-        return;
       }
+      res.status(200).json({ message: "Wallet credited" });
+      return;
+    }
+
+    if (eventType !== "charge.success") {
+      // if (eventType === "transfer.success") {
+      //   escrow.complete({
+      //     transfer_reference: paystackData.reference,
+      //   });
+      //   res.status(200).json({ message: "Payment completed" });
+      //   return;
+      // } else if (eventType === "transfer.failed") {
+      //   escrow.setTransferStatus({
+      //     status: "failed",
+      //     transfer_reference: paystackData.reference,
+      //   });
+      //   res.status(200).json({ message: "Payment completed" });
+      //   return;
+      // } else if (eventType === "transfer.reversed") {
+      //   escrow.setTransferStatus({
+      //     status: "reversed",
+      //     transfer_reference: paystackData.reference,
+      //   });
+      //   res.status(200).json({ message: "Payment completed" });
+      //   return;
+      // } else {
+      //   res.status(200).send("Ignored");
+      //   return;
+      // }
     }
 
     // Store all webhook deliveries for audit trail

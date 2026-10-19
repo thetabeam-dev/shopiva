@@ -1,10 +1,11 @@
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatNaira } from '../utils/formatNaira';
-import { fetchWallet } from '../api/user';
+import { fetchWallet, fetchWalletTransactions } from '../api/user';
+import { connectChatSocket } from '../socket/chatSocket';
 
 const TEAL = '#00926e';
 
@@ -18,6 +19,7 @@ const ACTIONS = [
 export default function WalletScreen() {
   const navigation = useNavigation();
   const [wallet, setWallet] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const balanceKobo = Number(wallet?.balance_kobo);
   const balance = Number.isFinite(balanceKobo) ? balanceKobo / 100 : 0;
@@ -25,22 +27,53 @@ export default function WalletScreen() {
 
   const loadWallet = useCallback(() => {
     setRefreshing(true);
-    return fetchWallet()
-      .then(row => setWallet(row))
-      .catch(() => setWallet(null))
+    return Promise.all([fetchWallet(), fetchWalletTransactions()])
+      .then(([row, list]) => {
+        setWallet(row);
+        setTransactions(list);
+      })
+      .catch(() => {
+        setWallet(null);
+        setTransactions([]);
+      })
       .finally(() => setRefreshing(false));
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    let socket = null;
+    const onWalletCredited = payload => {
+      const kobo = Number(payload?.balance_kobo);
+      if (Number.isFinite(kobo)) {
+        setWallet(current => ({ ...(current ?? {}), balance_kobo: kobo }));
+      }
+      if (Array.isArray(payload?.transactions)) setTransactions(payload.transactions);
+    };
+    void connectChatSocket().then(next => {
+      if (!alive || !next) return;
+      socket = next;
+      next.on('wallet_credited', onWalletCredited);
+    });
+    return () => {
+      alive = false;
+      socket?.off('wallet_credited', onWalletCredited);
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       setRefreshing(true);
-      fetchWallet()
-        .then(row => {
-          if (!cancelled) setWallet(row);
+      Promise.all([fetchWallet(), fetchWalletTransactions()])
+        .then(([row, list]) => {
+          if (cancelled) return;
+          setWallet(row);
+          setTransactions(list);
         })
         .catch(() => {
-          if (!cancelled) setWallet(null);
+          if (cancelled) return;
+          setWallet(null);
+          setTransactions([]);
         })
         .finally(() => {
           if (!cancelled) setRefreshing(false);
@@ -128,13 +161,22 @@ export default function WalletScreen() {
 
       <Text style={styles.sectionTitle}>Recent activity</Text>
       <Text style={styles.sectionHint}>Top ups, sends, and payments</Text>
-      <View style={styles.empty}>
-        <Icon name="time-outline" size={22} color={TEAL} />
-        <View style={styles.emptyText}>
-          <Text style={styles.emptyTitle}>No activity yet</Text>
-          <Text style={styles.muted}>Top ups and transfers will show up here.</Text>
+      {transactions.length === 0 ? (
+        <View style={styles.empty}>
+          <Icon name="time-outline" size={22} color={TEAL} />
+          <View style={styles.emptyText}>
+            <Text style={styles.emptyTitle}>No activity yet</Text>
+            <Text style={styles.muted}>Top ups and transfers will show up here.</Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        transactions.slice(0, 5).map(item => (
+          <View key={String(item.id)} style={styles.txRow}>
+            <Text style={styles.emptyTitle}>{item.type}</Text>
+            <Text style={styles.value}>{formatNaira(Number(item.amount_kobo) / 100)}</Text>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -195,4 +237,14 @@ const styles = StyleSheet.create({
   empty: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   emptyText: { flex: 1 },
   emptyTitle: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  txRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
 });

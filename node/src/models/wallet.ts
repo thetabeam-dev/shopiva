@@ -111,6 +111,113 @@ export async function replaceWalletPinHash(userId: number, pinHash: string) {
   return Number(rowCount) > 0;
 }
 
+function paystackAccountNumber(data: Record<string, unknown>) {
+  const authorization = (data.authorization ?? {}) as Record<string, unknown>;
+  const dedicated = (data.dedicated_account ?? {}) as Record<string, unknown>;
+  const metadata = (data.metadata ?? {}) as Record<string, unknown>;
+  const recipient = (data.recipient ?? {}) as Record<string, unknown>;
+  const details = (recipient.details ?? {}) as Record<string, unknown>;
+  const candidates = [
+    authorization.receiver_bank_account_number,
+    dedicated.account_number,
+    metadata.receiver_account_number,
+    details.account_number,
+  ];
+  for (const value of candidates) {
+    const next = String(value ?? "").replace(/\D/g, "");
+    if (next) return next;
+  }
+  return "";
+}
+
+/** Credits a wallet once for an inbound Paystack transfer, keyed by reference. */
+export async function creditWalletFromPaystack(data: Record<string, unknown>) {
+  const reference = String(data.reference ?? "").trim();
+  const amountKobo = Number(data.amount);
+  const accountNumber = paystackAccountNumber(data);
+  const customer = (data.customer ?? {}) as Record<string, unknown>;
+  const customerCode = String(customer.customer_code ?? "").trim();
+  if (!reference || !Number.isFinite(amountKobo) || amountKobo <= 0) {
+    return { credited: false };
+  }
+  if (!accountNumber && !customerCode) return { credited: false };
+
+  const pool = await db();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const wallet = await client.query<{ id: string; user_id: number }>(
+      `SELECT w.id, w.user_id
+       FROM wallets w
+       INNER JOIN virtual_accounts v ON v.wallet_id = w.id
+       WHERE ($1 <> '' AND v.account_number = $1)
+          OR ($2 <> '' AND v.paystack_customer_code = $2)
+       LIMIT 1`,
+      [accountNumber, customerCode]
+    );
+    const walletId = wallet.rows[0]?.id;
+    const userId = Number(wallet.rows[0]?.user_id);
+    if (!walletId) {
+      await client.query("ROLLBACK");
+      return { credited: false };
+    }
+    const inserted = await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, type, amount_kobo, reference, status, description)
+       VALUES ($1, 'topup', $2, $3, 'success', 'Paystack transfer')
+       ON CONFLICT (reference) DO NOTHING
+       RETURNING id`,
+      [walletId, Math.round(amountKobo), reference]
+    );
+    if (!inserted.rows[0]) {
+      await client.query("COMMIT");
+      return { credited: false, duplicate: true };
+    }
+    await client.query(
+      `UPDATE wallets SET balance_kobo = balance_kobo + $2, updated_at = NOW() WHERE id = $1`,
+      [walletId, Math.round(amountKobo)]
+    );
+    const balance = await client.query<{ balance_kobo: string }>(
+      `SELECT balance_kobo FROM wallets WHERE id = $1`,
+      [walletId]
+    );
+    const transactions = await client.query(
+      `SELECT id, type, amount_kobo, reference, status, description, created_at
+       FROM wallet_transactions
+       WHERE wallet_id = $1
+       ORDER BY created_at DESC
+       LIMIT 30`,
+      [walletId]
+    );
+    await client.query("COMMIT");
+    return {
+      credited: true,
+      userId,
+      balance_kobo: balance.rows[0]?.balance_kobo ?? null,
+      transactions: transactions.rows,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listWalletTransactions(userId: number) {
+  const id = Number(userId);
+  if (!Number.isFinite(id) || id <= 0) return [];
+  const { rows } = await (await db()).query(
+    `SELECT t.id, t.type, t.amount_kobo, t.reference, t.status, t.description, t.created_at
+     FROM wallet_transactions t
+     INNER JOIN wallets w ON w.id = t.wallet_id
+     WHERE w.user_id = $1
+     ORDER BY t.created_at DESC
+     LIMIT 30`,
+    [id]
+  );
+  return rows;
+}
+
 export async function updateWalletAddressByUserId(userId: number, address: string) {
   const id = Number(userId);
   const next = String(address ?? "").trim();

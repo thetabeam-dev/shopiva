@@ -320,6 +320,36 @@ export async function createWalletPin(pin, confirm) {
   return data;
 }
 
+export async function requestWalletPinReset(email) {
+  const res = await apiFetchAuth('/user/wallet/pin/recover', {
+    method: 'POST',
+    body: JSON.stringify({ email: String(email ?? '').trim().toLowerCase() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
+export async function verifyWalletPinReset(pin) {
+  const res = await apiFetchAuth('/user/wallet/pin/recover/verify', {
+    method: 'POST',
+    body: JSON.stringify({ pin: String(pin ?? '').trim() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
+export async function resetWalletPin(resetToken, pin, confirm) {
+  const res = await apiFetchAuth('/user/wallet/pin/recover/reset', {
+    method: 'POST',
+    body: JSON.stringify({ resetToken, pin, confirm }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
 export async function changeWalletPin(current, pin, confirm) {
   const res = await apiFetchAuth('/user/wallet/pin', {
     method: 'PUT',
@@ -338,6 +368,13 @@ export async function verifyWalletPin(pin) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(pickError(data, res));
   return data;
+}
+
+export async function fetchWalletTransactions() {
+  const res = await apiFetchAuth('/user/wallet/transactions', { method: 'GET' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return Array.isArray(data.transactions) ? data.transactions : [];
 }
 
 export async function fetchWallet() {

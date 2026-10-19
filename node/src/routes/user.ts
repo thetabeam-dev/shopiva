@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
-import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, CreateWalletPinController, VerifyWalletPinController, ChangeWalletPinController } from "../controllers/user.js";
+import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, ListWalletTransactionsController, CreateWalletPinController, VerifyWalletPinController, ChangeWalletPinController, RequestWalletPinResetController, VerifyWalletPinResetController, ResetWalletPinController } from "../controllers/user.js";
 import { UploadUserPhotoController, userPhotoUploadMiddleware } from "../controllers/userPhotoUpload.js";
 
 export const UserRouter = express.Router();
@@ -33,8 +33,12 @@ UserRouter.put('/user/photo/update/:id', authenticate, UpdatePhotoController);
 UserRouter.put('/user/profile/update/:id', authenticate, UpdateProfileController);
 UserRouter.put('/user/password/update/:id', authenticate, UpdatePasswordController);
 UserRouter.get('/user/wallet', authenticate, GetWalletController);
+UserRouter.get('/user/wallet/transactions', authenticate, ListWalletTransactionsController);
 UserRouter.get('/user/wallet/recipient', authenticate, GetWalletRecipientController);
 UserRouter.post('/user/wallet/pin', authenticate, CreateWalletPinController);
 UserRouter.post('/user/wallet/pin/verify', authenticate, VerifyWalletPinController);
 UserRouter.put('/user/wallet/pin', authenticate, ChangeWalletPinController);
+UserRouter.post('/user/wallet/pin/recover', authenticate, RequestWalletPinResetController);
+UserRouter.post('/user/wallet/pin/recover/verify', authenticate, VerifyWalletPinResetController);
+UserRouter.post('/user/wallet/pin/recover/reset', authenticate, ResetWalletPinController);
 UserRouter.post('/notifications/:notificationId/read', authenticate, MarkNotificationReadController);

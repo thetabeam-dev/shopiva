@@ -6,8 +6,13 @@ import {
     ResetPasswordWithPinService,
     VerifyPasswordResetPinService,
 } from "../services/passwordRecovery.js";
+import {
+    RequestWalletPinResetService,
+    ResetWalletPinService,
+    VerifyWalletPinResetService,
+} from "../services/walletPinRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
-import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, replaceWalletPinHash, setWalletPinHash } from "../models/wallet.js";
+import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, listWalletTransactions, replaceWalletPinHash, setWalletPinHash } from "../models/wallet.js";
 import {
     appRoleToNotificationRole,
     listNotifications,
@@ -317,6 +322,50 @@ function walletPinDigits(value: unknown) {
     return String(value ?? "").replace(/\D/g, "");
 }
 
+export async function RequestWalletPinResetController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        const result = await RequestWalletPinResetService(userId, req.body?.email);
+        res.status(200).json({ ...result, message: "A PIN was sent to that email." });
+    } catch (err) {
+        res.status(recoveryStatus(err)).json({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
+export async function VerifyWalletPinResetController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        const result = await VerifyWalletPinResetService(userId, req.body?.pin);
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(recoveryStatus(err)).json({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
+export async function ResetWalletPinController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        const result = await ResetWalletPinService(
+            userId,
+            req.body?.resetToken,
+            req.body?.pin,
+            req.body?.confirm,
+        );
+        res.status(200).json({ ...result, message: "Wallet PIN updated." });
+    } catch (err) {
+        res.status(recoveryStatus(err)).json({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
 export async function CreateWalletPinController(req: Request, res: Response) {
     try {
         const userId = Number((req as AuthRequest).user?.id);
@@ -453,6 +502,20 @@ export async function GetWalletRecipientController(req: Request, res: Response) 
                 bank_name: recipient.bank_name,
             },
         });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+export async function ListWalletTransactionsController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const transactions = await listWalletTransactions(userId);
+        res.status(200).json({ transactions });
     } catch (err) {
         res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
