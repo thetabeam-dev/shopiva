@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchWallet, fetchWalletRecipient } from '../api/user';
+import { fetchWallet, fetchWalletRecipient, sendWalletMoney } from '../api/user';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
-import WalletPinModals, { alertPinVerified } from '../components/WalletPinModals';
+import WalletPinModals from '../components/WalletPinModals';
 
 const TEAL = '#00926e';
 
@@ -137,9 +137,19 @@ export default function WalletSendScreen() {
         missingVisible={missingPin}
         onClosePin={() => setPinOpen(false)}
         onCloseMissing={() => setMissingPin(false)}
-        onVerified={() => {
+        onVerified={async enteredPin => {
           setPinOpen(false);
-          alertPinVerified('send');
+          try {
+            await sendWalletMoney({
+              address: recipient.trim(),
+              amount: amountValue,
+              remark,
+              pin: enteredPin,
+            });
+            Alert.alert('Sent', 'The money has been sent.');
+          } catch (error) {
+            Alert.alert('Send', error instanceof Error ? error.message : String(error));
+          }
         }}
       />
     </View>

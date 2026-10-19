@@ -12,7 +12,8 @@ import {
     VerifyWalletPinResetService,
 } from "../services/walletPinRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
-import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, listWalletTransactions, replaceWalletPinHash, setWalletPinHash } from "../models/wallet.js";
+import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, listWalletTransactions, replaceWalletPinHash, sendWalletToAddress, setWalletPinHash } from "../models/wallet.js";
+import { getIo } from "../index.js";
 import {
     appRoleToNotificationRole,
     listNotifications,
@@ -504,6 +505,57 @@ export async function GetWalletRecipientController(req: Request, res: Response) 
         });
     } catch (err) {
         res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+function emitWalletUpdate(snapshot: { userId: number; balance_kobo: unknown; transactions: unknown }) {
+    getIo().to(`user:${snapshot.userId}`).emit("wallet_credited", {
+        balance_kobo: snapshot.balance_kobo,
+        transactions: snapshot.transactions,
+    });
+}
+
+export async function SendWalletController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const pin = walletPinDigits(req.body?.pin);
+        if (pin.length !== 4) {
+            res.status(400).json({ error: "PIN must be 4 digits." });
+            return;
+        }
+        const hash = await getWalletPinHash(userId);
+        if (!hash) {
+            res.status(404).json({ error: "Create a wallet PIN first." });
+            return;
+        }
+        const match = await bcrypt.compare(pin, hash);
+        if (!match) {
+            res.status(400).json({ error: "Incorrect PIN." });
+            return;
+        }
+        const amountNaira = Number(req.body?.amount);
+        const result = await sendWalletToAddress(
+            userId,
+            String(req.body?.address ?? ""),
+            Math.round(amountNaira * 100),
+            String(req.body?.remark ?? ""),
+        );
+        emitWalletUpdate(result.sender);
+        emitWalletUpdate(result.recipient);
+        res.status(200).json({
+            message: "Money sent.",
+            balance_kobo: result.sender.balance_kobo,
+            transactions: result.sender.transactions,
+        });
+    } catch (err) {
+        const status = typeof err === "object" && err && "status" in err ? Number((err as { status?: number }).status) : 500;
+        res.status(Number.isFinite(status) ? status : 500).json({
+            error: err instanceof Error ? err.message : String(err),
+        });
     }
 }
 

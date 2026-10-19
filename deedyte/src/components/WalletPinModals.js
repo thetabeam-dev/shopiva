@@ -33,8 +33,9 @@ export default function WalletPinModals({
     setError('');
     try {
       await verifyWalletPin(pin);
+      const entered = pin;
       setPin('');
-      onVerified();
+      await onVerified(entered);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
