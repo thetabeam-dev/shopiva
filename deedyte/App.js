@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Appearance, Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WIPE_STORAGE_ON_LAUNCH } from './src/auth/devAuth';
@@ -21,6 +21,10 @@ import { requestLocationPermission } from './src/utils/deviceLocation';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
+
+  useEffect(() => {
+    Appearance.setColorScheme('unspecified');
+  }, []);
 
   // const handleDeepLink = (url) => {
   //   if (!url) return;
