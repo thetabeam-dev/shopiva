@@ -7,7 +7,7 @@ import {
     VerifyPasswordResetPinService,
 } from "../services/passwordRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
-import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, setWalletPinHash } from "../models/wallet.js";
+import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, replaceWalletPinHash, setWalletPinHash } from "../models/wallet.js";
 import {
     appRoleToNotificationRole,
     listNotifications,
@@ -350,6 +350,46 @@ export async function CreateWalletPinController(req: Request, res: Response) {
             return;
         }
         res.status(200).json({ message: "Wallet PIN created." });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+export async function ChangeWalletPinController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const current = walletPinDigits(req.body?.current);
+        const pin = walletPinDigits(req.body?.pin);
+        const confirm = walletPinDigits(req.body?.confirm);
+        if (current.length !== 4 || pin.length !== 4 || confirm.length !== 4) {
+            res.status(400).json({ error: "Each PIN must be 4 digits." });
+            return;
+        }
+        if (pin !== confirm) {
+            res.status(400).json({ error: "New PIN and confirmation do not match." });
+            return;
+        }
+        const hash = await getWalletPinHash(userId);
+        if (!hash) {
+            res.status(404).json({ error: "Create a wallet PIN first." });
+            return;
+        }
+        const match = await bcrypt.compare(current, hash);
+        if (!match) {
+            res.status(400).json({ error: "Current PIN is incorrect." });
+            return;
+        }
+        const nextHash = await bcrypt.hash(pin, 10);
+        const saved = await replaceWalletPinHash(userId, nextHash);
+        if (!saved) {
+            res.status(404).json({ error: "Create a wallet PIN first." });
+            return;
+        }
+        res.status(200).json({ message: "Wallet PIN updated." });
     } catch (err) {
         res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }

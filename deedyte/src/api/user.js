@@ -320,6 +320,16 @@ export async function createWalletPin(pin, confirm) {
   return data;
 }
 
+export async function changeWalletPin(current, pin, confirm) {
+  const res = await apiFetchAuth('/user/wallet/pin', {
+    method: 'PUT',
+    body: JSON.stringify({ current, pin, confirm }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
 export async function verifyWalletPin(pin) {
   const res = await apiFetchAuth('/user/wallet/pin/verify', {
     method: 'POST',

@@ -5,6 +5,8 @@ import WalletSendScreen from '../pages/WalletSend';
 import WalletHistoryScreen from '../pages/WalletHistory';
 import WalletWithdrawScreen from '../pages/WalletWithdraw';
 import WalletPinScreen from '../pages/WalletPin';
+import WalletSettingsScreen from '../pages/WalletSettings';
+import WalletPinChangeScreen from '../pages/WalletPinChange';
 
 const WalletStack = createNativeStackNavigator();
 
@@ -25,6 +27,8 @@ export function WalletStackScreen() {
       <WalletStack.Screen name="Wallet-history" component={WalletHistoryScreen} options={header('History')} />
       <WalletStack.Screen name="Wallet-withdraw" component={WalletWithdrawScreen} options={header('Withdraw')} />
       <WalletStack.Screen name="Wallet-pin" component={WalletPinScreen} options={header('Create PIN')} />
+      <WalletStack.Screen name="Wallet-settings" component={WalletSettingsScreen} options={header('Wallet settings')} />
+      <WalletStack.Screen name="Wallet-pin-change" component={WalletPinChangeScreen} options={header('Change PIN')} />
     </WalletStack.Navigator>
   );
 }

@@ -1,4 +1,4 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
@@ -18,19 +18,32 @@ const ACTIONS = [
 export default function WalletScreen() {
   const navigation = useNavigation();
   const [wallet, setWallet] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const balanceKobo = Number(wallet?.balance_kobo);
   const balance = Number.isFinite(balanceKobo) ? balanceKobo / 100 : 0;
   const address = String(wallet?.address ?? '').trim();
 
+  const loadWallet = useCallback(() => {
+    setRefreshing(true);
+    return fetchWallet()
+      .then(row => setWallet(row))
+      .catch(() => setWallet(null))
+      .finally(() => setRefreshing(false));
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      setRefreshing(true);
       fetchWallet()
         .then(row => {
           if (!cancelled) setWallet(row);
         })
         .catch(() => {
           if (!cancelled) setWallet(null);
+        })
+        .finally(() => {
+          if (!cancelled) setRefreshing(false);
         });
       return () => {
         cancelled = true;
@@ -41,7 +54,33 @@ export default function WalletScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Available balance</Text>
+        <View style={styles.balanceTop}>
+          <Text style={styles.balanceLabel}>Available balance</Text>
+          <View style={styles.balanceActions}>
+            <Pressable
+              onPress={() => {
+                void loadWallet();
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh wallet"
+            >
+              {refreshing ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Icon name="refresh" size={22} color="#FFFFFF" />
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('Wallet-settings')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Wallet settings"
+            >
+              <Icon name="settings-outline" size={22} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
         <Text style={styles.balanceValue}>{formatNaira(balance)}</Text>
         <Pressable
           style={styles.addressChip}
@@ -108,6 +147,8 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     padding: 18,
   },
+  balanceTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  balanceActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   balanceLabel: { color: '#E8F6F1', fontSize: 13 },
   balanceValue: { marginTop: 8, color: '#FFFFFF', fontSize: 32, fontWeight: '800' },
   addressChip: {

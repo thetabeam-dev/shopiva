@@ -94,6 +94,23 @@ export async function setWalletPinHash(userId: number, pinHash: string) {
   return Number(rowCount) > 0;
 }
 
+export async function replaceWalletPinHash(userId: number, pinHash: string) {
+  const id = Number(userId);
+  const hash = String(pinHash ?? "").trim();
+  if (!Number.isFinite(id) || id <= 0 || !hash) {
+    throw new Error("A wallet and PIN are required.");
+  }
+  const { rowCount } = await (await db()).query(
+    `UPDATE wallets
+     SET pin = $2, updated_at = NOW()
+     WHERE user_id = $1
+       AND pin IS NOT NULL
+       AND btrim(pin) <> ''`,
+    [id, hash]
+  );
+  return Number(rowCount) > 0;
+}
+
 export async function updateWalletAddressByUserId(userId: number, address: string) {
   const id = Number(userId);
   const next = String(address ?? "").trim();
