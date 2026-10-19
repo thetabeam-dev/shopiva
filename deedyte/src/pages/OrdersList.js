@@ -52,6 +52,23 @@ function statusThemeFor(raw) {
   return STATUS_THEME.payment_received;
 }
 
+const PROGRESS_GROUPS = [
+  ['unpaid', 'payment_received'],
+  ['order_accepted'],
+  ['order_processing'],
+  ['order_shipping'],
+  ['order_out_for_delivery'],
+  ['order_delivered'],
+  ['order_confirmed', 'order_completed'],
+];
+
+function orderProgressFraction(status) {
+  const key = String(status ?? '').toLowerCase().trim();
+  const index = PROGRESS_GROUPS.findIndex(group => group.includes(key));
+  if (index < 0) return 0;
+  return (index + 1) / PROGRESS_GROUPS.length;
+}
+
 function OrderCard({ item, onPress, isVendor }) {
   const rawStatus = String(item.status ?? '').toLowerCase().trim();
   const notAccepted = Boolean(isVendor) && (rawStatus === 'unpaid' || rawStatus === '');
@@ -88,6 +105,15 @@ function OrderCard({ item, onPress, isVendor }) {
           <View style={[styles.statusDot, { backgroundColor: t.dot }]} />
           <Text style={[styles.statusPillText, { color: t.text }]}>{t.label}</Text>
         </View>
+      </View>
+
+      <View style={styles.progressTrack}>
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round(orderProgressFraction(notAccepted ? 'unpaid' : item.status) * 100)}%` },
+          ]}
+        />
       </View>
 
       <View style={styles.grid}>
@@ -385,6 +411,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: COLOR.BRAND_COLOR,
   },
   grid: {
     flexDirection: 'row',

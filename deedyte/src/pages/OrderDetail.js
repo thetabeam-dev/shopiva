@@ -188,9 +188,9 @@ function SectionLabel({ children }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
-function SummaryRow({ icon, label, value, last }) {
+function SummaryRow({ icon, label, value, last, multiline }) {
   return (
-    <View style={[styles.summaryRow, last && styles.summaryRowLast]}>
+    <View style={[styles.summaryRow, multiline && styles.summaryRowMultiline, last && styles.summaryRowLast]}>
       <Icon
         name={icon}
         size={18}
@@ -201,10 +201,10 @@ function SummaryRow({ icon, label, value, last }) {
       <View style={styles.summaryValue}>
         {typeof value === 'string' || typeof value === 'number' ? (
           <Text
-            numberOfLines={1}
-            ellipsizeMode="tail"
+            {...(multiline ? {} : { numberOfLines: 1, ellipsizeMode: 'tail' })}
             style={[
               styles.summaryValueText,
+              multiline && styles.summaryValueMultiline,
               {
                 textTransform:
                   String(label).toLowerCase() === 'logistics provider'
@@ -237,6 +237,138 @@ function MoneyRow({ label, value, bold, muted }) {
 }
 
 const PAYOUT_HOLD_MS = 48 * 60 * 60 * 1000;
+
+const ORDER_PROGRESS_STEPS = [
+  { label: 'Pending', icon: 'time-outline', statuses: ['unpaid', 'payment_received'] },
+  { label: 'Accepted', icon: 'checkmark-done-outline', statuses: ['order_accepted'] },
+  { label: 'Processing', icon: 'cube-outline', statuses: ['order_processing'] },
+  { label: 'Shipping', icon: 'boat-outline', statuses: ['order_shipping'] },
+  { label: 'On the way', icon: 'car-outline', statuses: ['order_out_for_delivery'] },
+  { label: 'Delivered', icon: 'bag-check-outline', statuses: ['order_delivered'] },
+  { label: 'Confirmed', icon: 'shield-checkmark-outline', statuses: ['order_confirmed', 'order_completed'] },
+];
+
+function orderProgressIndex(statusKey) {
+  const key = String(statusKey ?? '').toLowerCase();
+  return ORDER_PROGRESS_STEPS.findIndex(step => step.statuses.includes(key));
+}
+
+function OrderProgress({ statusKey }) {
+  const current = orderProgressIndex(statusKey);
+  const stopped = ['order_cancelled', 'order_rejected', 'order_disputed'].includes(
+    String(statusKey ?? '').toLowerCase(),
+  );
+  const reached = index => !stopped && current >= index;
+  const topRow = ORDER_PROGRESS_STEPS.slice(0, 4).map((step, index) => ({ step, index }));
+  const bottomRow = ORDER_PROGRESS_STEPS.slice(4)
+    .map((step, offset) => ({ step, index: offset + 4 }))
+    .reverse();
+
+  const renderStep = ({ step, index }, { lineToLeft = false, drop = false } = {}) => {
+    const done = !stopped && current >= 0 && index < current;
+    const active = !stopped && index === current;
+    const nextIndex = index + 1;
+    const showSideLine = nextIndex < ORDER_PROGRESS_STEPS.length && (lineToLeft || index < 3);
+    return (
+      <View key={step.label} style={styles.progressItem}>
+        {showSideLine ? (
+          <View
+            style={[
+              lineToLeft ? styles.progressLineLeft : styles.progressLine,
+              reached(nextIndex) && styles.progressLineOn,
+            ]}
+          />
+        ) : null}
+        {drop ? (
+          <View style={[styles.progressDrop, reached(4) && styles.progressLineOn]} />
+        ) : null}
+        <View
+          style={[
+            styles.progressIcon,
+            done && styles.progressIconDone,
+            active && styles.progressIconActive,
+          ]}
+        >
+          <Icon
+            name={active ? step.icon.replace('-outline', '') : step.icon}
+            size={22}
+            color={done || active ? '#FFFFFF' : '#9CA3AF'}
+          />
+        </View>
+        <Text
+          style={[
+            styles.progressLabel,
+            (done || active) && styles.progressLabelOn,
+          ]}
+          numberOfLines={1}
+        >
+          {step.label}
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.progressSection}>
+      <SectionLabel>Order progress</SectionLabel>
+      <Text style={styles.progressSubtitle}>Track where your order is right now</Text>
+      <View style={styles.progressCard}>
+        <View style={[styles.progressRow, styles.progressRowGap]}>
+          {topRow.map(item => renderStep(item, { drop: item.index === 3 }))}
+        </View>
+        <View style={styles.progressRow}>
+          <View style={styles.progressSpacer} />
+          {bottomRow.map(item => renderStep(item, { lineToLeft: item.index < ORDER_PROGRESS_STEPS.length - 1 }))}
+        </View>
+      </View>
+      {stopped ? (
+        <Text style={styles.progressStopped}>
+          {STATUS_THEME[statusKey]?.label
+            ? `This order is ${STATUS_THEME[statusKey].label.toLowerCase()}.`
+            : 'This order is no longer moving through the usual steps.'}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function orderTurnHint(role, statusKey, awaitingBuyerPayment, eventCount) {
+  const vendor = role === 'vendor';
+  const status = String(statusKey ?? '').toLowerCase();
+  if (status === 'order_cancelled' || status === 'order_rejected') {
+    return 'This order is closed. The button below does not need an action.';
+  }
+  if (status === 'order_disputed') {
+    return 'A dispute is open. Press the button below to view it.';
+  }
+  if (vendor && eventCount <= 1) {
+    return 'Your turn. Press Accept or Reject below to respond to this order.';
+  }
+  if (vendor && status === 'order_accepted' && awaitingBuyerPayment) {
+    return 'Waiting on the buyer to pay. The button below is not your action yet.';
+  }
+  if (vendor && ['order_accepted', 'order_processing', 'order_shipping', 'order_out_for_delivery'].includes(status)) {
+    return 'Your turn. Press the button below to move this order to the next step.';
+  }
+  if (!vendor && awaitingBuyerPayment) {
+    return 'Your turn. Press the button below to pay for this order.';
+  }
+  if (!vendor && status === 'order_delivered') {
+    return 'Your turn. Press the button below to confirm you received this order.';
+  }
+  if (!vendor && status === 'unpaid') {
+    return 'Waiting on the shop to set the shipping fee before you can pay.';
+  }
+  if (vendor && (status === 'order_delivered' || status === 'order_confirmed')) {
+    return 'Waiting on the buyer. You will be notified when it is your turn.';
+  }
+  if (status === 'order_confirmed' || status === 'order_completed') {
+    return 'No action is needed. This order is wrapping up.';
+  }
+  return vendor
+    ? 'Waiting on the buyer. You will be notified when it is your turn.'
+    : 'Waiting on the shop. You will be notified when it is your turn.';
+}
 
 function paymentReleaseLabel(updatedAt, nowMs, fulfillmentStatus) {
   if (String(fulfillmentStatus ?? '').toLowerCase() === 'order_completed') return 'Completed';
@@ -1188,59 +1320,119 @@ export default function OrderDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <SectionLabel>Order Summary</SectionLabel>
-          <SummaryRow
-            icon="time-outline"
-            label="Order Date"
-            value={new Date(orderInfo?.order?.created_at).toLocaleString()}
-          />
-          <SummaryRow
-            icon="checkmark-circle-outline"
-            label="Order Status"
-            value={<StatusPill theme={statusTheme} />}
-          />
-          <SummaryRow
-            icon="location-outline"
-            label="Shipping Address"
-            value={String(orderInfo?.order?.shipping_address)}
-          />
+        <View style={styles.summaryHero}>
+            <View style={styles.summaryHeroTop}>
+              <View style={styles.summaryHeroCol}>
+                <Text style={styles.summaryHeroCaption}>Order Reference</Text>
+                <Text style={styles.summaryHeroValue} numberOfLines={1}>
+                  #{String(orderInfo?.order?.id ?? '').slice(0, 8)}
+                </Text>
+              </View>
+              <View style={[styles.summaryHeroCol, styles.summaryHeroColEnd]}>
+                <Text style={styles.summaryHeroCaption}>Total</Text>
+                <Text style={styles.summaryHeroValue}>
+                  {fmt(
+                    (Array.isArray(orderInfo?.order_items)
+                      ? orderInfo.order_items.reduce((acc, curr) => acc + Number(curr.total_price || 0), 0)
+                      : 0) +
+                      (auth.activeRole === 'vendor' ? 0 : 200) +
+                      Number(orderInfo?.order?.shipping_fee || 0),
+                  )}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.summaryHeroDate}>
+              <Icon name="calendar-outline" size={14} color="#9CA3AF" />
+              <Text style={[styles.summaryHeroDateText, styles.summaryHeroDateGrow]}>
+                {(() => {
+                  const date = new Date(orderInfo?.order?.created_at);
+                  if (Number.isNaN(date.getTime())) return '—';
+                  const day = date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  });
+                  const time = date.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  });
+                  return `${day} • ${time}`;
+                })()}
+              </Text>
+              <Pressable
+                onPress={onMail}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.summaryHeroChat}
+                accessibilityRole="button"
+                accessibilityLabel={auth.activeRole === 'vendor' ? 'Message customer' : 'Message shop'}
+              >
+                <Icon name="chatbubble-ellipses-outline" size={22} color={COLOR.BRAND_COLOR} />
+                <MessageIconBadge count={unreadMessages} />
+              </Pressable>
+            </View>
+            <View
+              style={[
+                styles.summaryHeroStatus,
+                { backgroundColor: statusTheme?.bg ?? '#EEF2FF' },
+              ]}
+            >
+              <Icon name="cube" size={16} color={statusTheme?.dot ?? COLOR.BRAND_COLOR} />
+              <Text style={[styles.summaryHeroStatusText, { color: statusTheme?.text ?? '#111' }]}>
+                {statusTheme?.label ?? 'Processing'}
+              </Text>
+            </View>
+            <View style={styles.summaryTurnTip}>
+              <Icon name="information-circle-outline" size={16} color={COLOR.BRAND_COLOR} />
+              <Text style={styles.summaryTurnTipText}>
+                {orderTurnHint(
+                  auth.activeRole,
+                  statusKey,
+                  awaitingBuyerPayment,
+                  orderInfo?.order_events?.length ?? 0,
+                )}
+              </Text>
+            </View>
+          </View>
 
-          <SummaryRow
-            icon="cube-outline"
-            label="Shipping Method"
-            value={String(
-              orderInfo?.order?.shipping_method?.split('_').join(' ') ||
-              'Awaiting shipment',
-            )}
-          />
+        <OrderProgress statusKey={statusKey} />
 
-          <SummaryRow
-            icon="cube-outline"
-            label="Logistics Provider"
-            value={String(
-              orderInfo?.order?.logistic_provider ||
-              'Not Available',
-            )}
-          />
-
-          <SummaryRow
-            icon="calendar-outline"
-            label="Estimated Delivery Date"
-            value={String(
-              orderInfo?.order?.estimated_delivery_date?.split('_').join(' ') ||
-              'Not Available',
-            )}
-          />
-          <SummaryRow
-            icon="pricetag-outline"
-            label="Tracking Number"
-            value={String(
-              orderInfo?.order?.tracking_number || 'Awaiting shipment',
-            )}
-            last
-          />
-        </View>
+        <View style={styles.deliveryCard}>
+            <View style={styles.deliveryAddressRow}>
+              <View style={styles.deliveryPin}>
+                <Icon name="location" size={18} color={COLOR.BRAND_COLOR} />
+              </View>
+              <View style={styles.deliveryAddressBody}>
+                <Text style={styles.deliveryAddressTitle}>Delivery Address</Text>
+                <Text style={styles.deliveryAddressText}>
+                  {String(orderInfo?.order?.shipping_address || 'Not available')}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.deliveryMeta}>
+              <SummaryRow
+                icon="cube-outline"
+                label="Shipping Method"
+                value={String(
+                  orderInfo?.order?.shipping_method?.split('_').join(' ') ||
+                  'Awaiting shipment',
+                )}
+              />
+              <SummaryRow
+                icon="calendar-outline"
+                label="Estimated Delivery"
+                value={String(
+                  orderInfo?.order?.estimated_delivery_date?.split('_').join(' ') ||
+                  'Not available',
+                )}
+              />
+              <SummaryRow
+                icon="pricetag-outline"
+                label="Tracking Number"
+                value={String(orderInfo?.order?.tracking_number || 'Awaiting shipment')}
+                last
+              />
+            </View>
+          </View>
 
         {orderInfo?.order_events?.length > 1 && (
           <View style={styles.card}>
@@ -1308,148 +1500,6 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        <View style={styles.card}>
-          <SectionLabel>
-            {auth.activeRole === 'vendor' ? 'Customer Info' : 'Shop detail'}
-          </SectionLabel>
-          {auth.activeRole === 'vendor' && (
-            <View style={styles.customerHead}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {initialsOf(
-                    `${orderInfo?.user?.fname || orderInfo?.customer?.fname} ${orderInfo?.user?.lname || orderInfo?.customer?.lname
-                    }`,
-                  )}
-                </Text>
-              </View>
-              <View style={styles.customerTitleRow}>
-                <View style={styles.customerNameCol}>
-                  <Text style={styles.customerName} numberOfLines={1}>
-                    {`${orderInfo?.user?.fname || orderInfo?.customer?.fname} ${orderInfo?.user?.lname || orderInfo?.customer?.lname
-                      }`}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={onMail}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={({ pressed }) => [
-                    styles.headMessageBtn,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Message customer"
-                >
-                  <Icon
-                    name="mail-outline"
-                    size={22}
-                    color={COLOR.BRAND_COLOR}
-                  />
-                  <MessageIconBadge count={unreadMessages} />
-                </Pressable>
-              </View>
-            </View>
-          )}
-          {auth.activeRole !== 'vendor' && (
-            <View style={styles.customerHead}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {initialsOf(`${orderInfo?.shop?.name}`)}
-                </Text>
-              </View>
-              <View style={styles.customerTitleRow}>
-                <View style={styles.customerNameCol}>
-                  <Text style={styles.customerName} numberOfLines={1}>
-                    {`${orderInfo?.shop?.name}`}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={onMail}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={({ pressed }) => [
-                    styles.headMessageBtn,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Message vendor"
-                >
-                  <Icon
-                    name="mail-outline"
-                    size={22}
-                    color={COLOR.BRAND_COLOR}
-                  />
-                  <MessageIconBadge count={unreadMessages} />
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.shippingBlock}>
-            <Text style={styles.shippingHeader}>
-              {auth.activeRole === 'vendor'
-                ? 'Shipping address'
-                : 'Shop location'}
-            </Text>
-
-            {[displayShipping.street, displayShipping.street2]
-              .filter(Boolean)
-              .join('\n') ? (
-              <View style={[styles.kvRow, styles.kvRowAlignTop]}>
-                <Text style={styles.kvLabel}>Street</Text>
-                <Text style={[styles.kvValue, styles.kvAddress]}>
-                  {[displayShipping.street, displayShipping.street2]
-                    .filter(Boolean)
-                    .join('\n')}
-                </Text>
-              </View>
-            ) : null}
-
-            {displayShipping.city ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>City</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.city}
-                </Text>
-              </View>
-            ) : null}
-            {displayShipping.state ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>State</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.state}
-                </Text>
-              </View>
-            ) : null}
-            {displayShipping.zip ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>ZIP / Postal</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.zip}
-                </Text>
-              </View>
-            ) : null}
-            {displayShipping.country ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>Country</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.country}
-                </Text>
-              </View>
-            ) : null}
-            {!displayShipping.street &&
-              !displayShipping.street2 &&
-              !displayShipping.city &&
-              !displayShipping.state &&
-              !displayShipping.country &&
-              !displayShipping.zip ? (
-              <View style={[styles.kvRow, styles.kvRowAlignTop]}>
-                <Text style={styles.kvLabel}>Address</Text>
-                <Text style={[styles.kvValue, styles.kvAddress]}>
-                  {displayShipping.text}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
 
         {/* <SectionLabel>Items</SectionLabel> */}
         <View style={styles.card}>
@@ -1529,6 +1579,53 @@ export default function OrderDetailScreen() {
             );
           })()}
         </View>
+
+        {(() => {
+          const isVendor = auth.activeRole === 'vendor';
+          const customerName = `${orderInfo?.user?.fname || orderInfo?.customer?.fname || ''} ${orderInfo?.user?.lname || orderInfo?.customer?.lname || ''}`.trim();
+          const partyName = isVendor
+            ? (customerName || 'Customer')
+            : String(orderInfo?.shop?.name ?? 'Shop');
+          const partyMeta = isVendor
+            ? 'Buyer for this order'
+            : ([displayShipping.city, displayShipping.state, displayShipping.country].filter(Boolean).join(', ') || 'Shop location unavailable');
+          return (
+            <View style={styles.shopCard}>
+              <View style={styles.shopCardHead}>
+                <View style={styles.shopCardHeadIcon}>
+                  <Icon
+                    name={isVendor ? 'person-outline' : 'storefront-outline'}
+                    size={18}
+                    color={COLOR.BRAND_COLOR}
+                  />
+                </View>
+                <View>
+                  <Text style={styles.shopCardTitle}>{isVendor ? 'Customer' : 'Shop'}</Text>
+                  <Text style={styles.shopCardSubtitle}>{isVendor ? 'Your buyer' : 'Your seller'}</Text>
+                </View>
+              </View>
+              <View style={styles.shopCardBody}>
+                <View style={styles.shopAvatar}>
+                  <Text style={styles.shopAvatarText}>{initialsOf(partyName)}</Text>
+                </View>
+                <View style={styles.shopCardIdentity}>
+                  <Text style={styles.shopCardName} numberOfLines={1}>{partyName.toUpperCase()}</Text>
+                  <Text style={styles.shopCardMeta} numberOfLines={2}>{partyMeta}</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={onMail}
+                style={({ pressed }) => [styles.shopMessageBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Message ${partyName}`}
+              >
+                <Icon name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.shopMessageText}>Message {partyName}</Text>
+                {unreadMessages ? <MessageIconBadge count={unreadMessages} /> : null}
+              </Pressable>
+            </View>
+          );
+        })()}
       </ScrollView>
 
       <View
@@ -1836,6 +1933,16 @@ export default function OrderDetailScreen() {
   );
 }
 
+const sectionShadow = Platform.select({
+  ios: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  android: { elevation: 3 },
+});
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -1889,7 +1996,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 32,
     height: 32,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLOR.NEUTRAL,
@@ -1932,22 +2039,203 @@ const styles = StyleSheet.create({
   linkArrow: {
     transform: [{ rotate: '45deg' }],
   },
+  summaryHero: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    padding: 16,
+    marginBottom: 8,
+    ...sectionShadow,
+  },
+  summaryHeroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  summaryHeroCol: { flex: 1 },
+  summaryHeroColEnd: { alignItems: 'flex-end' },
+  summaryHeroCaption: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  summaryHeroValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLOR.BRAND_COLOR,
+  },
+  summaryHeroDate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  summaryHeroDateText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  summaryHeroDateGrow: { flex: 1 },
+  summaryHeroChat: {
+    width: 36,
+    height: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    position: 'relative',
+  },
+  summaryHeroStatus: {
+    marginTop: 16,
+    borderRadius: 7,
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deliveryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E8E8EC',
+    ...sectionShadow,
+  },
+  deliveryAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  deliveryPin: {
+    width: 36,
+    height: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F6F1',
+  },
+  deliveryAddressBody: { flex: 1 },
+  deliveryAddressTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111111',
+  },
+  deliveryAddressText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#4B5563',
+  },
+  shopCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E8E8EC',
+    ...sectionShadow,
+  },
+  shopCardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  shopCardHeadIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F6F1',
+  },
+  shopCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111111',
+  },
+  shopCardSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  shopCardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F7F8FA',
+    borderRadius: 7,
+    padding: 12,
+  },
+  shopAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F6F1',
+  },
+  shopAvatarText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLOR.BRAND_COLOR,
+  },
+  shopCardIdentity: { flex: 1 },
+  shopCardName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111111',
+  },
+  shopCardMeta: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  shopMessageBtn: {
+    marginTop: 12,
+    minHeight: 46,
+    borderRadius: 7,
+    backgroundColor: COLOR.BRAND_COLOR,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  shopMessageText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  deliveryMeta: {
+    marginTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E8E8EC',
+  },
+  summaryTurnTip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 10,
+  },
+  summaryTurnTipText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#374151',
+  },
+  summaryHeroStatusText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
   card: {
     backgroundColor: COLOR.NEUTRAL,
-    borderRadius: 5,
+    borderRadius: 7,
     paddingVertical: 5,
     paddingHorizontal: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E8E8EC',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-      },
-      android: { elevation: 1 },
-    }),
+    marginBottom: 8,
+    ...sectionShadow,
   },
   pill: {
     flexDirection: 'row',
@@ -1956,12 +2244,12 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
+    borderRadius: 7,
   },
   pillDot: {
     width: 6,
     height: 6,
-    borderRadius: 3,
+    borderRadius: 7,
   },
   pillText: {
     fontSize: 12,
@@ -1991,12 +2279,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: 'flex-end',
   },
+  summaryRowMultiline: {
+    alignItems: 'flex-start',
+  },
   summaryValueText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLOR.DARK,
     textAlign: 'right',
     textTransform: 'capitalize',
+  },
+  summaryValueMultiline: {
+    lineHeight: 16,
   },
   escrowStatusRow: {
     flexDirection: 'row',
@@ -2047,7 +2341,7 @@ const styles = StyleSheet.create({
   escrowBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
@@ -2077,7 +2371,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 6,
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#FFF8F7',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#F2B8B5',
@@ -2097,7 +2391,7 @@ const styles = StyleSheet.create({
   },
   cancelledModalCard: {
     backgroundColor: COLOR.NEUTRAL,
-    borderRadius: 8,
+    borderRadius: 7,
     padding: 24,
     alignItems: 'center',
     gap: 10,
@@ -2125,7 +2419,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     width: '100%',
     height: 48,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: COLOR.BRAND_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2159,7 +2453,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 40,
     height: 40,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#EAEAEE',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2186,7 +2480,7 @@ const styles = StyleSheet.create({
   headIcon: {
     width: 32,
     height: 32,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2196,7 +2490,7 @@ const styles = StyleSheet.create({
     right: 7,
     width: 7,
     height: 7,
-    borderRadius: 4,
+    borderRadius: 7,
     backgroundColor: '#E5484D',
     borderWidth: 1,
     borderColor: COLOR.NEUTRAL,
@@ -2228,6 +2522,111 @@ const styles = StyleSheet.create({
   kvAddress: {
     lineHeight: 18,
   },
+  progressSection: {
+    marginTop: 0,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  progressTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111111',
+  },
+  progressSubtitle: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  progressCard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 0,
+    marginBottom: 8,
+    ...sectionShadow,
+  },
+  progressRow: {
+    flexDirection: 'row',
+  },
+  progressRowGap: {
+    marginBottom: 22,
+  },
+  progressItem: {
+    width: '25%',
+    alignItems: 'center',
+    marginBottom: 14,
+    position: 'relative',
+  },
+  progressSpacer: {
+    width: '25%',
+  },
+  progressLine: {
+    position: 'absolute',
+    top: 26,
+    left: '50%',
+    right: '-50%',
+    height: 3,
+    backgroundColor: '#E5E7EB',
+    zIndex: 0,
+  },
+  progressLineLeft: {
+    position: 'absolute',
+    top: 26,
+    right: '50%',
+    left: '-50%',
+    height: 3,
+    backgroundColor: '#E5E7EB',
+    zIndex: 0,
+  },
+  progressLineOn: {
+    backgroundColor: '#00926E',
+  },
+  progressDrop: {
+    position: 'absolute',
+    top: 76,
+    left: '50%',
+    marginLeft: -1.5,
+    width: 3,
+    height: 64,
+    backgroundColor: '#E5E7EB',
+    zIndex: 0,
+  },
+  progressIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E5E7EB',
+    zIndex: 1,
+  },
+  progressIconDone: {
+    backgroundColor: '#00926E',
+  },
+  progressIconActive: {
+    backgroundColor: '#00926E',
+    borderWidth: 3,
+    borderColor: '#B7E4D6',
+  },
+  progressLabel: {
+    marginTop: 8,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  progressLabelOn: {
+    color: '#111111',
+  },
+  progressStopped: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#6B7280',
+  },
   shippingBlock: {
     marginTop: 6,
     paddingTop: 6,
@@ -2257,7 +2656,7 @@ const styles = StyleSheet.create({
   itemThumb: {
     width: 56,
     height: 56,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#F4F4F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2292,7 +2691,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4F4F6',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 5,
+    borderRadius: 7,
   },
   qtyChipLabel: {
     fontSize: 11,
@@ -2349,7 +2748,7 @@ const styles = StyleSheet.create({
   tlDot: {
     width: 22,
     height: 22,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -2423,7 +2822,7 @@ const styles = StyleSheet.create({
   btnGhost: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLOR.NEUTRAL,
@@ -2438,7 +2837,7 @@ const styles = StyleSheet.create({
   btnPrimary: {
     flex: 1.2,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     // backgroundColor: "#000",
@@ -2459,7 +2858,7 @@ const styles = StyleSheet.create({
   btnAccept: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0D8A4A',
@@ -2475,7 +2874,7 @@ const styles = StyleSheet.create({
   btnReject: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#C62828',
@@ -2507,7 +2906,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 36,
     height: 4,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#D6D6DC',
     marginBottom: 12,
   },
@@ -2526,7 +2925,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     paddingHorizontal: 12,
-    borderRadius: 5,
+    borderRadius: 7,
   },
   sheetRowPressed: {
     backgroundColor: '#F5F5F7',
@@ -2534,7 +2933,7 @@ const styles = StyleSheet.create({
   sheetDot: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: 7,
   },
   sheetRowText: {
     flex: 1,

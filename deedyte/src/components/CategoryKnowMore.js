@@ -24,7 +24,7 @@ export default function CategoryKnowMore({ label, productTypes }) {
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`Product types in ${label}`}
-      >
+      >  
         <Icon name="information-circle-outline" size={18} color="#6B7280" />
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
