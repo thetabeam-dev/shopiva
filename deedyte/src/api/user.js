@@ -302,6 +302,21 @@ export function notificationRoleForApp(activeRole) {
   return activeRole === 'vendor' ? 'vendor' : 'buyer';
 }
 
+export async function fetchWalletRecipient(address) {
+  const params = new URLSearchParams({ address: String(address ?? '').trim() });
+  const res = await apiFetchAuth(`/user/wallet/recipient?${params.toString()}`, { method: 'GET' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data.recipient ?? null;
+}
+
+export async function fetchWallet() {
+  const res = await apiFetchAuth('/user/wallet', { method: 'GET' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data.wallet ?? null;
+}
+
 export async function listNotifications(activeRole) {
   const role = notificationRoleForApp(activeRole);
   const res = await apiFetchAuth(`/notifications?role=${role}`);

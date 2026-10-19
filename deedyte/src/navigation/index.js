@@ -136,7 +136,9 @@ function NavigationTree() {
             "Cart",
             "Catalog",
             "Profile",
-            "Explore"
+            "Explore",
+            "Wallet",
+            "Products",
             // 'home',
             // 'profile-main',
             // 'chat-list',

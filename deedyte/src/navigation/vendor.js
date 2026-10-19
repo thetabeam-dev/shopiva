@@ -12,6 +12,7 @@ import { VendorHomeStackScreen } from '../stacks/vendor/Home';
 import { VendorProductStackScreen } from '../stacks/vendor/Product';
 import { VendorActivitiesStackScreen } from '../stacks/vendor/Activities';
 import { VendorProfileStackScreen } from '../stacks/vendor/Profile';
+import { WalletStackScreen } from '../stacks/Wallet';
 
 
 
@@ -66,6 +67,7 @@ export default function VendorTabs() {
             else if (route.name === 'Activities') iconName = focused ? 'pulse' : 'pulse-outline';
             else if (route.name === 'Profile') iconName = focused ? 'person-circle' : 'person-circle-outline';
             else if (route.name === 'Products') iconName = focused ? 'pricetags' : 'pricetags-outline';
+            else if (route.name === 'Wallet') iconName = focused ? 'wallet' : 'wallet-outline';
             return <Ionicons name={iconName} size={size} color={color} />;
           },
           tabBarActiveTintColor: '#00926E',
@@ -83,6 +85,7 @@ export default function VendorTabs() {
           options={{ tabBarBadge: activitiesBadge }}
         />
         <Tab.Screen name="Products" component={VendorProductStackScreen} />
+        <Tab.Screen name="Wallet" component={WalletStackScreen} />
         <Tab.Screen name="Profile" component={VendorProfileStackScreen} />
       </Tab.Navigator>
     </ProfileProvider> 

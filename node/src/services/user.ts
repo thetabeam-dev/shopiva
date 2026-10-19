@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import { db } from "../config/database.js";
 import type { PoolClient } from "pg";
 import { formatPhoneNumber } from "../utils/phone.js";
+import paystackTools from "../utils/paystack.js";
+import { storePaystackVirtualAccount, updateWalletAddressByUserId } from "../models/wallet.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 const SALT_ROUNDS = 10;
@@ -74,15 +76,15 @@ function verifyOAuthReauthTokenForUser(token: string | undefined, userId: number
 
 export async function SignupService(payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string }) {
     const userDoc = await model.findUserByEmail(payload.email);
-    
+
     // Check if user exists and has deleted account
     if (userDoc.length > 0 && userDoc[0].accountstatus === "deleted") {
         const userId = userDoc[0].id;
-        
+
         // Update profile with new data and reactivate account
         await model.updateProfile({ ...payload, id: userId });
         await model.recreateProfile({ id: userId });
-        
+
         // Fetch updated user data
         const updatedUser = await model.findUserById(userId);
         const { password, ...userWithoutPassword } = updatedUser[0];
@@ -132,6 +134,25 @@ export async function SignupService(payload: NewUserDocument & { src: string; de
         throw new Error("Failed to load created user");
     }
     const created = users[0];
+
+    // create paystack DVA for user
+    const paystack_created = await paystackTools.createDVA({
+        firstName: created.fname,
+        lastName: created.lname,
+        email: created.email,
+        phone: `+234${created.phone}`
+    });
+    const userId = created.id;
+
+    await storePaystackVirtualAccount({
+        userId,
+        phone: created.phone,
+        customerCode: paystack_created.customerCode,
+        accountNumber: paystack_created.accountNumber,
+        accountName: paystack_created.accountName,
+        bankName: paystack_created.bankName,
+    });
+
     const { password, ...userWithoutPassword } = created;
 
     const token = jwt.sign(
@@ -171,7 +192,7 @@ export async function finalizeOAuthSession(userId: number): Promise<{ token: str
 export async function SigninService(payload: AuthData) {
     // Find user by email
     const users = await model.findUserByEmail(payload.email);
-    
+
     if (users.length === 0) {
         throw new Error("Invalid email or password");
     }
@@ -180,7 +201,7 @@ export async function SigninService(payload: AuthData) {
 
     // Verify password
     const passwordMatch = await bcrypt.compare(payload.password, user.password);
-    
+
     if (!passwordMatch) {
         // Record failed login attempt
         await model.recordFailedLoginAttempt(user.id);
@@ -201,16 +222,16 @@ export async function SigninService(payload: AuthData) {
         { expiresIn: "7d" }
     );
     await pool.query(
-      `UPDATE users SET devicetoken = $1 WHERE id = $2
+        `UPDATE users SET devicetoken = $1 WHERE id = $2
        RETURNING *`,
-      [payload.fcmToken, user.id]
+        [payload.fcmToken, user.id]
     );
 
     // Return user without password
     const { password, ...userWithoutPassword } = user;
 
 
-    
+
     return {
         token,
         user: userWithoutPassword
@@ -226,7 +247,7 @@ export async function UpdateProfileService(
     }
 ) {
     const result = await model.updateProfile({ ...payload, id });
-    
+
     if (result.length === 0) {
         throw new Error("User not found");
     }
@@ -243,7 +264,7 @@ export async function UpdateRoleService(id: number, role: string) {
     }
 
     const result = await model.updateUserRoleById(id, role);
-    
+
     if (result.length === 0) {
         throw new Error("User not found");
     }
@@ -305,6 +326,7 @@ export async function UpdatePhoneService(id: number, phone: string | number) {
     }
 
     await model.syncOwnedShopsAfterUserPhoneChange(id, previousPhone || null, phoneNorm);
+    await updateWalletAddressByUserId(id, phoneNorm);
 
     const { password, ...userWithoutPassword } = result[0];
     return userWithoutPassword;
@@ -312,7 +334,7 @@ export async function UpdatePhoneService(id: number, phone: string | number) {
 
 export async function UpdatePhotoService(id: number, photo: string) {
     const result = await model.updatePhoto({ photo, id });
-    
+
     if (result.length === 0) {
         throw new Error("User not found");
     }
@@ -326,7 +348,7 @@ export async function UpdatePasswordService(id: number, password: string) {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     const result = await model.updatePassword({ id, password: hashedPassword });
-    
+
     if (result.length === 0) {
         throw new Error("User not found");
     }

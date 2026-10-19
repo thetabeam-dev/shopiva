@@ -6,6 +6,7 @@ import { HomeStackScreen } from '../stacks/customer/Home';
 import { ExploreStackScreen } from '../stacks/customer/Explore';
 import { ProfileStackScreen } from '../stacks/customer/Profile';
 import { CartStackScreen } from '../stacks/customer/Cart';
+import { WalletStackScreen } from '../stacks/Wallet';
 import { ActivitiesStackScreen } from '../stacks/customer/Activities';
 import { ProfileProvider } from '../context/ProfileContext';
 import { useAuth } from '../hooks/useAuth';
@@ -72,6 +73,8 @@ export default function CustomerTab() {
               iconName = focused ? 'cart' : 'cart-outline';
             } else if (route.name === 'Activities') {
               iconName = focused ? 'pulse' : 'pulse-outline';
+            } else if (route.name === 'Wallet') {
+              iconName = focused ? 'wallet' : 'wallet-outline';
             } else if (route.name === 'Profile') {
               iconName = focused ? 'person-circle' : 'person-circle-outline';
             }
@@ -95,6 +98,7 @@ export default function CustomerTab() {
           />
         )}
         {isGuest ? null : <Tab.Screen name="Cart" component={CartStackScreen} />}
+        {isGuest ? null : <Tab.Screen name="Wallet" component={WalletStackScreen} />}
         <Tab.Screen name="Profile" component={ProfileStackScreen} />
       </Tab.Navigator>
     </ProfileProvider>

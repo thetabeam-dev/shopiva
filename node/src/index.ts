@@ -31,6 +31,8 @@ import { sendFcmForActivities } from "./services/firebaseConfig.js";
 import { createAndEmitNotification } from "./services/notifications.js";
 import { GetShopOwnerByShopIdService } from "./services/business/shop.js";
 import { sendNotificationEmail } from "./services/email.js";
+import paystackTools from "./utils/paystack.js";
+import { storePaystackVirtualAccount } from "./models/wallet.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -49,6 +51,8 @@ app.post(
   express.raw({ type: "application/json" }),
   PaystackWebhookController,
 );
+
+
 app.get("/webhooks/whatsapp", WhatsAppWebhookVerificationController);
 app.post(
   "/webhooks/whatsapp",
@@ -229,6 +233,14 @@ app.post("/update-fcm", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
+// app.post("/pay", async (req, res) => {
+//   const body = req.body ?? {};
+  
+//   res.json({ result: created, stored });
+// });
+
 // Routes
 app.use("/api/oauth", OAuthRouter);
 app.use(UserRouter);

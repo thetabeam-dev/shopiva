@@ -6,6 +6,7 @@ import {
     VerifyPasswordResetPinService,
 } from "../services/passwordRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
+import { getWalletByUserId, getWalletRecipientByAddress } from "../models/wallet.js";
 import {
     appRoleToNotificationRole,
     listNotifications,
@@ -308,6 +309,52 @@ export async function UpdatePasswordController(req: Request, res: Response) {
         res.status(400).json({
             error: err instanceof Error ? err.message : String(err)
         });
+    }
+}
+
+export async function GetWalletRecipientController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const address = String(req.query.address ?? "").trim();
+        if (!address) {
+            res.status(400).json({ error: "Enter a wallet address." });
+            return;
+        }
+        const recipient = await getWalletRecipientByAddress(address);
+        if (!recipient) {
+            res.status(404).json({ error: "No wallet found for this address." });
+            return;
+        }
+        res.status(200).json({
+            recipient: {
+                id: recipient.id,
+                fname: recipient.fname,
+                lname: recipient.lname,
+                phone: recipient.phone,
+                photo: recipient.photo,
+                address: recipient.address,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+export async function GetWalletController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const wallet = await getWalletByUserId(userId);
+        res.status(200).json({ wallet });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
 }
 
