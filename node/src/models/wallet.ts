@@ -297,6 +297,52 @@ export async function sendWalletToAddress(senderUserId: number, address: string,
   }
 }
 
+/** Debits the sender's wallet for a bank withdrawal. No fee. */
+export async function withdrawFromWallet(userId: number, amountKobo: number, description: string) {
+  const id = Number(userId);
+  const kobo = Math.round(Number(amountKobo));
+  if (!Number.isFinite(id) || id <= 0) {
+    throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  }
+  if (!Number.isFinite(kobo) || kobo <= 0) {
+    throw Object.assign(new Error("Enter an amount greater than 0."), { status: 400 });
+  }
+  const pool = await db();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const locked = await client.query<{ id: string; user_id: number; balance_kobo: string }>(
+      `SELECT id, user_id, balance_kobo FROM wallets WHERE user_id = $1 FOR UPDATE`,
+      [id]
+    );
+    const wallet = locked.rows[0];
+    if (!wallet) {
+      throw Object.assign(new Error("Wallet not found."), { status: 404 });
+    }
+    if (Number(wallet.balance_kobo) < kobo) {
+      throw Object.assign(new Error("Amount cannot be more than your balance."), { status: 400 });
+    }
+    await client.query(
+      `UPDATE wallets SET balance_kobo = balance_kobo - $2, updated_at = NOW() WHERE id = $1`,
+      [wallet.id, kobo]
+    );
+    const note = description.trim() || "Wallet withdrawal";
+    await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, type, amount_kobo, reference, status, description)
+       VALUES ($1, 'withdraw', $2, $3, 'success', $4)`,
+      [wallet.id, kobo, crypto.randomUUID(), note]
+    );
+    const snapshot = await walletSnapshot(client, wallet.id);
+    await client.query("COMMIT");
+    return { userId: Number(wallet.user_id), ...snapshot };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listWalletTransactions(userId: number) {
   const id = Number(userId);
   if (!Number.isFinite(id) || id <= 0) return [];

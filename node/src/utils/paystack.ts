@@ -49,7 +49,6 @@ export default class paystackTools {
                 "Content-Type": "application/json",
             },
         });
-
         // 1. Create the Paystack customer
         const customerResponse = await paystack.post("/customer", {
             email: user.email,

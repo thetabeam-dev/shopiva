@@ -370,6 +370,16 @@ export async function verifyWalletPin(pin) {
   return data;
 }
 
+export async function withdrawWalletMoney({ amount, pin, bank, accountNumber, accountName }) {
+  const res = await apiFetchAuth('/user/wallet/withdraw', {
+    method: 'POST',
+    body: JSON.stringify({ amount, pin, bank, accountNumber, accountName }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
 export async function sendWalletMoney({ address, amount, remark, pin }) {
   const res = await apiFetchAuth('/user/wallet/send', {
     method: 'POST',

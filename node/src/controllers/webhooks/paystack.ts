@@ -14,6 +14,7 @@ import { escrow } from "../../services/escrow.js";
 import { sendFcmForActivities } from "../../services/firebaseConfig.js";
 import { createAndEmitNotification } from "../../services/notifications.js";
 import { creditWalletFromPaystack } from "../../models/wallet.js";
+import { nairaLabel, pushWalletFcm } from "../../services/walletPush.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
 
 export async function PaystackWebhookController(
@@ -65,6 +66,8 @@ export async function PaystackWebhookController(
           balance_kobo: credit.balance_kobo,
           transactions: credit.transactions ?? [],
         });
+        const toppedUp = nairaLabel(Number(paystackData?.amount) / 100);
+        await pushWalletFcm(credit.userId, "Wallet topped up", `${toppedUp} was added to your wallet.`);
       }
       res.status(200).json({ message: "Wallet credited" });
       return;

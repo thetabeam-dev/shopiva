@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
-import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, ListWalletTransactionsController, SendWalletController, CreateWalletPinController, VerifyWalletPinController, ChangeWalletPinController, RequestWalletPinResetController, VerifyWalletPinResetController, ResetWalletPinController } from "../controllers/user.js";
+import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, ListWalletTransactionsController, SendWalletController, WithdrawWalletController, CreateWalletPinController, VerifyWalletPinController, ChangeWalletPinController, RequestWalletPinResetController, VerifyWalletPinResetController, ResetWalletPinController } from "../controllers/user.js";
 import { UploadUserPhotoController, userPhotoUploadMiddleware } from "../controllers/userPhotoUpload.js";
 
 export const UserRouter = express.Router();
@@ -35,6 +35,7 @@ UserRouter.put('/user/password/update/:id', authenticate, UpdatePasswordControll
 UserRouter.get('/user/wallet', authenticate, GetWalletController);
 UserRouter.get('/user/wallet/transactions', authenticate, ListWalletTransactionsController);
 UserRouter.post('/user/wallet/send', authenticate, SendWalletController);
+UserRouter.post('/user/wallet/withdraw', authenticate, WithdrawWalletController);
 UserRouter.get('/user/wallet/recipient', authenticate, GetWalletRecipientController);
 UserRouter.post('/user/wallet/pin', authenticate, CreateWalletPinController);
 UserRouter.post('/user/wallet/pin/verify', authenticate, VerifyWalletPinController);

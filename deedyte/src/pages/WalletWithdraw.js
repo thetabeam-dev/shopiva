@@ -16,7 +16,8 @@ import { fetchPayoutBanks, verifyPayoutAccount } from '../api/shop';
 import { fetchWallet } from '../api/user';
 import { formatNaira } from '../utils/formatNaira';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
-import WalletPinModals, { alertPinVerified } from '../components/WalletPinModals';
+import WalletPinModals from '../components/WalletPinModals';
+import { withdrawWalletMoney } from '../api/user';
 
 const TEAL = '#00926e';
 const BORDER = '#E5E7EB';
@@ -259,9 +260,20 @@ export default function WalletWithdrawScreen() {
         missingVisible={missingPin}
         onClosePin={() => setPinOpen(false)}
         onCloseMissing={() => setMissingPin(false)}
-        onVerified={() => {
+        onVerified={async enteredPin => {
           setPinOpen(false);
-          alertPinVerified('withdraw');
+          try {
+            await withdrawWalletMoney({
+              amount: amountValue,
+              pin: enteredPin,
+              bank: bankOptions.find(bank => bank.value === bankCode)?.label,
+              accountNumber,
+              accountName,
+            });
+            Alert.alert('Withdraw', 'The withdrawal was recorded.');
+          } catch (error) {
+            Alert.alert('Withdraw', error instanceof Error ? error.message : String(error));
+          }
         }}
       />
     </ScrollView>
