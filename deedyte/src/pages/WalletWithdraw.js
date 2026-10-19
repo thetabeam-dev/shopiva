@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,129 +9,91 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { Dropdown } from 'react-native-element-dropdown';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useProfile } from '../context/ProfileContext';
-import { fetchPayoutBanks, verifyPayoutAccount } from '../api/shop';
-import { fetchWallet } from '../api/user';
+import { fetchOwnerShops, fetchShopPayoutAccount } from '../api/shop';
+import { fetchWallet, withdrawWalletMoney } from '../api/user';
 import { formatNaira } from '../utils/formatNaira';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
 import WalletPinModals from '../components/WalletPinModals';
-import { withdrawWalletMoney } from '../api/user';
 
 const TEAL = '#00926e';
 const BORDER = '#E5E7EB';
 
+function field(row, snake, camel) {
+  if (!row) return '';
+  const value = row[snake] != null ? row[snake] : row[camel];
+  return value != null ? String(value) : '';
+}
+
 export default function WalletWithdrawScreen() {
+  const navigation = useNavigation();
   const { user } = useProfile();
   const userId = Number(user?.id);
   const [amount, setAmount] = useState('');
   const [balance, setBalance] = useState(0);
   const [hasPin, setHasPin] = useState(false);
-  const [banks, setBanks] = useState(/** @type {Record<string, unknown>[]} */ ([]));
-  const [banksLoading, setBanksLoading] = useState(true);
-  const [bankCode, setBankCode] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [verified, setVerified] = useState(false);
-  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [payout, setPayout] = useState(null);
+  const [payoutLoading, setPayoutLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [missingPin, setMissingPin] = useState(false);
 
-  const bankOptions = useMemo(() => {
-    return banks
-      .map(bank => {
-        const code = String(bank.code ?? bank.bank_code ?? '').trim();
-        const name = String(bank.name ?? bank.bank_name ?? '').trim();
-        if (!code || !name) return null;
-        return { label: name, value: code };
-      })
-      .filter(Boolean);
-  }, [banks]);
+  const bank = field(payout, 'bank_name', 'bankName');
+  const accountNumber = field(payout, 'account_number', 'accountNumber');
+  const accountName = field(payout, 'account_name', 'accountName');
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      fetchWallet()
-        .then(row => {
+      setPayoutLoading(true);
+      const load = async () => {
+        try {
+          const row = await fetchWallet();
           if (cancelled) return;
           const kobo = Number(row?.balance_kobo);
           setBalance(Number.isFinite(kobo) ? kobo / 100 : 0);
           setHasPin(Boolean(row?.has_pin));
-        })
-        .catch(() => {
+        } catch {
           if (!cancelled) setBalance(0);
-        });
+        }
+        if (!Number.isFinite(userId) || userId <= 0) {
+          if (!cancelled) {
+            setPayout(null);
+            setPayoutLoading(false);
+          }
+          return;
+        }
+        try {
+          const shops = await fetchOwnerShops(userId);
+          let saved = null;
+          for (const shop of shops) {
+            const shopId = Number(shop.id ?? shop.shopid ?? shop.shop_id);
+            if (!Number.isFinite(shopId) || shopId <= 0) continue;
+            const account = await fetchShopPayoutAccount(shopId, userId);
+            if (account) {
+              saved = account;
+              break;
+            }
+          }
+          if (!cancelled) setPayout(saved);
+        } catch {
+          if (!cancelled) setPayout(null);
+        } finally {
+          if (!cancelled) setPayoutLoading(false);
+        }
+      };
+      void load();
       return () => {
         cancelled = true;
       };
-    }, []),
+    }, [userId]),
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!Number.isFinite(userId) || userId <= 0) {
-        setBanksLoading(false);
-        return;
-      }
-      try {
-        const list = await fetchPayoutBanks(userId);
-        if (!cancelled) setBanks(list);
-      } catch (error) {
-        if (!cancelled) {
-          Alert.alert('Banks', error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!cancelled) setBanksLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  const clearVerification = useCallback(() => {
-    setVerified(false);
-    setAccountName('');
-  }, []);
-
-  const onVerify = async () => {
-    const account = accountNumber.replace(/\D/g, '');
-    if (account.length !== 10) {
-      Alert.alert('Account number', 'Enter a valid 10-digit account number.');
-      return;
-    }
-    if (!bankCode) {
-      Alert.alert('Bank', 'Select a bank first.');
-      return;
-    }
-    setVerifyBusy(true);
-    try {
-      const data = await verifyPayoutAccount(userId, account, bankCode);
-      const name = data?.account_name != null ? String(data.account_name) : '';
-      if (!name) {
-        setVerified(false);
-        setAccountName('');
-        Alert.alert('Verify', 'Could not resolve this account.');
-        return;
-      }
-      setAccountName(name);
-      setVerified(true);
-    } catch (error) {
-      setVerified(false);
-      setAccountName('');
-      Alert.alert('Verify', error instanceof Error ? error.message : String(error));
-    } finally {
-      setVerifyBusy(false);
-    }
-  };
 
   const amountValue = Number(amount);
   const overBalance = Number.isFinite(amountValue) && amountValue > balance;
-  const canWithdraw =
-    verified && amountValue > 0 && amountValue <= balance && !verifyBusy;
+  const hasPayout = Boolean(bank && accountNumber && accountName);
+  const canWithdraw = hasPayout && amountValue > 0 && amountValue <= balance && !payoutLoading;
 
   const onAmountChange = text => {
     const cleaned = text.replace(/[^\d.]/g, '');
@@ -166,69 +128,39 @@ export default function WalletWithdrawScreen() {
         <Text style={styles.amountError}>Amount cannot be more than your balance.</Text>
       ) : null}
 
-      <Text style={styles.label}>Bank</Text>
-      {banksLoading ? (
+      <Text style={styles.label}>Payout account</Text>
+      {payoutLoading ? (
         <ActivityIndicator color={TEAL} style={styles.loader} />
+      ) : hasPayout ? (
+        <View style={styles.card}>
+          <Text style={styles.muted}>Bank</Text>
+          <Text style={styles.value}>{bank}</Text>
+          <Text style={styles.muted}>Account number</Text>
+          <Text style={styles.value}>{accountNumber}</Text>
+          <Text style={styles.muted}>Account name</Text>
+          <Text style={styles.value}>{accountName}</Text>
+          <Pressable
+            style={styles.secondary}
+            onPress={() => navigation.navigate('Wallet-payout')}
+            accessibilityRole="button"
+            accessibilityLabel="Change payout account"
+          >
+            <Text style={styles.secondaryText}>Change payout account</Text>
+          </Pressable>
+        </View>
       ) : (
-        <Dropdown
-          style={styles.dropdown}
-          containerStyle={styles.dropdownList}
-          placeholderStyle={styles.placeholder}
-          selectedTextStyle={styles.selected}
-          itemTextStyle={styles.selected}
-          data={bankOptions}
-          labelField="label"
-          valueField="value"
-          placeholder="Select bank"
-          search
-          searchField="label"
-          searchPlaceholder="Search banks..."
-          value={bankCode}
-          onChange={item => {
-            setBankCode(item.value);
-            clearVerification();
-          }}
-        />
+        <View style={styles.card}>
+          <Text style={styles.empty}>Add a payout account before you can withdraw.</Text>
+          <Pressable
+            style={styles.secondary}
+            onPress={() => navigation.navigate('Wallet-payout')}
+            accessibilityRole="button"
+            accessibilityLabel="Set up payout account"
+          >
+            <Text style={styles.secondaryText}>Set up payout account</Text>
+          </Pressable>
+        </View>
       )}
-
-      <Text style={styles.label}>Account number</Text>
-      <TextInput
-        value={accountNumber}
-        onChangeText={text => {
-          setAccountNumber(text.replace(/\D/g, '').slice(0, 10));
-          clearVerification();
-        }}
-        placeholder="10 digits"
-        placeholderTextColor="#9CA3AF"
-        keyboardType="number-pad"
-        maxLength={10}
-        style={styles.input}
-      />
-
-      <Pressable
-        style={[styles.verifyBtn, verifyBusy && styles.disabled]}
-        onPress={() => {
-          void onVerify();
-        }}
-        disabled={verifyBusy}
-        accessibilityRole="button"
-        accessibilityLabel="Verify account"
-      >
-        {verifyBusy ? (
-          <ActivityIndicator color={TEAL} />
-        ) : (
-          <Text style={styles.verifyText}>Verify account</Text>
-        )}
-      </Pressable>
-
-      <Text style={styles.label}>Account name</Text>
-      <TextInput
-        value={accountName}
-        editable={false}
-        placeholder="Account holder name"
-        placeholderTextColor="#9CA3AF"
-        style={styles.input}
-      />
 
       <Pressable
         style={[styles.button, !canWithdraw && styles.disabledButton]}
@@ -244,7 +176,7 @@ export default function WalletWithdrawScreen() {
         visible={confirming}
         amount={amountValue}
         balance={balance}
-        bank={bankOptions.find(bank => bank.value === bankCode)?.label}
+        bank={bank}
         accountNumber={accountNumber}
         accountName={accountName}
         onClose={() => setConfirming(false)}
@@ -266,7 +198,7 @@ export default function WalletWithdrawScreen() {
             await withdrawWalletMoney({
               amount: amountValue,
               pin: enteredPin,
-              bank: bankOptions.find(bank => bank.value === bankCode)?.label,
+              bank,
               accountNumber,
               accountName,
             });
@@ -309,21 +241,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111111',
   },
-  dropdown: {
-    height: 50,
+  loader: { marginVertical: 12 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 7,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFFFFF',
+    padding: 14,
   },
-  dropdownList: { borderRadius: 7 },
-  placeholder: { fontSize: 16, color: '#9CA3AF' },
-  selected: { fontSize: 16, color: '#111111' },
-  loader: { marginVertical: 12 },
-  verifyBtn: {
-    marginTop: 16,
-    minHeight: 48,
+  muted: { marginTop: 8, fontSize: 12, color: '#6B7280' },
+  value: { marginTop: 2, fontSize: 16, fontWeight: '800', color: '#111111' },
+  empty: { fontSize: 14, lineHeight: 20, color: '#374151' },
+  secondary: {
+    marginTop: 14,
+    minHeight: 44,
     borderRadius: 7,
     borderWidth: 1,
     borderColor: TEAL,
@@ -331,7 +262,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
   },
-  verifyText: { color: TEAL, fontSize: 16, fontWeight: '700' },
+  secondaryText: { color: TEAL, fontSize: 15, fontWeight: '700' },
   button: {
     marginTop: 20,
     backgroundColor: TEAL,
@@ -341,6 +272,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  disabled: { opacity: 0.6 },
   disabledButton: { backgroundColor: '#9CA3AF' },
 });

@@ -45,6 +45,13 @@ export default function WalletSettingsScreen() {
         />
         <View style={styles.menuDivider} />
         <SettingsRow
+          icon="card-outline"
+          title="Payout setup"
+          hint="Add the bank account used for payouts."
+          onPress={() => navigation.navigate('Wallet-payout')}
+        />
+        <View style={styles.menuDivider} />
+        <SettingsRow
           icon="lock-closed-outline"
           title="Change PIN"
           hint={

@@ -12,7 +12,7 @@ import {
     VerifyWalletPinResetService,
 } from "../services/walletPinRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
-import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, listWalletTransactions, replaceWalletPinHash, sendWalletToAddress, setWalletPinHash, withdrawFromWallet } from "../models/wallet.js";
+import { getOwnerPayoutAccount, getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, listWalletTransactions, replaceWalletPinHash, sendWalletToAddress, setWalletPinHash, withdrawFromWallet } from "../models/wallet.js";
 import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 import { getIo } from "../index.js";
 import {
@@ -20,6 +20,8 @@ import {
     listNotifications,
     markNotificationRead,
 } from "../services/notifications.js";
+import paystackTools from "../utils/paystack.js";
+import { paystack } from "../services/paystack.js";
 
 export async function SignupController(req: Request, res: Response) {
     try {
@@ -586,9 +588,26 @@ export async function WithdrawWalletController(req: Request, res: Response) {
             return;
         }
         const amountNaira = Number(req.body?.amount);
-        const bank = String(req.body?.bank ?? "").trim();
-        const accountNumber = String(req.body?.accountNumber ?? "").replace(/\D/g, "");
-        const accountName = String(req.body?.accountName ?? "").trim();
+        const payout = await getOwnerPayoutAccount(userId);
+        const recipient = String(payout?.provider_recipient_id ?? "").trim();
+        if (!payout || !recipient) {
+            res.status(400).json({ error: "Set up a payout account before withdrawing." });
+            return;
+        }
+        const reference = paystack.generateRefId("WDR");
+        const transfer = await paystack.initiateTransfer({
+            amount: amountNaira,
+            recipient,
+            reason: "Wallet withdrawal",
+            reference,
+        }) as { status?: boolean; message?: string };
+        if (!transfer?.status) {
+            res.status(400).json({ error: transfer?.message || "Could not start the transfer." });
+            return;
+        }
+        const bank = String(payout.bank_name ?? "").trim();
+        const accountNumber = String(payout.account_number ?? "").trim();
+        const accountName = String(payout.account_name ?? "").trim();
         const result = await withdrawFromWallet(
             userId,
             Math.round(amountNaira * 100),

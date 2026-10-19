@@ -277,16 +277,6 @@ export default function ProfileSettings() {
             title="Location"
             onPress={() => navigation.navigate('profile-settings-location')}
           />
-          {vendorMode ? (
-            <>
-              <View style={styles.menuDivider} />
-              <SettingsRow
-                icon="card-outline"
-                title="Payout setup"
-                onPress={() => navigation.navigate('profile-settings-payout')}
-              />
-            </>
-          ) : null}
           <View style={styles.menuDivider} />
           <SettingsRow
             icon={isAuthenticated ? 'log-out-outline' : 'log-in-outline'}

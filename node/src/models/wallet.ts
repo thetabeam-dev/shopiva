@@ -297,6 +297,27 @@ export async function sendWalletToAddress(senderUserId: number, address: string,
   }
 }
 
+export async function getOwnerPayoutAccount(userId: number) {
+  const id = Number(userId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const { rows } = await (await db()).query(
+    `SELECT
+       p.provider_recipient_id,
+       p.bank_name,
+       p.account_number,
+       p.account_name
+     FROM shop_payout_accounts p
+     INNER JOIN shops s ON s.id = p.shop_id
+     WHERE s.ownerid = $1
+       AND p.provider_recipient_id IS NOT NULL
+       AND btrim(p.provider_recipient_id) <> ''
+     ORDER BY p.updated_at DESC NULLS LAST
+     LIMIT 1`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
 /** Debits the sender's wallet for a bank withdrawal. No fee. */
 export async function withdrawFromWallet(userId: number, amountKobo: number, description: string) {
   const id = Number(userId);
