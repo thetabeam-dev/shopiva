@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
-import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController } from "../controllers/user.js";
+import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, CreateWalletPinController, VerifyWalletPinController } from "../controllers/user.js";
 import { UploadUserPhotoController, userPhotoUploadMiddleware } from "../controllers/userPhotoUpload.js";
 
 export const UserRouter = express.Router();
@@ -34,4 +34,6 @@ UserRouter.put('/user/profile/update/:id', authenticate, UpdateProfileController
 UserRouter.put('/user/password/update/:id', authenticate, UpdatePasswordController);
 UserRouter.get('/user/wallet', authenticate, GetWalletController);
 UserRouter.get('/user/wallet/recipient', authenticate, GetWalletRecipientController);
+UserRouter.post('/user/wallet/pin', authenticate, CreateWalletPinController);
+UserRouter.post('/user/wallet/pin/verify', authenticate, VerifyWalletPinController);
 UserRouter.post('/notifications/:notificationId/read', authenticate, MarkNotificationReadController);

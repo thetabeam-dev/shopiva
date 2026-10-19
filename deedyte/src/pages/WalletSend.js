@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { fetchWalletRecipient } from '../api/user';
+import { useFocusEffect } from '@react-navigation/native';
+import { fetchWallet, fetchWalletRecipient } from '../api/user';
+import WalletConfirmSheet from '../components/WalletConfirmSheet';
+import WalletPinModals, { alertPinVerified } from '../components/WalletPinModals';
 
 const TEAL = '#00926e';
 
@@ -11,6 +14,30 @@ export default function WalletSendScreen() {
   const [profile, setProfile] = useState(null);
   const [lookupError, setLookupError] = useState('');
   const [lookingUp, setLookingUp] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [hasPin, setHasPin] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [missingPin, setMissingPin] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      fetchWallet()
+        .then(row => {
+          if (cancelled) return;
+          const kobo = Number(row?.balance_kobo);
+          setBalance(Number.isFinite(kobo) ? kobo / 100 : 0);
+          setHasPin(Boolean(row?.has_pin));
+        })
+        .catch(() => {
+          if (!cancelled) setBalance(0);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   const lookupRecipient = async address => {
     const next = String(address ?? '').trim();
@@ -33,6 +60,8 @@ export default function WalletSendScreen() {
   };
 
   const name = [profile?.fname, profile?.lname].filter(Boolean).join(' ').trim();
+  const amountValue = Number(amount);
+  const canSend = Boolean(profile) && amountValue > 0 && amountValue <= balance;
 
   return (
     <View style={styles.root}>
@@ -79,9 +108,40 @@ export default function WalletSendScreen() {
         style={[styles.input, styles.remark]}
         multiline
       />
-      <Pressable style={styles.button} accessibilityRole="button" accessibilityLabel="Send money">
+      <Pressable
+        style={[styles.button, !canSend && styles.disabled]}
+        disabled={!canSend}
+        onPress={() => setConfirming(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Send money"
+      >
         <Text style={styles.buttonText}>Send</Text>
       </Pressable>
+      <WalletConfirmSheet
+        visible={confirming}
+        amount={amountValue}
+        balance={balance}
+        bank={profile?.bank_name}
+        accountNumber={profile?.account_number}
+        accountName={profile?.account_name || name}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          if (hasPin) setPinOpen(true);
+          else setMissingPin(true);
+        }}
+      />
+      <WalletPinModals
+        hasPin={hasPin}
+        pinVisible={pinOpen}
+        missingVisible={missingPin}
+        onClosePin={() => setPinOpen(false)}
+        onCloseMissing={() => setMissingPin(false)}
+        onVerified={() => {
+          setPinOpen(false);
+          alertPinVerified('send');
+        }}
+      />
     </View>
   );
 }
@@ -122,4 +182,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  disabled: { backgroundColor: '#9CA3AF' },
 });

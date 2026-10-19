@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
 import { SignupService, SigninService, UpdateProfileService, UpdateEmailService, UpdatePhoneService, UpdatePhotoService, UpdatePasswordService, DeleteUserService, UpdateRoleService } from "../services/user.js";
 import {
@@ -6,7 +7,7 @@ import {
     VerifyPasswordResetPinService,
 } from "../services/passwordRecovery.js";
 import type { AuthRequest } from "../middleware/auth.js";
-import { getWalletByUserId, getWalletRecipientByAddress } from "../models/wallet.js";
+import { getWalletByUserId, getWalletPinHash, getWalletRecipientByAddress, setWalletPinHash } from "../models/wallet.js";
 import {
     appRoleToNotificationRole,
     listNotifications,
@@ -312,6 +313,76 @@ export async function UpdatePasswordController(req: Request, res: Response) {
     }
 }
 
+function walletPinDigits(value: unknown) {
+    return String(value ?? "").replace(/\D/g, "");
+}
+
+export async function CreateWalletPinController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const pin = walletPinDigits(req.body?.pin);
+        const confirm = walletPinDigits(req.body?.confirm);
+        if (pin.length !== 4 || confirm.length !== 4) {
+            res.status(400).json({ error: "PIN must be 4 digits." });
+            return;
+        }
+        if (pin !== confirm) {
+            res.status(400).json({ error: "PIN and confirmation do not match." });
+            return;
+        }
+        const wallet = await getWalletByUserId(userId);
+        if (!wallet) {
+            res.status(404).json({ error: "Wallet not found." });
+            return;
+        }
+        if (wallet.has_pin) {
+            res.status(409).json({ error: "This wallet already has a PIN." });
+            return;
+        }
+        const hash = await bcrypt.hash(pin, 10);
+        const saved = await setWalletPinHash(userId, hash);
+        if (!saved) {
+            res.status(409).json({ error: "This wallet already has a PIN." });
+            return;
+        }
+        res.status(200).json({ message: "Wallet PIN created." });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
+export async function VerifyWalletPinController(req: Request, res: Response) {
+    try {
+        const userId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(userId) || userId <= 0) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const pin = walletPinDigits(req.body?.pin);
+        if (pin.length !== 4) {
+            res.status(400).json({ error: "PIN must be 4 digits." });
+            return;
+        }
+        const hash = await getWalletPinHash(userId);
+        if (!hash) {
+            res.status(404).json({ error: "Create a wallet PIN first." });
+            return;
+        }
+        const match = await bcrypt.compare(pin, hash);
+        if (!match) {
+            res.status(400).json({ error: "Incorrect PIN." });
+            return;
+        }
+        res.status(200).json({ valid: true });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+}
+
 export async function GetWalletRecipientController(req: Request, res: Response) {
     try {
         const userId = Number((req as AuthRequest).user?.id);
@@ -337,6 +408,9 @@ export async function GetWalletRecipientController(req: Request, res: Response) 
                 phone: recipient.phone,
                 photo: recipient.photo,
                 address: recipient.address,
+                account_number: recipient.account_number,
+                account_name: recipient.account_name,
+                bank_name: recipient.bank_name,
             },
         });
     } catch (err) {

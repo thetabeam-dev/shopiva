@@ -2,6 +2,7 @@ CREATE TABLE wallets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
     address INTEGER NOT NULL UNIQUE REFERENCES users(phone),
+    pin VARCHAR,
     currency VARCHAR(3) NOT NULL DEFAULT 'NGN',
     balance_kobo BIGINT NOT NULL DEFAULT 0
         CHECK (balance_kobo >= 0),

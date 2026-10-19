@@ -15,6 +15,8 @@ import { useProfile } from '../context/ProfileContext';
 import { fetchPayoutBanks, verifyPayoutAccount } from '../api/shop';
 import { fetchWallet } from '../api/user';
 import { formatNaira } from '../utils/formatNaira';
+import WalletConfirmSheet from '../components/WalletConfirmSheet';
+import WalletPinModals, { alertPinVerified } from '../components/WalletPinModals';
 
 const TEAL = '#00926e';
 const BORDER = '#E5E7EB';
@@ -24,6 +26,7 @@ export default function WalletWithdrawScreen() {
   const userId = Number(user?.id);
   const [amount, setAmount] = useState('');
   const [balance, setBalance] = useState(0);
+  const [hasPin, setHasPin] = useState(false);
   const [banks, setBanks] = useState(/** @type {Record<string, unknown>[]} */ ([]));
   const [banksLoading, setBanksLoading] = useState(true);
   const [bankCode, setBankCode] = useState('');
@@ -31,6 +34,9 @@ export default function WalletWithdrawScreen() {
   const [accountName, setAccountName] = useState('');
   const [verified, setVerified] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [missingPin, setMissingPin] = useState(false);
 
   const bankOptions = useMemo(() => {
     return banks
@@ -51,6 +57,7 @@ export default function WalletWithdrawScreen() {
           if (cancelled) return;
           const kobo = Number(row?.balance_kobo);
           setBalance(Number.isFinite(kobo) ? kobo / 100 : 0);
+          setHasPin(Boolean(row?.has_pin));
         })
         .catch(() => {
           if (!cancelled) setBalance(0);
@@ -225,12 +232,38 @@ export default function WalletWithdrawScreen() {
       <Pressable
         style={[styles.button, !canWithdraw && styles.disabledButton]}
         disabled={!canWithdraw}
+        onPress={() => setConfirming(true)}
         accessibilityRole="button"
         accessibilityState={{ disabled: !canWithdraw }}
         accessibilityLabel="Withdraw"
       >
         <Text style={styles.buttonText}>Withdraw</Text>
       </Pressable>
+      <WalletConfirmSheet
+        visible={confirming}
+        amount={amountValue}
+        balance={balance}
+        bank={bankOptions.find(bank => bank.value === bankCode)?.label}
+        accountNumber={accountNumber}
+        accountName={accountName}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          if (hasPin) setPinOpen(true);
+          else setMissingPin(true);
+        }}
+      />
+      <WalletPinModals
+        hasPin={hasPin}
+        pinVisible={pinOpen}
+        missingVisible={missingPin}
+        onClosePin={() => setPinOpen(false)}
+        onCloseMissing={() => setMissingPin(false)}
+        onVerified={() => {
+          setPinOpen(false);
+          alertPinVerified('withdraw');
+        }}
+      />
     </ScrollView>
   );
 }

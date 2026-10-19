@@ -310,6 +310,26 @@ export async function fetchWalletRecipient(address) {
   return data.recipient ?? null;
 }
 
+export async function createWalletPin(pin, confirm) {
+  const res = await apiFetchAuth('/user/wallet/pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin, confirm }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
+export async function verifyWalletPin(pin) {
+  const res = await apiFetchAuth('/user/wallet/pin/verify', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(pickError(data, res));
+  return data;
+}
+
 export async function fetchWallet() {
   const res = await apiFetchAuth('/user/wallet', { method: 'GET' });
   const data = await res.json().catch(() => ({}));

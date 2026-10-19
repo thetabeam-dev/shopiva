@@ -67,6 +67,33 @@ export async function storePaystackVirtualAccount(account: PaystackVirtualAccoun
   }
 }
 
+export async function getWalletPinHash(userId: number) {
+  const id = Number(userId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const { rows } = await (await db()).query<{ pin: string | null }>(
+    `SELECT pin FROM wallets WHERE user_id = $1 LIMIT 1`,
+    [id]
+  );
+  const pin = rows[0]?.pin;
+  return pin && String(pin).trim() ? String(pin) : null;
+}
+
+export async function setWalletPinHash(userId: number, pinHash: string) {
+  const id = Number(userId);
+  const hash = String(pinHash ?? "").trim();
+  if (!Number.isFinite(id) || id <= 0 || !hash) {
+    throw new Error("A wallet and PIN are required.");
+  }
+  const { rowCount } = await (await db()).query(
+    `UPDATE wallets
+     SET pin = $2, updated_at = NOW()
+     WHERE user_id = $1
+       AND (pin IS NULL OR btrim(pin) = '')`,
+    [id, hash]
+  );
+  return Number(rowCount) > 0;
+}
+
 export async function updateWalletAddressByUserId(userId: number, address: string) {
   const id = Number(userId);
   const next = String(address ?? "").trim();
@@ -87,9 +114,13 @@ export async function getWalletRecipientByAddress(address: string) {
        u.lname,
        u.phone,
        u.photo,
-       w.address
+       w.address,
+       v.account_number,
+       v.account_name,
+       v.bank_name
      FROM wallets w
      INNER JOIN users u ON u.id = w.user_id
+     LEFT JOIN virtual_accounts v ON v.wallet_id = w.id
      WHERE w.address::text = $1
      LIMIT 1`,
     [next]
@@ -104,6 +135,7 @@ export async function getWalletByUserId(userId: number) {
     `SELECT
        w.address,
        w.balance_kobo,
+       (w.pin IS NOT NULL AND btrim(w.pin) <> '') AS has_pin,
        v.account_number,
        v.account_name,
        v.bank_name
