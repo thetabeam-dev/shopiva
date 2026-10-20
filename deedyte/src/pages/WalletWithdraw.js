@@ -125,7 +125,7 @@ export default function WalletWithdrawScreen() {
         <Text style={styles.balanceHint}>Available {formatNaira(balance)}</Text>
       </View>
       {overBalance ? (
-        <Text style={styles.amountError}>Amount cannot be more than your balance.</Text>
+        <Text style={styles.amountError}>Amount cannot be more than your available balance.</Text>
       ) : null}
 
       <Text style={styles.label}>Payout account</Text>

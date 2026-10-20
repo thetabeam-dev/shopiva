@@ -43,4 +43,5 @@ UserRouter.put('/user/wallet/pin', authenticate, ChangeWalletPinController);
 UserRouter.post('/user/wallet/pin/recover', authenticate, RequestWalletPinResetController);
 UserRouter.post('/user/wallet/pin/recover/verify', authenticate, VerifyWalletPinResetController);
 UserRouter.post('/user/wallet/pin/recover/reset', authenticate, ResetWalletPinController);
+UserRouter.get('/notifications', authenticate, ListNotificationsController);
 UserRouter.post('/notifications/:notificationId/read', authenticate, MarkNotificationReadController);

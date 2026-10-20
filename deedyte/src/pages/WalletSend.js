@@ -62,6 +62,7 @@ export default function WalletSendScreen() {
 
   const name = [profile?.fname, profile?.lname].filter(Boolean).join(' ').trim();
   const amountValue = Number(amount);
+  const overBalance = Number.isFinite(amountValue) && amountValue > balance;
   const canSend = Boolean(profile) && amountValue > 0 && amountValue <= balance;
 
   return (
@@ -100,6 +101,9 @@ export default function WalletSendScreen() {
         placeholderTextColor="#9CA3AF"
         style={styles.input}
       />
+      {overBalance ? (
+        <Text style={styles.error}>Amount cannot be more than your available balance.</Text>
+      ) : null}
       <Text style={styles.label}>Remark</Text>
       <TextInput
         value={remark}

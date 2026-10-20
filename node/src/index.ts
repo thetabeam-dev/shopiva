@@ -235,25 +235,24 @@ app.post("/update-fcm", async (req, res) => {
 });
 
 
-app.post("/pay", async (req, res) => {
-  try {
-    const body = req.body ?? {};
-    const created = await paystackTools.createDVA(body);
-    const phone = ("9047263572");
-    const userId = Number(body.userId ?? body.user_id ?? 60);
-    const stored = await storePaystackVirtualAccount({
-      userId,
-      phone,
-      customerCode: created.customerCode,
-      accountNumber: created.accountNumber,
-      accountName: created.accountName,
-      bankName: created.bankName,
-    });
-    res.json({ result: created, stored });
-  } catch (error: any) {
-    console.log(error?.response?.data ?? error)
-  }
-});
+// app.post("/pay", async (req, res) => {
+//   try {
+//     const body = req.body ?? {};
+//     const created = await paystackTools.createDVAOnce(body);
+//     const userId = Number(body.userId ?? body.user_id ?? 60);
+//     const stored = await storePaystackVirtualAccount({
+//       userId,
+//       phone: req.body.phone,
+//       customerCode: created.customerCode,
+//       accountNumber: created.accountNumber,
+//       accountName: created.accountName,
+//       bankName: created.bankName,
+//     });
+//     res.json({ result: created, stored });
+//   } catch (error: any) {
+//     console.log(error?.response?.data ?? error)
+//   }
+// });
 
 // Routes
 app.use("/api/oauth", OAuthRouter);
