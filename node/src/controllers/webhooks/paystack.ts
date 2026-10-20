@@ -10,7 +10,6 @@ import { getIo } from "../../index.js";
 import { ordersTransformer as buyerOrdersTransformer } from "../../transformers/buyer/orders.js";
 import { ordersTransformer as vendorOrdersTransformer } from "../../transformers/business/orders.js";
 import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
-import { escrow } from "../../services/escrow.js";
 import { sendFcmForActivities } from "../../services/firebaseConfig.js";
 import { createAndEmitNotification } from "../../services/notifications.js";
 import { creditWalletFromPaystack } from "../../models/wallet.js";
@@ -74,30 +73,8 @@ export async function PaystackWebhookController(
     }
 
     if (eventType !== "charge.success") {
-      // if (eventType === "transfer.success") {
-      //   escrow.complete({
-      //     transfer_reference: paystackData.reference,
-      //   });
-      //   res.status(200).json({ message: "Payment completed" });
-      //   return;
-      // } else if (eventType === "transfer.failed") {
-      //   escrow.setTransferStatus({
-      //     status: "failed",
-      //     transfer_reference: paystackData.reference,
-      //   });
-      //   res.status(200).json({ message: "Payment completed" });
-      //   return;
-      // } else if (eventType === "transfer.reversed") {
-      //   escrow.setTransferStatus({
-      //     status: "reversed",
-      //     transfer_reference: paystackData.reference,
-      //   });
-      //   res.status(200).json({ message: "Payment completed" });
-      //   return;
-      // } else {
-      //   res.status(200).send("Ignored");
-      //   return;
-      // }
+      res.status(200).send("Ignored");
+      return;
     }
 
     // Store all webhook deliveries for audit trail

@@ -58,11 +58,19 @@ function iosLocationGranted(interactive) {
       resolve(true);
       return;
     }
+    let settled = false;
+    const finish = (granted) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(granted);
+    };
+    const timer = setTimeout(() => finish(false), 8000);
     geo.requestAuthorization(
-      () => resolve(true),
+      () => finish(true),
       () => {
         if (interactive) openAppLocationSettings();
-        resolve(false);
+        finish(false);
       },
     );
   });
@@ -76,7 +84,12 @@ function iosLocationGranted(interactive) {
 export async function requestLocationPermission(options = {}) {
   const interactive = options.interactive !== false;
   try {
-    const servicesOn = await DeviceInfo.isLocationEnabled();
+    const servicesOn = await Promise.race([
+      DeviceInfo.isLocationEnabled(),
+      new Promise((resolve) => {
+        setTimeout(() => resolve(false), 4000);
+      }),
+    ]);
     if (!servicesOn) {
       if (interactive) openDeviceLocationSettings();
       return false;
@@ -98,9 +111,19 @@ export async function requestLocationPermission(options = {}) {
  */
 export function getCurrentCoordinates() {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (handler, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      handler(value);
+    };
+    const timer = setTimeout(() => {
+      finish(reject, new Error('Turn on device location, then try again.'));
+    }, 12000);
     Geolocation.getCurrentPosition(
       (pos) => {
-        resolve({
+        finish(resolve, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         });
@@ -108,18 +131,18 @@ export function getCurrentCoordinates() {
       (err) => {
         const code = Number(err?.code);
         if (code === 1) {
-          reject(new Error('Location permission was denied. Allow location access and try again.'));
+          finish(reject, new Error('Location permission was denied. Allow location access and try again.'));
           return;
         }
-        if (code === 2) {
-          reject(new Error('Turn on device location, then try again.'));
+        if (code === 2 || code === 3) {
+          finish(reject, new Error('Turn on device location, then try again.'));
           return;
         }
-        reject(err instanceof Error ? err : new Error(String(err?.message ?? 'Could not read your location.')));
+        finish(reject, err instanceof Error ? err : new Error(String(err?.message ?? 'Could not read your location.')));
       },
       {
         enableHighAccuracy: true,
-        timeout: 20000,
+        timeout: 10000,
         maximumAge: 60000,
       },
     );

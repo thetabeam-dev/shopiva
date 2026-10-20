@@ -259,7 +259,7 @@ export interface ShopPolicies {
 
 
 export interface NewPayoutAccount{
-  shopId: string,
+  userId: string,
   bank_name: string,
   bank_code: string,
   account_name: string,

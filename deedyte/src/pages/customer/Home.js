@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
+  Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -48,6 +51,14 @@ function formatCategoryLabel(category) {
     .join(' ');
 }
 
+const SORTS = [
+  { key: 'relevance', label: 'Relevance' },
+  { key: 'az', label: 'A-Z' },
+  { key: 'za', label: 'Z-A' },
+  { key: 'price_asc', label: 'Price ascending' },
+  { key: 'price_desc', label: 'Price descending' },
+];
+
 function locationLabel(user) {
   const loc = user?.location;
   if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
@@ -72,6 +83,16 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [sortKey, setSortKey] = useState('relevance');
+  const [sortOpen, setSortOpen] = useState(false);
+  const [layout, setLayout] = useState('grid');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftCategory, setDraftCategory] = useState('all');
+  const [draftMin, setDraftMin] = useState('');
+  const [draftMax, setDraftMax] = useState('');
 
   const categories = useMemo(() => {
     const seen = new Set();
@@ -140,10 +161,46 @@ export default function HomeScreen() {
   }, [loadArrivals]);
 
   const visibleArrivals = useMemo(() => {
-    if (selectedCategory === 'all') return arrivals;
-    const wanted = categoryKey(selectedCategory);
-    return arrivals.filter(item => categoryKey(item.category) === wanted);
-  }, [arrivals, selectedCategory]);
+    const query = searchQuery.trim().toLowerCase();
+    const min = minPrice.trim() === '' ? null : Number(minPrice);
+    const max = maxPrice.trim() === '' ? null : Number(maxPrice);
+    const filtered = arrivals.filter(item => {
+      if (selectedCategory !== 'all' && categoryKey(item.category) !== categoryKey(selectedCategory)) {
+        return false;
+      }
+      if (query && !String(item.title ?? '').toLowerCase().includes(query)) return false;
+      if (min != null && Number.isFinite(min) && item.price < min) return false;
+      if (max != null && Number.isFinite(max) && item.price > max) return false;
+      return true;
+    });
+    const sorted = [...filtered];
+    if (sortKey === 'az') sorted.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortKey === 'za') sorted.sort((a, b) => b.title.localeCompare(a.title));
+    else if (sortKey === 'price_asc') sorted.sort((a, b) => a.price - b.price);
+    else if (sortKey === 'price_desc') sorted.sort((a, b) => b.price - a.price);
+    return sorted;
+  }, [arrivals, selectedCategory, searchQuery, minPrice, maxPrice, sortKey]);
+
+  const openFilters = () => {
+    setDraftCategory(selectedCategory);
+    setDraftMin(minPrice);
+    setDraftMax(maxPrice);
+    setSortOpen(false);
+    setFilterOpen(true);
+  };
+
+  const applyFilters = () => {
+    setSelectedCategory(draftCategory);
+    setMinPrice(draftMin.replace(/[^\d.]/g, ''));
+    setMaxPrice(draftMax.replace(/[^\d.]/g, ''));
+    setFilterOpen(false);
+  };
+
+  const clearFilters = () => {
+    setDraftCategory('all');
+    setDraftMin('');
+    setDraftMax('');
+  };
 
   const openProduct = useCallback((item) => {
     navigation.navigate('Product', {
@@ -176,11 +233,84 @@ export default function HomeScreen() {
             <Text style={styles.place} numberOfLines={1} ellipsizeMode="tail">{locationLabel(user)}</Text>
           </View>
         </View>
-        <NotificationBell
-          onPress={() => navigation.navigate('Notifications')}
-          style={styles.bell}
-        />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.bell}
+            onPress={openFilters}
+            accessibilityRole="button"
+            accessibilityLabel="Filter products"
+          >
+            <Icon name="options-outline" size={22} color="#111111" />
+          </TouchableOpacity>
+          <NotificationBell
+            onPress={() => navigation.navigate('Notifications')}
+            style={styles.bell}
+          />
+        </View>
       </View>
+
+      <View style={styles.searchRow}>
+        <View style={styles.searchField}>
+          <Icon name="search-outline" size={18} color="#8A8A8A" />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search products"
+            placeholderTextColor="#9A9A9A"
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+              <Icon name="close-circle" size={18} color="#B0B0B0" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.searchActions}>
+          <TouchableOpacity
+            style={styles.sortBtn}
+            onPress={() => setSortOpen(open => !open)}
+            accessibilityRole="button"
+            accessibilityLabel="Sort products"
+          >
+            <Icon name="swap-vertical-outline" size={20} color="#111111" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sortBtn}
+            onPress={() => setLayout(current => (current === 'grid' ? 'list' : 'grid'))}
+            accessibilityRole="button"
+            accessibilityLabel={layout === 'grid' ? 'Show products as a list' : 'Show products as boxes'}
+          >
+            <Icon name={layout === 'grid' ? 'list-outline' : 'grid-outline'} size={20} color="#111111" />
+          </TouchableOpacity>
+        </View>
+      </View>
+      {sortOpen ? (
+        <View style={styles.sortMenu}>
+          {SORTS.map(option => {
+            const selected = option.key === sortKey;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.sortItem, selected && styles.sortItemOn]}
+                onPress={() => {
+                  setSortKey(option.key);
+                  setSortOpen(false);
+                }}
+              >
+                <Text style={styles.sortItemText}>{option.label}</Text>
+                <Icon
+                  name={selected ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={selected ? '#00926E' : '#C5C5C5'}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
 
       <ScrollView
         horizontal
@@ -231,33 +361,33 @@ export default function HomeScreen() {
       </View> */}
 
       {loading ? (
-        <View style={styles.grid}>
-          {Array.from({ length: 6 }, (_, index) => (
-            <View key={index} style={styles.card}>
-              <View style={[styles.cardImage, styles.bone]} />
-              <View style={[styles.boneLine, { width: '92%', marginTop: 8 }]} />
-              <View style={[styles.boneLine, { width: '64%', marginTop: 6 }]} />
-              <View style={[styles.boneLine, { width: '48%', marginTop: 8, height: 12 }]} />
-              <View style={styles.priceRow}>
-                <View style={[styles.boneLine, { width: '42%', height: 16 }]} />
-                <View style={styles.boneCart} />
+        <View style={layout === 'list' ? styles.list : styles.grid}>
+          {Array.from({ length: layout === 'list' ? 4 : 6 }, (_, index) => (
+            <View key={index} style={layout === 'list' ? styles.listCard : styles.card}>
+              <View style={[layout === 'list' ? styles.listImage : styles.cardImage, styles.bone]} />
+              <View style={layout === 'list' ? styles.listBody : null}>
+                <View style={[styles.boneLine, { width: '92%', marginTop: layout === 'list' ? 0 : 8 }]} />
+                <View style={[styles.boneLine, { width: '64%', marginTop: 6 }]} />
+                <View style={[styles.boneLine, { width: '48%', marginTop: 8, height: 12 }]} />
               </View>
             </View>
           ))}
         </View>
       ) : (
-        <View style={styles.grid}>
+        <View style={layout === 'list' ? styles.list : styles.grid}>
           {visibleArrivals.map(item => {
             const showCompare = item.comparePrice > item.price && item.price > 0;
             const { rating, count } = shopRating(item.shop);
+            const asList = layout === 'list';
             return (
               <TouchableOpacity
                 key={`${item.shop?.id}-${item.id}`}
-                style={styles.card}
+                style={asList ? styles.listCard : styles.card}
                 activeOpacity={0.9}
                 onPress={() => openProduct(item)}
               >
-                <ProductCardMedia uri={item.uri} style={styles.cardImage} />
+                <ProductCardMedia uri={item.uri} style={asList ? styles.listImage : styles.cardImage} />
+                <View style={asList ? styles.listBody : null}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
                 <View style={styles.ratingRow}>
                   {[1, 2, 3, 4, 5].map(star => (
@@ -288,6 +418,7 @@ export default function HomeScreen() {
                     <Icon name="cart-outline" size={18} color="#111111" />
                   </TouchableOpacity>
                 </View>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -295,12 +426,74 @@ export default function HomeScreen() {
       )}
       {!loading && visibleArrivals.length === 0 ? (
         <Text style={styles.empty}>
-          {selectedCategory === 'all'
-            ? 'No products yet. Explore shops to see what is in stock.'
-            : `No products in ${formatCategoryLabel(selectedCategory)}.`}
+          {searchQuery.trim()
+            ? `No products match “${searchQuery.trim()}”.`
+            : selectedCategory === 'all'
+              ? 'No products yet. Explore shops to see what is in stock.'
+              : `No products in ${formatCategoryLabel(selectedCategory)}.`}
         </Text>
       ) : null}
     </ScrollView>
+
+    <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+      <View style={styles.modalFill}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setFilterOpen(false)} />
+      <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={styles.sheetHandle} />
+        <View style={styles.sheetHeader}>
+          <TouchableOpacity onPress={() => setFilterOpen(false)} hitSlop={8}>
+            <Icon name="close" size={22} color="#111111" />
+          </TouchableOpacity>
+          <Text style={styles.sheetTitle}>Filters</Text>
+          <TouchableOpacity onPress={clearFilters}>
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionTitle}>Price</Text>
+          <Text style={styles.sectionHint}>Set a range in naira</Text>
+          <View style={styles.priceInputs}>
+            <TextInput
+              value={draftMin}
+              onChangeText={setDraftMin}
+              placeholder="Min (₦)"
+              placeholderTextColor="#9A9A9A"
+              keyboardType="decimal-pad"
+              style={styles.priceInput}
+            />
+            <TextInput
+              value={draftMax}
+              onChangeText={setDraftMax}
+              placeholder="Max (₦)"
+              placeholderTextColor="#9A9A9A"
+              keyboardType="decimal-pad"
+              style={styles.priceInput}
+            />
+          </View>
+
+          <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Category</Text>
+          <Text style={styles.sectionHint}>Pick one to focus</Text>
+          {['all', ...categories].map(item => {
+            const selected = categoryKey(item) === categoryKey(draftCategory);
+            return (
+              <TouchableOpacity
+                key={item}
+                style={[styles.sheetOption, selected && styles.sheetOptionOn]}
+                onPress={() => setDraftCategory(item)}
+              >
+                <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextOn]}>
+                  {item === 'all' ? 'All' : formatCategoryLabel(item)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
+          <Text style={styles.applyText}>Apply</Text>
+        </TouchableOpacity>
+      </View>
+      </View>
+    </Modal>
     </View>
   );
 }
@@ -321,6 +514,118 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: 18, fontWeight: '700', color: '#111111' },
   place: { marginTop: 2, fontSize: 14, color: '#8A8A8A' },
+  searchRow: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchField: {
+    flex: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F4F4F4',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchActions: {
+    flex: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#111111',
+    paddingVertical: 0,
+  },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sortBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortMenu: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    overflow: 'hidden',
+  },
+  sortItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  sortItemOn: { backgroundColor: '#F3F8F6' },
+  sortItemText: { fontSize: 15, color: '#111111' },
+  modalFill: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0E0E0',
+    marginBottom: 8,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '700', color: '#111111' },
+  clearText: { fontSize: 15, fontWeight: '700', color: '#00926E' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111111' },
+  sectionHint: { marginTop: 2, marginBottom: 10, fontSize: 13, color: '#8A8A8A' },
+  sheetOption: {
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#F2F2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  sheetOptionOn: { backgroundColor: '#00926E' },
+  sheetOptionText: { fontSize: 15, fontWeight: '600', color: '#333333' },
+  sheetOptionTextOn: { color: '#FFFFFF' },
+  priceInputs: { flexDirection: 'row', gap: 10 },
+  priceInput: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#F2F2F2',
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: '#111111',
+  },
+  applyBtn: {
+    marginTop: 12,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#00926E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   bell: {
     width: 44,
     height: 44,
@@ -365,6 +670,27 @@ const styles = StyleSheet.create({
   bone: { backgroundColor: '#ECECEC' },
   boneLine: { height: 14, borderRadius: 6, backgroundColor: '#ECECEC' },
   boneCart: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ECECEC' },
+  list: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
+  listCard: {
+    width: '100%',
+    marginBottom: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 7,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  listImage: {
+    width: 92,
+    height: 92,
+    borderRadius: 8,
+    backgroundColor: '#F3F3F3',
+  },
+  listBody: { flex: 1, minWidth: 0 },
   card: {
     width: '48%',
     marginBottom: 14,

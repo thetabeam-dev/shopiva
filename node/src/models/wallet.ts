@@ -223,6 +223,74 @@ async function walletSnapshot(client: { query: Function }, walletId: string) {
   };
 }
 
+/** Credits an order payout to the shop owner's wallet: gross in, commission out, net added to the balance. */
+export async function creditOrderPayoutToWallet(input: {
+  shopId: number | string;
+  orderId: number | string;
+  grossNaira: number;
+  commissionNaira: number;
+  netNaira: number;
+}) {
+  const orderId = String(input.orderId ?? "").trim();
+  const grossKobo = Math.round(Number(input.grossNaira) * 100);
+  const commissionKobo = Math.round(Number(input.commissionNaira) * 100);
+  const netKobo = Math.round(Number(input.netNaira) * 100);
+  if (!orderId || !Number.isFinite(netKobo) || netKobo <= 0) {
+    return { credited: false, duplicate: false, userId: 0, balance_kobo: null, transactions: [] };
+  }
+
+  const pool = await db();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const wallet = await client.query<{ id: string; user_id: number }>(
+      `SELECT w.id, w.user_id
+       FROM wallets w
+       INNER JOIN shops s ON s.ownerid = w.user_id
+       WHERE s.id::text = $1
+       FOR UPDATE OF w`,
+      [String(input.shopId)]
+    );
+    const row = wallet.rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      return { credited: false, duplicate: false, userId: 0, balance_kobo: null, transactions: [] };
+    }
+
+    const inserted = await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, type, amount_kobo, reference, status, description)
+       VALUES ($1, 'receive', $2, $3, 'success', $4)
+       ON CONFLICT (reference) DO NOTHING
+       RETURNING id`,
+      [row.id, Math.max(grossKobo, netKobo), `order:${orderId}:payout`, `Order #${orderId} payout`]
+    );
+    if (!inserted.rows[0]) {
+      const snapshot = await walletSnapshot(client, row.id);
+      await client.query("COMMIT");
+      return { credited: false, duplicate: true, userId: Number(row.user_id), ...snapshot };
+    }
+    if (commissionKobo > 0) {
+      await client.query(
+        `INSERT INTO wallet_transactions (wallet_id, type, amount_kobo, reference, status, description)
+         VALUES ($1, 'send', $2, $3, 'success', $4)`,
+        [row.id, commissionKobo, `order:${orderId}:commission`, `Order #${orderId} commission`]
+      );
+    }
+    await client.query(
+      `UPDATE wallets SET balance_kobo = balance_kobo + $2, updated_at = NOW() WHERE id = $1`,
+      [row.id, netKobo]
+    );
+    const snapshot = await walletSnapshot(client, row.id);
+    await client.query("COMMIT");
+    return { credited: true, duplicate: false, userId: Number(row.user_id), ...snapshot };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 /** Moves naira, in kobo, from the sender to the recipient address. No fee. */
 export async function sendWalletToAddress(senderUserId: number, address: string, amountKobo: number, remark: string) {
   const senderId = Number(senderUserId);
@@ -297,23 +365,32 @@ export async function sendWalletToAddress(senderUserId: number, address: string,
   }
 }
 
-export async function getOwnerPayoutAccount(userId: number) {
+export async function getWalletIdByUserId(userId: number) {
   const id = Number(userId);
   if (!Number.isFinite(id) || id <= 0) return null;
+  const { rows } = await (await db()).query<{ id: string }>(
+    `SELECT id FROM wallets WHERE user_id = $1 LIMIT 1`,
+    [id]
+  );
+  return rows[0]?.id ?? null;
+}
+
+export async function getOwnerPayoutAccount(userId: number) {
+  const walletId = await getWalletIdByUserId(userId);
+  if (!walletId) return null;
   const { rows } = await (await db()).query(
     `SELECT
-       p.provider_recipient_id,
-       p.bank_name,
-       p.account_number,
-       p.account_name
-     FROM shop_payout_accounts p
-     INNER JOIN shops s ON s.id = p.shop_id
-     WHERE s.ownerid = $1
-       AND p.provider_recipient_id IS NOT NULL
-       AND btrim(p.provider_recipient_id) <> ''
-     ORDER BY p.updated_at DESC NULLS LAST
+       provider_recipient_id,
+       bank_name,
+       account_number,
+       account_name
+     FROM wallet_payout_accounts
+     WHERE wallet_id = $1
+       AND provider_recipient_id IS NOT NULL
+       AND btrim(provider_recipient_id) <> ''
+     ORDER BY is_primary DESC, updated_at DESC NULLS LAST
      LIMIT 1`,
-    [id]
+    [walletId]
   );
   return rows[0] ?? null;
 }

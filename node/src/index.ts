@@ -23,7 +23,6 @@ import handleSocketConnection from "./services/socket.js";
 import { attachSocketServer } from "./services/socketBroadcast.js";
 import { Server, type Socket } from "socket.io";
 import { db } from "./config/database.js";
-import { escrow } from "./services/escrow.js";
 import nodeCron from "node-cron";
 import { paystack } from "./services/paystack.js";
 import { error } from "console";
@@ -32,7 +31,7 @@ import { createAndEmitNotification } from "./services/notifications.js";
 import { GetShopOwnerByShopIdService } from "./services/business/shop.js";
 import { sendNotificationEmail } from "./services/email.js";
 import paystackTools from "./utils/paystack.js";
-import { storePaystackVirtualAccount } from "./models/wallet.js";
+import { creditOrderPayoutToWallet, storePaystackVirtualAccount } from "./models/wallet.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -76,8 +75,8 @@ app.post(
 // Mobile / RN has no browser Origin; reflect request origin when present. Set CORS_ORIGIN for a strict allowlist.
 const corsAllowlist = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",")
-      .map((o) => o.trim())
-      .filter(Boolean)
+    .map((o) => o.trim())
+    .filter(Boolean)
   : null;
 app.use(
   cors({
@@ -234,23 +233,57 @@ app.post("/update-fcm", async (req, res) => {
   }
 });
 
-
-// app.post("/pay", async (req, res) => {
+// app.post("/pay", async (_req, res) => {
 //   try {
-//     const body = req.body ?? {};
-//     const created = await paystackTools.createDVAOnce(body);
-//     const userId = Number(body.userId ?? body.user_id ?? 60);
-//     const stored = await storePaystackVirtualAccount({
-//       userId,
-//       phone: req.body.phone,
-//       customerCode: created.customerCode,
-//       accountNumber: created.accountNumber,
-//       accountName: created.accountName,
-//       bankName: created.bankName,
-//     });
-//     res.json({ result: created, stored });
+//     const pool = await db();
+//     const missing = await pool.query<{
+//       id: number;
+//       fname: string;
+//       lname: string | any;
+//       email: string;
+//       phone: string;
+//     }>(
+//       `SELECT u.id, u.fname, u.lname, u.email, u.phone
+//        FROM users u
+//        WHERE u.phone IS NOT NULL
+//          AND btrim(u.phone) <> ''
+//          AND NOT EXISTS (
+//            SELECT 1 FROM wallets w WHERE w.user_id = u.id
+//          )`
+//     );
+
+//     const created: number[] = [];
+//     const failed: { userId: number; error: string }[] = [];
+
+//     for (const user of missing.rows) {
+//       try {
+//         const account = await paystackTools.createDVAOnce({
+//           firstName: user.fname,
+//           lastName: user.lname?.trim() ? user.lname : user.email.split("@")[0],
+//           email: user.email,
+//           phone: `+234${user.phone}`,
+//         });
+//         await storePaystackVirtualAccount({
+//           userId: user.id,
+//           phone: user.phone,
+//           customerCode: account.customerCode,
+//           accountNumber: account.accountNumber,
+//           accountName: account.accountName,
+//           bankName: account.bankName,
+//         });
+//         created.push(user.id);
+//       } catch (error: any) {
+//         const message = error?.response?.data?.message
+//           ?? (error instanceof Error ? error.message : String(error));
+//         console.log(error?.response?.data ?? error);
+//         failed.push({ userId: user.id, error: message });
+//       }
+//     }
+
+//     res.json({ created: created.length, userIds: created, failed });
 //   } catch (error: any) {
-//     console.log(error?.response?.data ?? error)
+//     console.log(error?.response?.data ?? error);
+//     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
 //   }
 // });
 
@@ -269,63 +302,6 @@ function formatNaira(amount: number): string {
 
 
 
-async function notifyVendorToSetupPayout(payout: {
-  shop_id: unknown;
-  order_id: unknown;
-}): Promise<void> {
-  try {
-    const owner = await GetShopOwnerByShopIdService(Number(payout.shop_id));
-    const vendorId = Number(owner?.id);
-    const orderId = Number(payout.order_id);
-    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(orderId) || orderId <= 0) return;
-
-    const pool = await db();
-    const title = "Set up your payout";
-    const existing = await pool.query(
-      `SELECT id FROM notifications
-       WHERE recipient_id = $1 AND role = 'vendor' AND source_type = 'order'
-         AND source_id = $2 AND title = $3
-       LIMIT 1`,
-      [vendorId, orderId, title],
-    );
-    if (existing.rows.length > 0) return;
-
-    const message = `A payout for order #${orderId} is waiting. Add your bank account in shop settings so we can send it.`;
-
-    await createAndEmitNotification({
-      recipientId: vendorId,
-      title,
-      message,
-      sourceType: "order",
-      sourceId: orderId,
-      role: "vendor",
-    });
-
-    const { rows } = await pool.query<{ devicetoken: string | null; email: string | null; fname: string | null }>(
-      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
-      [vendorId],
-    );
-    const token = String(rows[0]?.devicetoken ?? "").trim();
-    if (token) {
-      await sendFcmForActivities(token, title, message, null, {
-        type: "order",
-        order_id: orderId,
-      });
-    }
-
-    const email = String(rows[0]?.email ?? owner.email ?? "").trim();
-    if (email) {
-      await sendNotificationEmail(email, {
-        fname: String(rows[0]?.fname ?? owner.fname ?? "there"),
-        title,
-        message,
-      });
-    }
-  } catch (err) {
-    console.error("notifyVendorToSetupPayout failed", err);
-  }
-}
-
 async function notifyShopOfPayout(payout: {
   shop_id: unknown;
   order_id: unknown;
@@ -339,7 +315,7 @@ async function notifyShopOfPayout(payout: {
 
     const amount = formatNaira(Number(payout.net_amount));
     const title = "Payout Sent";
-    const message = `A payout of ${amount} for order #${orderId} has been sent to your shop’s payout account. It will arrive once the transfer is completed.`;
+    const message = `A payout of ${amount} for order #${orderId} has been added to your wallet.`;
 
     await createAndEmitNotification({
       recipientId: vendorId,
@@ -376,7 +352,7 @@ async function notifyShopOfPayout(payout: {
   }
 }
 
-const server = app.listen(process.env.PORT, () => {
+const server = app.listen(process.env.PORT, async () => {
   console.log(`listening to port ${process.env.PORT}`);
   console.log(`Swagger docs at http://localhost:${process.env.PORT}/api-docs`);
   const secretLen = (process.env.JWT_SECRET ?? "")
@@ -386,67 +362,46 @@ const server = app.listen(process.env.PORT, () => {
 
   nodeCron.schedule("*/5 * * * * *", async () => {
     const pool = await db();
-
-    const { rows: payouts } = await pool.query(
-      `SELECT * FROM shop_payouts WHERE status = $1`,
-      ["pending"],
+    const { rows: orders } = await pool.query<{
+      id: string;
+      shop_id: string;
+      total_paid: string;
+    }>(
+      `SELECT o.id, o.shop_id, o.total_paid
+       FROM orders o
+       WHERE o.updated_at <= NOW() - INTERVAL '48 hours'
+         AND o.fulfillment_status IN ('order_confirmed', 'order_completed')
+         AND NOT EXISTS (
+           SELECT 1 FROM wallet_transactions t
+           WHERE t.reference = 'order:' || o.id::text || ':payout'
+         )`,
     );
 
-    for (const payout of payouts) {
+    for (const order of orders) {
       try {
-        let sid = payout.shop_id;
-        let order_id = payout.order_id;
-        let ref = paystack.generateRefId();
-
-
-        const { rows: agedOrders } = await pool.query(
-          `SELECT updated_at FROM orders
-           WHERE id = $1 AND updated_at <= NOW() - INTERVAL '48 hours'`,
-          [order_id],
-        );
-        if (agedOrders.length === 0) continue;
-
-        const {
-          rows: [shop_payout_accounts],
-        } = await pool.query(
-          `SELECT * FROM shop_payout_accounts WHERE shop_id = $1`,
-          [sid],
-        );
-
-        const recipientId = String(shop_payout_accounts?.provider_recipient_id ?? "").trim();
-        if (!recipientId) {
-          await notifyVendorToSetupPayout(payout);
-          continue;
-        }
-
-        await escrow.update({
-          status: "processing",
-          id: order_id
+        const gross = Number(order.total_paid);
+        const commission = Number((gross * 0.03).toFixed(2)) + 200;
+        const net = Number((gross - commission).toFixed(2));
+        const credited = await creditOrderPayoutToWallet({
+          shopId: order.shop_id,
+          orderId: order.id,
+          grossNaira: gross,
+          commissionNaira: commission,
+          netNaira: net,
         });
-
-        const {status, message} = await (await paystack.initiateTransfer({
-          amount: Number((payout.net_amount)),
-          recipient: recipientId,
-          reason: `Deedyte Payout for Order #${order_id}`,
-          reference: ref,
-        })) as any;
-
-        console.log(status, message);
-
-        if (status && message === "Transfer has been queued") {
-          await escrow.finalize({
-            status: "queued",
-            transfer_reference: ref,
-            id: order_id,
+        if (credited.credited && credited.userId) {
+          getIo().to(`user:${credited.userId}`).emit("wallet_credited", {
+            balance_kobo: credited.balance_kobo,
+            transactions: credited.transactions,
           });
-          await notifyShopOfPayout(payout);
+          await notifyShopOfPayout({
+            shop_id: order.shop_id,
+            order_id: order.id,
+            net_amount: net,
+          });
         }
       } catch (error) {
         console.log(error);
-        await escrow.update({
-          status: "failed",
-          id: payout.order_id,
-        });
       }
     }
   });

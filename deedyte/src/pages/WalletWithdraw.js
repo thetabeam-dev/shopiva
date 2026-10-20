@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useProfile } from '../context/ProfileContext';
-import { fetchOwnerShops, fetchShopPayoutAccount } from '../api/shop';
+import { fetchShopPayoutAccount } from '../api/shop';
 import { fetchWallet, withdrawWalletMoney } from '../api/user';
 import { formatNaira } from '../utils/formatNaira';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
@@ -65,17 +65,7 @@ export default function WalletWithdrawScreen() {
           return;
         }
         try {
-          const shops = await fetchOwnerShops(userId);
-          let saved = null;
-          for (const shop of shops) {
-            const shopId = Number(shop.id ?? shop.shopid ?? shop.shop_id);
-            if (!Number.isFinite(shopId) || shopId <= 0) continue;
-            const account = await fetchShopPayoutAccount(shopId, userId);
-            if (account) {
-              saved = account;
-              break;
-            }
-          }
+          const saved = await fetchShopPayoutAccount(0, userId);
           if (!cancelled) setPayout(saved);
         } catch {
           if (!cancelled) setPayout(null);

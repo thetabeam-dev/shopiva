@@ -458,7 +458,7 @@ export class shop{
 
     static createPayoutAccount = withErrorHandling(async (payload: NewPayoutAccount) => {
         const {
-            shopId,
+            userId,
             bank_name,
             bank_code,
             account_name,
@@ -468,23 +468,32 @@ export class shop{
             verification_method,
             status
         } = payload;
+        const wallet = await (await db()).query<{ id: string }>(
+            `SELECT id FROM wallets WHERE user_id = $1 LIMIT 1`,
+            [Number(userId)]
+        );
+        const walletId = wallet.rows[0]?.id;
+        if (!walletId) {
+            throw new Error("Create a wallet before setting up a payout account.");
+        }
+        const last4 = String(account_number ?? "").replace(/\D/g, "").slice(-4);
         const {
             rowCount
         } = await (await db()).query(
             `
-                INSERT INTO shop_payout_accounts(shop_id, provider, country_code, currency, bank_name, bank_code, account_name, account_number, provider_recipient_id, provider_account_id, status, verification_method, created_at, updated_at)
+                INSERT INTO wallet_payout_accounts(wallet_id, provider, country_code, currency, bank_name, bank_code, account_name, account_number, provider_recipient_id, provider_account_id, is_primary, status, verification_method, created_at, updated_at)
 
-                VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+                VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, $11, $12, NOW(), NOW())
             `,
             [
-                shopId,
+                walletId,
                 'paystack',
                 'NG',
                 'NGN',
                 bank_name,
                 bank_code,
                 account_name,
-                account_number,
+                last4,
                 provider_recipient_id,
                 provider_account_id,
                 status,
@@ -498,7 +507,7 @@ export class shop{
     static updatePayoutAccount = withErrorHandling(async (payload: NewPayoutAccount) => {
         
         const {
-            shopId,
+            userId,
             bank_name,
             bank_code,
             account_name,
@@ -508,10 +517,11 @@ export class shop{
             verification_method,
             status
         } = payload;
-    
+        const last4 = String(account_number ?? "").replace(/\D/g, "").slice(-4);
+
         const { rows } = await (await db()).query(
             `
-            UPDATE shop_payout_accounts
+            UPDATE wallet_payout_accounts
             SET
                 bank_name = $1,
                 bank_code = $2,
@@ -522,59 +532,63 @@ export class shop{
                 status = $7,
                 verification_method = $8,
                 updated_at = NOW()
-            WHERE shop_id = $9
+            WHERE wallet_id = (
+              SELECT id FROM wallets WHERE user_id = $9 LIMIT 1
+            )
             RETURNING *
             `,
             [
                 bank_name,
                 bank_code,
                 account_name,
-                account_number,
+                last4,
                 provider_recipient_id,
                 provider_account_id,
                 status,
                 verification_method,
-                shopId
+                Number(userId)
             ]
         );
     
         return rows;
     });
 
-    static getPayoutAccountByShopId = withErrorHandling(async (shopId: string | number) => {
+    static getPayoutAccountByUserId = withErrorHandling(async (userId: string | number) => {
         const { rows } = await (await db()).query(
             `
             SELECT
-                id,
-                shop_id,
-                provider,
-                country_code,
-                currency,
-                bank_name,
-                bank_code,
-                account_name,
-                account_number,
-                provider_recipient_id,
-                provider_account_id,
-                status,
-                verification_method,
-                created_at,
-                updated_at
-            FROM shop_payout_accounts
-            WHERE shop_id = $1
-            ORDER BY is_primary DESC, id DESC
+                p.id,
+                p.wallet_id,
+                p.provider,
+                p.country_code,
+                p.currency,
+                p.bank_name,
+                p.bank_code,
+                p.account_name,
+                p.account_number,
+                p.provider_recipient_id,
+                p.provider_account_id,
+                p.status,
+                p.verification_method,
+                p.created_at,
+                p.updated_at
+            FROM wallet_payout_accounts p
+            INNER JOIN wallets w ON w.id = p.wallet_id
+            WHERE w.user_id = $1
+            ORDER BY p.is_primary DESC, p.id DESC
             LIMIT 1
             `,
-            [String(shopId)]
+            [Number(userId)]
         );
 
         return rows?.[0] ?? null;
     });
 
-    static deletePayoutAccountByShopId = withErrorHandling(async (shopId: string | number) => {
+    static deletePayoutAccountByUserId = withErrorHandling(async (userId: string | number) => {
         const { rowCount } = await (await db()).query(
-            `DELETE FROM shop_payout_accounts WHERE shop_id = $1`,
-            [String(shopId)]
+            `DELETE FROM wallet_payout_accounts
+             WHERE wallet_id = (SELECT id FROM wallets WHERE user_id = $1 LIMIT 1)`,
+            [Number(userId)]
         );
         return rowCount ?? 0;
     });

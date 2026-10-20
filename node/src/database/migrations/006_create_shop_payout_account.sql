@@ -1,8 +1,8 @@
-CREATE TABLE shop_payout_accounts (
+CREATE TABLE wallet_payout_accounts (
   id BIGSERIAL PRIMARY KEY,
 
   -- Ownership
-  shop_id BIGINT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  wallet_id UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
 
   -- Provider
   provider VARCHAR(30) NOT NULL
@@ -16,7 +16,8 @@ CREATE TABLE shop_payout_accounts (
   bank_name VARCHAR(100),
   bank_code VARCHAR(20),
   account_name VARCHAR(150),
-  account_number_last4 CHAR(4),
+  -- account_number_last4 CHAR(4),
+  account_number CHAR(4),
 
   -- Provider references (safe to store)
   provider_recipient_id VARCHAR(120),
@@ -36,5 +37,5 @@ CREATE TABLE shop_payout_accounts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  UNIQUE (shop_id, is_primary)
+  UNIQUE (wallet_id, is_primary)
 );

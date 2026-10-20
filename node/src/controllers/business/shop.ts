@@ -435,12 +435,7 @@ export async function CreateShopPaymentController(req: Request, res: Response) {
             return;
         }
 
-        const shopId = req.params.shopId;
-        
-        if (!shopId) {
-            res.status(400).json({ error: "Shop ID required" });
-            return;
-        }
+        const userId = req.params.id;
 
         const {
             bank_name,
@@ -452,7 +447,7 @@ export async function CreateShopPaymentController(req: Request, res: Response) {
         } = req.body;
 
         const result = await CreatePayoutAccountService({
-            shopId,
+            userId,
             bank_name,
             bank_code,
             account_name,
@@ -484,12 +479,7 @@ export async function UpdateShopPaymentController(req: Request, res: Response) {
             return;
         }
 
-        const shopId = req.params.shopId;
-        
-        if (!shopId) {
-            res.status(400).json({ error: "Shop ID required" });
-            return;
-        }
+        const userId = req.params.id;
 
         const {
             bank_name,
@@ -503,7 +493,7 @@ export async function UpdateShopPaymentController(req: Request, res: Response) {
         } = req.body;
 
         const result = await UpdatePayoutAccountService({
-            shopId,
+            userId,
             bank_name,
             bank_code,
             account_name,
@@ -536,13 +526,7 @@ export async function GetShopPaymentController(req: Request, res: Response) {
             return;
         }
 
-        const shopId = req.params.shopId;
-        if (!shopId) {
-            res.status(400).json({ error: "Shop ID required" });
-            return;
-        }
-
-        const payoutAccount = await GetPayoutAccountService(shopId);
+        const payoutAccount = await GetPayoutAccountService(req.params.id);
         res.status(200).json({
             success: true,
             payoutAccount,
@@ -564,12 +548,7 @@ export async function DeleteShopPaymentController(req: Request, res: Response) {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const shopId = req.params.shopId;
-        if (!shopId) {
-            res.status(400).json({ error: "Shop ID required" });
-            return;
-        }
-        await DeletePayoutAccountService(shopId);
+        await DeletePayoutAccountService(req.params.id);
         res.status(200).json({ success: true, message: "Payout account deleted." });
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

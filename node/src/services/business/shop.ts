@@ -416,15 +416,16 @@ export async function CreatePayoutAccountService(payload: Partial<NewPayoutAccou
     if(!status) {
         throw new Error(`Failed to create payout account while generating recipient code: ${message}`, );
     }
-    const updatedPayoutAccountData = {
-        ...payload, 
+    const updatedPayoutAccountData: NewPayoutAccount = {
+        userId: String(payload.userId ?? ""),
+        bank_name: String(payload.bank_name ?? ""),
+        bank_code: String(payload.bank_code ?? ""),
+        account_name: String(payload.account_name ?? ""),
+        account_number: String(payload.account_number ?? ""),
         provider_recipient_id: data.recipient_code,
-        provider_account_id: data.id,
-        account_number: typeof payload.account_number === 'string'
-            ? Number(payload.account_number)
-            : undefined,
-        status: 'verified',
-        verification_method: 'bank'
+        provider_account_id: String(data.id),
+        status: "verified",
+        verification_method: "bank",
     };
 
     const result = await shop.createPayoutAccount(updatedPayoutAccountData);
@@ -454,15 +455,16 @@ export async function UpdatePayoutAccountService(payload: Partial<NewPayoutAccou
     if(!status) {
         throw new Error(`Failed to create payout account while generating recipient code: ${message}`, );
     }
-    const updatedPayoutAccountData = {
-        ...payload, 
+    const updatedPayoutAccountData: NewPayoutAccount = {
+        userId: String(payload.userId ?? ""),
+        bank_name: String(payload.bank_name ?? ""),
+        bank_code: String(payload.bank_code ?? ""),
+        account_name: String(payload.account_name ?? ""),
+        account_number: String(payload.account_number ?? ""),
         provider_recipient_id: data.recipient_code,
-        provider_account_id: data.id,
-        account_number: typeof payload.account_number === 'string'
-            ? Number(payload.account_number)
-            : undefined,
-        status: 'verified',
-        verification_method: 'bank'
+        provider_account_id: String(data.id),
+        status: "verified",
+        verification_method: "bank",
     };
 
     const result = await shop.updatePayoutAccount(updatedPayoutAccountData);
@@ -477,12 +479,12 @@ export async function UpdatePayoutAccountService(payload: Partial<NewPayoutAccou
 /**
  * Get primary payout account for a shop
  */
-export async function GetPayoutAccountService(shopId: string | number) {
-    return shop.getPayoutAccountByShopId(shopId);
+export async function GetPayoutAccountService(userId: string | number) {
+    return shop.getPayoutAccountByUserId(userId);
 }
 
-export async function DeletePayoutAccountService(shopId: string | number) {
-    const deleted = await shop.deletePayoutAccountByShopId(shopId);
+export async function DeletePayoutAccountService(userId: string | number) {
+    const deleted = await shop.deletePayoutAccountByUserId(userId);
     if (!deleted) throw new Error("Payout account not found.");
     return { deleted: true as const };
 }

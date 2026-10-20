@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,6 @@ import { useProfile } from '../context/ProfileContext';
 import {
   createShopPayoutAccount,
   deleteShopPayoutAccount,
-  fetchOwnerShops,
   fetchPayoutBanks,
   fetchShopPayoutAccount,
   updateShopPayoutAccount,
@@ -34,18 +33,6 @@ const BRAND = '#00926e';
 const SUCCESS = '#2E7D32';
 const BORDER = '#E5E7EB';
 
-/** @param {Record<string, unknown>} row */
-function shopIdOf(row) {
-  const v = row.id ?? row.shopid ?? row.shop_id;
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-/** @param {Record<string, unknown>} row */
-function shopNameOf(row) {
-  return String(row.name ?? row.shopname ?? row.shop_name ?? 'Shop').trim() || 'Shop';
-}
-
 /** @param {Record<string, unknown> | null} row */
 function payoutField(row, snake, camel) {
   if (!row) return '';
@@ -60,11 +47,8 @@ export default function SettingsPayoutScreen() {
   const { user } = useProfile();
   const userId = Number(user?.id);
 
-  const [shops, setShops] = useState(/** @type {Record<string, unknown>[]} */ ([]));
-  const [selectedShopId, setSelectedShopId] = useState(/** @type {number | null} */ (null));
   const [payout, setPayout] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [loading, setLoading] = useState(true);
-  const [payoutLoading, setPayoutLoading] = useState(false);
   const [banner, setBanner] = useState(/** @type {string | null} */ (null));
 
   const [formOpen, setFormOpen] = useState(false);
@@ -77,15 +61,6 @@ export default function SettingsPayoutScreen() {
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
 
-  const shopOptions = useMemo(
-    () =>
-      shops.map((s) => ({
-        label: shopNameOf(s),
-        value: shopIdOf(s),
-      })),
-    [shops],
-  );
-
   const bankOptions = useMemo(() => {
     return banks
       .map((b) => {
@@ -97,53 +72,28 @@ export default function SettingsPayoutScreen() {
       .filter(Boolean);
   }, [banks]);
 
-  const loadShops = useCallback(async () => {
+  const loadPayout = useCallback(async () => {
     if (!Number.isFinite(userId) || userId <= 0) {
-      setShops([]);
+      setPayout(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const list = await fetchOwnerShops(userId);
-      setShops(list);
-      setSelectedShopId((prev) => {
-        if (prev && list.some((s) => shopIdOf(s) === prev)) return prev;
-        if (list.length === 1) return shopIdOf(list[0]);
-        return list.length ? shopIdOf(list[0]) : null;
-      });
+      const row = await fetchShopPayoutAccount(0, userId);
+      setPayout(row);
     } catch {
-      setShops([]);
+      setPayout(null);
     } finally {
       setLoading(false);
     }
   }, [userId]);
 
-  const loadPayout = useCallback(async () => {
-    if (!selectedShopId || !Number.isFinite(userId) || userId <= 0) {
-      setPayout(null);
-      return;
-    }
-    setPayoutLoading(true);
-    try {
-      const row = await fetchShopPayoutAccount(selectedShopId, userId);
-      setPayout(row);
-    } catch {
-      setPayout(null);
-    } finally {
-      setPayoutLoading(false);
-    }
-  }, [selectedShopId, userId]);
-
   useFocusEffect(
     useCallback(() => {
-      void loadShops();
-    }, [loadShops]),
+      void loadPayout();
+    }, [loadPayout]),
   );
-
-  useEffect(() => {
-    void loadPayout();
-  }, [loadPayout]);
 
   const openAddForm = async () => {
     setBanner(null);
@@ -216,7 +166,7 @@ export default function SettingsPayoutScreen() {
   );
 
   const onSaveForm = async () => {
-    if (!selectedShopId) return;
+    if (!Number.isFinite(userId) || userId <= 0) return;
     const acct = accountNumber.replace(/\D/g, '');
     if (acct.length !== 10) {
       Alert.alert('Account number', 'Enter a valid 10-digit account number.');
@@ -244,9 +194,9 @@ export default function SettingsPayoutScreen() {
     setSaveBusy(true);
     try {
       if (formMode === 'add') {
-        await createShopPayoutAccount(selectedShopId, userId, body);
+        await createShopPayoutAccount(0, userId, body);
       } else {
-        await updateShopPayoutAccount(selectedShopId, userId, body);
+        await updateShopPayoutAccount(0, userId, body);
       }
       setFormOpen(false);
       await loadPayout();
@@ -259,15 +209,15 @@ export default function SettingsPayoutScreen() {
   };
 
   const onDelete = () => {
-    if (!selectedShopId || !payout) return;
-    Alert.alert('Delete payout account', 'Remove bank details for this shop? You can add them again later.', [
+    if (!payout) return;
+    Alert.alert('Delete payout account', 'Remove these bank details? You can add them again later.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
           try {
-            const data = await deleteShopPayoutAccount(selectedShopId, userId);
+            const data = await deleteShopPayoutAccount(0, userId);
             setPayout(null);
             const msg = typeof data?.message === 'string' ? data.message : 'Payout account deleted.';
             setBanner(msg);
@@ -311,33 +261,11 @@ export default function SettingsPayoutScreen() {
 
         {loading ? (
           <ActivityIndicator style={styles.loader} color={BRAND} />
-        ) : shops.length === 0 ? (
-          <Text style={styles.muted}>You do not have a shop yet. Create one from Settings (vendor mode).</Text>
         ) : (
           <>
-            <Text style={styles.fieldLabel}>Shop</Text>
-            <Dropdown
-              style={styles.dropdown}
-              containerStyle={styles.dropdownList}
-              placeholderStyle={styles.dropdownPh}
-              selectedTextStyle={styles.dropdownSel}
-              itemTextStyle={styles.dropdownItem}
-              data={shopOptions}
-              labelField="label"
-              valueField="value"
-              placeholder="Select shop"
-              value={selectedShopId}
-              onChange={(item) => {
-                setSelectedShopId(item.value);
-                setBanner(null);
-              }}
-            />
-
             {banner ? <Text style={styles.banner}>{banner}</Text> : null}
 
-            {payoutLoading ? (
-              <ActivityIndicator style={styles.loader} color={BRAND} />
-            ) : (
+            {(
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Payout account</Text>
                 {!payout ? (
