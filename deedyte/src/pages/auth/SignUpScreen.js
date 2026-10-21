@@ -49,7 +49,7 @@ export default function SignUpScreen({ navigation, route }) {
           if (out.message) Alert.alert('Sign up', out.message);
           return;
         }
-        await completeAuthAndGoHome(out.token, null, { fromSignup: true });
+        await completeAuthAndGoHome(out.token, out.user ?? null, { fromSignup: true });
       } catch (e) {
         Alert.alert('Sign up', e instanceof Error ? e.message : String(e));
       } finally {

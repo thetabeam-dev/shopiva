@@ -2836,7 +2836,7 @@ PODS:
     - React-perflogger (= 0.85.2)
     - React-utils (= 0.85.2)
     - SocketRocket
-  - RNCAsyncStorage (1.21.0):
+  - RNCAsyncStorage (1.24.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -2985,6 +2985,34 @@ PODS:
     - Yoga
   - RNInAppBrowser (3.7.1):
     - React-Core
+  - RNLocalize (3.7.2):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNNotifee (10.8.0):
     - boost
     - DoubleConversion
@@ -3253,6 +3281,7 @@ DEPENDENCIES:
   - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNInAppBrowser (from `../node_modules/react-native-inappbrowser-reborn`)
+  - RNLocalize (from `../node_modules/react-native-localize`)
   - RNNotifee (from `../node_modules/react-native-notify-kit`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSound (from `../node_modules/react-native-sound`)
@@ -3458,6 +3487,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-gesture-handler"
   RNInAppBrowser:
     :path: "../node_modules/react-native-inappbrowser-reborn"
+  RNLocalize:
+    :path: "../node_modules/react-native-localize"
   RNNotifee:
     :path: "../node_modules/react-native-notify-kit"
   RNScreens:
@@ -3564,13 +3595,14 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 22e2265d86a4e871e5e858f4e7ef1c8d01103680
   ReactCodegen: 7dc68ad0db3e9581148cd1a821f11dcd0c9bbe4b
   ReactCommon: eae62f1181bfa316ff00c19bb907c2950cc64d34
-  RNCAsyncStorage: f3643016947dfd5b8dc2d5570d0aab08cbd8e712
+  RNCAsyncStorage: 87d51a3aa982dd38d07ecb588aa67821a4a14eee
   RNCClipboard: e560338bf6cc4656a09ff90610b62ddc0dbdad65
   RNDeviceInfo: 4c852998208b60dc192ae3529e5867817719ad1e
   RNFBApp: cec9fe4fe0e6ccd8e2359aa8f6dc41fa16ff8cd9
   RNFBMessaging: 7bf784ca7b67c052629cf669e20d9966c92e151b
   RNGestureHandler: 8c2cbbde4fae60d249ec431308aa07a645168c68
   RNInAppBrowser: 904d24dc75e8e6c6c98a3160329192608946f9df
+  RNLocalize: 90214ec5e728faed99d768dc6ada0aa0f45a7ef1
   RNNotifee: cfae7b8901e714f8bdf8c57b96ec2e8cb653f393
   RNScreens: e902eba58a27d3ad399a495d578e8aba3ea0f490
   RNSound: 80f864773ff8f670fc8f052a3e478cec201d9b43

@@ -485,7 +485,7 @@ export default function VendorShopScreen({ route, navigation }) {
               style={styles.shareBtn}
               activeOpacity={0.85}
               onPress={() => {
-                Share.share({ message: displayName }).catch(() => {});
+                // Share.share({ message: displayName }).catch(() => {});
               }}
             >
               <Text style={styles.shareBtnText}>Share profile</Text>

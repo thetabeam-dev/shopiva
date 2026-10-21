@@ -8,9 +8,18 @@ function appRedirectBase(): string {
     return process.env.OAUTH_APP_REDIRECT_URI ?? "deedyte://oauth";
 }
 
-function redirectWithToken(res: import("express").Response, token: string): void {
-    const uri = `${appRedirectBase()}?token=${encodeURIComponent(token)}`;
-    res.redirect(302, uri);
+function redirectWithToken(
+    res: import("express").Response,
+    token: string,
+    user: { id?: unknown; email?: unknown; fname?: unknown },
+): void {
+    const params = new URLSearchParams({
+        token,
+        id: String(user.id ?? ""),
+        email: String(user.email ?? ""),
+        fname: String(user.fname ?? ""),
+    });
+    res.redirect(302, `${appRedirectBase()}?${params.toString()}`);
 }
 
 function redirectWithError(res: import("express").Response, code: string): void {
@@ -44,8 +53,8 @@ OAuthRouter.get(
     async (req, res, next) => {
         try {
             const u = req.user as { id: number };
-            const { token } = await finalizeOAuthSession(u.id);
-            redirectWithToken(res, token);
+            const { token, user } = await finalizeOAuthSession(u.id);
+            redirectWithToken(res, token, user);
         } catch (e) {
             next(e);
         }
@@ -72,8 +81,8 @@ OAuthRouter.get(
     async (req, res, next) => {
         try {
             const u = req.user as { id: number };
-            const { token } = await finalizeOAuthSession(u.id);
-            redirectWithToken(res, token);
+            const { token, user } = await finalizeOAuthSession(u.id);
+            redirectWithToken(res, token, user);
         } catch (e) {
             next(e);
         }

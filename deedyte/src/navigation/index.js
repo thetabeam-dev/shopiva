@@ -51,7 +51,7 @@ function NavigationTree() {
         return;
       }
       try {
-        await signIn(parsed.token, null);
+        await signIn(parsed.token, parsed.user ?? null);
       } catch (e) {
         Alert.alert('Sign-in', e instanceof Error ? e.message : String(e));
       }

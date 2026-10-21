@@ -48,7 +48,7 @@ export default function LoginScreen({ navigation, route }) {
           if (out.message) Alert.alert('Sign-in', out.message);
           return;
         }
-        await completeAuthAndGoHome(out.token, null);
+        await completeAuthAndGoHome(out.token, out.user ?? null);
       } catch (e) {
         Alert.alert('Sign-in', e instanceof Error ? e.message : String(e));
       } finally {
