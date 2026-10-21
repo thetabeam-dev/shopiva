@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#EFEFEF',
     paddingTop: 10,
-    paddingBottom: 60
+    paddingBottom: 10
   },
   searchSection: {
     backgroundColor: '#EFEFEF',

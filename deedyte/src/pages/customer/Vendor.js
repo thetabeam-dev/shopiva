@@ -536,8 +536,15 @@ export default function VendorShopScreen({ route, navigation }) {
               {shopReviews.map((review) => {
                 const name = String(review.reviewer_name ?? '').trim() || 'Buyer';
                 const place = String(review.reviewer_location ?? '').trim();
-                const comment = String(review.comment ?? review.title ?? '').trim();
+                const comment = String(review.comment ?? '').trim();
+                const ratingTitle = String(review.title ?? '')
+                  .trim()
+                  .replace(/\b\w/g, (letter) => letter.toUpperCase());
                 const rating = Number(review.rating) || 0;
+                const created = review.created_at ? new Date(String(review.created_at)) : null;
+                const dateLabel = created && !Number.isNaN(created.getTime())
+                  ? created.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                  : '';
                 return (
                   <View key={String(review.id)} style={styles.reviewCard}>
                     <View style={styles.reviewHead}>
@@ -547,9 +554,11 @@ export default function VendorShopScreen({ route, navigation }) {
                       <View style={styles.reviewIdentity}>
                         <Text style={styles.reviewName} numberOfLines={1}>{name}</Text>
                         {place ? <Text style={styles.reviewPlace} numberOfLines={1}>{place}</Text> : null}
+                        {dateLabel ? <Text style={styles.reviewDate}>{dateLabel}</Text> : null}
                       </View>
                     </View>
                     <RatingRow rating={rating} count={0} starSize={14} activeColor="#E8A317" emptyColor="#E5E7EB" countColor="#6B7280" />
+                    {ratingTitle ? <Text style={styles.reviewTitle}>{ratingTitle}</Text> : null}
                     {comment ? <Text style={styles.reviewComment}>{comment}</Text> : null}
                   </View>
                 );
@@ -863,6 +872,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 13,
     color: '#6B7280',
+  },
+  reviewDate: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  reviewTitle: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111111',
   },
   reviewComment: {
     marginTop: 8,

@@ -431,11 +431,12 @@ export class shop{
             }[]
         > => {
             const { rows } = await (await db()).query(
-                `SELECT id, rating, comment, created_at, reviewer_name, reviewer_location
+                `SELECT id, rating, title, comment, created_at, reviewer_name, reviewer_location
                  FROM (
                    SELECT r.id::text AS id,
                           r.rating,
-                          COALESCE(NULLIF(btrim(r.comment), ''), NULLIF(btrim(r.title), '')) AS comment,
+                          NULLIF(btrim(r.title), '') AS title,
+                          NULLIF(btrim(r.comment), '') AS comment,
                           r.created_at,
                           NULLIF(TRIM(CONCAT_WS(' ', u.fname, u.lname)), '') AS reviewer_name,
                           CASE
@@ -448,6 +449,12 @@ export class shop{
                    UNION ALL
                    SELECT pr.id::text AS id,
                           pr.rating,
+                          CASE
+                            WHEN pr.rating >= 5 THEN 'Best'
+                            WHEN pr.rating >= 4 THEN 'Good'
+                            WHEN pr.rating >= 3 THEN 'Average'
+                            ELSE 'Poor'
+                          END AS title,
                           NULLIF(btrim(pr.comment), '') AS comment,
                           pr.created_at,
                           NULLIF(TRIM(CONCAT_WS(' ', u.fname, u.lname)), '') AS reviewer_name,
