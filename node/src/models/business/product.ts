@@ -324,12 +324,12 @@ export class product {
            SUM(oi.total_price) AS revenue
          FROM order_items oi
          INNER JOIN orders o ON o.id = oi.order_id
-         WHERE o.shop_id = $1::text
+         WHERE o.shop_id::text = $1::text
            AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('unpaid', 'failed', 'abandoned', 'pending')
            AND LOWER(COALESCE(o.fulfillment_status, '')) NOT IN ('cancelled', 'canceled', 'declined', 'rejected')
          GROUP BY oi.item_id
        ) stats ON stats.item_id = p.id::text
-       WHERE p.shop_id = $1
+       WHERE p.shop_id::text = $1::text
        ORDER BY p.created_at DESC`,
       [shopId]
     );
