@@ -13,6 +13,7 @@ import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
 import { sendFcmForActivities } from "../../services/firebaseConfig.js";
 import { createAndEmitNotification } from "../../services/notifications.js";
 import { creditWalletFromPaystack } from "../../models/wallet.js";
+import { nairaLabel, pushWalletFcm } from "../../services/walletPush.js";
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
 import { ensurePaidOrderChatRoom } from "../../services/buyer/checkoutConfirm.js";
 import type { AuthRequest } from "../../middleware/auth.js";
