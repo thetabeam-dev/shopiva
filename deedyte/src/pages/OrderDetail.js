@@ -26,6 +26,7 @@ import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../context/ProfileContext';
 import { payAcceptedOrder } from '../api/buyer';
 import { formatNaira } from '../utils/formatNaira';
+import { ProductCardMedia } from '../components/ProductCardMedia';
 import {
   fetchBuyerOrder,
   fetchOwnerShops,
@@ -1514,10 +1515,7 @@ export default function OrderDetailScreen() {
               >
                 <View style={styles.itemThumb}>
                   {it.product.thumbnail_url ? (
-                    <Image
-                      source={{ uri: String(it.product.thumbnail_url) }}
-                      style={styles.itemImg}
-                    />
+                    <ProductCardMedia uri={String(it.product.thumbnail_url)} style={styles.itemImg} />
                   ) : (
                     <Icon
                       name="phone-portrait-outline"

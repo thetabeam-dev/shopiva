@@ -8,10 +8,10 @@ import {
 } from "../../services/buyer/cart.js";
 import { db } from "../../config/database.js";
 
-function firstImageUrl(images: unknown): string {
-  if (Array.isArray(images) && images.length > 0) {
-    const u = images[0];
-    if (typeof u === "string" && u.trim()) return u.trim();
+function firstMediaUrl(images: unknown): string {
+  if (!Array.isArray(images)) return "";
+  for (const item of images) {
+    if (typeof item === "string" && item.trim()) return item.trim();
   }
   return "";
 }
@@ -31,7 +31,7 @@ export async function GetBuyerCartController(req: AuthRequest, res: Response): P
       productId: r.product_id,
       shopId: r.shop_id,
       title: r.product_name,
-      image: firstImageUrl(r.images),
+      image: firstMediaUrl(r.images),
       sku: r.sku,
       unitPrice: Number(r.unit_price) || 0,
       currency: r.currency || "NGN",

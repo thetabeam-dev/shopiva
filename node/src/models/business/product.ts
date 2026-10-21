@@ -312,7 +312,25 @@ export class product {
 
   static getByShopId = withErrorHandling(async (shopId: number): Promise<ProductRow[]> => {
     const { rows } = await (await db()).query<ProductRow>(
-      `SELECT * FROM products WHERE shop_id = $1 ORDER BY created_at DESC`,
+      `SELECT
+         p.*,
+         COALESCE(stats.units, 0)::int AS total_sales,
+         COALESCE(stats.revenue, 0)::float8 AS total_revenue
+       FROM products p
+       LEFT JOIN (
+         SELECT
+           oi.item_id,
+           SUM(oi.units) AS units,
+           SUM(oi.total_price) AS revenue
+         FROM order_items oi
+         INNER JOIN orders o ON o.id = oi.order_id
+         WHERE o.shop_id = $1::text
+           AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('unpaid', 'failed', 'abandoned', 'pending')
+           AND LOWER(COALESCE(o.fulfillment_status, '')) NOT IN ('cancelled', 'canceled', 'declined', 'rejected')
+         GROUP BY oi.item_id
+       ) stats ON stats.item_id = p.id::text
+       WHERE p.shop_id = $1
+       ORDER BY p.created_at DESC`,
       [shopId]
     );
     return rows;

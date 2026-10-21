@@ -22,6 +22,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../utils/formatNaira';
+import { ProductCardMedia } from '../components/ProductCardMedia';
 import { fetchBuyerReturn, fetchOwnerShops, fetchShopReturnDetail, fetchShopOwner } from '../api';
 import { useDispatch, useSelector } from 'react-redux';
 import { getStoredUser } from '../auth/session';
@@ -1048,10 +1049,7 @@ export default function ReturnDetailScreen() {
               >
                 <View style={styles.itemThumb}>
                   {it.product.thumbnail_url ? (
-                    <Image
-                      source={{ uri: String(it.product.thumbnail_url) }}
-                      style={styles.itemImg}
-                    />
+                    <ProductCardMedia uri={String(it.product.thumbnail_url)} style={styles.itemImg} />
                   ) : (
                     <Icon
                       name="phone-portrait-outline"

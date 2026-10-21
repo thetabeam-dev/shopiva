@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../../utils/formatNaira';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { deleteBuyerCartLine, fetchBuyerCart, fetchBuyerCartProductShopId, patchBuyerCartLine } from '../../api/buyer';
 
 const BG = '#F8F8F8';
@@ -53,13 +53,7 @@ function CartLineCard({
         <Icon name="trash-outline" size={20} color="#000000" />
       </Pressable>
 
-      {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.cardImage, styles.cardImagePh]}>
-          <Icon name="image-outline" size={28} color="#9E9E9E" />
-        </View>
-      )}
+      <ProductCardMedia uri={item.image} style={styles.cardImage} />
 
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={2}>
@@ -110,6 +104,7 @@ export default function CartScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      setLoading(false);
       (async () => {
         setCartLoading(true);
         try {
@@ -257,27 +252,35 @@ export default function CartScreen({ navigation }) {
                 style={styles.checkoutBtn}
                 onPress={async() => {
                     setLoading(true);
-                    const list = await Promise.all(lines.map(async(l) => {
-                      let {
-                        shop_id
-                      } = await fetchBuyerCartProductShopId(l.productId);
-                      return({
-                        key: l.id,
-                        cartItemId: l.cartItemId,
-                        inventoryId: l.inventoryId,
-                        productId: l.productId,
-                        title: l.title,
-                        image: l.image,
-                        unitPrice: l.unitPrice,
-                        qty: l.qty,
-                        shop_id,
-                        variantLabel: l.size && l.size !== '—' ? l.size : '',
-                      })
-                    }));
-                    navigation.navigate('Cart-checkout', {
-                      checkoutSource: 'cart',
-                      checkoutLines: list,
-                    })
+                    try {
+                      const list = await Promise.all(lines.map(async (l) => {
+                        let shop_id = null;
+                        try {
+                          const res = await fetchBuyerCartProductShopId(l.productId);
+                          shop_id = res && typeof res === 'object' ? res.shop_id : null;
+                        } catch {
+                          shop_id = null;
+                        }
+                        return {
+                          key: l.id,
+                          cartItemId: l.cartItemId,
+                          inventoryId: l.inventoryId,
+                          productId: l.productId,
+                          title: l.title,
+                          image: l.image,
+                          unitPrice: l.unitPrice,
+                          qty: l.qty,
+                          shop_id,
+                          variantLabel: l.size && l.size !== '—' ? l.size : '',
+                        };
+                      }));
+                      navigation.navigate('Cart-checkout', {
+                        checkoutSource: 'cart',
+                        checkoutLines: list,
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
                   }
                 }
                 accessibilityRole="button"

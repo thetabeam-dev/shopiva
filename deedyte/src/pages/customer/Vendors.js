@@ -90,7 +90,7 @@ const STATE_ALIASES = new Map([
  * @param {unknown} raw
  * @returns {string | null}
  */
-function vendorStateRaw(vendor) {
+export function vendorStateRaw(vendor) {
   if (!vendor || typeof vendor !== 'object') return null;
   if (vendor.state != null && String(vendor.state).trim()) return vendor.state;
   const location = vendor.location;
@@ -100,7 +100,7 @@ function vendorStateRaw(vendor) {
   return null;
 }
 
-function normalizeVendorState(raw) {
+export function normalizeVendorState(raw) {
   if (raw == null) return null;
   const t = String(raw).trim().toLowerCase().replace(/\s+/g, ' ');
   if (!t) return null;
@@ -263,7 +263,7 @@ function VendorCard({
 
   return (
     <View
-      style={[styles.card, { backgroundColor: t.cardBg, borderRadius: 10 }]}
+      style={[styles.card, { backgroundColor: t.cardBg, borderRadius: 7 }]}
     >
       <View style={styles.cardInner}>
         <View style={styles.headerRow}>
@@ -573,7 +573,11 @@ export default function VendorScreen({ route, navigation }) {
   );
   /** `null` = all states. */
   const [locationFilter, setLocationFilter] = useState(
-    /** @type {string | null} */ (null),
+    /** @type {string | null} */ (
+      typeof route.params?.state === 'string' && route.params.state.trim()
+        ? route.params.state.trim()
+        : null
+    ),
   );
   /** @type {Record<string, { loading: boolean; items: { key: string; uri: string; priceLabel: string }[] }>} */
   const [slugPreviews, setSlugPreviews] = useState({});
@@ -639,6 +643,11 @@ export default function VendorScreen({ route, navigation }) {
   useEffect(() => {
     loadVendors(false).catch(() => {});
   }, [loadVendors]);
+
+  useEffect(() => {
+    const state = route.params?.state;
+    setLocationFilter(typeof state === 'string' && state.trim() ? state.trim() : null);
+  }, [route.params?.state]);
 
   const onRefreshVendors = useCallback(() => {
     loadVendors(true);
@@ -718,10 +727,6 @@ export default function VendorScreen({ route, navigation }) {
       cancelled = true;
     };
   }, [vendors]);
-
-  useEffect(() => {
-    setLocationFilter(null);
-  }, [category]);
 
   useEffect(() => {
     if (route.params?.openVendorFilter != null) {
@@ -923,7 +928,10 @@ export default function VendorScreen({ route, navigation }) {
   const displayedVendors = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return vendors.filter(v => {
-      if (locationFilter != null && normalizeVendorState(vendorStateRaw(v)) !== locationFilter) {
+      const canon = normalizeVendorState(vendorStateRaw(v));
+      if (locationFilter === 'Other') {
+        if (canon != null) return false;
+      } else if (locationFilter != null && canon !== locationFilter) {
         return false;
       }
       if (!query) return true;
@@ -1221,7 +1229,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   productCell: {
-    borderRadius: 10,
+    borderRadius: 7,
     overflow: 'hidden',
     marginRight: PRODUCT_GAP,
     aspectRatio: 1,

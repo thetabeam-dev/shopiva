@@ -23,6 +23,7 @@ import { selectCategoryTree } from '../../../redux/categoriesSlice';
 import { getStorefrontProducts, getStorefrontShop, getStorefrontShopDelivery } from '../../api/storefront';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
 
 const { width: WINDOW_W, height: WINDOW_H } = Dimensions.get('window');
@@ -188,7 +189,7 @@ function ProductTile({ product, width, shop, navigation, vendor, category }) {
     >
       <View style={styles.tileImageWrap}>
         {product.uri ? (
-          <Image source={{ uri: product.uri }} style={styles.tileImage} resizeMode="cover" />
+          <ProductCardMedia uri={product.uri} style={styles.tileImage} />
         ) : (
           <View style={[styles.tileImage, styles.tileImagePh]}>
             <Icon name="image-outline" size={32} color="rgba(255,255,255,0.45)" />

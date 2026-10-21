@@ -18,11 +18,12 @@ function unreadCountForRole(items, activeRole) {
 
 export function NotificationBell({ onPress, style }) {
   const dispatch = useDispatch();
-  const { activeRole } = useAuth();
+  const { activeRole, isAuthenticated } = useAuth();
   const items = useSelector((state) => state.notifications?.items ?? []);
   const unread = unreadCountForRole(items, activeRole);
 
   useEffect(() => {
+    if (!isAuthenticated) return undefined;
     let cancelled = false;
     listNotifications(activeRole)
       .then((rows) => {
@@ -32,7 +33,9 @@ export function NotificationBell({ onPress, style }) {
     return () => {
       cancelled = true;
     };
-  }, [activeRole, dispatch]);
+  }, [activeRole, dispatch, isAuthenticated]);
+
+  if (!isAuthenticated) return null;
 
   const label = unread > 99 ? '99+' : String(unread);
 

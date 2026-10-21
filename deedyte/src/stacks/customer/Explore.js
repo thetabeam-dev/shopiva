@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import VendorsScreen from '../../pages/customer/Vendors';
+import ExploreBrowse from '../../pages/customer/ExploreBrowse';
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
 import CartScreen from '../../pages/customer/Cart';
@@ -76,8 +77,16 @@ export function ExploreStackScreen() {
     <ExploreStack.Navigator>
       <ExploreStack.Screen
         name="Explore"
+        component={ExploreBrowse}
+        options={{ title: 'Explore', headerShadowVisible: false }}
+      />
+      <ExploreStack.Screen
+        name="State-shops"
         component={VendorsScreen}
-        options={({ navigation }) => exploreOpt(navigation)}
+        options={({ navigation, route }) => ({
+          ...exploreOpt(navigation),
+          title: route.params?.state ? `Shops in ${route.params.state}` : 'Shops',
+        })}
       />
       <ExploreStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <ExploreStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />

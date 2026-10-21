@@ -567,25 +567,35 @@ export default function ProductScreen({ route, navigation }) {
   }, []);
 
   const syncCartMembership = useCallback(async () => {
-    if (!loggedIn || !selectedInventoryId) {
+    if (!loggedIn) {
       setCartLineForSelection(null);
       return;
     }
     try {
       const res = await fetchBuyerCart();
       const lines = Array.isArray(res.lines) ? res.lines : [];
-      const inv = selectedInventoryId;
-      const hit = lines.find(l => {
+      const productId = Number(productIdParam);
+      const forProduct = lines.filter(l => {
         if (!l || typeof l !== 'object') return false;
         const r = /** @type {Record<string, unknown>} */ (l);
-        const iid = Number(r.inventoryId ?? r.inventory_id);
-        return Number.isFinite(iid) && iid === inv;
+        const pid = Number(r.productId ?? r.product_id);
+        return Number.isFinite(productId) && productId > 0 && pid === productId;
       });
+      const hit = forProduct.find(l => {
+        const r = /** @type {Record<string, unknown>} */ (l);
+        const iid = Number(r.inventoryId ?? r.inventory_id);
+        return selectedInventoryId != null && iid === selectedInventoryId;
+      }) ?? (selectedInventoryId == null ? forProduct[0] : null);
       if (!hit) {
         setCartLineForSelection(null);
         return;
       }
       const r = /** @type {Record<string, unknown>} */ (hit);
+      const inventoryId = Number(r.inventoryId ?? r.inventory_id);
+      if (hasVariants && selectedInventoryId == null && Number.isFinite(inventoryId)) {
+        const match = variantsForUi.find(v => Number(v?.id) === inventoryId);
+        if (match) applyVariantPick(match);
+      }
       const cartItemId = Number(r.cartItemId ?? r.cart_item_id);
       const q = Number(r.qty ?? r.quantity ?? 1);
       if (Number.isFinite(cartItemId) && cartItemId > 0) {
@@ -599,7 +609,7 @@ export default function ProductScreen({ route, navigation }) {
     } catch {
       setCartLineForSelection(null);
     }
-  }, [loggedIn, selectedInventoryId]);
+  }, [loggedIn, selectedInventoryId, productIdParam, hasVariants, variantsForUi, applyVariantPick]);
 
   const refreshProductOrderState = useCallback(() => {
     const productId = productIdParam != null ? String(productIdParam).trim() : '';

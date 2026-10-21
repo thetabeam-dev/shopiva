@@ -17,7 +17,7 @@ import {
   BRAND,
   DISCOUNT_OPTIONS,
   formatAmountInput,
-  NIGERIA_LOCATIONS,
+  NIGERIA_GEO_ZONES,
   parseAmountInput,
   sharedStyles,
 } from './shippingShared';
@@ -304,35 +304,57 @@ export default function ShippingZoneEditScreen({ route }) {
               <Text style={{ color: BRAND, fontSize: 16, fontWeight: '700' }}>Done</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 24 }}>
-            {NIGERIA_LOCATIONS.map((loc) => {
-              const selected = locations.includes(loc);
-              return (
-                <TouchableOpacity
-                  key={loc}
+          <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+            {NIGERIA_GEO_ZONES.map((zone) => (
+              <View key={zone.name}>
+                <View
                   style={{
-                    paddingVertical: 14,
-                    borderBottomWidth: 1,
-                    borderBottomColor: '#F3F4F6',
                     flexDirection: 'row',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
+                    gap: 8,
+                    paddingHorizontal: 20,
+                    paddingTop: 18,
+                    paddingBottom: 8,
+                    backgroundColor: '#F7F7F8',
                   }}
-                  onPress={() => toggleLocation(loc)}
                 >
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      color: selected ? BRAND : '#111111',
-                      fontWeight: selected ? '600' : '400',
-                    }}
-                  >
-                    {loc}
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: zone.color }} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
+                    {zone.name}
                   </Text>
-                  {selected ? <Icon name="checkmark-circle" size={20} color={BRAND} /> : null}
-                </TouchableOpacity>
-              );
-            })}
+                </View>
+                {zone.states.map((loc) => {
+                  const selected = locations.includes(loc);
+                  return (
+                    <TouchableOpacity
+                      key={loc}
+                      style={{
+                        paddingVertical: 14,
+                        paddingHorizontal: 20,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#F3F4F6',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                      onPress={() => toggleLocation(loc)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          color: selected ? BRAND : '#111111',
+                          fontWeight: selected ? '600' : '400',
+                        }}
+                      >
+                        {loc}
+                      </Text>
+                      {selected ? <Icon name="checkmark-circle" size={20} color={BRAND} /> : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </ScrollView>
         </View>
       </Modal>

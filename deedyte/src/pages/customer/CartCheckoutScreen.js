@@ -3,7 +3,6 @@ import {
   Alert,
   FlatList,
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -24,6 +23,7 @@ import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder 
 import { getStorefrontShopDelivery } from '../../api/storefront';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 import {
   getCurrentCoordinates,
   requestLocationPermission,
@@ -115,7 +115,7 @@ function isValidPhone(phone) {
  * @param {string} street
  */
 function isValidStreet(street) {
-  return street.trim().length >= 5;
+  return street.trim().length >= 2;
 }
 
 /**
@@ -162,13 +162,7 @@ function OrderLinesList({ lines, styles: S }) {
         const last = idx === lines.length - 1;
         return (
           <View key={line.key} style={[S.orderLine, last ? S.orderLineLast : null]}>
-            {line.image ? (
-              <Image source={{ uri: line.image }} style={S.orderThumb} resizeMode="cover" />
-            ) : (
-              <View style={[S.orderThumb, S.orderThumbPh]}>
-                <Icon name="image-outline" size={22} color="#BDBDBD" />
-              </View>
-            )}
+            <ProductCardMedia uri={line.image} style={S.orderThumb} />
             <View style={S.orderLineBody}>
               <Text style={S.orderTitle} numberOfLines={2}>
                 {line.title}
@@ -404,6 +398,15 @@ export default function CartCheckoutScreen({ navigation }) {
       setSelectedDeliveryKey(null);
     }
   }, [deliveryLocations, selectedDeliveryKey]);
+
+  useEffect(() => {
+    const stateName = String(country || '').trim().toLowerCase();
+    if (!stateName) return;
+    const match = deliveryLocations.find((loc) => String(loc.name || '').trim().toLowerCase() === stateName);
+    if (match && match.key !== selectedDeliveryKey) {
+      setSelectedDeliveryKey(match.key);
+    }
+  }, [country, deliveryLocations, selectedDeliveryKey]);
 
   const errors = useMemo(() => {
     const e = /** @type {Record<string, string>} */ ({});
@@ -685,8 +688,7 @@ export default function CartCheckoutScreen({ navigation }) {
     navigation,
   ]);
 
-  const onContinue = useCallback(async () => {
-    if (sendingQuote) return;
+  const onContinue = useCallback(() => {
     setTouchedSubmit(true);
     setFormBanner('');
     if (subtotal <= 0) {
@@ -701,57 +703,12 @@ export default function CartCheckoutScreen({ navigation }) {
       setFormBanner('Please complete all fields correctly before continuing.');
       return;
     }
-
-    const shippingAddress = [street.trim(), area1.trim(), area2.trim(), city.trim(), zip.trim(), country.trim()]
-      .filter(Boolean)
-      .join(', ');
-    const ordersByShop = checkoutLines.reduce((acc, line) => {
-      const shopId = String(parseShopId(line.shop_id) || line.shop_id || '');
-      if (!shopId) return acc;
-      if (!acc[shopId]) acc[shopId] = [];
-      acc[shopId].push({
-        item_id: String(line.productId),
-        unit: line.qty,
-        unit_price: line.unitPrice,
-        total: line.unitPrice * line.qty,
-        cart_id: line.cartItemId,
-      });
-      return acc;
-    }, /** @type {Record<string, Array<Record<string, unknown>>>} */ ({}));
-
-    setSendingQuote(true);
-    try {
-      await createUnpaidCheckoutOrder({
-        shipping_address: shippingAddress,
-        use_cart: !(Array.isArray(route.params?.checkoutLines) && route.params.checkoutLines.length > 0),
-        orders: Object.entries(ordersByShop).map(([shopId, items]) => ({ shop_id: shopId, items })),
-      });
-      Alert.alert(
-        'Order sent',
-        'Your order has been placed successfully without payment. The seller will set the shipping fee, after which you can proceed to pay for your order.',
-      );
-      navigation.goBack();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not place the order.';
-      setFormBanner(msg);
-    } finally {
-      setSendingQuote(false);
-    }
+    setOrderSummaryOpen(true);
   }, [
     subtotal,
     hasEmptyRequiredFields,
     hasBlockingErrors,
     showBottomToast,
-    street,
-    area1,
-    area2,
-    city,
-    zip,
-    country,
-    checkoutLines,
-    route.params?.checkoutLines,
-    navigation,
-    sendingQuote,
   ]);
 
   const onConfirmDeliveryLocation = useCallback(() => {
@@ -1024,12 +981,12 @@ export default function CartCheckoutScreen({ navigation }) {
               <Text style={styles.continueBtnText}>{isPaying ? 'Sending order…' : 'Request shipping fee'}</Text>
             </Pressable> */}
             <Pressable
-              style={[styles.continueBtn, (isPaying || sendingQuote) ? styles.payBtnDisabled : null]}
+              style={[styles.continueBtn, isPaying ? styles.payBtnDisabled : null]}
               onPress={onContinue}
-              disabled={isPaying || sendingQuote}
+              disabled={isPaying}
               accessibilityRole="button"
             >
-              <Text style={styles.continueBtnText}>Request Delivery Fee</Text>
+              <Text style={styles.continueBtnText}>Continue</Text>
             </Pressable>
           </View>
         ) : null}
@@ -1082,7 +1039,7 @@ export default function CartCheckoutScreen({ navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel="Continue to payment"
               >
-                <Text style={styles.orderModalContinueBtnText}>{isPaying ? 'Processing payment…' : 'Confirm & Pay'}</Text>
+                <Text style={styles.orderModalContinueBtnText}>{isPaying ? 'Confirm Delivery Fee' : 'Top Up Wallet'}</Text>
               </Pressable>
               <Pressable
                 style={styles.orderModalCloseLink}

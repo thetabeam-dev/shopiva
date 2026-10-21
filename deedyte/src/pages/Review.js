@@ -3,7 +3,6 @@ import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +15,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createProductReview } from '../api';
+import { ProductCardMedia } from '../components/ProductCardMedia';
 import ReviewStarSelector from '../components/ReviewStarSelector';
 
 const BRAND = '#00926e';
@@ -146,11 +146,7 @@ export default function ReviewSubmissionScreen({ navigation }) {
         >
           <View style={styles.productCard}>
             {imageUri ? (
-              <Image
-                source={{ uri: imageUri }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
+              <ProductCardMedia uri={imageUri} style={styles.productImage} />
             ) : (
               <View style={styles.productImageFallback}>
                 <Ionicons name="cube-outline" size={28} color={MUTED} />
