@@ -1,4 +1,4 @@
-import { Alert, Linking, PermissionsAndroid, Platform } from 'react-native';
+import { Alert, AppState, Linking, PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import DeviceInfo from 'react-native-device-info';
 
@@ -106,10 +106,84 @@ export async function requestLocationPermission(options = {}) {
   }
 }
 
+function waitUntilAppResumes() {
+  return new Promise((resolve) => {
+    let leftApp = AppState.currentState !== 'active';
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') leftApp = true;
+      if (leftApp && state === 'active') {
+        sub.remove();
+        resolve();
+      }
+    });
+  });
+}
+
+async function deviceLocationIsOn() {
+  try {
+    return await Promise.race([
+      DeviceInfo.isLocationEnabled(),
+      new Promise((resolve) => {
+        setTimeout(() => resolve(false), 4000);
+      }),
+    ]);
+  } catch {
+    return false;
+  }
+}
+
+function openDeviceLocationSettingsDirect() {
+  if (Platform.OS === 'android') {
+    Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS').catch(() => Linking.openSettings());
+    return;
+  }
+  Linking.openSettings();
+}
+
+async function ensureDeviceLocationOn() {
+  let enabled = await deviceLocationIsOn();
+  while (!enabled) {
+    openDeviceLocationSettingsDirect();
+    await waitUntilAppResumes();
+    enabled = await deviceLocationIsOn();
+  }
+}
+
+async function ensureLocationAccessGranted() {
+  const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+  while (true) {
+    if (Platform.OS === 'android') {
+      if (await PermissionsAndroid.check(fine)) return;
+      const result = await PermissionsAndroid.request(fine, PERMISSION_RATIONALE);
+      if (result === PermissionsAndroid.RESULTS.GRANTED) return;
+      if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+        await Linking.openSettings();
+        await waitUntilAppResumes();
+      }
+      continue;
+    }
+    const granted = await iosLocationGranted(false);
+    if (granted) return;
+    await Linking.openSettings();
+    await waitUntilAppResumes();
+  }
+}
+
 /**
+ * Turns device location on, asks until permission is granted, then reads a fresh GPS fix.
  * @returns {Promise<{ latitude: number; longitude: number }>}
  */
-export function getCurrentCoordinates() {
+export async function readExactLocation() {
+  await ensureDeviceLocationOn();
+  await ensureLocationAccessGranted();
+  return getCurrentCoordinates({ exact: true });
+}
+
+/**
+ * @param {{ exact?: boolean }} [options]
+ * @returns {Promise<{ latitude: number; longitude: number }>}
+ */
+export function getCurrentCoordinates(options = {}) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (handler, value) => {
@@ -119,7 +193,7 @@ export function getCurrentCoordinates() {
       handler(value);
     };
     const timer = setTimeout(() => {
-      finish(reject, new Error('Turn on device location, then try again.'));
+      finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
     }, 12000);
     Geolocation.getCurrentPosition(
       (pos) => {
@@ -135,15 +209,15 @@ export function getCurrentCoordinates() {
           return;
         }
         if (code === 2 || code === 3) {
-          finish(reject, new Error('Turn on device location, then try again.'));
+          finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
           return;
         }
-        finish(reject, err instanceof Error ? err : new Error(String(err?.message ?? 'Could not read your location.')));
+        finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
+        timeout: 20000,
+        maximumAge: options.exact ? 0 : 60000,
       },
     );
   });
@@ -326,6 +400,9 @@ export async function reverseGeocodeToPlace(latitude, longitude) {
 
   const city = pickField(bdc.city, nom.city);
   const state = pickField(bdc.state, nom.state);
+  if (!city && !state) {
+    throw new Error('We could not get your location. Enter your city and state manually.');
+  }
   const country = pickField(bdc.country, nom.country) || 'Nigeria';
 
   let town = pickField(bdc.town, nom.town);

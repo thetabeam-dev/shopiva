@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { formatNaira } from '../../utils/formatNaira';
 import { BRAND, sharedStyles } from './shippingShared';
 import { deleteShippingZone, getShippingZones } from '../../api/shop';
+import ShippingZoneTutorial from './ShippingZoneTutorial';
 
 /** @typedef {{ id: string; name: string; locations: string[]; baseFee: number; discountPercent: number; pinColor: string }} ShippingZone */
 
@@ -37,12 +38,29 @@ export default function ShippingZonesScreen({ navigation, route }) {
   const [zones, setZones] = useState(/** @type {ShippingZone[]} */ ([]));
   const [loading, setLoading] = useState(false);
   const [menuZoneId, setMenuZoneId] = useState(/** @type {string | null} */(null));
+  const [tutorialOpen, setTutorialOpen] = useState(false);
 
   const model = route.params?.model ?? 'multi_item_discount';
   const defaultBaseFee = route.params?.baseFee ?? 1000;
   const defaultDiscount = route.params?.discountPercent ?? 50;
   const shopId = route.params?.shopId;
   const userId = route.params?.userId;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setTutorialOpen(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Tutorial"
+          style={{ paddingRight: 4 }}
+        >
+          <Icon name="play-circle-outline" size={26} color={BRAND} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const loadZones = useCallback(async () => {
     if (!shopId || !userId) return;
@@ -81,6 +99,12 @@ export default function ShippingZonesScreen({ navigation, route }) {
       navigation.setParams({ pendingZone: undefined });
     }, [navigation, route.params?.pendingZone]),
   );
+
+  useEffect(() => {
+    if (!route.params?.showTutorial) return;
+    setTutorialOpen(true);
+    navigation.setParams({ showTutorial: undefined });
+  }, [navigation, route.params?.showTutorial]);
 
   useEffect(() => {
     if (route.params?.deletedZoneId) {
@@ -285,6 +309,8 @@ export default function ShippingZonesScreen({ navigation, route }) {
           </View>
         </Pressable>
       </Modal>
+
+      <ShippingZoneTutorial visible={tutorialOpen} onClose={() => setTutorialOpen(false)} />
     </View>
   );
 }

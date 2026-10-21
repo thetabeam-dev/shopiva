@@ -151,6 +151,19 @@ export async function confirmCheckoutPayment(body) {
  * Place an unpaid order so the vendor can set a shipping quote.
  * @param {{ shipping_address: string; orders: Array<Record<string, unknown>> }} body
  */
+/**
+ * Finish checkout after the wallet can cover the order.
+ * Body matches the Paystack metadata shape: customer_id, shipping_address, tax, orders, reference.
+ * @param {Record<string, unknown>} body
+ */
+export async function completeCheckoutOrder(body) {
+  const res = await apiFetchAuth('/buyer/checkout/complete', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return readJson(res);
+}
+
 export async function createUnpaidCheckoutOrder(body) {
   const res = await apiFetchAuth('/buyer/checkout/unpaid-order', {
     method: 'POST',

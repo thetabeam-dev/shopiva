@@ -18,6 +18,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { ProductCardMedia } from '../components/ProductCardMedia';
 import {
   errorCodes,
   isErrorWithCode,
@@ -154,7 +155,7 @@ function OrderLinesList({ lines, styles: S, selectable, selectedKeys, onToggle }
               </View>
             ) : null}
             {line.image ? (
-              <Image source={{ uri: line.image }} style={S.orderThumb} resizeMode="cover" />
+              <ProductCardMedia uri={line.image} style={S.orderThumb} />
             ) : (
               <View style={[S.orderThumb, S.orderThumbPh]}>
                 <Icon name="image-outline" size={22} color="#BDBDBD" />

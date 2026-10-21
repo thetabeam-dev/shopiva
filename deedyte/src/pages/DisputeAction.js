@@ -27,8 +27,7 @@ import { useDispatch } from "react-redux";
 import { fetchShopOwner } from "../api";
 import FormKeyboardAvoiding from "../components/FormKeyboardAvoiding";
 import {
-    getCurrentCoordinates,
-    requestLocationPermission,
+    readExactLocation,
     reverseGeocodeToPlace,
 } from "../utils/deviceLocation";
 import { set_disputeInfo } from "../../redux/dispute";
@@ -219,15 +218,7 @@ function Acceptance({ data }) {
     const onUseDeviceLocation = useCallback(async () => {
         setLocatingAddress(true);
         try {
-            const granted = await requestLocationPermission();
-            if (!granted) {
-                Alert.alert(
-                    "Location",
-                    "Permission was denied. You can enter the address manually."
-                );
-                return;
-            }
-            const coords = await getCurrentCoordinates();
+            const coords = await readExactLocation();
             const place = await reverseGeocodeToPlace(
                 coords.latitude,
                 coords.longitude

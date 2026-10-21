@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchBuyerProductPendingReviews } from '../api/buyer';
+import { ProductCardMedia } from '../components/ProductCardMedia';
 
 const BRAND = '#0D9488';
 const BG = '#F4F5F7';
@@ -26,11 +26,7 @@ function OrderReviewCard({ item, onPress }) {
     >
       <View style={styles.cardTop}>
         {item?.productImage ? (
-          <Image
-            source={{ uri: item.productImage }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
+          <ProductCardMedia uri={item.productImage} style={styles.productImage} />
         ) : (
           <View style={styles.iconCircle}>
             <Text style={styles.iconText}>★</Text>

@@ -270,7 +270,7 @@ export function VendorProfileStackScreen() {
       {/* Shipping Setup Screens */}
       <ProfileStack.Screen name="shipping-fee-model" component={ShippingFeeModelScreen} options={{ title: "Shipping Fee Model", }} />
       <ProfileStack.Screen name="shipping-discount" component={ShippingMultiItemDiscountScreen} options={{ title: "Multi-Item Discount" }} />
-      <ProfileStack.Screen name="shipping-zones" component={ShippingZonesScreen} options={{ title: "Shipping Zones" }} />
+      <ProfileStack.Screen name="shipping-zones" component={ShippingZonesScreen} options={{ title: "Shipping Zones", headerBackVisible: true, headerBackTitle: "Shop info" }} />
       <ProfileStack.Screen name="shipping-zone-edit" component={ShippingZoneEditScreen} options={({ route }) => ({
         title: route.params?.mode === 'edit' ? 'Edit Zone' : 'Add / Edit Zone',
       })} />

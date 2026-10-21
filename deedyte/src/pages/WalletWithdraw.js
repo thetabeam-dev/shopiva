@@ -16,6 +16,7 @@ import { fetchWallet, withdrawWalletMoney } from '../api/user';
 import { formatNaira } from '../utils/formatNaira';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
 import WalletPinModals from '../components/WalletPinModals';
+import WalletProcessingOverlay from '../components/WalletProcessingOverlay';
 
 const TEAL = '#00926e';
 const BORDER = '#E5E7EB';
@@ -38,6 +39,7 @@ export default function WalletWithdrawScreen() {
   const [confirming, setConfirming] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [missingPin, setMissingPin] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   const bank = field(payout, 'bank_name', 'bankName');
   const accountNumber = field(payout, 'account_number', 'accountNumber');
@@ -184,6 +186,7 @@ export default function WalletWithdrawScreen() {
         onCloseMissing={() => setMissingPin(false)}
         onVerified={async enteredPin => {
           setPinOpen(false);
+          setProcessing(true);
           try {
             await withdrawWalletMoney({
               amount: amountValue,
@@ -198,9 +201,12 @@ export default function WalletWithdrawScreen() {
             ]);
           } catch (error) {
             Alert.alert('Withdraw', error instanceof Error ? error.message : String(error));
+          } finally {
+            setProcessing(false);
           }
         }}
       />
+      <WalletProcessingOverlay visible={processing} label="Withdrawing…" />
     </ScrollView>
   );
 }

@@ -171,6 +171,7 @@ export async function handleCreateRoom(
       {
         type: "order",
         order_id,
+        role: recipientAppRole,
       },
     );
   })();
@@ -343,6 +344,7 @@ export async function handleCreateMessage(
       void sendFcmForActivities(token, senderName, `${orderName}: ${preview}`, null, {
         type: "order",
         order_id: orderId,
+        role,
       });
     }
   }

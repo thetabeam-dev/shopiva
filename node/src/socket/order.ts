@@ -6,6 +6,8 @@ import { ordersTransformer as customerOrdersTransformer } from "../transformers/
 import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
+import { creditUserWallet } from "../models/wallet.js";
+import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 
 const ESCROW_FEE = 200;
 
@@ -26,7 +28,7 @@ function fcmMssg(
       const shipping = Number(amounts?.shipping ?? 0);
       const goods = Number(amounts?.goods ?? 0);
       const total = shipping + goods + ESCROW_FEE;
-      return `The seller has accepted your order and set the shipping fee at ₦${naira(shipping)}. Your total payable amount is ₦${naira(total)}. Complete your payment to allow the seller to begin processing your order.`;
+      return `The seller has accepted your order and set the shipping fee at ₦${naira(shipping)}. The total amount for your order is ₦${naira(total)}. Any unused funds will be refunded to your DeeDyte wallet. Your order is now being processed.`;
     }
 
     case "order_processing":
@@ -136,7 +138,7 @@ function emitOrderUpdateToUser(
   const role = appRoleToNotificationRole(notificationRole);
   const sourceId = Number(orderId);
 
-  db().then(async (pool) => {
+  void db().then(async (pool) => {
     let amounts: { shipping: number; goods: number } | undefined;
     if (event === "order_acceptance") {
       const { rows } = await pool.query<{
@@ -155,7 +157,7 @@ function emitOrderUpdateToUser(
     }
     const msg = fcmMssg(event, amounts, role);
     if (role && Number.isFinite(sourceId) && sourceId > 0) {
-      void createAndEmitNotification({
+      await createAndEmitNotification({
         recipientId: id,
         title: "Order update",
         message: msg,
@@ -165,14 +167,20 @@ function emitOrderUpdateToUser(
       });
     }
 
-    const { rows: [{ devicetoken: customerDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
-    sendFcmForActivities(
-      customerDevicetoken /**token */,
-      "Order Update" /** title */,
-      msg /**body */,
-      "null" /** media */,
-      { type: "order", order_id: orderId } /** meta */,
+    const { rows: tokenRows } = await pool.query<{ devicetoken: string | null }>(
+      `SELECT devicetoken FROM users WHERE id = $1`,
+      [id],
     );
+    const deviceToken = String(tokenRows[0]?.devicetoken ?? "").trim();
+    if (deviceToken) {
+      await sendFcmForActivities(
+        deviceToken,
+        "Order Update",
+        msg,
+        null,
+        { type: "order", order_id: orderId, role },
+      );
+    }
     const { rows: [{ devicetoken: vendorDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
     if (event === "order_disputed") {
       sendFcmForActivities(
@@ -180,10 +188,12 @@ function emitOrderUpdateToUser(
         "Order Update" /** title */,
         msg /**body */,
         "null" /** media */,
-        { type: "order", order_id: orderId } /** meta */,
+        { type: "order", order_id: orderId, role } /** meta */,
       );
     }
-  })
+    }).catch((err) => {
+      console.error(`[order] ${event} buyer notification failed`, err);
+    });
 }
 
 /**
@@ -267,7 +277,18 @@ export const handleOrderAcceptance = async (
         await updateShipping(fulfillment_duration, order_id);
       }
       const shippingFee = Number(metaObj?.shipping_fee);
-      if (Number.isFinite(shippingFee) && shippingFee >= 0) {
+      if (Number.isFinite(shippingFee) && shippingFee >= 0 && stage !== "order_rejected") {
+        const current = await p.query<{ shipping_fee: string | number | null; customer_id: string | number | null }>(
+          `SELECT shipping_fee, customer_id FROM orders WHERE id = $1`,
+          [order_id],
+        );
+        const chargedShipping = Number(current.rows[0]?.shipping_fee ?? 0);
+        const buyerId = Number(current.rows[0]?.customer_id);
+        const estimatedFee = Number(metaObj?.estimated_shipping_fee);
+        const deductedShipping =
+          Number.isFinite(estimatedFee) && estimatedFee > chargedShipping
+            ? estimatedFee
+            : chargedShipping;
         await p.query(
           `UPDATE orders
            SET shipping_fee = $1,
@@ -276,6 +297,45 @@ export const handleOrderAcceptance = async (
            WHERE id = $2`,
           [shippingFee, order_id],
         );
+        const excessNaira = deductedShipping - shippingFee;
+        if (excessNaira > 0 && Number.isFinite(buyerId) && buyerId > 0) {
+          try {
+            const excessKobo = Math.round(excessNaira * 100);
+            const credit = await creditUserWallet(
+              buyerId,
+              excessKobo,
+              `order:${order_id}:shipping-refund:${Math.round(deductedShipping * 100)}-${Math.round(shippingFee * 100)}`,
+              `Shipping fee refund for order #${order_id}`,
+            );
+            await p.query(
+              `UPDATE escrow_transactions
+               SET amount_refunded_kobo = amount_refunded_kobo + $2,
+                   status = CASE
+                     WHEN amount_refunded_kobo + $2 >= amount_held_kobo THEN 'refunded'
+                     ELSE 'partially_refunded'
+                   END,
+                   refunded_at = NOW(),
+                   updated_at = NOW()
+               WHERE order_id = $1
+                 AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+              [order_id, excessKobo],
+            );
+            if (credit.credited) {
+              const refundMessage = `${nairaLabel(excessNaira)} from your shipping fee was returned to your wallet.`;
+              await createAndEmitNotification({
+                recipientId: buyerId,
+                title: "Shipping refund",
+                message: refundMessage,
+                sourceType: "order",
+                sourceId: Number(order_id),
+                role: "buyer",
+              });
+              await pushWalletFcm(buyerId, "Shipping refund", refundMessage);
+            }
+          } catch (err) {
+            console.error("shipping fee refund failed", err);
+          }
+        }
       }
       const orderPayload = await broadcastOrderUpdate(
         "order_acceptance",

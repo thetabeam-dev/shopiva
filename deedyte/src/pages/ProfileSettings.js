@@ -24,6 +24,7 @@ import { createVendorShop, fetchOwnerShops, hasVendorShop, updateVendorShop } fr
 import { updateUserRole } from '../api/user';
 import {
   getCurrentCoordinates,
+  readExactLocation,
   requestLocationPermission,
   reverseGeocodeToPlace,
 } from '../utils/deviceLocation';
@@ -123,12 +124,7 @@ export default function ProfileSettings() {
   const onUseMyLocation = async () => {
     setLocating(true);
     try {
-      const granted = await requestLocationPermission();
-      if (!granted) {
-        Alert.alert('Location permission', 'Location access was denied. You can enter your location manually.');
-        return;
-      }
-      const c = await getCurrentCoordinates();
+      const c = await readExactLocation();
       setCoords(c);
       try {
         const place = await reverseGeocodeToPlace(c.latitude, c.longitude);

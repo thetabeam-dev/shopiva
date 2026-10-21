@@ -312,7 +312,25 @@ export class product {
 
   static getByShopId = withErrorHandling(async (shopId: number): Promise<ProductRow[]> => {
     const { rows } = await (await db()).query<ProductRow>(
-      `SELECT * FROM products WHERE shop_id = $1 ORDER BY created_at DESC`,
+      `SELECT
+         p.*,
+         COALESCE(stats.units, 0)::int AS total_sales,
+         COALESCE(stats.revenue, 0)::float8 AS total_revenue
+       FROM products p
+       LEFT JOIN (
+         SELECT
+           oi.item_id,
+           SUM(oi.units) AS units,
+           SUM(oi.total_price) AS revenue
+         FROM order_items oi
+         INNER JOIN orders o ON o.id = oi.order_id
+         WHERE o.shop_id::text = $1::text
+           AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('unpaid', 'failed', 'abandoned', 'pending')
+           AND LOWER(COALESCE(o.fulfillment_status, '')) NOT IN ('cancelled', 'canceled', 'declined', 'rejected')
+         GROUP BY oi.item_id
+       ) stats ON stats.item_id = p.id::text
+       WHERE p.shop_id::text = $1::text
+       ORDER BY p.created_at DESC`,
       [shopId]
     );
     return rows;
@@ -322,6 +340,26 @@ export class product {
     const { rows } = await (await db()).query<ProductRow>(
       `SELECT * FROM products WHERE shop_id = $1 AND is_published = true ORDER BY created_at DESC`,
       [shopId]
+    );
+    return rows;
+  });
+
+  static getReviewsByShopId = withErrorHandling(async (shopId: number) => {
+    const { rows } = await (await db()).query(
+      `SELECT
+          pr.id,
+          pr.rating,
+          pr.comment,
+          pr.created_at,
+          TRIM(CONCAT_WS(' ', u.fname, u.lname)) AS reviewer_name,
+          NULLIF(TRIM(CONCAT_WS(', ', u.location->>'city', u.location->>'state')), '') AS reviewer_location
+       FROM product_reviews pr
+       INNER JOIN products p ON p.id = pr.product_id
+       LEFT JOIN users u ON u.id = pr.user_id
+       WHERE p.shop_id::text = $1::text
+       ORDER BY pr.created_at DESC
+       LIMIT 40`,
+      [shopId],
     );
     return rows;
   });

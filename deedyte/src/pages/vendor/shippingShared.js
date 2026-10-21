@@ -29,45 +29,40 @@ export const DISCOUNT_OPTIONS = [
   { label: '100% (Free)', value: 100 },
 ];
 
-export const NIGERIA_LOCATIONS = [
-  'Abia State',
-  'Adamawa State',
-  'Akwa Ibom State',
-  'Anambra State',
-  'Bauchi State',
-  'Bayelsa State',
-  'Benue State',
-  'Borno State',
-  'Cross River State',
-  'Delta State',
-  'Ebonyi State',
-  'Edo State',
-  'Ekiti State',
-  'Enugu State',
-  'FCT Abuja',
-  'Gombe State',
-  'Imo State',
-  'Jigawa State',
-  'Kaduna State',
-  'Kano State',
-  'Katsina State',
-  'Kebbi State',
-  'Kogi State',
-  'Kwara State',
-  'Lagos State',
-  'Nasarawa State',
-  'Niger State',
-  'Ogun State',
-  'Ondo State',
-  'Osun State',
-  'Oyo State',
-  'Plateau State',
-  'Rivers State',
-  'Sokoto State',
-  'Taraba State',
-  'Yobe State',
-  'Zamfara State',
+export const NIGERIA_GEO_ZONES = [
+  {
+    name: 'North Central',
+    color: '#3D5A80',
+    states: ['Benue State', 'FCT Abuja', 'Kogi State', 'Kwara State', 'Nasarawa State', 'Niger State', 'Plateau State'],
+  },
+  {
+    name: 'North East',
+    color: '#9A6B3F',
+    states: ['Adamawa State', 'Bauchi State', 'Borno State', 'Gombe State', 'Taraba State', 'Yobe State'],
+  },
+  {
+    name: 'North West',
+    color: '#6B5B73',
+    states: ['Jigawa State', 'Kaduna State', 'Kano State', 'Katsina State', 'Kebbi State', 'Sokoto State', 'Zamfara State'],
+  },
+  {
+    name: 'South East',
+    color: '#00926E',
+    states: ['Abia State', 'Anambra State', 'Ebonyi State', 'Enugu State', 'Imo State'],
+  },
+  {
+    name: 'South South',
+    color: '#2F6F6A',
+    states: ['Akwa Ibom State', 'Bayelsa State', 'Cross River State', 'Delta State', 'Edo State', 'Rivers State'],
+  },
+  {
+    name: 'South West',
+    color: '#8C4A4A',
+    states: ['Ekiti State', 'Lagos State', 'Ogun State', 'Ondo State', 'Osun State', 'Oyo State'],
+  },
 ];
+
+export const NIGERIA_LOCATIONS = NIGERIA_GEO_ZONES.flatMap((zone) => zone.states);
 
 /** @param {string | number} raw */
 export function parseAmountInput(raw) {

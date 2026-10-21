@@ -138,7 +138,7 @@ export async function SignupService(payload: NewUserDocument & { src: string; de
     // create paystack DVA for user
     const paystack_created = await paystackTools.createDVAOnce({
         firstName: created.fname,
-        lastName: created.lname,
+        lastName: created.lname?.trim() ? created.lname : created.fname[0],
         email: created.email,
         phone: `+234${created.phone}`
     });

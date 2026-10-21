@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -18,6 +17,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchOwnerShops } from '../../api/shop';
 import { deleteProduct, getProducts } from '../../api/product';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { useProfile } from '../../context/ProfileContext';
 import { getProductImageUri } from '../../utils/productImageUtils';
 
@@ -370,7 +370,7 @@ export default function VendorProductListScreen() {
                       >
                                 <View style={styles.thumb}>
                           {row.uri ? (
-                            <Image source={{ uri: row.uri }} style={styles.thumbImage} resizeMode="cover" />
+                            <ProductCardMedia uri={row.uri} style={styles.thumbImage} />
                           ) : (
                             <Icon name="image-outline" size={22} color="#9CA3AF" />
                           )}

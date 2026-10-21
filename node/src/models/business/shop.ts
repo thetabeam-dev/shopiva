@@ -427,15 +427,47 @@ export class shop{
                 is_verified_purchase: boolean | null;
                 created_at: string;
                 reviewer_name: string | null;
+                reviewer_location: string | null;
             }[]
         > => {
             const { rows } = await (await db()).query(
-                `SELECT r.id, r.rating, r.title, r.comment, r.is_verified_purchase, r.created_at,
-                        TRIM(CONCAT_WS(' ', u.fname, u.lname)) AS reviewer_name
-                 FROM shop_reviews r
-                 INNER JOIN users u ON u.id = r.reviewer_id
-                 WHERE r.shop_id = $1 AND r.is_hidden IS NOT TRUE
-                 ORDER BY r.created_at DESC
+                `SELECT id, rating, title, comment, created_at, reviewer_name, reviewer_location
+                 FROM (
+                   SELECT r.id::text AS id,
+                          r.rating,
+                          NULLIF(btrim(r.title), '') AS title,
+                          NULLIF(btrim(r.comment), '') AS comment,
+                          r.created_at,
+                          NULLIF(TRIM(CONCAT_WS(' ', u.fname, u.lname)), '') AS reviewer_name,
+                          CASE
+                            WHEN u.location IS NULL OR jsonb_typeof(u.location) <> 'object' THEN NULL
+                            ELSE NULLIF(TRIM(CONCAT_WS(', ', u.location->>'city', u.location->>'state')), '')
+                          END AS reviewer_location
+                   FROM shop_reviews r
+                   LEFT JOIN users u ON u.id::text = r.reviewer_id::text
+                   WHERE r.shop_id::text = $1::text AND r.is_hidden IS NOT TRUE
+                   UNION ALL
+                   SELECT pr.id::text AS id,
+                          pr.rating,
+                          CASE
+                            WHEN pr.rating >= 5 THEN 'Best'
+                            WHEN pr.rating >= 4 THEN 'Good'
+                            WHEN pr.rating >= 3 THEN 'Average'
+                            ELSE 'Poor'
+                          END AS title,
+                          NULLIF(btrim(pr.comment), '') AS comment,
+                          pr.created_at,
+                          NULLIF(TRIM(CONCAT_WS(' ', u.fname, u.lname)), '') AS reviewer_name,
+                          CASE
+                            WHEN u.location IS NULL OR jsonb_typeof(u.location) <> 'object' THEN NULL
+                            ELSE NULLIF(TRIM(CONCAT_WS(', ', u.location->>'city', u.location->>'state')), '')
+                          END AS reviewer_location
+                   FROM product_reviews pr
+                   INNER JOIN products p ON p.id = pr.product_id
+                   LEFT JOIN users u ON u.id::text = pr.user_id::text
+                   WHERE p.shop_id::text = $1::text
+                 ) reviews
+                 ORDER BY created_at DESC
                  LIMIT 40`,
                 [shopId]
             );

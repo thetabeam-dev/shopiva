@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -18,6 +17,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../context/ProfileContext';
 import { fetchOwnerShops, fetchShopInventory } from '../../api/shop';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 
@@ -375,7 +375,7 @@ export default function VendorInventoryScreen() {
                     >
                       <View style={styles.thumb}>
                         {row.uri ? (
-                          <Image source={{ uri: row.uri }} style={styles.thumbImage} resizeMode="cover" />
+                          <ProductCardMedia uri={row.uri} style={styles.thumbImage} />
                         ) : (
                           <Icon name="cube-outline" size={22} color="#9CA3AF" />
                         )}

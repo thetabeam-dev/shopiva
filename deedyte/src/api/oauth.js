@@ -21,7 +21,7 @@ export function getOAuthStartUrl(provider) {
 
 /**
  * @param {string} url
- * @returns {{ token?: string, error?: string } | null}
+ * @returns {{ token?: string, error?: string, user?: { id: string, email: string, fname: string } | null } | null}
  */
 export function parseOAuthCallbackUrl(url) {
   if (!url || typeof url !== 'string') {
@@ -39,10 +39,20 @@ export function parseOAuthCallbackUrl(url) {
     const params = new URLSearchParams(qs);
     const token = params.get('token');
     const error = params.get('error');
-    /** @type {{ token?: string, error?: string }} */
+    const id = params.get('id');
+    const email = params.get('email');
+    const fname = params.get('fname');
+    /** @type {{ token?: string, error?: string, user?: { id: string, email: string, fname: string } | null }} */
     const out = {};
     if (token) out.token = token;
     if (error) out.error = error;
+    if (id || email || fname) {
+      out.user = {
+        id: id || '',
+        email: email || '',
+        fname: fname || '',
+      };
+    }
     return out;
   } catch {
     return null;

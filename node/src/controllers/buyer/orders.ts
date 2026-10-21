@@ -65,6 +65,7 @@ async function notifyVendorOfBuyerPayment(
       await sendFcmForActivities(token, title, message, null, {
         type: "order",
         order_id: orderId,
+        role: "vendor",
       });
     }
     const email = String(rows[0]?.email ?? owner.email ?? "").trim();
@@ -97,6 +98,7 @@ async function notifyVendorOfBuyerPayment(
         await sendFcmForActivities(buyerToken, buyerTitle, buyerMessage, null, {
           type: "order",
           order_id: orderId,
+          role: "buyer",
         });
       }
       const buyerEmail = String(buyerContact[0]?.email ?? "").trim();

@@ -143,7 +143,7 @@ export function ShopOverflowMenu({
                 </TouchableOpacity>
               </>
             ) : null} */}
-            {/* {typeof onDeliveryPolicy === 'function' ? (
+            {typeof onDeliveryPolicy === 'function' ? (
               <>
                 <View style={styles.rowSep} />
                 <TouchableOpacity
@@ -157,10 +157,10 @@ export function ShopOverflowMenu({
                     color="#202124"
                     style={styles.rowIcon}
                   />
-                  <Text style={styles.rowLabel}>Delivery details</Text>
+                  <Text style={styles.rowLabel}>Delivery</Text>
                 </TouchableOpacity>
               </>
-            ) : null} */}
+            ) : null}}
             {/* <TouchableOpacity
               style={styles.row}
               onPress={onNotInterested}

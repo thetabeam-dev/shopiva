@@ -10,10 +10,12 @@ import { getIo } from "../../index.js";
 import { ordersTransformer as buyerOrdersTransformer } from "../../transformers/buyer/orders.js";
 import { ordersTransformer as vendorOrdersTransformer } from "../../transformers/business/orders.js";
 import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
-import { sendFcmForActivities } from "../../services/firebaseConfig.js";
-import { createAndEmitNotification } from "../../services/notifications.js";
 import { creditWalletFromPaystack } from "../../models/wallet.js";
 import { nairaLabel, pushWalletFcm } from "../../services/walletPush.js";
+import { persistShippingAddress } from "../../utils/shippingAddress.js";
+import { ensurePaidOrderChatRoom, notifyVendorOfPurchase } from "../../services/buyer/checkoutConfirm.js";
+import { createEscrowForOrder } from "../../models/escrow.js";
+import type { AuthRequest } from "../../middleware/auth.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
 
 export async function PaystackWebhookController(
@@ -117,13 +119,7 @@ export async function PaystackWebhookController(
       ],
     );
 
-    //
-    const { metadata, reference } = paystackData;
-
-    // const { metadata, reference } = paystackData;
-    const { customer_id, shipping_address, tax, orders } = metadata || {};
-
-    // Verify payment with Paystack
+    const { reference } = paystackData;
     const verifyRaw = await paystack.verifyTransaction(reference);
     const data =
       verifyRaw.data && typeof verifyRaw.data === "object"
@@ -138,139 +134,206 @@ export async function PaystackWebhookController(
       return;
     }
 
-    // Check if order already exists
+    res.status(200).json({
+      success: true,
+      message: "Payment verified. Checkout completes from the app.",
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Webhook error");
+    return;
+  }
+}
+
+/**
+ * POST /buyer/checkout/complete
+ * Same metadata shape the Paystack charge used to carry:
+ * `{ customer_id, shipping_address, tax, orders, reference }`.
+ * Debits the wallet, creates the orders, and opens the buyer–vendor chat room.
+ */
+export async function CompleteCheckoutController(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const userId = Number(req.user?.id);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const body = (req.body ?? {}) as {
+      customer_id?: unknown;
+      shipping_address?: unknown;
+      tax?: unknown;
+      reference?: unknown;
+      orders?: Array<Record<string, unknown>>;
+    };
+    const customerId = String(body.customer_id ?? userId);
+    if (customerId !== String(userId)) {
+      res.status(403).json({ error: "Checkout does not belong to this account." });
+      return;
+    }
+    const orders = Array.isArray(body.orders) ? body.orders : [];
+    if (!orders.length) {
+      res.status(400).json({ error: "orders is required" });
+      return;
+    }
+    const reference = String(body.reference ?? "").trim() || `wallet_${userId}_${Date.now()}`;
+    const shippingAddress = persistShippingAddress(body.shipping_address);
+    const tax = Number(body.tax) || 0;
+    const dueNaira = orders.reduce((sum, order) => {
+      return sum + (Number(order.subtotal) || 0) + (Number(order.shipping_fee) || 0);
+    }, tax + 200);
+
+    const pool = await db();
+    const io = getIo();
     const { rows: existingOrder } = await pool.query(
       `SELECT id FROM orders WHERE payment_reference = $1`,
       [reference],
     );
-
     if (existingOrder.length > 0) {
-      res.status(200).json({ message: "Order already processed" });
+      res.status(200).json({ success: true, message: "Order already processed", reference });
       return;
     }
 
-    // Create order from Paystack data
+    const amountKobo = Math.round(dueNaira * 100);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{ id: string; balance_kobo: string }>(
+        `SELECT id, balance_kobo FROM wallets WHERE user_id = $1 FOR UPDATE`,
+        [userId],
+      );
+      const wallet = locked.rows[0];
+      if (!wallet) {
+        throw Object.assign(new Error("Wallet not found."), { status: 404 });
+      }
+      if (Number(wallet.balance_kobo) < amountKobo) {
+        throw Object.assign(new Error("Wallet balance is not enough to complete this order."), { status: 400 });
+      }
+      await client.query(
+        `UPDATE wallets SET balance_kobo = balance_kobo - $2, updated_at = NOW() WHERE id = $1`,
+        [wallet.id, amountKobo],
+      );
+      await client.query(
+        `INSERT INTO wallet_transactions (wallet_id, type, amount_kobo, reference, status, description)
+         VALUES ($1, 'payment', $2, $3, 'success', $4)`,
+        [wallet.id, amountKobo, reference, "Checkout payment"],
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      const status = Number((err as { status?: number }).status) || 400;
+      const message = err instanceof Error ? err.message : "Could not debit wallet";
+      if (String(message).toLowerCase().includes("duplicate") || String((err as { code?: string }).code) === "23505") {
+        const again = await pool.query(`SELECT id FROM orders WHERE payment_reference = $1`, [reference]);
+        if (again.rows.length) {
+          res.status(200).json({ success: true, message: "Order already processed", reference });
+          return;
+        }
+      }
+      res.status(status).json({ error: message });
+      return;
+    } finally {
+      client.release();
+    }
+
+    const rooms: unknown[] = [];
     await Promise.all(
-      orders.map(async (order: any, index: Number) => {
-        const { items, shop_id, shipping_fee, shipping_method, subtotal } =
-          order;
+      orders.map(async (order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const shop_id = order.shop_id;
+        const shipping_fee = Number(order.shipping_fee) || 0;
+        const shipping_method = String(order.shipping_method ?? "");
+        const subtotal = Number(order.subtotal) || 0;
 
         const newOrder: NewOrder = {
-          customer_id: customer_id || paystackData.customer.email,
-          shop_id: shop_id,
+          customer_id: customerId,
+          shop_id: String(shop_id ?? ""),
           amount_paid: subtotal,
-          shipping_fee: shipping_fee || 0,
-          tax: tax || 0,
+          shipping_fee,
+          tax,
           charges: 0,
           total_paid: subtotal,
           currency: "NGN",
           fulfillment_status: "payment_received",
           escrow_status: "held",
-          payment_status: paystackData.status,
-          shipping_address: shipping_address || "",
+          payment_status: "success",
+          shipping_address: shippingAddress,
           payment_reference: reference,
-          shipping_method: shipping_method || "",
+          shipping_method,
           tracking_number: "",
         };
         const orderId = await OrderHandler.newOrder(newOrder);
         try {
           const { id: vendorId } = await GetShopOwnerByShopIdService(Number(shop_id));
-          await createAndEmitNotification({
-            recipientId: Number(vendorId),
-            title: "New order",
-            message: "A customer just made a purchase from your shop.",
-            sourceType: "order",
-            sourceId: Number(orderId),
-            role: "vendor",
+          await createEscrowForOrder({
+            orderId: Number(orderId),
+            buyerId: userId,
+            vendorId: Number(vendorId),
+            amountNaira: subtotal + shipping_fee,
+            status: "held",
           });
-          const tokenResult = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [vendorId]);
-          const vendorToken = String(tokenResult.rows[0]?.devicetoken ?? "").trim();
-          const itemCount = (items ?? []).reduce((sum: number, item: { unit?: number; quantity?: number }) => {
-            const qty = Number(item.unit ?? item.quantity ?? 0);
-            return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
-          }, 0);
-          const orderTotal = Number(subtotal || 0) + Number(shipping_fee || 0);
-          const count = itemCount || (items?.length ?? 0);
-          const itemLabel = count === 1 ? "item" : "items";
-          const totalLabel = `₦${orderTotal.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          if (vendorToken) {
-            sendFcmForActivities(
-              vendorToken,
-              "New Order Received",
-              `You have a new order for ${count} ${itemLabel} totaling ${totalLabel}.`,
-              null,
-              { type: "order", order_id: orderId },
-            );
-          }
         } catch (err) {
-          console.error("vendor new-order notification failed", err);
+          console.error("checkout escrow row failed", err);
         }
+        try {
+          const created = await ensurePaidOrderChatRoom(userId, Number(orderId), shop_id);
+          if (Array.isArray(created)) rooms.push(...created);
+        } catch (err) {
+          console.error("checkout chat room failed", err);
+        }
+        const itemCount = items.reduce((sum: number, item: { unit?: number; quantity?: number }) => {
+          const qty = Number(item?.unit ?? item?.quantity ?? 0);
+          return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+        }, 0);
+        await notifyVendorOfPurchase(shop_id, orderId, {
+          itemCount: itemCount || items.length,
+          total: subtotal + shipping_fee,
+        });
 
-        const orderEvent = {
-          order_id: orderId,
+        await OrderHandler.orderEvent({
+          order_id: String(orderId),
           event_type: "payment",
           stage: "payment_received",
-          actor_type: "customer" as const,
-          actor_id: customer_id || paystackData.customer.email,
-          outcome: "success" as const,
-          notes: `Payment received via Paystack - Reference: ${reference}`,
-          meta: JSON.stringify({
-            channel: paystackData.channel,
-            paystack_charge_id: paystackData.id,
-            paid_at: paystackData.paid_at,
-          }),
-        };
-        await OrderHandler.orderEvent(orderEvent);
+          actor_type: "customer",
+          actor_id: customerId,
+          outcome: "success",
+          notes: `Payment received from wallet - Reference: ${reference}`,
+          meta: JSON.stringify({ channel: "wallet", paid_at: new Date().toISOString() }),
+        });
 
-        for (const item of items) {
-          let { item_id, unit, unit_price, total, cart_id } = item;
-
-          // Construct order items payload (assuming single item for now, adjust based on your cart structure)
-          const orderItems = {
-            order_id: orderId,
-            item_id: item_id,
-            units: unit,
-            unit_price: unit_price,
-            total_price: total,
-          };
-
-          await OrderHandler.orderedTtem(orderItems);
-          // await OrderHandler.removeItemFromCart(cart_id);
+        for (const item of items as Array<Record<string, unknown>>) {
+          await OrderHandler.orderedTtem({
+            order_id: String(orderId),
+            item_id: String(item.item_id ?? ""),
+            units: Number(item.unit) || 0,
+            unit_price: Number(item.unit_price) || 0,
+            total_price: Number(item.total) || 0,
+          });
+          if (item.cart_id != null) {
+            try {
+              await OrderHandler.removeItemFromCart(item.cart_id as string | number);
+            } catch (err) {
+              console.error("remove cart item failed", err);
+            }
+          }
         }
       }),
     );
 
-    io.to(`user:${customer_id}`).emit("payment_received", {
-      list: await buyerOrdersTransformer(customer_id),
+    io.to(`user:${customerId}`).emit("payment_received", {
+      list: await buyerOrdersTransformer(customerId),
     });
-
-    // "Your payment has been received successfully. The seller has been notified."
-
-    for (let order of orders) {
+    for (const order of orders) {
       const shop_id = order.shop_id;
-      const { id: vid } = await GetShopOwnerByShopIdService(shop_id);
+      const { id: vid } = await GetShopOwnerByShopIdService(Number(shop_id));
       io.to(`user:${vid}`).emit("payment_received", {
-        list: await vendorOrdersTransformer(shop_id),
+        list: await vendorOrdersTransformer(String(shop_id ?? "")),
       });
-      const {
-        rows: [{ buyerDevicetoken }],
-      } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [
-        customer_id,
-      ]);
-      sendFcmForActivities(
-        buyerDevicetoken /**token */,
-        "Payment Successful" /** title */,
-        "Your payment has been received successfully, and the seller has been notified. You’ll receive updates as your order progresses." /**body */,
-        "null" /** media */,
-        { type: "order", order_id: order.id } /** meta */,
-      );
     }
-    res
-      .status(200)
-      .json({ success: true, message: "Webhook processed successfully" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).send("Webhook error");
-    return;
+
+    res.status(200).json({ success: true, message: "Checkout completed", reference, rooms });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Could not complete checkout" });
   }
 }

@@ -16,6 +16,7 @@ import {
   PostBuyerCartController,
 } from "../controllers/buyer/cart.js";
 import { PostBuyerCheckoutConfirmPaymentController, PostBuyerUnpaidOrderController } from "../controllers/buyer/checkout.js";
+import { CompleteCheckoutController } from "../controllers/webhooks/paystack.js";
 import {
   PostBuyerShopReviewController,
   GetBuyerProductPendingReviewsController,
@@ -36,6 +37,7 @@ BuyerRouter.delete("/buyer/cart/:cartItemId", verifyToken, DeleteBuyerCartLineCo
 
 BuyerRouter.post("/buyer/checkout/unpaid-order", verifyToken, PostBuyerUnpaidOrderController);
 BuyerRouter.post("/buyer/checkout/confirm-payment", verifyToken, PostBuyerCheckoutConfirmPaymentController);
+BuyerRouter.post("/buyer/checkout/complete", verifyToken, CompleteCheckoutController);
 
 BuyerRouter.post("/buyer/orders/:orderId/pay", verifyToken, PostBuyerPayAcceptedOrderController);
 BuyerRouter.get("/buyer/orders", verifyToken, GetBuyerOrdersController);

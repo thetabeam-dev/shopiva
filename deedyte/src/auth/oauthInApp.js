@@ -18,7 +18,7 @@ function hasNativeInAppBrowser() {
  * Runs OAuth in Custom Tabs / ASWebAuthenticationSession when native code is present.
  * Otherwise opens the auth URL with Linking — complete sign-in via `deedyte://oauth` deep link (see `navigations/index.js`).
  * @param {'google' | 'facebook' | 'apple'} provider
- * @returns {Promise<{ ok: true, token: string } | { ok: false, cancelled?: boolean, external?: boolean, message?: string }>}
+ * @returns {Promise<{ ok: true, token: string, user: { id: string, email: string, fname: string } | null } | { ok: false, cancelled?: boolean, external?: boolean, message?: string }>}
  */
 export async function runOAuthInPopup(provider) {
   const authUrl = getOAuthStartUrl(provider);
@@ -127,5 +127,5 @@ export async function runOAuthInPopup(provider) {
     };
   }
 
-  return { ok: true, token: parsed.token };
+  return { ok: true, token: parsed.token, user: parsed.user ?? null };
 }

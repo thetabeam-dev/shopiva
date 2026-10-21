@@ -95,6 +95,11 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true, service: "deedyte-api" });
 });
 
+app.get("/config/shipping-tutorial", (_req, res) => {
+  const videoUrl = String(process.env.SHIPPING_TUTORIAL_VIDEO_URL ?? "").trim().replace(/^["']|["']$/g, "");
+  res.status(200).json({ videoUrl });
+});
+
 app.get("/config/customer-access", (_req, res) => {
   const enabled = String(process.env.CUSTOMER_ACCESS_ENABLED ?? "true").trim().toLowerCase() !== "false";
   const unquote = (value: string | undefined) =>
@@ -233,59 +238,59 @@ app.post("/update-fcm", async (req, res) => {
   }
 });
 
-// app.post("/pay", async (_req, res) => {
-//   try {
-//     const pool = await db();
-//     const missing = await pool.query<{
-//       id: number;
-//       fname: string;
-//       lname: string | any;
-//       email: string;
-//       phone: string;
-//     }>(
-//       `SELECT u.id, u.fname, u.lname, u.email, u.phone
-//        FROM users u
-//        WHERE u.phone IS NOT NULL
-//          AND btrim(u.phone) <> ''
-//          AND NOT EXISTS (
-//            SELECT 1 FROM wallets w WHERE w.user_id = u.id
-//          )`
-//     );
+app.post("/pay", async (_req, res) => {
+  try {
+    const pool = await db();
+    const missing = await pool.query<{
+      id: number;
+      fname: string;
+      lname: string | any;
+      email: string;
+      phone: string;
+    }>(
+      `SELECT u.id, u.fname, u.lname, u.email, u.phone
+       FROM users u
+       WHERE u.phone IS NOT NULL
+         AND btrim(u.phone) <> ''
+         AND NOT EXISTS (
+           SELECT 1 FROM wallets w WHERE w.user_id = u.id
+         )`
+    );
 
-//     const created: number[] = [];
-//     const failed: { userId: number; error: string }[] = [];
+    const created: number[] = [];
+    const failed: { userId: number; error: string }[] = [];
 
-//     for (const user of missing.rows) {
-//       try {
-//         const account = await paystackTools.createDVAOnce({
-//           firstName: user.fname,
-//           lastName: user.lname?.trim() ? user.lname : user.email.split("@")[0],
-//           email: user.email,
-//           phone: `+234${user.phone}`,
-//         });
-//         await storePaystackVirtualAccount({
-//           userId: user.id,
-//           phone: user.phone,
-//           customerCode: account.customerCode,
-//           accountNumber: account.accountNumber,
-//           accountName: account.accountName,
-//           bankName: account.bankName,
-//         });
-//         created.push(user.id);
-//       } catch (error: any) {
-//         const message = error?.response?.data?.message
-//           ?? (error instanceof Error ? error.message : String(error));
-//         console.log(error?.response?.data ?? error);
-//         failed.push({ userId: user.id, error: message });
-//       }
-//     }
+    for (const user of missing.rows) {
+      try {
+        const account = await paystackTools.createDVAOnce({
+          firstName: user.fname,
+          lastName: user.lname?.trim() ? user.lname : user.fname[0],
+          email: user.email,
+          phone: `+234${user.phone}`,
+        });
+        await storePaystackVirtualAccount({
+          userId: user.id,
+          phone: user.phone,
+          customerCode: account.customerCode,
+          accountNumber: account.accountNumber,
+          accountName: account.accountName,
+          bankName: account.bankName,
+        });
+        created.push(user.id);
+      } catch (error: any) {
+        const message = error?.response?.data?.message
+          ?? (error instanceof Error ? error.message : String(error));
+        console.log(error?.response?.data ?? error);
+        failed.push({ userId: user.id, error: message });
+      }
+    }
 
-//     res.json({ created: created.length, userIds: created, failed });
-//   } catch (error: any) {
-//     console.log(error?.response?.data ?? error);
-//     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
-//   }
-// });
+    res.json({ created: created.length, userIds: created, failed });
+  } catch (error: any) {
+    console.log(error?.response?.data ?? error);
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
 
 // Routes
 app.use("/api/oauth", OAuthRouter);
@@ -336,6 +341,7 @@ async function notifyShopOfPayout(payout: {
       await sendFcmForActivities(token, title, message, null, {
         type: "order",
         order_id: orderId,
+        role: "vendor",
       });
     }
 

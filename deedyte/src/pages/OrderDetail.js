@@ -26,6 +26,8 @@ import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../context/ProfileContext';
 import { payAcceptedOrder } from '../api/buyer';
 import { formatNaira } from '../utils/formatNaira';
+import { formatShippingAddress } from '../utils/shippingAddress';
+import { ProductCardMedia } from '../components/ProductCardMedia';
 import {
   fetchBuyerOrder,
   fetchOwnerShops,
@@ -116,13 +118,16 @@ function parseShippingAddress(input) {
   const phone = pickStr(obj, ['phone', 'phoneNumber', 'mobile']);
   const email = pickStr(obj, ['email']);
   const street = pickStr(obj, [
+    'street_address',
     'street',
     'address1',
     'addressLine1',
     'line1',
     'street1',
+    'area_1',
   ]);
   const street2 = pickStr(obj, [
+    'area_2',
     'address2',
     'addressLine2',
     'line2',
@@ -243,7 +248,7 @@ const ORDER_PROGRESS_STEPS = [
   { label: 'Accepted', icon: 'checkmark-done-outline', statuses: ['order_accepted'] },
   { label: 'Processing', icon: 'cube-outline', statuses: ['order_processing'] },
   { label: 'Shipping', icon: 'boat-outline', statuses: ['order_shipping'] },
-  { label: 'On the way', icon: 'car-outline', statuses: ['order_out_for_delivery'] },
+  { label: 'Out For PickUp', icon: 'car-outline', statuses: ['order_out_for_delivery'] },
   { label: 'Delivered', icon: 'bag-check-outline', statuses: ['order_delivered'] },
   { label: 'Confirmed', icon: 'shield-checkmark-outline', statuses: ['order_confirmed', 'order_completed'] },
 ];
@@ -376,7 +381,7 @@ function paymentReleaseLabel(updatedAt, nowMs, fulfillmentStatus) {
   if (!Number.isFinite(updated)) return 'Payment releasing';
   const remaining = updated + PAYOUT_HOLD_MS - nowMs;
   if (remaining <= 0) return 'Payment releasing';
-  
+
   const hours = Math.floor(remaining / (60 * 60 * 1000));
   const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
   const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
@@ -414,7 +419,7 @@ export default function OrderDetailScreen() {
     statusKey === 'order_accepted' &&
     String(orderInfo?.order?.payment_status ?? '').toLowerCase() === 'unpaid';
   const autoPayStarted = useRef(false);
-  const onMakePaymentRef = useRef(() => {});
+  const onMakePaymentRef = useRef(() => { });
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -554,9 +559,9 @@ export default function OrderDetailScreen() {
 
   const rawPaymentStatus = String(
     orderInfo?.order?.payment_status ??
-      order?.payment_status ??
-      order?.paymentStatus ??
-      '',
+    order?.payment_status ??
+    order?.paymentStatus ??
+    '',
   )
     .trim()
     .toLowerCase();
@@ -1291,7 +1296,7 @@ export default function OrderDetailScreen() {
             Alert.alert('Payment received', msg);
           });
       },
-      onCancel: () => {},
+      onCancel: () => { },
       onError: (err) => {
         const msg =
           err && typeof err === 'object' && 'message' in err
@@ -1306,7 +1311,7 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: 0 }]}>
-      <Modal visible={confirmingPayment} transparent animationType="fade" onRequestClose={() => {}}>
+      <Modal visible={confirmingPayment} transparent animationType="fade" onRequestClose={() => { }}>
         <View style={styles.paymentOverlay}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.paymentOverlayText}>Confirming your payment…</Text>
@@ -1321,118 +1326,118 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.summaryHero}>
-            <View style={styles.summaryHeroTop}>
-              <View style={styles.summaryHeroCol}>
-                <Text style={styles.summaryHeroCaption}>Order Reference</Text>
-                <Text style={styles.summaryHeroValue} numberOfLines={1}>
-                  #{String(orderInfo?.order?.id ?? '').slice(0, 8)}
-                </Text>
-              </View>
-              <View style={[styles.summaryHeroCol, styles.summaryHeroColEnd]}>
-                <Text style={styles.summaryHeroCaption}>Total</Text>
-                <Text style={styles.summaryHeroValue}>
-                  {fmt(
-                    (Array.isArray(orderInfo?.order_items)
-                      ? orderInfo.order_items.reduce((acc, curr) => acc + Number(curr.total_price || 0), 0)
-                      : 0) +
-                      (auth.activeRole === 'vendor' ? 0 : 200) +
-                      Number(orderInfo?.order?.shipping_fee || 0),
-                  )}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.summaryHeroDate}>
-              <Icon name="calendar-outline" size={14} color="#9CA3AF" />
-              <Text style={[styles.summaryHeroDateText, styles.summaryHeroDateGrow]}>
-                {(() => {
-                  const date = new Date(orderInfo?.order?.created_at);
-                  if (Number.isNaN(date.getTime())) return '—';
-                  const day = date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  });
-                  const time = date.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  });
-                  return `${day} • ${time}`;
-                })()}
-              </Text>
-              <Pressable
-                onPress={onMail}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.summaryHeroChat}
-                accessibilityRole="button"
-                accessibilityLabel={auth.activeRole === 'vendor' ? 'Message customer' : 'Message shop'}
-              >
-                <Icon name="chatbubble-ellipses-outline" size={22} color={COLOR.BRAND_COLOR} />
-                <MessageIconBadge count={unreadMessages} />
-              </Pressable>
-            </View>
-            <View
-              style={[
-                styles.summaryHeroStatus,
-                { backgroundColor: statusTheme?.bg ?? '#EEF2FF' },
-              ]}
-            >
-              <Icon name="cube" size={16} color={statusTheme?.dot ?? COLOR.BRAND_COLOR} />
-              <Text style={[styles.summaryHeroStatusText, { color: statusTheme?.text ?? '#111' }]}>
-                {statusTheme?.label ?? 'Processing'}
+          <View style={styles.summaryHeroTop}>
+            <View style={styles.summaryHeroCol}>
+              <Text style={styles.summaryHeroCaption}>Order Reference</Text>
+              <Text style={styles.summaryHeroValue} numberOfLines={1}>
+                #{String(orderInfo?.order?.id ?? '').slice(0, 8)}
               </Text>
             </View>
-            <View style={styles.summaryTurnTip}>
-              <Icon name="information-circle-outline" size={16} color={COLOR.BRAND_COLOR} />
-              <Text style={styles.summaryTurnTipText}>
-                {orderTurnHint(
-                  auth.activeRole,
-                  statusKey,
-                  awaitingBuyerPayment,
-                  orderInfo?.order_events?.length ?? 0,
+            <View style={[styles.summaryHeroCol, styles.summaryHeroColEnd]}>
+              <Text style={styles.summaryHeroCaption}>Total</Text>
+              <Text style={styles.summaryHeroValue}>
+                {fmt(
+                  (Array.isArray(orderInfo?.order_items)
+                    ? orderInfo.order_items.reduce((acc, curr) => acc + Number(curr.total_price || 0), 0)
+                    : 0) +
+                  (auth.activeRole === 'vendor' ? 0 : 200) +
+                  Number(orderInfo?.order?.shipping_fee || 0),
                 )}
               </Text>
             </View>
           </View>
+          <View style={styles.summaryHeroDate}>
+            <Icon name="calendar-outline" size={14} color="#9CA3AF" />
+            <Text style={[styles.summaryHeroDateText, styles.summaryHeroDateGrow]}>
+              {(() => {
+                const date = new Date(orderInfo?.order?.created_at);
+                if (Number.isNaN(date.getTime())) return '—';
+                const day = date.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+                const time = date.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                });
+                return `${day} • ${time}`;
+              })()}
+            </Text>
+            <Pressable
+              onPress={onMail}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.summaryHeroChat}
+              accessibilityRole="button"
+              accessibilityLabel={auth.activeRole === 'vendor' ? 'Message customer' : 'Message shop'}
+            >
+              <Icon name="chatbubble-ellipses-outline" size={22} color={COLOR.BRAND_COLOR} />
+              <MessageIconBadge count={unreadMessages} />
+            </Pressable>
+          </View>
+          <View
+            style={[
+              styles.summaryHeroStatus,
+              { backgroundColor: statusTheme?.bg ?? '#EEF2FF' },
+            ]}
+          >
+            <Icon name="cube" size={16} color={statusTheme?.dot ?? COLOR.BRAND_COLOR} />
+            <Text style={[styles.summaryHeroStatusText, { color: statusTheme?.text ?? '#111' }]}>
+              {statusTheme?.label ?? 'Processing'}
+            </Text>
+          </View>
+          <View style={styles.summaryTurnTip}>
+            <Icon name="information-circle-outline" size={16} color={COLOR.BRAND_COLOR} />
+            <Text style={styles.summaryTurnTipText}>
+              {orderTurnHint(
+                auth.activeRole,
+                statusKey,
+                awaitingBuyerPayment,
+                orderInfo?.order_events?.length ?? 0,
+              )}
+            </Text>
+          </View>
+        </View>
 
         <OrderProgress statusKey={statusKey} />
 
         <View style={styles.deliveryCard}>
-            <View style={styles.deliveryAddressRow}>
-              <View style={styles.deliveryPin}>
-                <Icon name="location" size={18} color={COLOR.BRAND_COLOR} />
-              </View>
-              <View style={styles.deliveryAddressBody}>
-                <Text style={styles.deliveryAddressTitle}>Delivery Address</Text>
-                <Text style={styles.deliveryAddressText}>
-                  {String(orderInfo?.order?.shipping_address || 'Not available')}
-                </Text>
-              </View>
+          <View style={styles.deliveryAddressRow}>
+            <View style={styles.deliveryPin}>
+              <Icon name="location" size={18} color={COLOR.BRAND_COLOR} />
             </View>
-            <View style={styles.deliveryMeta}>
-              <SummaryRow
-                icon="cube-outline"
-                label="Shipping Method"
-                value={String(
-                  orderInfo?.order?.shipping_method?.split('_').join(' ') ||
-                  'Awaiting shipment',
-                )}
-              />
-              <SummaryRow
-                icon="calendar-outline"
-                label="Estimated Delivery"
-                value={String(
-                  orderInfo?.order?.estimated_delivery_date?.split('_').join(' ') ||
-                  'Not available',
-                )}
-              />
-              <SummaryRow
-                icon="pricetag-outline"
-                label="Tracking Number"
-                value={String(orderInfo?.order?.tracking_number || 'Awaiting shipment')}
-                last
-              />
+            <View style={styles.deliveryAddressBody}>
+              <Text style={styles.deliveryAddressTitle}>Delivery Address</Text>
+              <Text style={styles.deliveryAddressText}>
+                {formatShippingAddress(orderInfo?.order?.shipping_address)}
+              </Text>
             </View>
           </View>
+          <View style={styles.deliveryMeta}>
+            <SummaryRow
+              icon="cube-outline"
+              label="Shipping Method"
+              value={String(
+                orderInfo?.order?.shipping_method?.split('_').join(' ') ||
+                'Awaiting shipment',
+              )}
+            />
+            <SummaryRow
+              icon="calendar-outline"
+              label="Estimated Delivery"
+              value={String(
+                orderInfo?.order?.estimated_delivery_date?.split('_').join(' ') ||
+                'Not available',
+              )}
+            />
+            <SummaryRow
+              icon="pricetag-outline"
+              label="Tracking Number"
+              value={String(orderInfo?.order?.tracking_number || 'Awaiting shipment')}
+              last
+            />
+          </View>
+        </View>
 
         {orderInfo?.order_events?.length > 1 && (
           <View style={styles.card}>
@@ -1514,10 +1519,7 @@ export default function OrderDetailScreen() {
               >
                 <View style={styles.itemThumb}>
                   {it.product.thumbnail_url ? (
-                    <Image
-                      source={{ uri: String(it.product.thumbnail_url) }}
-                      style={styles.itemImg}
-                    />
+                    <ProductCardMedia uri={String(it.product.thumbnail_url)} style={styles.itemImg} />
                   ) : (
                     <Icon
                       name="phone-portrait-outline"
@@ -1556,9 +1558,9 @@ export default function OrderDetailScreen() {
           {(() => {
             const subtotal = Array.isArray(orderInfo?.order_items)
               ? orderInfo.order_items.reduce(
-                  (acc, curr) => acc + Number(curr.total_price || 0),
-                  0,
-                )
+                (acc, curr) => acc + Number(curr.total_price || 0),
+                0,
+              )
               : 0;
             const showEscrowFee = auth.activeRole !== 'vendor';
             const escrowFee = showEscrowFee ? 200 : 0;
@@ -1587,7 +1589,7 @@ export default function OrderDetailScreen() {
             ? (customerName || 'Customer')
             : String(orderInfo?.shop?.name ?? 'Shop');
           const partyMeta = isVendor
-            ? 'Buyer for this order'
+            ? ''
             : ([displayShipping.city, displayShipping.state, displayShipping.country].filter(Boolean).join(', ') || 'Shop location unavailable');
           return (
             <View style={styles.shopCard}>
@@ -1601,7 +1603,6 @@ export default function OrderDetailScreen() {
                 </View>
                 <View>
                   <Text style={styles.shopCardTitle}>{isVendor ? 'Customer' : 'Shop'}</Text>
-                  <Text style={styles.shopCardSubtitle}>{isVendor ? 'Your buyer' : 'Your seller'}</Text>
                 </View>
               </View>
               <View style={styles.shopCardBody}>
@@ -1610,7 +1611,7 @@ export default function OrderDetailScreen() {
                 </View>
                 <View style={styles.shopCardIdentity}>
                   <Text style={styles.shopCardName} numberOfLines={1}>{partyName.toUpperCase()}</Text>
-                  <Text style={styles.shopCardMeta} numberOfLines={2}>{partyMeta}</Text>
+                  {partyMeta ? <Text style={styles.shopCardMeta} numberOfLines={2}>{partyMeta}</Text> : null}
                 </View>
               </View>
               <Pressable
@@ -1647,7 +1648,13 @@ export default function OrderDetailScreen() {
                     action: 'acceptance',
                     data: {
                       order_id: orderInfo.order.id,
+                      shop_id: orderInfo.order.shop_id || orderInfo.shop?.id,
+                      item_count: (Array.isArray(orderInfo?.order_items) ? orderInfo.order_items : []).reduce(
+                        (sum, item) => sum + (Number(item.units ?? item.unit ?? 1) || 0),
+                        0,
+                      ),
                       shipping_address: orderInfo.order.shipping_address,
+                      shipping_method: orderInfo.order.shipping_method,
                       event_type: 'acceptance',
                       stage: 'order_accepted',
                       actor_type: 'vendor',

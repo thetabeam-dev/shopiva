@@ -260,6 +260,15 @@ export async function pingApi() {
 
 
 
+/** Public tutorial clip from GET /config/shipping-tutorial. */
+export async function getShippingTutorialVideoUrl() {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/config/shipping-tutorial`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return '';
+  return String(data?.videoUrl ?? '').trim();
+}
+
 /** Public gate from GET /config/customer-access. */
 export async function getCustomerAccess() {
   const base = getApiBaseUrl();

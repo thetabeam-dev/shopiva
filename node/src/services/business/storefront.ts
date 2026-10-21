@@ -42,7 +42,10 @@ export async function GetStorefrontShopBySlugService(slug: string) {
       row.review_count = Number(shopReviewMetrics.review_count ?? row.review_count ?? 0);
     }
   }
-  return { shop: row, shopPolicies, shopReviewMetrics };
+  const reviews = shopId != null && Number.isFinite(Number(shopId))
+    ? await shopModel.getStorefrontReviewsByShopId(Number(shopId))
+    : [];
+  return { shop: row, shopPolicies, shopReviewMetrics, reviews };
 }
 
 export async function GetStorefrontProductsByShopIdService(shopId: number) {

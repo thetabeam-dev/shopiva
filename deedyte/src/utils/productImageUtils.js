@@ -63,6 +63,7 @@ export function getProductImageUris(source) {
   pushArray((/** @type {Record<string, unknown>} */ (source)).product_images);
   pushArray((/** @type {Record<string, unknown>} */ (source)).productImages);
   pushArray((/** @type {Record<string, unknown>} */ (source)).thumbnails);
+  pushArray((/** @type {Record<string, unknown>} */ (source)).videos);
 
   return images;
 }

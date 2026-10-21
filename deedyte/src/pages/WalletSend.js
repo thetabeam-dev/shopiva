@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { fetchWallet, fetchWalletRecipient, sendWalletMoney } from '../api/user';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
 import WalletPinModals from '../components/WalletPinModals';
+import WalletProcessingOverlay from '../components/WalletProcessingOverlay';
 
 const TEAL = '#00926e';
 
@@ -20,6 +21,7 @@ export default function WalletSendScreen() {
   const [confirming, setConfirming] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [missingPin, setMissingPin] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,6 +146,7 @@ export default function WalletSendScreen() {
         onCloseMissing={() => setMissingPin(false)}
         onVerified={async enteredPin => {
           setPinOpen(false);
+          setProcessing(true);
           try {
             await sendWalletMoney({
               address: recipient.trim(),
@@ -161,9 +164,12 @@ export default function WalletSendScreen() {
             ]);
           } catch (error) {
             Alert.alert('Send', error instanceof Error ? error.message : String(error));
+          } finally {
+            setProcessing(false);
           }
         }}
       />
+      <WalletProcessingOverlay visible={processing} label="Sending…" />
     </View>
   );
 }

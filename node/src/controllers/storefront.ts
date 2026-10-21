@@ -33,6 +33,7 @@ export async function GetStorefrontShopController(req: Request, res: Response): 
       },
       shopPolicies: result.shopPolicies,
       shopReviewMetrics: result.shopReviewMetrics,
+      reviews: result.reviews ?? [],
     });
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

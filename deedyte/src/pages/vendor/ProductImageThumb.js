@@ -1,10 +1,11 @@
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { ProductCardMedia } from '../../components/ProductCardMedia';
 
 export default function ProductImageThumb({ uri }) {
   const imageUri = typeof uri === 'string' && uri.trim() ? uri.trim() : null;
   return imageUri ? (
-    <Image source={{ uri: imageUri }} style={styles.thumb} resizeMode="cover" />
+    <ProductCardMedia uri={imageUri} style={styles.thumb} />
   ) : (
     <View style={[styles.thumb, styles.placeholder]} />
   );

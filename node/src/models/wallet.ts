@@ -509,3 +509,54 @@ export async function getWalletByUserId(userId: number) {
   );
   return rows[0] ?? null;
 }
+
+/** Credits a user's wallet once per reference. */
+export async function creditUserWallet(
+  userId: number,
+  amountKobo: number,
+  reference: string,
+  description: string,
+) {
+  const uid = Number(userId);
+  const kobo = Math.round(Number(amountKobo));
+  const ref = String(reference ?? "").trim();
+  if (!Number.isFinite(uid) || uid <= 0 || !Number.isFinite(kobo) || kobo <= 0 || !ref) {
+    return { credited: false };
+  }
+  const pool = await db();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const wallet = await client.query<{ id: string }>(
+      `SELECT id FROM wallets WHERE user_id = $1 FOR UPDATE`,
+      [uid],
+    );
+    const row = wallet.rows[0];
+    if (!row) {
+      await client.query("ROLLBACK");
+      return { credited: false };
+    }
+    const inserted = await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, type, amount_kobo, reference, status, description)
+       VALUES ($1, 'receive', $2, $3, 'success', $4)
+       ON CONFLICT (reference) DO NOTHING
+       RETURNING id`,
+      [row.id, kobo, ref, description],
+    );
+    if (!inserted.rows[0]) {
+      await client.query("COMMIT");
+      return { credited: false };
+    }
+    await client.query(
+      `UPDATE wallets SET balance_kobo = balance_kobo + $2, updated_at = NOW() WHERE id = $1`,
+      [row.id, kobo],
+    );
+    await client.query("COMMIT");
+    return { credited: true };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}

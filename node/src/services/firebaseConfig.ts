@@ -89,6 +89,7 @@ function buildNavData(
   put("return_id", m.return_id ?? m.returnId);
   put("room_id", m.room_id ?? m.roomId);
   put("room_name", m.room_name ?? m.roomName ?? m.name);
+  put("role", m.role);
 
   return data;
 }

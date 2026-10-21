@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useLayoutEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { fetchOwnerShops, fetchShopOrders } from '../../api/shop';
 import { getStorefrontProduct, getStorefrontProducts } from '../../api/storefront';
 import { mapOrderRowToListItem } from '../../utils/buyerUi';
 import { formatNaira } from '../../utils/formatNaira';
+import { readExactLocation, reverseGeocodeToPlace } from '../../utils/deviceLocation';
 
 /** Vendor-only dashboard — not shared with customer flows or `HomeStackScreen`. */
 const BRAND = '#00926E';
@@ -127,6 +128,18 @@ async function countLowInventoryAlerts(shop) {
   return values.reduce((a, b) => a + b, 0);
 }
 
+function savedLocationLabel(user) {
+  const loc = user?.location;
+  if (loc && typeof loc === 'object' && !Array.isArray(loc)) {
+    const city = String(loc.city ?? '').trim();
+    const state = String(loc.state ?? '').trim();
+    const line = [city, state].filter(Boolean).join(', ');
+    if (line) return line;
+  }
+  const display = String(user?.locationDisplay ?? (typeof loc === 'string' ? loc : '')).trim();
+  return display;
+}
+
 function MetricCard({ title, value, footer, footerTone = 'muted', children }) {
   return (
     <View style={styles.metricCard}>
@@ -173,8 +186,10 @@ function OrderPreviewRow({ title, time, detail, isLast, onPress }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { user } = useProfile();
+  const { user, saveProfileFields } = useProfile();
   const userId = Number(user?.id);
+  const [primaryShop, setPrimaryShop] = useState(/** @type {Record<string, unknown> | null} */ (null));
+  const [locating, setLocating] = useState(false);
 
   const [orders, setOrders] = useState(/** @type {ReturnType<typeof mapOrderRowToListItem>[]} */ ([]));
   const [ordersTotalCount, setOrdersTotalCount] = useState(0);
@@ -189,6 +204,7 @@ export default function HomeScreen() {
     if (!Number.isFinite(userId) || userId <= 0) {
       setOrders([]);
       setOrdersTotalCount(0);
+      setPrimaryShop(null);
       setShopsCount(0);
       setNewCustomersCount(0);
       setLowInventoryCount(0);
@@ -205,6 +221,7 @@ export default function HomeScreen() {
       const firstShop = pickFirstCreatedShop(
         shops.map((s) => /** @type {Record<string, unknown>} */ (s)),
       );
+      setPrimaryShop(firstShop);
       const shopId = firstShop ? shopIdOf(firstShop) : 0;
       if (!shopId) {
         setOrders([]);
@@ -244,6 +261,7 @@ export default function HomeScreen() {
     } catch (e) {
       setOrders([]);
       setOrdersTotalCount(0);
+      setPrimaryShop(null);
       setShopsCount(0);
       setNewCustomersCount(0);
       setLowInventoryCount(0);
@@ -283,6 +301,69 @@ export default function HomeScreen() {
   );
 
   const hasMoreThanShown = ordersTotalCount > MAX_DASHBOARD_ORDERS;
+  const locationLabel = savedLocationLabel(user);
+  const shopName = String(primaryShop?.name ?? primaryShop?.shop_name ?? 'Your shop').trim() || 'Your shop';
+  const shopLogo = String(primaryShop?.logo ?? primaryShop?.logo_url ?? primaryShop?.image ?? '').trim();
+
+  const onSetLocation = useCallback(async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const coords = await readExactLocation();
+      const place = await reverseGeocodeToPlace(coords.latitude, coords.longitude);
+      const saved = await saveProfileFields({
+        location: {
+          city: place.city || place.town || '',
+          state: place.state || '',
+          country: place.country || 'Nigeria',
+        },
+      });
+      if (!saved?.ok) {
+        Alert.alert('Location', saved?.message || 'Could not save your location.');
+      }
+    } catch (err) {
+      Alert.alert('Location', err instanceof Error ? err.message : 'Could not read your location.');
+    } finally {
+      setLocating(false);
+    }
+  }, [locating, saveProfileFields]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitleAlign: 'left',
+      headerLeft:  () => (
+        <View style={styles.identity}>
+          {shopLogo ? (
+            <Image source={{ uri: shopLogo }} style={styles.shopLogo} />
+          ) : (
+            <View style={[styles.shopLogo, styles.shopLogoFallback]}>
+              <Text style={styles.shopLogoLetter}>{shopName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
+          <View style={styles.identityText}>
+            <Text style={styles.shopName} numberOfLines={1}>{shopName}</Text>
+            {locationLabel ? (
+              <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
+            ) : (
+              <TouchableOpacity
+                onPress={() => { void onSetLocation(); }}
+                disabled={locating}
+                style={styles.locationBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Set your location"
+              >
+                {locating ? (
+                  <ActivityIndicator size="small" color={BRAND} />
+                ) : (
+                  <Icon name="location-outline" size={18} color={BRAND} />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ),
+    });
+  }, [navigation, shopLogo, shopName, locationLabel, locating, onSetLocation]);
 
   return (
     <View style={[styles.root, { paddingTop: 15 }]}>
@@ -366,6 +447,45 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
+  },
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: 240,
+  },
+  shopLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F6F1',
+  },
+  shopLogoFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopLogoLetter: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: BRAND,
+  },
+  identityText: {
+    marginLeft: 10,
+    flexShrink: 1,
+  },
+  shopName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT,
+  },
+  locationText: {
+    marginTop: 1,
+    fontSize: 12,
+    color: MUTED,
+  },
+  locationBtn: {
+    marginTop: 2,
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
   },
   header: {
     flexDirection: 'row',
