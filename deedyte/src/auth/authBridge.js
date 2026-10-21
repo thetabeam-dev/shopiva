@@ -1,5 +1,3 @@
-import { posthog } from '../analytics/posthog';
-
 /** @type {null | ((token: string, user: object | null, options?: { forceHome?: boolean; fromSignup?: boolean }) => Promise<void>)} */
 let signInHandler = null;
 
@@ -19,12 +17,6 @@ export function registerAuthSignInHandler(fn) {
 export async function completeAuthAndGoHome(token, user, options) {
   if (!signInHandler) {
     throw new Error('Auth is not ready yet. Try again in a moment.');
-  }
-  if (user?.id != null) {
-    posthog.identify(String(user.id), {
-      email: user.email ?? "",
-      name: user.fname ?? "",
-    });
   }
   await signInHandler(token, user ?? null, options);
 }

@@ -18,7 +18,6 @@ import axios from 'axios';
 import { DEFAULT_API_BASE_URL } from './src/api/config';
 import { checkForUpdate } from './src/api';
 import { requestLocationPermission } from './src/utils/deviceLocation';
-import { PostHogProvider } from 'posthog-react-native';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -183,13 +182,6 @@ function App() {
 
   return (
     <>
-      <PostHogProvider
-        apiKey="phc_qYgwSAhiFJLUMkrkHqLZmk3Km4UXVjywLPaFMnSsn2BX"
-        autocapture={{ captureScreens: false, captureTouches: false }}
-        options={{
-          host: 'https://us.i.posthog.com',
-        }}
-      >
         {!versionCheck.isUpdating && !versionCheck.isLatest ? (
           <SafeAreaView
             style={{
@@ -199,7 +191,7 @@ function App() {
               paddingHorizontal: 28,
             }}
           >
-            <View style={{ alignItems: 'center' }}>
+            <TouchableOpacity style={{ alignItems: 'center' }} onPress={openStore}>
               <Text style={{ fontSize: 22, fontWeight: '800', color: '#111111', textAlign: 'center', marginBottom: 10 }}>
                 Update required
               </Text>
@@ -211,7 +203,7 @@ function App() {
                   Click Here To Download The Latest Version
                 </Text>
               </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </SafeAreaView>
         ) : null}
 
@@ -233,7 +225,6 @@ function App() {
             </SafeAreaProvider>
           </GestureHandlerRootView>
         ) : null}
-      </PostHogProvider>
     </>
   );
 }
