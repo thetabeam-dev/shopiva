@@ -353,6 +353,7 @@ export default function ReturnDetailScreen() {
         <Pressable
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           onPress={() => navigation.goBack()}
+          style={({ pressed }) => [styles.headerBackButton, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
@@ -367,7 +368,7 @@ export default function ReturnDetailScreen() {
           <Text style={{ fontWeight: 700, fontSize: 18 }}>
             Return #{returnNumber}
           </Text>
-          {/* <StatusPill theme={payTheme} /> */}
+          <StatusPill theme={payTheme} />
         </View>
       ),
       headerRight: () => (
@@ -824,52 +825,101 @@ export default function ReturnDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <SectionLabel>Return Summary</SectionLabel>
-          <SummaryRow
-            icon="time-outline"
-            label="Return Date"
-            value={new Date(returnInfo?.return?.created_at).toLocaleString()}
-          />
-          <SummaryRow
-            icon="checkmark-circle-outline"
-            label="Return Status"
-            value={<StatusPill theme={statusTheme} />}
-          />
-          <SummaryRow
-            icon="location-outline"
-            label="Shipping Address"
-            value={
-              returnInfo?.return?.shipping_address &&
-              String(
-                Object.values(JSON.parse(returnInfo?.return?.shipping_address)).join(", ")
-              )}
-          />
+        <View style={styles.summaryHero}>
+          <View style={styles.summaryHeroTop}>
+            <View style={styles.summaryHeroCol}>
+              <Text style={styles.summaryHeroCaption}>Return Reference</Text>
+              <Text style={styles.summaryHeroValue} numberOfLines={1}>
+                #{String(returnInfo?.return?.id ?? '').slice(0, 8)}
+              </Text>
+            </View>
+            <View style={[styles.summaryHeroCol, styles.summaryHeroColEnd]}>
+              <Text style={styles.summaryHeroCaption}>Total</Text>
+              <Text style={styles.summaryHeroValue}>
+                {fmt(
+                  (Array.isArray(returnInfo?.return_items)
+                    ? returnInfo.return_items.reduce((acc, curr) => acc + Number(curr.total_price || 0), 0)
+                    : 0) + Number(returnInfo?.return?.return_shipping_fee || returnInfo?.return?.shipping_fee || 0),
+                )}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.summaryHeroDate}>
+            <Icon name="calendar-outline" size={14} color="#9CA3AF" />
+            <Text style={[styles.summaryHeroDateText, styles.summaryHeroDateGrow]}>
+              {(() => {
+                const date = new Date(returnInfo?.return?.created_at);
+                if (Number.isNaN(date.getTime())) return '—';
+                const day = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                return `${day} • ${time}`;
+              })()}
+            </Text>
+            <Pressable
+              onPress={onMail}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.summaryHeroChat}
+              accessibilityRole="button"
+              accessibilityLabel={auth.activeRole === 'vendor' ? 'Message customer' : 'Message shop'}
+            >
+              <Icon name="chatbubble-ellipses-outline" size={22} color={COLOR.BRAND_COLOR} />
+            </Pressable>
+          </View>
+          <View style={[styles.summaryHeroStatus, { backgroundColor: statusTheme?.bg ?? '#EEF2FF' }]}>
+            <Icon name="cube" size={16} color={statusTheme?.dot ?? COLOR.BRAND_COLOR} />
+            <Text style={[styles.summaryHeroStatusText, { color: statusTheme?.text ?? '#111' }]}>
+              {statusTheme?.label ?? 'Processing'}
+            </Text>
+          </View>
+          <View style={styles.summaryTurnTip}>
+            <Icon name="information-circle-outline" size={16} color={COLOR.BRAND_COLOR} />
+            <Text style={styles.summaryTurnTipText}>{actionBtn()}</Text>
+          </View>
+        </View>
 
-          <SummaryRow
-            icon="cube-outline"
-            label="Shipping Method"
-            value={String(
-              returnInfo?.return?.shipping_method?.split('_').join(' ') ||
-              'Awaiting shipment',
-            )}
-          />
-          <SummaryRow
-            icon="calendar-outline"
-            label="Estimated Delivery Date"
-            value={String(
-              returnInfo?.return?.estimated_delivery_date?.split('_').join(' ') ||
-              'Not Available',
-            )}
-          />
-          <SummaryRow
-            icon="pricetag-outline"
-            label="Tracking Number"
-            value={String(
-              returnInfo?.return?.tracking_number || 'Awaiting shipment',
-            )}
-            last
-          />
+        <View style={styles.deliveryCard}>
+          <View style={styles.deliveryAddressRow}>
+            <View style={styles.deliveryPin}>
+              <Icon name="location" size={18} color={COLOR.BRAND_COLOR} />
+            </View>
+            <View style={styles.deliveryAddressBody}>
+              <Text style={styles.deliveryAddressTitle}>Delivery Address</Text>
+              <Text style={styles.deliveryAddressText}>
+                {(() => {
+                  const raw = returnInfo?.return?.shipping_address;
+                  if (!raw) return 'Not available';
+                  if (typeof raw === 'object') return Object.values(raw).filter(Boolean).join(', ') || 'Not available';
+                  try {
+                    const parsed = JSON.parse(String(raw));
+                    if (parsed && typeof parsed === 'object') {
+                      return Object.values(parsed).filter(Boolean).join(', ') || 'Not available';
+                    }
+                  } catch {
+                    /* plain text */
+                  }
+                  return String(raw);
+                })()}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.deliveryMeta}>
+            <SummaryRow
+              icon="cube-outline"
+              label="Shipping Method"
+              value={String(returnInfo?.return?.shipping_method?.split('_').join(' ') || 'Awaiting shipment')}
+            />
+            <SummaryRow
+              icon="calendar-outline"
+              label="Estimated Delivery"
+              value={String(returnInfo?.return?.estimated_delivery_date?.split('_').join(' ') || 'Not available')}
+            />
+            <SummaryRow
+              icon="pricetag-outline"
+              label="Tracking Number"
+              value={String(returnInfo?.return?.tracking_number || 'Awaiting shipment')}
+              last
+            />
+          </View>
         </View>
 
         {returnInfo?.return_events?.length > 1 && (
@@ -903,138 +953,47 @@ export default function ReturnDetailScreen() {
           </View>
         )}
 
-        <View style={styles.card}>
-          <SectionLabel>
-            {auth.activeRole === 'vendor' ? 'Customer Info' : 'Shop detail'}
-          </SectionLabel>
-          {auth.activeRole === 'vendor' && (
-            <View style={styles.customerHead}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {initialsOf(
-                    `${returnInfo?.user?.fname || returnInfo?.customer?.fname} ${returnInfo?.user?.lname || returnInfo?.customer?.lname
-                    }`,
-                  )}
-                </Text>
-              </View>
-              <View style={styles.customerTitleRow}>
-                <View style={styles.customerNameCol}>
-                  <Text style={styles.customerName} numberOfLines={1}>
-                    {`${returnInfo?.user?.fname || returnInfo?.customer?.fname} ${returnInfo?.user?.lname || returnInfo?.customer?.lname
-                      }`}
-                  </Text>
+        {(() => {
+          const isVendor = auth.activeRole === 'vendor';
+          const customerName = `${returnInfo?.user?.fname || returnInfo?.customer?.fname || ''} ${returnInfo?.user?.lname || returnInfo?.customer?.lname || ''}`.trim();
+          const partyName = isVendor
+            ? (customerName || 'Customer')
+            : String(returnInfo?.shop?.name ?? 'Shop');
+          const partyMeta = isVendor
+            ? 'Buyer for this return'
+            : ([displayShipping.city, displayShipping.state, displayShipping.country].filter(Boolean).join(', ') || 'Shop location unavailable');
+          return (
+            <View style={styles.shopCard}>
+              <View style={styles.shopCardHead}>
+                <View style={styles.shopCardHeadIcon}>
+                  <Icon name={isVendor ? 'person-outline' : 'storefront-outline'} size={18} color={COLOR.BRAND_COLOR} />
                 </View>
-                <Pressable
-                  onPress={onMail}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={({ pressed }) => [
-                    styles.headMessageBtn,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Message customer"
-                >
-                  <Icon name="mail-outline" size={22} color={COLOR.BRAND_COLOR} />
-                </Pressable>
-              </View>
-            </View>
-          )}
-          {auth.activeRole !== 'vendor' && (
-            <View style={styles.customerHead}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {initialsOf(`${returnInfo?.shop?.name}`)}
-                </Text>
-              </View>
-              <View style={styles.customerTitleRow}>
-                <View style={styles.customerNameCol}>
-                  <Text style={styles.customerName} numberOfLines={1}>
-                    {`${returnInfo?.shop?.name}`}
-                  </Text>
+                <View>
+                  <Text style={styles.shopCardTitle}>{isVendor ? 'Customer' : 'Shop'}</Text>
+                  <Text style={styles.shopCardSubtitle}>{isVendor ? 'Your buyer' : 'Your seller'}</Text>
                 </View>
-                <Pressable
-                  onPress={onMail}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={({ pressed }) => [
-                    styles.headMessageBtn,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Message vendor"
-                >
-                  <Icon name="mail-outline" size={22} color={COLOR.BRAND_COLOR} />
-                </Pressable>
               </View>
+              <View style={styles.shopCardBody}>
+                <View style={styles.shopAvatar}>
+                  <Text style={styles.shopAvatarText}>{initialsOf(partyName)}</Text>
+                </View>
+                <View style={styles.shopCardIdentity}>
+                  <Text style={styles.shopCardName} numberOfLines={1}>{partyName.toUpperCase()}</Text>
+                  <Text style={styles.shopCardMeta} numberOfLines={2}>{partyMeta}</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={onMail}
+                style={({ pressed }) => [styles.shopMessageBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Message ${partyName}`}
+              >
+                <Icon name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.shopMessageText}>Message {partyName}</Text>
+              </Pressable>
             </View>
-          )}
-
-          <View style={styles.shippingBlock}>
-            <Text style={styles.shippingHeader}>
-              {auth.activeRole === 'vendor'
-                ? 'Shipping address'
-                : 'Shop location'}
-            </Text>
-
-            {[displayShipping.street, displayShipping.street2]
-              .filter(Boolean)
-              .join('\n') ? (
-              <View style={[styles.kvRow, styles.kvRowAlignTop]}>
-                <Text style={styles.kvLabel}>Street</Text>
-                <Text style={[styles.kvValue, styles.kvAddress]}>
-                  {[displayShipping.street, displayShipping.street2]
-                    .filter(Boolean)
-                    .join('\n')}
-                </Text>
-              </View>
-            ) : null}
-
-            {displayShipping.city ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>City</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.city}
-                </Text>
-              </View>
-            ) : null}
-            {displayShipping.state ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>State</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.state}
-                </Text>
-              </View>
-            ) : null}
-            {displayShipping.zip ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>ZIP / Postal</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.zip}
-                </Text>
-              </View>
-            ) : null}
-            {displayShipping.country ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvLabel}>Country</Text>
-                <Text style={styles.kvValue} numberOfLines={1}>
-                  {displayShipping.country}
-                </Text>
-              </View>
-            ) : null}
-            {!displayShipping.street &&
-              !displayShipping.street2 &&
-              !displayShipping.city &&
-              !displayShipping.state &&
-              !displayShipping.country &&
-              !displayShipping.zip ? (
-              <View style={[styles.kvRow, styles.kvRowAlignTop]}>
-                <Text style={styles.kvLabel}>Address</Text>
-                <Text style={[styles.kvValue, styles.kvAddress]}>
-                  {displayShipping.text}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
+          );
+        })()}
 
         {/* <SectionLabel>Items</SectionLabel> */}
         <View style={styles.card}>
@@ -1398,6 +1357,16 @@ export default function ReturnDetailScreen() {
   );
 }
 
+const sectionShadow = Platform.select({
+  ios: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  android: { elevation: 3 },
+});
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -1437,7 +1406,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 32,
     height: 32,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLOR.NEUTRAL,
@@ -1480,9 +1449,128 @@ const styles = StyleSheet.create({
   linkArrow: {
     transform: [{ rotate: '45deg' }],
   },
+  summaryHero: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    padding: 16,
+    marginBottom: 8,
+    ...sectionShadow,
+  },
+  summaryHeroTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  summaryHeroCol: { flex: 1 },
+  summaryHeroColEnd: { alignItems: 'flex-end' },
+  summaryHeroCaption: { fontSize: 12, color: '#9CA3AF', marginBottom: 4 },
+  summaryHeroValue: { fontSize: 22, fontWeight: '800', color: COLOR.BRAND_COLOR },
+  summaryHeroDate: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  summaryHeroDateText: { fontSize: 13, color: '#6B7280' },
+  summaryHeroDateGrow: { flex: 1 },
+  summaryHeroChat: {
+    width: 36,
+    height: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  summaryHeroStatus: {
+    marginTop: 16,
+    borderRadius: 7,
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  summaryHeroStatusText: { fontSize: 15, fontWeight: '700' },
+  summaryTurnTip: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 10 },
+  summaryTurnTipText: { flex: 1, fontSize: 13, lineHeight: 18, color: '#374151' },
+  deliveryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E8E8EC',
+    ...sectionShadow,
+  },
+  deliveryAddressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  deliveryPin: {
+    width: 36,
+    height: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F6F1',
+  },
+  deliveryAddressBody: { flex: 1 },
+  deliveryAddressTitle: { fontSize: 16, fontWeight: '800', color: '#111111' },
+  deliveryAddressText: { marginTop: 6, fontSize: 13, lineHeight: 20, color: '#4B5563' },
+  deliveryMeta: {
+    marginTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E8E8EC',
+  },
+  shopCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E8E8EC',
+    ...sectionShadow,
+  },
+  shopCardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  shopCardHeadIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F6F1',
+  },
+  shopCardTitle: { fontSize: 16, fontWeight: '800', color: '#111111' },
+  shopCardSubtitle: { marginTop: 2, fontSize: 12, color: '#6B7280' },
+  shopCardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F7F8FA',
+    borderRadius: 7,
+    padding: 12,
+  },
+  shopAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F6F1',
+  },
+  shopAvatarText: { fontSize: 14, fontWeight: '800', color: COLOR.BRAND_COLOR },
+  shopCardIdentity: { flex: 1 },
+  shopCardName: { fontSize: 16, fontWeight: '800', color: '#111111' },
+  shopCardMeta: { marginTop: 2, fontSize: 13, color: '#6B7280' },
+  shopMessageBtn: {
+    marginTop: 12,
+    minHeight: 46,
+    borderRadius: 7,
+    backgroundColor: COLOR.BRAND_COLOR,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  shopMessageText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  headerBackButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginLeft: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   card: {
     backgroundColor: COLOR.NEUTRAL,
-    borderRadius: 5,
+    borderRadius: 7,
     paddingVertical: 5,
     paddingHorizontal: 14,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1594,7 +1682,7 @@ const styles = StyleSheet.create({
   escrowBtn: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
@@ -1624,7 +1712,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 6,
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#FFF8F7',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#F2B8B5',
@@ -1644,7 +1732,7 @@ const styles = StyleSheet.create({
   },
   cancelledModalCard: {
     backgroundColor: COLOR.NEUTRAL,
-    borderRadius: 8,
+    borderRadius: 7,
     padding: 24,
     alignItems: 'center',
     gap: 10,
@@ -1672,7 +1760,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     width: '100%',
     height: 48,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: COLOR.BRAND_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1705,7 +1793,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 40,
     height: 40,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#EAEAEE',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1732,7 +1820,7 @@ const styles = StyleSheet.create({
   headIcon: {
     width: 32,
     height: 32,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1803,7 +1891,7 @@ const styles = StyleSheet.create({
   itemThumb: {
     width: 56,
     height: 56,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#F4F4F6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1838,7 +1926,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4F4F6',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 5,
+    borderRadius: 7,
   },
   qtyChipLabel: {
     fontSize: 11,
@@ -1895,7 +1983,7 @@ const styles = StyleSheet.create({
   tlDot: {
     width: 22,
     height: 22,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -1969,7 +2057,7 @@ const styles = StyleSheet.create({
   btnGhost: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLOR.NEUTRAL,
@@ -1984,7 +2072,7 @@ const styles = StyleSheet.create({
   btnPrimary: {
     flex: 1.2,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     // backgroundColor: COLOR.BRAND_COLOR,
@@ -2001,7 +2089,7 @@ const styles = StyleSheet.create({
   btnAccept: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0D8A4A',
@@ -2017,7 +2105,7 @@ const styles = StyleSheet.create({
   btnReject: {
     flex: 1,
     height: 44,
-    borderRadius: 5,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#C62828',
@@ -2049,7 +2137,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 36,
     height: 4,
-    borderRadius: 5,
+    borderRadius: 7,
     backgroundColor: '#D6D6DC',
     marginBottom: 12,
   },
@@ -2068,7 +2156,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     paddingHorizontal: 12,
-    borderRadius: 5,
+    borderRadius: 7,
   },
   sheetRowPressed: {
     backgroundColor: '#F5F5F7',
@@ -2076,7 +2164,7 @@ const styles = StyleSheet.create({
   sheetDot: {
     width: 10,
     height: 10,
-    borderRadius: 5,
+    borderRadius: 7,
   },
   sheetRowText: {
     flex: 1,

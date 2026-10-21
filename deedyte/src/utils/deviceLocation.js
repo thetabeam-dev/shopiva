@@ -193,7 +193,7 @@ export function getCurrentCoordinates(options = {}) {
       handler(value);
     };
     const timer = setTimeout(() => {
-      finish(reject, new Error('Turn on device location, then try again.'));
+      finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
     }, 12000);
     Geolocation.getCurrentPosition(
       (pos) => {
@@ -209,10 +209,10 @@ export function getCurrentCoordinates(options = {}) {
           return;
         }
         if (code === 2 || code === 3) {
-          finish(reject, new Error('Turn on device location, then try again.'));
+          finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
           return;
         }
-        finish(reject, err instanceof Error ? err : new Error(String(err?.message ?? 'Could not read your location.')));
+        finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
       },
       {
         enableHighAccuracy: true,
@@ -400,6 +400,9 @@ export async function reverseGeocodeToPlace(latitude, longitude) {
 
   const city = pickField(bdc.city, nom.city);
   const state = pickField(bdc.state, nom.state);
+  if (!city && !state) {
+    throw new Error('We could not get your location. Enter your city and state manually.');
+  }
   const country = pickField(bdc.country, nom.country) || 'Nigeria';
 
   let town = pickField(bdc.town, nom.town);

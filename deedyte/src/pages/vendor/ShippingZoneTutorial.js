@@ -39,8 +39,9 @@ export default function ShippingZoneTutorial({ visible, onClose }) {
             Add a zone, choose the states it covers, then set the fee for the first item and the discount for extra items.
           </Text>
           <View style={{ flex: 1, borderRadius: 7, overflow: 'hidden', marginTop: 14, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' }}>
-            {loading ? <ActivityIndicator color="#FFFFFF" /> : null}
-            {!loading && videoUrl ? (
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : videoUrl ? (
               <Video
                 source={{ uri: videoUrl }}
                 style={{ width: '100%', height: '100%' }}
@@ -51,12 +52,11 @@ export default function ShippingZoneTutorial({ visible, onClose }) {
                 ignoreSilentSwitch="ignore"
                 useTextureView={Platform.OS === 'android'}
               />
-            ) : null}
-            {!loading && !videoUrl ? (
+            ) : (
               <Text style={{ color: '#FFFFFF', fontSize: 14, textAlign: 'center', paddingHorizontal: 16 }}>
                 Tutorial video is not available yet.
               </Text>
-            ) : null}
+            )}
           </View>
           <TouchableOpacity
             onPress={onClose}

@@ -1,4 +1,5 @@
 import { apiFetchAuth, apiFetchAuthMultipart } from './client';
+import { updateUserProfileFields } from './user';
 
 /**
  * @param {Response} res
@@ -61,7 +62,11 @@ export async function createVendorShop(payload) {
     method: 'POST',
     body: JSON.stringify(body),
   });
-  return readJson(res);
+  const data = await readJson(res);
+  const { getStoredUser } = await import('../auth/session');
+  const stored = await getStoredUser();
+  if (stored?.id) await copyShopLocationToProfile(stored.id, payload.location);
+  return data;
 }
 
 /** @param {number | string} userId */
@@ -101,6 +106,21 @@ export async function fetchShopDetails(shopId, userId) {
  * @param {number | string} userId
  * @param {Record<string, unknown>} body
  */
+function profileLocationFromShop(location) {
+  if (!location || typeof location !== 'object') return null;
+  const city = String(location.city ?? '').trim();
+  const state = String(location.state ?? '').trim();
+  const country = String(location.country ?? '').trim();
+  if (!city && !state && !country) return null;
+  return { city, state, country };
+}
+
+async function copyShopLocationToProfile(userId, location) {
+  const profileLocation = profileLocationFromShop(location);
+  if (!profileLocation) return;
+  await updateUserProfileFields(userId, { location: profileLocation }).catch(() => {});
+}
+
 export async function updateVendorShop(shopId, userId, body) {
   const res = await apiFetchAuth(
     `/shop/update/${encodeURIComponent(String(shopId))}/${encodeURIComponent(String(userId))}`,
@@ -109,7 +129,54 @@ export async function updateVendorShop(shopId, userId, body) {
       body: JSON.stringify(body),
     },
   );
-  return readJson(res);
+  const data = await readJson(res);
+  await copyShopLocationToProfile(userId, body?.location);
+  return data;
+}
+
+/**
+ * Write a personal-info location onto the vendor's first shop.
+ * @param {number | string} userId
+ * @param {{ city?: string; state?: string; country?: string }} location
+ */
+export async function applyProfileLocationToShop(userId, location) {
+  const profileLocation = profileLocationFromShop(location);
+  if (!profileLocation) return;
+  const { resolvePrimaryShopId } = await import('../utils/vendorShippingGate');
+  const shopId = await resolvePrimaryShopId(userId);
+  if (!shopId) return;
+  const shop = await fetchShopDetails(shopId, userId);
+  const current = shop.location && typeof shop.location === 'object' ? shop.location : {};
+  await apiFetchAuth(
+    `/shop/update/${encodeURIComponent(String(shopId))}/${encodeURIComponent(String(userId))}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        name: shop.name,
+        slug: shop.slug,
+        description: shop.description ?? null,
+        logo: shop.logo ?? null,
+        banner: shop.banner ?? null,
+        category: shop.category,
+        tags: Array.isArray(shop.tags) ? shop.tags : [],
+        contactEmail: shop.contactemail ?? shop.contactEmail ?? null,
+        contactPhone: shop.contactphone ?? shop.contactPhone ?? null,
+        vendorType: shop.vendortype ?? shop.vendorType ?? 'reseller',
+        socialLinks: shop.sociallinks ?? shop.socialLinks ?? {},
+        isActive: shop.isactive ?? shop.isActive ?? true,
+        isVerified: shop.isverified ?? shop.isVerified ?? false,
+        status: shop.status ?? 'pending_approval',
+        verificationDocuments: shop.verificationdocuments ?? shop.verificationDocuments ?? {},
+        location: {
+          ...current,
+          city: profileLocation.city,
+          state: profileLocation.state,
+          country: profileLocation.country || current.country || 'Nigeria',
+          address: [profileLocation.city, profileLocation.state, profileLocation.country].filter(Boolean).join(', '),
+        },
+      }),
+    },
+  ).then(readJson);
 }
 
 /**

@@ -272,7 +272,7 @@ export default function ShopSetupScreen() {
       >
         <Text style={styles.sheetTitle}>Set up your shop</Text>
         <Text style={styles.sheetSub}>
-          Register your shop to start selling on Deedyte.
+          Register your shop to start selling on Deedyte. City and state are required.
         </Text>
 
         {!isAuthenticated ? (
@@ -424,12 +424,12 @@ export default function ShopSetupScreen() {
         <TouchableOpacity
           style={[
             styles.primaryBtn,
-            submittingSetup && styles.primaryBtnDisabled,
+            (submittingSetup || !city.trim() || !stateName.trim()) && styles.primaryBtnDisabled,
           ]}
           onPress={() => {
             void onCompleteVendorSetup();
           }}
-          disabled={submittingSetup}
+          disabled={submittingSetup || !city.trim() || !stateName.trim()}
           activeOpacity={0.9}
         >
           {submittingSetup ? (

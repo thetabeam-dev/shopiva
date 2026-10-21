@@ -19,7 +19,8 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../../context/ProfileContext';
-import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder } from '../../api/buyer';
+import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder, completeCheckoutOrder } from '../../api/buyer';
+import { fetchWallet } from '../../api/user';
 import { getStorefrontShopDelivery } from '../../api/storefront';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
@@ -219,6 +220,8 @@ export default function CartCheckoutScreen({ navigation }) {
   const [touchedSubmit, setTouchedSubmit] = useState(false);
   const [formBanner, setFormBanner] = useState('');
   const [orderSummaryOpen, setOrderSummaryOpen] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(/** @type {number | null} */(null));
+  const [deliveryBlockedOpen, setDeliveryBlockedOpen] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [sendingQuote, setSendingQuote] = useState(false);
   const [bottomToast, setBottomToast] = useState('');
@@ -349,6 +352,28 @@ export default function CartCheckoutScreen({ navigation }) {
     : deliveryLocations.length
       ? 'Select location'
       : '—';
+  const estimatedShippingFee = useMemo(() => {
+    if (!selectedDelivery?.perShop?.length || !checkoutLines.length) return null;
+    try {
+      return selectedDelivery.perShop.reduce((sum, shop) => {
+        const shopLines = checkoutLines.filter(
+          (line) => parseShopId(line.shop_id) === shop.shopId,
+        );
+        const items = (shopLines.length ? shopLines : [{ qty: shop.itemCount }]).map((line) => ({
+          quantity: Math.max(1, Math.round(Number(line.qty) || 1)),
+        }));
+        const estimate = calculateEstimatedShippingFee({
+          baseShippingFee: Number(shop.fee) || 0,
+          additionalItemDiscountPercent: Number(shop.discountPercent) || 0,
+          safetyBufferPercent: 30,
+          items,
+        });
+        return sum + estimate.estimatedShippingFee;
+      }, 0);
+    } catch {
+      return null;
+    }
+  }, [checkoutLines, selectedDelivery]);
   const escrowCharge = 200;
   const total = Math.max(0, subtotal + shippingCost + escrowCharge);
 
@@ -487,6 +512,74 @@ export default function CartCheckoutScreen({ navigation }) {
     [],
   );
 
+  const buildCheckoutPayload = useCallback((reference) => {
+    const shippingSummary = [street.trim(), area1.trim(), area2.trim(), city.trim(), zip.trim(), country.trim()]
+      .filter(Boolean)
+      .join(', ');
+    const uid = Number(user?.id);
+    const shippingMethod = selectedDelivery
+      ? `vendor_delivery:${selectedDelivery.name}`
+      : 'vendor_delivery';
+    const feeByShop = new Map();
+    if (selectedDelivery?.perShop?.length) {
+      for (const shopFee of selectedDelivery.perShop) {
+        feeByShop.set(
+          shopFee.shopId,
+          computeMultiItemShippingFee(shopFee.itemCount, shopFee.fee, shopFee.discountPercent),
+        );
+      }
+    }
+    const shopCount = Object.keys(
+      checkoutLines.reduce((acc, line) => {
+        const sid = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
+        acc[sid] = true;
+        return acc;
+      }, {}),
+    ).length;
+    const ordersByShop = checkoutLines.reduce((acc, line) => {
+      const shopId = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
+      if (!acc[shopId]) acc[shopId] = [];
+      acc[shopId].push({
+        item_id: String(line.productId),
+        unit: line.qty,
+        unit_price: line.unitPrice,
+        total: line.unitPrice * line.qty,
+        cart_id: line.cartItemId,
+      });
+      return acc;
+    }, {});
+    const orders = Object.entries(ordersByShop).map(([shopId, items]) => {
+      const orderSubtotal = items.reduce((sum, item) => sum + item.total, 0);
+      const numericShopId = Number(shopId);
+      let shopShipping = 0;
+      if (Number.isFinite(numericShopId) && feeByShop.has(numericShopId)) {
+        shopShipping = feeByShop.get(numericShopId) || 0;
+      } else if (shopCount === 1) {
+        shopShipping = shippingCost;
+      }
+      return {
+        shop_id: shopId,
+        shipping_fee: shopShipping,
+        shipping_method: shippingMethod,
+        subtotal: orderSubtotal,
+        items,
+      };
+    });
+    return {
+      customer_id: String(uid),
+      shipping_address: street.trim(),
+      shipping_city: city.trim(),
+      shipping_summary: shippingSummary,
+      delivery_location: selectedDelivery?.name || '',
+      delivery_location_key: selectedDelivery?.key || '',
+      tax: 0,
+      orders,
+      reference,
+    };
+  }, [
+    street, area1, area2, city, zip, country, user?.id, selectedDelivery, checkoutLines, shippingCost,
+  ]);
+
   const onPaystackCheckout = useCallback(() => {
     if (isPaying) return;
     setTouchedSubmit(true);
@@ -520,9 +613,6 @@ export default function CartCheckoutScreen({ navigation }) {
     const reference = `deedyte_cart_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const firstLine = checkoutLines[0];
 
-    const shippingSummary = [street.trim(), area1.trim(), area2.trim(), city.trim(), zip.trim(), country.trim()]
-      .filter(Boolean)
-      .join(', ');
     const uid = Number(user?.id);
     if (!Number.isFinite(uid) || uid <= 0) {
       setFormBanner('You must be signed in to pay.');
@@ -533,73 +623,7 @@ export default function CartCheckoutScreen({ navigation }) {
       return;
     }
 
-    /**
-     * Must match server `parseAndValidateOrderMetadata` (used by Paystack webhook after verify).
-     * Each line: `{ inventory_id, quantity, productId?, variant? }` — inventory_id is required for cart SKUs;
-     * productId is optional cross-check for `webhookOrderFromPaystack`.
-     */
-    const shippingMethod = selectedDelivery
-      ? `vendor_delivery:${selectedDelivery.name}`
-      : 'vendor_delivery';
-
-    /** @type {Map<number, number>} */
-    const feeByShop = new Map();
-    if (selectedDelivery?.perShop?.length) {
-      for (const shopFee of selectedDelivery.perShop) {
-        feeByShop.set(
-          shopFee.shopId,
-          computeMultiItemShippingFee(
-            shopFee.itemCount,
-            shopFee.fee,
-            shopFee.discountPercent,
-          ),
-        );
-      }
-    }
-
-    const shopCount = Object.keys(
-      checkoutLines.reduce((acc, line) => {
-        const sid = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
-        acc[sid] = true;
-        return acc;
-      }, /** @type {Record<string, boolean>} */({})),
-    ).length;
-
-    // Group items by shop_id to create orders array
-    const ordersByShop = checkoutLines.reduce((acc, line) => {
-      const shopId = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
-      if (!acc[shopId]) {
-        acc[shopId] = [];
-      }
-      acc[shopId].push({
-        item_id: String(line.productId),
-        unit: line.qty,
-        unit_price: line.unitPrice,
-        total: line.unitPrice * line.qty,
-        cart_id: line.cartItemId,
-      });
-      return acc;
-    }, /** @type {Record<string, Array<{ item_id: string; unit: number; unit_price: number; total: number; cart_id?: number }>>} */({}));
-
-    // Build orders array with proper structure
-    const ordersArray = Object.entries(ordersByShop).map(([shopId, items]) => {
-      const orderSubtotal = items.reduce((sum, item) => sum + item.total, 0);
-      const numericShopId = Number(shopId);
-      let shopShipping = 0;
-      if (Number.isFinite(numericShopId) && feeByShop.has(numericShopId)) {
-        shopShipping = feeByShop.get(numericShopId) || 0;
-      } else if (shopCount === 1) {
-        shopShipping = shippingCost;
-      }
-
-      return {
-        shop_id: shopId,
-        shipping_fee: shopShipping,
-        shipping_method: shippingMethod,
-        subtotal: orderSubtotal,
-        items,
-      };
-    });
+    const checkoutPayload = buildCheckoutPayload(reference);
 
     setIsPaying(true);
     setFormBanner('');
@@ -607,16 +631,7 @@ export default function CartCheckoutScreen({ navigation }) {
       email: customerEmail,
       amount: amountKobo / 100,
       reference,
-      metadata: {
-        customer_id: String(uid),
-        shipping_address: street.trim(),
-        shipping_city: city.trim(),
-        shipping_summary: shippingSummary,
-        delivery_location: selectedDelivery?.name || '',
-        delivery_location_key: selectedDelivery?.key || '',
-        tax: 0,
-        orders: ordersArray,
-      },
+      metadata: checkoutPayload,
       onSuccess: (res) => {
         setIsPaying(false);
         setOrderSummaryOpen(false);
@@ -679,6 +694,7 @@ export default function CartCheckoutScreen({ navigation }) {
     user?.id,
     popup,
     navigation,
+    buildCheckoutPayload,
   ]);
 
   const onContinue = useCallback(() => {
@@ -696,12 +712,27 @@ export default function CartCheckoutScreen({ navigation }) {
       setFormBanner('Please complete all fields correctly before continuing.');
       return;
     }
+    if (deliveryLoading) {
+      Alert.alert('Checking delivery', 'Please wait while we confirm where this shop delivers.');
+      return;
+    }
+    const selectedState = String(country || '').trim();
+    const shipsToState = deliveryLocations.some(
+      (loc) => String(loc.name || '').trim().toLowerCase() === selectedState.toLowerCase(),
+    );
+    if (!shipsToState) {
+      setDeliveryBlockedOpen(true);
+      return;
+    }
     setOrderSummaryOpen(true);
   }, [
     subtotal,
     hasEmptyRequiredFields,
     hasBlockingErrors,
     showBottomToast,
+    deliveryLoading,
+    country,
+    deliveryLocations,
   ]);
 
   const onConfirmDeliveryLocation = useCallback(() => {
@@ -714,10 +745,61 @@ export default function CartCheckoutScreen({ navigation }) {
     setDeliveryModalVisible(false);
   }, [selectedDeliveryKey, deliveryLocations, city, country]);
 
+  useEffect(() => {
+    if (!orderSummaryOpen) return undefined;
+    let cancelled = false;
+    fetchWallet()
+      .then((row) => {
+        if (cancelled) return;
+        const kobo = Number(row?.balance_kobo);
+        setWalletBalance(Number.isFinite(kobo) ? kobo / 100 : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setWalletBalance(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderSummaryOpen]);
+
+  const walletCoversTotal = walletBalance != null && walletBalance >= total;
+
   const continueToPayment = useCallback(() => {
     setOrderSummaryOpen(false);
-    onPaystackCheckout();
-  }, [onPaystackCheckout]);
+    if (!walletCoversTotal) {
+      const shortfall = Math.max(0, total - (walletBalance || 0));
+      const uid = Number(user?.id);
+      navigation.navigate('Checkout-wallet-topup', {
+        orderTotal: total,
+        walletBalance: walletBalance || 0,
+        transferAmount: Math.ceil(shortfall / 10) * 10,
+        subtotal,
+        shipping: shippingCost,
+        itemCount: checkoutLines.length,
+        checkout: buildCheckoutPayload(`wallet_${uid}_${Date.now()}`),
+      });
+      return;
+    }
+    const uid = Number(user?.id);
+    const checkout = buildCheckoutPayload(`wallet_${uid}_${Date.now()}`);
+    setIsPaying(true);
+    completeCheckoutOrder(checkout)
+      .then(() => {
+        setIsPaying(false);
+        navigation.replace('Payment-success', {
+          reference: checkout.reference,
+          subtotal,
+          shipping: shippingCost,
+          total,
+          itemCount: checkoutLines.length,
+        });
+      })
+      .catch((err) => {
+        setIsPaying(false);
+        const message = err instanceof Error ? err.message : 'Could not complete checkout.';
+        Alert.alert('Checkout', message);
+      });
+  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, shippingCost, checkoutLines.length, buildCheckoutPayload]);
 
   const inputStyle = (key) => [
     styles.input,
@@ -731,7 +813,7 @@ export default function CartCheckoutScreen({ navigation }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
       <View style={[styles.root, { paddingTop: 5 }]}>
-        <Modal visible={sendingQuote} transparent animationType="fade" onRequestClose={() => {}}>
+        <Modal visible={sendingQuote} transparent animationType="fade" onRequestClose={() => { }}>
           <View style={styles.quoteOverlay}>
             <ActivityIndicator size="large" color="#FFFFFF" />
             <Text style={styles.quoteOverlayText}>Sending your shipping fee request…</Text>
@@ -1012,8 +1094,10 @@ export default function CartCheckoutScreen({ navigation }) {
                     <Text style={styles.orderModalTotalValue}>{formatNaira(subtotal)}</Text>
                   </View>
                   <View style={styles.orderModalTotalRow}>
-                    <Text style={styles.orderModalTotalLabel}>Shipping</Text>
-                    <Text style={styles.orderModalTotalValue}>{shippingLabel}</Text>
+                    <Text style={styles.orderModalTotalLabel}>Estimated Shipping</Text>
+                    <Text style={styles.orderModalTotalValue}>
+                      {estimatedShippingFee == null ? shippingLabel : formatNaira(estimatedShippingFee)}
+                    </Text>
                   </View>
                   <View style={styles.orderModalTotalRow}>
                     <Text style={styles.orderModalTotalLabel}>Escrow charges</Text>
@@ -1022,6 +1106,12 @@ export default function CartCheckoutScreen({ navigation }) {
                   <View style={[styles.orderModalTotalRow, styles.orderModalTotalRowGrand]}>
                     <Text style={styles.orderModalGrandLabel}>Total</Text>
                     <Text style={styles.orderModalGrandValue}>{formatNaira(total)}</Text>
+                  </View>
+                  <View style={styles.orderModalTotalRow}>
+                    <Text style={styles.orderModalWalletLabel}>Wallet balance</Text>
+                    <Text style={styles.orderModalWalletValue}>
+                      {walletBalance == null ? '…' : formatNaira(walletBalance)}
+                    </Text>
                   </View>
                 </View>
               </ScrollView>
@@ -1032,7 +1122,13 @@ export default function CartCheckoutScreen({ navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel="Continue to payment"
               >
-                <Text style={styles.orderModalContinueBtnText}>{isPaying ? 'Confirm Delivery Fee' : 'Top Up Wallet'}</Text>
+                <Text style={styles.orderModalContinueBtnText}>
+                  {isPaying
+                    ? 'Confirm Delivery Fee'
+                    : walletCoversTotal
+                      ? `Pay Now ${formatNaira(total)}`
+                      : 'Top Up Wallet And Pay'}
+                </Text>
               </Pressable>
               <Pressable
                 style={styles.orderModalCloseLink}
@@ -1040,6 +1136,43 @@ export default function CartCheckoutScreen({ navigation }) {
                 accessibilityRole="button"
               >
                 <Text style={styles.orderModalCloseLinkText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={deliveryBlockedOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDeliveryBlockedOpen(false)}
+        >
+          <View style={styles.blockRoot}>
+            <View style={styles.blockCard}>
+              <Text style={styles.blockTitle}>Delivery unavailable</Text>
+              <Text style={styles.blockBody}>
+                {String(country || '').trim()
+                  ? `The vendor does not ship to ${String(country).trim()}.`
+                  : 'The vendor does not ship to the selected location.'}
+                {' '}This shop delivers to:
+              </Text>
+              <ScrollView style={styles.blockList} contentContainerStyle={styles.blockListContent}>
+                {deliveryLocations.length ? (
+                  deliveryLocations.map((loc) => (
+                    <View key={loc.key || loc.name} style={styles.blockChip}>
+                      <Text style={styles.blockChipText}>{loc.name}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.blockEmpty}>No delivery states have been set for this shop yet.</Text>
+                )}
+              </ScrollView>
+              <Pressable
+                style={styles.blockBtn}
+                onPress={() => setDeliveryBlockedOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close delivery warning"
+              >
+                <Text style={styles.blockBtnText}>Close</Text>
               </Pressable>
             </View>
           </View>
@@ -1469,6 +1602,50 @@ const styles = StyleSheet.create({
   headerOrderBtnLabelDisabled: {
     color: '#BDBDBD',
   },
+  blockRoot: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  blockCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    maxHeight: '70%',
+  },
+  blockTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111111',
+    textAlign: 'center',
+  },
+  blockBody: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  blockList: { marginTop: 14, flexGrow: 0 },
+  blockListContent: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  blockChip: {
+    borderRadius: 7,
+    backgroundColor: '#E7F6EF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  blockChipText: { fontSize: 13, fontWeight: '700', color: '#00926E' },
+  blockEmpty: { fontSize: 14, color: '#6B7280', textAlign: 'center' },
+  blockBtn: {
+    marginTop: 16,
+    backgroundColor: '#00926E',
+    borderRadius: 7,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  blockBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   orderModalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -1547,6 +1724,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111',
   },
+  orderModalWalletLabel: {
+    marginTop: 10,
+    fontSize: 15,
+    color: '#444',
+  },
+  orderModalWalletValue: {
+    marginTop: 10,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#00926E',
+  },
   orderModalGrandValue: {
     fontSize: 18,
     fontWeight: '800',
@@ -1598,3 +1786,96 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+
+
+// type ShippingEstimateInput = {
+//   baseShippingFee: number;
+//   additionalItemDiscountPercent: number;
+//   safetyBufferPercent: number;
+//   items: Array<{
+//     quantity: number;
+//   }>;
+// };
+
+// type ShippingEstimateResult = {
+//   itemCount: number;
+//   baseShippingFee: number;
+//   shippingBeforeBuffer: number;
+//   safetyBufferAmount: number;
+//   estimatedShippingFee: number;
+// };
+
+function calculateEstimatedShippingFee(
+  input,
+) {
+  const {
+    baseShippingFee,
+    additionalItemDiscountPercent,
+    safetyBufferPercent,
+    items,
+  } = input;
+
+  if (!Number.isFinite(baseShippingFee) || baseShippingFee < 0) {
+    throw new Error("Invalid base shipping fee");
+  }
+
+  if (
+    !Number.isFinite(additionalItemDiscountPercent) ||
+    additionalItemDiscountPercent < 0 ||
+    additionalItemDiscountPercent > 100
+  ) {
+    throw new Error("Discount must be between 0 and 100");
+  }
+
+  if (
+    !Number.isFinite(safetyBufferPercent) ||
+    safetyBufferPercent < 0
+  ) {
+    throw new Error("Invalid safety buffer");
+  }
+
+  if (
+    items.length === 0 ||
+    items.some(
+      (item) =>
+        !Number.isInteger(item.quantity) ||
+        item.quantity < 1,
+    )
+  ) {
+    throw new Error("At least one valid item is required");
+  }
+
+  const itemCount = items.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+
+  const discountRate = additionalItemDiscountPercent / 100;
+  const additionalItemRate = 1 - discountRate;
+
+  // First item pays the full fee.
+  // Every additional item pays the discounted fee.
+  const shippingBeforeBuffer =
+    baseShippingFee *
+    (1 + (itemCount - 1) * additionalItemRate);
+
+  const safetyBufferAmount =
+    shippingBeforeBuffer * (safetyBufferPercent / 100);
+
+  // Round UP to the next whole naira.
+  const estimatedShippingFee = Math.ceil(
+    shippingBeforeBuffer + safetyBufferAmount,
+  );
+
+  return {
+    itemCount,
+    baseShippingFee,
+    shippingBeforeBuffer,
+    safetyBufferAmount,
+    estimatedShippingFee,
+  };
+}
+
+// Example
+

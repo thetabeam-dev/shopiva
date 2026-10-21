@@ -16,6 +16,7 @@ import {
 } from '../api/user';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../auth/session';
 import { normalizeUser } from '../profile/normalizeUser';
+import { applyProfileLocationToShop } from '../api/shop';
 
 /** @typedef {ReturnType<typeof normalizeUser>} NormalizedUser */
 
@@ -144,6 +145,9 @@ export function ProfileProvider({ children }) {
       const uid = user?.id;
       if (!uid) return { ok: false, message: 'Not signed in.' };
       const out = await updateUserProfileFields(uid, fields);
+      if (out.ok && fields.location) {
+        await applyProfileLocationToShop(uid, fields.location).catch(() => {});
+      }
       if (out.ok && out.user) {
         await mergeRemoteUser(out.user);
       } else if (out.ok) {

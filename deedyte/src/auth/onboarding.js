@@ -1,4 +1,5 @@
-import { hasVendorShop } from '../api/shop';
+import { fetchOwnerShops, hasVendorShop } from '../api/shop';
+import { shopRecordHasLocation } from '../utils/shopLocation';
 
 /**
  * Post-signup onboarding: “Almost there” profile (phone, gender, location).
@@ -72,12 +73,15 @@ export async function resolveInitialAppRoute(user, opts = {}) {
     return 'OnboardingProfile';
   }
 
-  // Vendor login (existing account): shop setup when no shop yet.
-  // Vendor signup always passes through OnboardingProfile above first.
-  if (!fromSignup && wantsVendor) {
+  // Vendor signup and login both stop here until the shop has a city and state.
+  if (wantsVendor) {
     try {
       const hasShop = await hasVendorShop();
       if (!hasShop) return 'Shop-Onboarding';
+      const uid = Number(/** @type {{ id?: unknown }} */ (user)?.id);
+      const shops = Number.isFinite(uid) ? await fetchOwnerShops(uid).catch(() => []) : [];
+      const shop = Array.isArray(shops) ? shops[0] : null;
+      if (!shop || !shopRecordHasLocation(shop)) return 'Shop-Onboarding';
     } catch {
       return 'Shop-Onboarding';
     }

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import CartScreen from '../../pages/customer/Cart';
 import CartCheckoutScreen from '../../pages/customer/CartCheckoutScreen';
+import CheckoutWalletTopUpScreen from '../../pages/customer/CheckoutWalletTopUp';
 import PaymentSuccessScreen from '../../pages/customer/PaymentSuccessScreen';
 import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
 
@@ -54,6 +55,7 @@ export function CartStackScreen() {
     <CartStack.Navigator>
       <CartStack.Screen name="Cart" component={CartScreen} options={cartOpt}/>
       <CartStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt}/>
+      <CartStack.Screen name="Checkout-wallet-topup" component={CheckoutWalletTopUpScreen} options={{ ...cartCheckoutOpt, title: 'Top up to pay' }}/>
       <CartStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt}/>
       <CartStack.Screen name="Payment-failed" component={PaymentFailedScreen} options={payFailedOpt}/>
     </CartStack.Navigator>

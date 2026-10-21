@@ -355,6 +355,23 @@ export default function VendorShopScreen({ route, navigation }) {
   }, [shopMeta]);
   const followerCount = Number(shopMeta.follower_count ?? shopMeta.followers ?? 0) || 0;
   const displayName = String(shopMeta.name ?? shopName).trim() || shopName;
+  const deliveryStates = useMemo(
+    () => (deliveryInfo?.locations ?? []).map((loc) => loc.name).filter(Boolean),
+    [deliveryInfo],
+  );
+
+  useEffect(() => {
+    if (!resolvedShopId) return;
+    let active = true;
+    getStorefrontShopDelivery(resolvedShopId)
+      .then((raw) => {
+        if (active) setDeliveryInfo(normalizeShopDelivery(raw));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [resolvedShopId]);
 
   const colW = (WINDOW_W - PAD * 2 - GRID_GAP) / 2;
 
@@ -495,10 +512,13 @@ export default function VendorShopScreen({ route, navigation }) {
           <Text style={styles.profileName}>{displayName}</Text>
           {about ? <Text style={styles.profileAbout}>{about}</Text> : null}
 
-          <Text style={styles.profileMeta}>
-            {'📦  Delivers everywhere'}
-            {joinedLabel ? `   ·   📅  Joined ${joinedLabel}` : ''}
-          </Text>
+          <TouchableOpacity style={styles.shipBlock} onPress={openDeliveryDetails} activeOpacity={0.85}>
+            <Text style={styles.shipStates}>
+              <Text style={styles.shipLabel}>Ships To: </Text>
+              {deliveryStates.length ? deliveryStates.join(', ') : 'Delivery locations are not set yet.'}
+            </Text>
+          </TouchableOpacity>
+          {joinedLabel ? <Text style={styles.profileMeta}>Joined {joinedLabel}</Text> : null}
           <Text style={styles.profileCounts}>
             <Text style={styles.profileCountStrong}>{apiProducts.length} products</Text>
             {'    '}
@@ -775,6 +795,28 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#374151',
+  },
+  shipBlock: {
+    marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    borderRadius: 7,
+    backgroundColor: '#E7F6EF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  shipLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#00926E',
+  },
+  shipStates: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111111',
   },
   profileCounts: {
     marginTop: 14,

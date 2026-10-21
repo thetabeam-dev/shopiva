@@ -7,6 +7,7 @@ import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
 import CartScreen from '../../pages/customer/Cart';
 import CartCheckoutScreen from '../../pages/customer/CartCheckoutScreen';
+import CheckoutWalletTopUpScreen from '../../pages/customer/CheckoutWalletTopUp';
 import PaymentSuccessScreen from '../../pages/customer/PaymentSuccessScreen';
 import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
 import NotificationsScreen from '../../pages/NotificationsScreen';
@@ -92,6 +93,7 @@ export function ExploreStackScreen() {
       <ExploreStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />
       <ExploreStack.Screen name="Cart" component={CartScreen} options={cartOpt} />
       <ExploreStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt} />
+      <ExploreStack.Screen name="Checkout-wallet-topup" component={CheckoutWalletTopUpScreen} options={{ ...cartCheckoutOpt, title: 'Top up to pay' }} />
       <ExploreStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt} />
       <ExploreStack.Screen name="Payment-failed" component={PaymentFailedScreen} options={payFailedOpt} />
       {/* <ExploreStack.Screen

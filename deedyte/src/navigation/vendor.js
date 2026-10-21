@@ -14,6 +14,7 @@ import { VendorActivitiesStackScreen } from '../stacks/vendor/Activities';
 import { VendorProfileStackScreen } from '../stacks/vendor/Profile';
 import { WalletStackScreen } from '../stacks/Wallet';
 import VendorShippingRequiredGate from '../components/VendorShippingRequiredGate';
+import VendorShopLocationGate from '../components/VendorShopLocationGate';
 
 
 
@@ -61,6 +62,7 @@ export default function VendorTabs() {
   return (
     <ProfileProvider>
       <VendorShippingRequiredGate />
+      <VendorShopLocationGate />
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, size, color }) => {
