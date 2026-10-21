@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,15 +15,18 @@ import { Dropdown } from 'react-native-element-dropdown';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BRAND,
+  buildPreviewLines,
   DISCOUNT_OPTIONS,
   formatAmountInput,
   NIGERIA_GEO_ZONES,
   parseAmountInput,
   sharedStyles,
+  ShippingPreviewCard,
 } from './shippingShared';
 import { formatPriceInput } from '../../utils/variantOptions';
 import { useNavigation } from '@react-navigation/native';
-import { saveShippingZone } from '../../api/shop';
+import { deleteShippingZone, getShippingZones, saveShippingZone } from '../../api/shop';
+import ShippingZoneTutorial from './ShippingZoneTutorial';
 
 /** @param {string} name */
 function slugFromName(name) {
@@ -57,9 +60,58 @@ export default function ShippingZoneEditScreen({ route }) {
     existingZone?.discountPercent ?? defaultDiscount,
   );
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [takenByZone, setTakenByZone] = useState(/** @type {Record<string, string>} */ ({}));
   const shopId = route.params?.shopId;
   const userId = route.params?.userId;
+  const previewLines = useMemo(
+    () => buildPreviewLines('multi_item_discount', baseFee, discountPercent),
+    [baseFee, discountPercent],
+  );
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setTutorialOpen(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Tutorial"
+          style={{ paddingRight: 4 }}
+        >
+          <Icon name="play-circle-outline" size={26} color={BRAND} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
+  useEffect(() => {
+    if (!shopId || !userId) return;
+    let active = true;
+    getShippingZones(shopId, userId)
+      .then((rows) => {
+        if (!active) return;
+        const currentId = existingZone?.id != null ? String(existingZone.id) : '';
+        /** @type {Record<string, string>} */
+        const taken = {};
+        for (const row of Array.isArray(rows) ? rows : []) {
+          const zoneId = String(row.zone_id ?? row.id ?? '');
+          if (currentId && zoneId === currentId) continue;
+          const name = String(row.name ?? 'another zone');
+          const locs = Array.isArray(row.locations) ? row.locations : [];
+          for (const loc of locs) {
+            const key = String(loc).trim();
+            if (key) taken[key] = name;
+          }
+        }
+        setTakenByZone(taken);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [shopId, userId, existingZone?.id]);
 
   const onBaseFeeChange = (text) => {
     setBaseFeeText(text);
@@ -67,6 +119,14 @@ export default function ShippingZoneEditScreen({ route }) {
   };
 
   const toggleLocation = (loc) => {
+    const owner = takenByZone[loc];
+    if (owner && !locations.includes(loc)) {
+      Alert.alert(
+        'State already in a zone',
+        `${loc} is already in “${owner}”. Remove it from that zone before adding it here.`,
+      );
+      return;
+    }
     setLocations((prev) =>
       prev.includes(loc) ? prev.filter((item) => item !== loc) : [...prev, loc],
     );
@@ -147,13 +207,16 @@ export default function ShippingZoneEditScreen({ route }) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            navigation.navigate({
-              name: 'shipping-zones',
-              params: { deletedZoneId: existingZone.id },
-              merge: true,
-            });
-            navigation.goBack();
+          onPress: async () => {
+            setSaving(true);
+            try {
+              await deleteShippingZone(shopId, existingZone.id, userId);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert('Delete failed', error?.message || 'Could not delete this shipping zone.');
+            } finally {
+              setSaving(false);
+            }
           },
         },
       ],
@@ -243,6 +306,8 @@ export default function ShippingZoneEditScreen({ route }) {
             )}
           />
         </View>
+
+        <ShippingPreviewCard lines={previewLines} />
       </ScrollView>
 
       <View
@@ -325,6 +390,8 @@ export default function ShippingZoneEditScreen({ route }) {
                 </View>
                 {zone.states.map((loc) => {
                   const selected = locations.includes(loc);
+                  const takenName = takenByZone[loc];
+                  const taken = Boolean(takenName) && !selected;
                   return (
                     <TouchableOpacity
                       key={loc}
@@ -337,18 +404,26 @@ export default function ShippingZoneEditScreen({ route }) {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         backgroundColor: '#FFFFFF',
+                        opacity: taken ? 0.4 : 1,
                       }}
                       onPress={() => toggleLocation(loc)}
                     >
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          color: selected ? BRAND : '#111111',
-                          fontWeight: selected ? '600' : '400',
-                        }}
-                      >
-                        {loc}
-                      </Text>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            color: selected ? BRAND : '#111111',
+                            fontWeight: selected ? '600' : '400',
+                          }}
+                        >
+                          {loc}
+                        </Text>
+                        {taken ? (
+                          <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                            Already in {takenName}
+                          </Text>
+                        ) : null}
+                      </View>
                       {selected ? <Icon name="checkmark-circle" size={20} color={BRAND} /> : null}
                     </TouchableOpacity>
                   );
@@ -376,6 +451,7 @@ export default function ShippingZoneEditScreen({ route }) {
           <ActivityIndicator size="large" color={BRAND} />
         </View>
       ) : null}
+      <ShippingZoneTutorial visible={tutorialOpen} onClose={() => setTutorialOpen(false)} />
     </View>
   );
 }

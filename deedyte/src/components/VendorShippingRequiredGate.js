@@ -4,7 +4,10 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { navigationRef } from '../navigation/root';
 import { useProfile } from '../context/ProfileContext';
 import { getVendorShippingCreateGate, resolvePrimaryShopId } from '../utils/vendorShippingGate';
+import { WebView } from 'react-native-webview';
 
+const GUIDE_URL =
+  'https://app.trupeer.ai/embed/2W2wF19jJ/doc?app=69f9261c487f9d6e7dbfc075&embed=doc';
 const SETUP_ROUTES = new Set(['profile-shop-info', 'shipping-zones', 'shipping-zone-edit']);
 
 function currentRouteName() {
@@ -64,7 +67,7 @@ export default function VendorShippingRequiredGate() {
           routes: [
             { name: 'Profile' },
             { name: 'profile-shop-info' },
-            { name: 'shipping-zones', params: { shopId, userId } },
+            { name: 'shipping-zones', params: { shopId, userId, showTutorial: true } },
           ],
         },
       },
@@ -72,13 +75,23 @@ export default function VendorShippingRequiredGate() {
   };
 
   return (
-    <Modal visible={blocked && !onSetup} transparent animationType="fade" onRequestClose={() => {}}>
+    <Modal visible={blocked && !onSetup} transparent animationType="fade" onRequestClose={() => { }}>
       <View style={styles.root}>
         <View style={styles.card}>
           <View style={styles.iconWrap}>
             <Icon name="alert-circle" size={36} color="#B45309" />
           </View>
           <Text style={styles.title}>Set up shipping zones</Text>
+          {/* <View style={styles.videoWrap}>
+            <WebView
+              source={{ uri: GUIDE_URL }}
+              style={styles.video}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled
+              domStorageEnabled
+            />
+          </View> */}
           <Text style={styles.body}>
             Add shipping zones and fees in Shop info before you can use the rest of the app. Buyers need those fees to place an order.
           </Text>
@@ -98,6 +111,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
+  videoWrap: {
+    height: 180,
+    borderRadius: 7,
+    overflow: 'hidden',
+    marginBottom: 14,
+    backgroundColor: '#F3F4F6',
+  },
+  video: { flex: 1, backgroundColor: 'transparent' },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 7,

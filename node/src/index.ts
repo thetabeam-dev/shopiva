@@ -95,6 +95,11 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true, service: "deedyte-api" });
 });
 
+app.get("/config/shipping-tutorial", (_req, res) => {
+  const videoUrl = String(process.env.SHIPPING_TUTORIAL_VIDEO_URL ?? "").trim().replace(/^["']|["']$/g, "");
+  res.status(200).json({ videoUrl });
+});
+
 app.get("/config/customer-access", (_req, res) => {
   const enabled = String(process.env.CUSTOMER_ACCESS_ENABLED ?? "true").trim().toLowerCase() !== "false";
   const unquote = (value: string | undefined) =>
