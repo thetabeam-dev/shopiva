@@ -337,7 +337,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
       const shop_id = order.shop_id;
       const { id: vid } = await GetShopOwnerByShopIdService(Number(shop_id));
       io.to(`user:${vid}`).emit("payment_received", {
-        list: await vendorOrdersTransformer(shop_id),
+        list: await vendorOrdersTransformer(String(shop_id ?? "")),
       });
     }
 
