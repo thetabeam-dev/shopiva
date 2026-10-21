@@ -4,9 +4,9 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
-  ImageBackground,
   Modal,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -61,8 +61,8 @@ function renderShopReviewSummary(shop) {
       count={count}
       starSize={17}
       activeColor="#E8C547"
-      emptyColor="rgba(255,255,255,0.7)"
-      countColor="#FFFFFF"
+      emptyColor="#D1D5DB"
+      countColor="#111111"
       countSize={14}
       style={{ marginTop: 4 }}
     />
@@ -192,7 +192,7 @@ function ProductTile({ product, width, shop, navigation, vendor, category }) {
           <ProductCardMedia uri={product.uri} style={styles.tileImage} />
         ) : (
           <View style={[styles.tileImage, styles.tileImagePh]}>
-            <Icon name="image-outline" size={32} color="rgba(255,255,255,0.45)" />
+            <Icon name="image-outline" size={32} color="#9CA3AF" />
           </View>
         )}
         {/* MVP: wishlist heart on grid tile — disabled
@@ -224,6 +224,7 @@ export default function VendorShopScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
 
   const [filterOpen, setFilterOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState('products');
   const [following, setFollowing] = useState(false);
   const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS }));
   const [modalFilters, setModalFilters] = useState(() => ({ ...DEFAULT_FILTERS }));
@@ -231,6 +232,7 @@ export default function VendorShopScreen({ route, navigation }) {
   const [apiProducts, setApiProducts] = useState(/** @type {ReturnType<typeof mapStorefrontProductToTile>[]} */ ([]));
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState('');
+  const [shopReviews, setShopReviews] = useState(/** @type {Record<string, unknown>[]} */ ([]));
   const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const [deliveryInfo, setDeliveryInfo] = useState(
@@ -288,7 +290,7 @@ export default function VendorShopScreen({ route, navigation }) {
       setProductsError('');
       try {
         const [shopRes, prodRes] = await Promise.all([
-          getStorefrontShop(slug).catch(() => ({ shop: {}, shopPolicies: null })),
+          getStorefrontShop(slug).catch(() => ({ shop: {}, shopPolicies: null, reviews: [] })),
           getStorefrontProducts(slug),
         ]);
         
@@ -317,6 +319,7 @@ export default function VendorShopScreen({ route, navigation }) {
         }));
         const list = Array.isArray(prodRes.products) ? prodRes.products : [];
         setApiProducts(list.map(mapStorefrontProductToTile));
+        setShopReviews(Array.isArray(shopRes.reviews) ? shopRes.reviews : []);
       } catch (e) {
         if (!cancelled) {
           setProductsError(e instanceof Error ? e.message : String(e));
@@ -341,13 +344,17 @@ export default function VendorShopScreen({ route, navigation }) {
 
   const products = apiProducts;
   const displayedProducts = useMemo(() => applyProductFilters(products, filters), [products, filters]);
-  const heroUri = useMemo(() => {
-    const banner = typeof shopMeta.banner === 'string' ? shopMeta.banner.trim() : '';
-    const logo = typeof shopMeta.logo === 'string' ? shopMeta.logo.trim() : '';
-    if (banner) return banner;
-    if (logo) return logo;
-    return '';
+  const coverUri = typeof shopMeta.banner === 'string' ? shopMeta.banner.trim() : '';
+  const logoUri = typeof shopMeta.logo === 'string' ? shopMeta.logo.trim() : '';
+  const about = String(shopMeta.description ?? shopMeta.bio ?? shopMeta.about ?? '').trim();
+  const joinedLabel = useMemo(() => {
+    const raw = shopMeta.created_at ?? shopMeta.createdAt;
+    const date = raw ? new Date(String(raw)) : null;
+    if (!date || Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   }, [shopMeta]);
+  const followerCount = Number(shopMeta.follower_count ?? shopMeta.followers ?? 0) || 0;
+  const displayName = String(shopMeta.name ?? shopName).trim() || shopName;
 
   const colW = (WINDOW_W - PAD * 2 - GRID_GAP) / 2;
 
@@ -450,87 +457,108 @@ export default function VendorShopScreen({ route, navigation }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={BROWN} translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="#E7F6EF" translucent />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 88 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          {heroUri ? (
-            <ImageBackground source={{ uri: heroUri }} style={styles.heroImage} resizeMode="cover">
-              <View style={styles.heroTint} />
-              <View style={styles.heroBrownFade} />
-              <View style={[styles.heroTopBar, { paddingTop: topPad }]}>
-                <View style={styles.heroTopLeft}>
-                  <TouchableOpacity style={styles.circleBrown} onPress={() => navigation.goBack()} activeOpacity={0.85}>
-                    <Icon name="arrow-back" size={22} color="#000000" />
-                  </TouchableOpacity>
-                  {/* <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
-                    <Icon name="search-outline" size={20} color="#000000" />
-                  </TouchableOpacity> */}
-                </View>
-                <View style={styles.heroTopRight}>
-                  {/* <TouchableOpacity style={styles.followPill} onPress={onFollow} activeOpacity={0.88}>
-                    <Text style={styles.followPillText}>{following ? 'Following' : 'Follow'}</Text>
-                  </TouchableOpacity> */}
-                  {deliveryHeaderActions}
-                  {/* <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
-                    <Icon name="share-outline" size={20} color="#000000" />
-                  </TouchableOpacity> */}
-                </View>
-              </View>
-              <View style={styles.heroBrandBlock}>
-                <Text style={styles.brandWordmark} numberOfLines={1}>
-                  {shopName}
-                </Text>
-                {renderShopReviewSummary(shopMeta)}
-              </View>
-            </ImageBackground>
-          ) : (
-            <View style={[styles.heroImage, styles.heroSolid]}>
-              <View style={styles.heroTint} />
-              <View style={styles.heroBrownFade} />
-              <View style={[styles.heroTopBar, { paddingTop: topPad }]}>
-                <View style={styles.heroTopLeft}>
-                  <TouchableOpacity style={styles.circleBrown} onPress={() => navigation.goBack()} activeOpacity={0.85}>
-                    <Icon name="arrow-back" size={22} color="#000000" />
-                  </TouchableOpacity>
-                  {/* <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
-                    <Icon name="search-outline" size={20} color="#000000" />
-                  </TouchableOpacity> */}
-                </View>
-                <View style={styles.heroTopRight}>
-                  {/* <TouchableOpacity style={styles.followPill} onPress={onFollow} activeOpacity={0.88}>
-                    <Text style={styles.followPillText}>{following ? 'Following' : 'Follow'}</Text>
-                  </TouchableOpacity> */}
-                  {deliveryHeaderActions}
-                  <TouchableOpacity style={[styles.circleBrown, styles.heroIconGap]} activeOpacity={0.85}>
-                    <Icon name="share-outline" size={20} color="#000000" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.heroBrandBlock}>
-                <Text style={styles.brandWordmark} numberOfLines={1}>
-                  {shopName}
-                </Text>
-                {renderShopReviewSummary(shopMeta)}
-              </View>
-            </View>
-          )}
+        <View style={styles.cover}>
+          {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+          <TouchableOpacity style={[styles.backBtn, { top: 8 }]} onPress={() => navigation.goBack()} activeOpacity={0.85}>
+            <Icon name="arrow-back" size={22} color="#111111" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.productsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>All products</Text>
-            <TouchableOpacity style={styles.filterFab} onPress={openFilterModal} activeOpacity={0.88}>
-              <Icon name="options-outline" size={20} color="#000000" />
+        <View style={styles.profileBody}>
+          <View style={styles.profileTop}>
+            <View style={styles.avatarRing}>
+              {logoUri ? (
+                <Image source={{ uri: logoUri }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarLetter}>{displayName.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.shareBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                Share.share({ message: displayName }).catch(() => {});
+              }}
+            >
+              <Text style={styles.shareBtnText}>Share profile</Text>
             </TouchableOpacity>
           </View>
 
-          {productsLoading ? (
+          <Text style={styles.profileName}>{displayName}</Text>
+          {about ? <Text style={styles.profileAbout}>{about}</Text> : null}
+
+          <Text style={styles.profileMeta}>
+            {'📦  Delivers everywhere'}
+            {joinedLabel ? `   ·   📅  Joined ${joinedLabel}` : ''}
+          </Text>
+          <Text style={styles.profileCounts}>
+            <Text style={styles.profileCountStrong}>{apiProducts.length} products</Text>
+            {'    '}
+            {/* <Text style={styles.profileCountStrong}>{followerCount} followers</Text> */}
+          </Text>
+
+          <View style={styles.profileTabs}>
+            <TouchableOpacity style={styles.profileTab} onPress={() => setProfileTab('products')}>
+              <Text style={[styles.profileTabText, profileTab === 'products' && styles.profileTabTextOn]}>Products</Text>
+              {profileTab === 'products' ? <View style={styles.profileTabLine} /> : null}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileTab} onPress={() => setProfileTab('reviews')}>
+              <Text style={[styles.profileTabText, profileTab === 'reviews' && styles.profileTabTextOn]}>Reviews</Text>
+              {profileTab === 'reviews' ? <View style={styles.profileTabLine} /> : null}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.productsSection}>
+          {profileTab === 'products' ? (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>All products</Text>
+            <TouchableOpacity style={styles.filterFab} onPress={openFilterModal} activeOpacity={0.88}>
+              <Icon name="options-outline" size={20} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          ) : shopReviews.length === 0 ? (
+            <View style={styles.reviewsEmpty}>
+              <Icon name="chatbubble-ellipses-outline" size={42} color="#9CA3AF" />
+              <Text style={styles.reviewsEmptyTitle}>No reviews yet</Text>
+              <Text style={styles.reviewsEmptyHint}>Buyers’ reviews will show here after a completed order.</Text>
+            </View>
+          ) : (
+            <View style={styles.reviewsPane}>
+              {shopReviews.map((review) => {
+                const name = String(review.reviewer_name ?? '').trim() || 'Buyer';
+                const place = String(review.reviewer_location ?? '').trim();
+                const comment = String(review.comment ?? review.title ?? '').trim();
+                const rating = Number(review.rating) || 0;
+                return (
+                  <View key={String(review.id)} style={styles.reviewCard}>
+                    <View style={styles.reviewHead}>
+                      <View style={styles.reviewAvatar}>
+                        <Text style={styles.reviewAvatarLetter}>{name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={styles.reviewIdentity}>
+                        <Text style={styles.reviewName} numberOfLines={1}>{name}</Text>
+                        {place ? <Text style={styles.reviewPlace} numberOfLines={1}>{place}</Text> : null}
+                      </View>
+                    </View>
+                    <RatingRow rating={rating} count={0} starSize={14} activeColor="#E8A317" emptyColor="#E5E7EB" countColor="#6B7280" />
+                    {comment ? <Text style={styles.reviewComment}>{comment}</Text> : null}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+          {profileTab === 'reviews' ? null : productsLoading ? (
             <View style={styles.productsLoading}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
+              <ActivityIndicator size="large" color={BROWN} />
               <Text style={styles.productsLoadingText}>Loading products…</Text>
             </View>
           ) : productsError ? (
@@ -658,7 +686,189 @@ export default function VendorShopScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BROWN,
+    backgroundColor: '#FFFFFF',
+  },
+  cover: {
+    height: 168,
+    backgroundColor: '#E7F6EF',
+  },
+  backBtn: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  profileBody: {
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  profileTop: {
+    marginTop: -36,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  avatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatar: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#E7F6EF',
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: BROWN,
+  },
+  shareBtn: {
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  shareBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  profileName: {
+    marginTop: 12,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#111111',
+  },
+  profileAbout: {
+    marginTop: 10,
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#111111',
+  },
+  profileMeta: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#374151',
+  },
+  profileCounts: {
+    marginTop: 14,
+    fontSize: 15,
+    color: '#111111',
+  },
+  profileCountStrong: {
+    fontWeight: '800',
+  },
+  profileTabs: {
+    marginTop: 18,
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  profileTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  profileTabText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9CA3AF',
+  },
+  profileTabTextOn: {
+    color: '#111111',
+  },
+  profileTabLine: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    bottom: 0,
+    height: 2,
+    backgroundColor: '#111111',
+  },
+  reviewsPane: {
+    paddingVertical: 12,
+    gap: 12,
+  },
+  reviewsEmpty: {
+    minHeight: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  reviewsEmptyTitle: {
+    marginTop: 12,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  reviewsEmptyHint: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  reviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 14,
+  },
+  reviewHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reviewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E7F6EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewAvatarLetter: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: BROWN,
+  },
+  reviewIdentity: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  reviewName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  reviewPlace: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  reviewComment: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#111111',
   },
   scroll: {
     flex: 1,
@@ -782,7 +992,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   productsSection: {
-    backgroundColor: BROWN,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: PAD,
     paddingTop: 8,
   },
@@ -794,7 +1004,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
-    color: '#FFFFFF',
+    color: '#111111',
     fontSize: 17,
     fontWeight: '600',
   },
@@ -818,7 +1028,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     aspectRatio: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F3F4F6',
   },
   tileImage: {
     width: '100%',
@@ -827,7 +1037,7 @@ const styles = StyleSheet.create({
   tileImagePh: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F3F4F6',
   },
   /* MVP: wishlist overlay on product tile — disabled (see commented TouchableOpacity above)
   tileHeart: {
@@ -843,7 +1053,7 @@ const styles = StyleSheet.create({
   },
   */
   tileTitle: {
-    color: '#FFFFFF',
+    color: '#111111',
     fontSize: 14,
     fontWeight: '600',
     marginTop: 10,
@@ -865,7 +1075,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   tilePrice: {
-    color: '#FFFFFF',
+    color: '#111111',
     fontSize: 15,
     fontWeight: '700',
     marginTop: 6,

@@ -344,6 +344,26 @@ export class product {
     return rows;
   });
 
+  static getReviewsByShopId = withErrorHandling(async (shopId: number) => {
+    const { rows } = await (await db()).query(
+      `SELECT
+          pr.id,
+          pr.rating,
+          pr.comment,
+          pr.created_at,
+          TRIM(CONCAT_WS(' ', u.fname, u.lname)) AS reviewer_name,
+          NULLIF(TRIM(CONCAT_WS(', ', u.location->>'city', u.location->>'state')), '') AS reviewer_location
+       FROM product_reviews pr
+       INNER JOIN products p ON p.id = pr.product_id
+       LEFT JOIN users u ON u.id = pr.user_id
+       WHERE p.shop_id::text = $1::text
+       ORDER BY pr.created_at DESC
+       LIMIT 40`,
+      [shopId],
+    );
+    return rows;
+  });
+
   static getProductReviewsByProductId = withErrorHandling(async (productId: number) => {
     const { rows } = await (await db()).query(
       `SELECT

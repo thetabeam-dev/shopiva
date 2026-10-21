@@ -35,7 +35,7 @@ export function VendorHomeStackScreen(){
             name="Home"
             component={HomeScreen}
             options={({ navigation }) => ({
-              title: 'Home',
+              title: '',
               headerBackVisible: false,
               headerShadowVisible: false,
               headerStyle: styles.homeHeaderBar,
