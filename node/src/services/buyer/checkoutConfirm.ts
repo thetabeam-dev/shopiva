@@ -10,6 +10,7 @@ import { GetShopOwnerByShopIdService } from "../business/shop.js";
 import { OrderHandler } from "../webhook/paystack.js";
 import type { NewOrder } from "../../types/paystack.js";
 import { sendNotificationEmail } from "../email.js";
+import { emitUnpaidOrderToVendor } from "../../socket/order.js";
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
 
 function pickNumber(v: unknown): number | null {
