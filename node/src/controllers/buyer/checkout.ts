@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import type { AuthRequest } from "../../middleware/auth.js";
-import { confirmCartCheckoutAndCreateChatRoom, createUnpaidCheckoutOrders } from "../../services/buyer/checkoutConfirm.js";
+import { persistShippingAddress } from "../../utils/shippingAddress.js";
 
 type UnpaidClientItem = {
   item_id?: unknown;
@@ -47,7 +47,7 @@ export async function PostBuyerUnpaidOrderController(req: AuthRequest, res: Resp
       : [];
     const result = await createUnpaidCheckoutOrders(
       userId,
-      String(body.shipping_address ?? ""),
+      persistShippingAddress(body.shipping_address),
       orders,
       body.use_cart !== false,
     );

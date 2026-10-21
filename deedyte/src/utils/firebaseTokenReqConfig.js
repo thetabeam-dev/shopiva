@@ -2,6 +2,8 @@ import messaging from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import notifee, { AndroidImportance, EventType } from 'react-native-notify-kit';
 import { navigateToActivitiesScreen, navigationRef } from '../navigation/root';
+import store from '../../redux/store';
+import { setActiveRoleThunk } from '../../redux/authSlice';
 
 /**
  * Wait until APNs has handed iOS a device token (required before a usable FCM token).
@@ -68,6 +70,7 @@ function resolveNotificationTarget(meta, data) {
     return orderId
       ? {
         screen: 'Order-detail',
+        role: asString(merged.role),
         params: {
           orderId,
           order: { id: Number(orderId) || orderId, order_id: Number(orderId) || orderId },
@@ -122,6 +125,7 @@ function resolveNotificationTarget(meta, data) {
   if (orderId) {
     return {
       screen: 'Order-detail',
+      role: asString(merged.role),
       params: {
         orderId,
         order: { id: Number(orderId) || orderId, order_id: Number(orderId) || orderId },
@@ -189,8 +193,29 @@ export function parseFcmMessage(remoteMessage) {
  * Retry until the root navigator is ready, then open the detail screen.
  * @param {{ screen: string; params?: Record<string, unknown> }} target
  */
+function notificationAppRole(raw) {
+  const role = String(raw ?? '').trim().toLowerCase();
+  if (role === 'vendor' || role === 'seller') return 'vendor';
+  if (role === 'buyer' || role === 'customer') return 'customer';
+  return '';
+}
+
+async function alignRole(rawRole) {
+  const wanted = notificationAppRole(rawRole);
+  if (!wanted) return;
+  const current = String(store.getState()?.auth?.activeRole ?? '').toLowerCase();
+  if (current === wanted) return;
+  await store.dispatch(setActiveRoleThunk(wanted));
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
 function navigateWhenReady(target) {
-  const tryNavigate = (attempt = 0) => {
+  const tryNavigate = async (attempt = 0) => {
+    try {
+      await alignRole(target.role);
+    } catch (err) {
+      console.warn('[fcm] role switch failed:', err instanceof Error ? err.message : String(err));
+    }
     if (navigationRef.isReady()) {
       const ok = navigateToActivitiesScreen(target.screen, target.params);
       if (!ok && attempt < 20) {

@@ -10,7 +10,7 @@ import { GetShopOwnerByShopIdService } from "../business/shop.js";
 import { OrderHandler } from "../webhook/paystack.js";
 import type { NewOrder } from "../../types/paystack.js";
 import { sendNotificationEmail } from "../email.js";
-import { emitUnpaidOrderToVendor } from "../../socket/order.js";
+import { persistShippingAddress } from "../../utils/shippingAddress.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -91,6 +91,7 @@ async function notifyVendorOfUnpaidOrder(
       await sendFcmForActivities(token, title, message, null, {
         type: "order",
         order_id: sourceId,
+        role: "vendor",
       });
     }
     const email = String(rows[0]?.email ?? owner.email ?? "").trim();
@@ -259,6 +260,7 @@ async function notifyVendorOfPurchase(
         await sendFcmForActivities(token, VENDOR_PURCHASE_FCM_TITLE, newOrderPushBody(itemCount, total), null, {
           type: "order",
           order_id: sourceId,
+          role: "vendor",
         });
       }
     }
@@ -300,6 +302,7 @@ async function notifyChatRecipient(
       {
         type: "order",
         order_id: sourceId,
+        role,
       },
     );
   } catch (err) {
@@ -364,8 +367,8 @@ export async function ensurePaidOrderChatRoom(
   buyerUserId: number,
   orderId: number,
   shopId: unknown,
-): Promise<void> {
-  await createCheckoutRoomsForOrderRows(
+): Promise<CheckoutConfirmRoomEntry[]> {
+  return createCheckoutRoomsForOrderRows(
     buyerUserId,
     [{ id: orderId, shop_id: shopId }],
     orderId,
@@ -530,7 +533,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
         const meta = d.metadata && typeof d.metadata === "object"
           ? (d.metadata as Record<string, unknown>)
           : {};
-        const address = String(meta.shipping_address ?? "").trim();
+        const address = persistShippingAddress(meta.shipping_address);
         for (const order of metadataOrders) {
           const newOrder: NewOrder = {
             customer_id: String(buyerUserId),

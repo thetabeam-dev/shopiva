@@ -13,7 +13,7 @@ import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
 import { sendFcmForActivities } from "../../services/firebaseConfig.js";
 import { createAndEmitNotification } from "../../services/notifications.js";
 import { creditWalletFromPaystack } from "../../models/wallet.js";
-import { nairaLabel, pushWalletFcm } from "../../services/walletPush.js";
+import { persistShippingAddress } from "../../utils/shippingAddress.js";
 import { ensurePaidOrderChatRoom } from "../../services/buyer/checkoutConfirm.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
@@ -177,7 +177,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
       return;
     }
     const reference = String(body.reference ?? "").trim() || `wallet_${userId}_${Date.now()}`;
-    const shippingAddress = String(body.shipping_address ?? "");
+    const shippingAddress = persistShippingAddress(body.shipping_address);
     const tax = Number(body.tax) || 0;
     const dueNaira = orders.reduce((sum, order) => {
       return sum + (Number(order.subtotal) || 0) + (Number(order.shipping_fee) || 0);
@@ -236,6 +236,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
       client.release();
     }
 
+    const rooms: unknown[] = [];
     await Promise.all(
       orders.map(async (order) => {
         const items = Array.isArray(order.items) ? order.items : [];
@@ -263,7 +264,8 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
         };
         const orderId = await OrderHandler.newOrder(newOrder);
         try {
-          await ensurePaidOrderChatRoom(userId, Number(orderId), shop_id);
+          const created = await ensurePaidOrderChatRoom(userId, Number(orderId), shop_id);
+          if (Array.isArray(created)) rooms.push(...created);
         } catch (err) {
           console.error("checkout chat room failed", err);
         }
@@ -293,7 +295,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
               "New Order Received",
               `You have a new order for ${count} ${itemLabel} totaling ${totalLabel}.`,
               null,
-              { type: "order", order_id: orderId },
+              { type: "order", order_id: orderId, role: "vendor" },
             );
           }
         } catch (err) {
@@ -341,7 +343,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
       });
     }
 
-    res.status(200).json({ success: true, message: "Checkout completed", reference });
+    res.status(200).json({ success: true, message: "Checkout completed", reference, rooms });
   } catch (err) {
     console.log(err);
     res.status(500).json({ error: "Could not complete checkout" });

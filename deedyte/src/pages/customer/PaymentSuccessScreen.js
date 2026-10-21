@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { confirmCheckoutPayment } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { setLastOpenedChatRoomId } from '../../utils/lastOpenedChatRoom';
 
@@ -57,12 +56,23 @@ export default function PaymentSuccessScreen({ navigation, route }) {
   const total = normalizeAmount(route?.params?.total || subtotal + shipping);
   const itemCount = Math.max(0, Number(route?.params?.itemCount) || 0);
   const reference = String(route?.params?.reference || '').trim();
+  const presetRooms = Array.isArray(route?.params?.rooms) ? route.params.rooms : [];
 
-  const [confirmEntries, setConfirmEntries] = useState(
-    /** @type {Array<{ room: Record<string, unknown>; vendor_user_id?: number; existing?: boolean }>} */ ([]),
-  );
-  const [confirmLoading, setConfirmLoading] = useState(/** @type {boolean} */ (false));
-  const [confirmError, setConfirmError] = useState('');
+  const confirmEntries = useMemo(() => {
+    return presetRooms
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null;
+        const r = /** @type {Record<string, unknown>} */ (row);
+        const room = r.room && typeof r.room === 'object' ? /** @type {Record<string, unknown>} */ (r.room) : null;
+        if (!room || !String(room.id ?? '').trim()) return null;
+        return {
+          room,
+          vendor_user_id: Number(r.vendor_user_id),
+          existing: Boolean(r.existing),
+        };
+      })
+      .filter((x) => x != null);
+  }, [presetRooms]);
 
   const hasConfirmedChats = confirmEntries.length > 0;
   const multiShopCheckout = confirmEntries.length > 1;
@@ -84,59 +94,6 @@ export default function PaymentSuccessScreen({ navigation, route }) {
     ];
     return lines.join('\n');
   }, [reference, itemCount, subtotal, shipping, paidLabel]);
-
-  const runConfirm = useCallback(async () => {
-    if (!reference) {
-      setConfirmError('Missing payment reference.');
-      return;
-    }
-    setConfirmLoading(true);
-    setConfirmError('');
-    try {
-      const data = await confirmCheckoutPayment({
-        reference,
-        // order_id: route?.params?.order_id,
-        shipping_naira: shipping,
-      });
-      const rawRooms = Array.isArray(data?.rooms) ? data.rooms : [];
-      /** @type {Array<{ room: Record<string, unknown>; vendor_user_id?: number; existing?: boolean }>} */
-      let entries = [];
-      if (rawRooms.length) {
-        entries = rawRooms
-          .map((row) => {
-            if (!row || typeof row !== 'object') return null;
-            const r = /** @type {Record<string, unknown>} */ (row);
-            const room = r.room && typeof r.room === 'object' ? /** @type {Record<string, unknown>} */ (r.room) : null;
-            if (!room || !String(room.id ?? '').trim()) return null;
-            return {
-              room,
-              vendor_user_id: typeof r.vendor_user_id === 'number' ? r.vendor_user_id : Number(r.vendor_user_id),
-              existing: Boolean(r.existing),
-            };
-          })
-          .filter((x) => x != null);
-      } else if (data?.room && typeof data.room === 'object') {
-        const room = /** @type {Record<string, unknown>} */ (data.room);
-        if (String(room.id ?? '').trim()) {
-          entries = [{ room, vendor_user_id: Number(data.vendor_user_id), existing: Boolean(data.existing) }];
-        }
-      }
-      if (!entries.length) {
-        throw new Error('Server did not return chat room(s).');
-      }
-      setConfirmEntries(entries);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setConfirmError(msg);
-    } finally {
-      setConfirmLoading(false);
-    }
-  }, [reference, shipping]);
-
-  useEffect(() => {
-    if (!reference) return;
-    void runConfirm();
-  }, [reference, shipping, runConfirm]);
 
   const onShareReceipt = async () => {
     try {
@@ -165,11 +122,8 @@ export default function PaymentSuccessScreen({ navigation, route }) {
     if (!hasConfirmedChats) {
       Alert.alert(
         'Chat not ready',
-        confirmError || 'We could not open your seller chat yet. Try again or open Chats from the tab bar.',
-        [
-          { text: 'Retry', onPress: () => void runConfirm() },
-          { text: 'OK', style: 'cancel' },
-        ],
+        'We could not open your seller chat yet. Open Chats from the tab bar.',
+        [{ text: 'OK' }],
       );
       return;
     }
@@ -210,22 +164,7 @@ export default function PaymentSuccessScreen({ navigation, route }) {
         <Text style={styles.title}>Payment Successful!</Text>
         <Text style={styles.subtitle}>Successfully paid {paidLabel}</Text>
 
-        {reference && confirmLoading ? (
-          <View style={styles.statusBanner}>
-            <ActivityIndicator color="#00926e" />
-            <Text style={styles.statusBannerText}>Setting up your seller chats…</Text>
-          </View>
-        ) : null}
-        {reference && confirmError ? (
-          <Pressable style={styles.errorBanner} onPress={() => void runConfirm()} accessibilityRole="button">
-            <Icon name="warning-outline" size={18} color="#B42318" />
-            <Text style={styles.errorBannerText} numberOfLines={3}>
-              {confirmError}
-            </Text>
-            <Text style={styles.errorRetry}>Tap to retry</Text>
-          </Pressable>
-        ) : null}
-        {reference && !confirmLoading && !confirmError && hasConfirmedChats ? (
+        {hasConfirmedChats ? (
           <Text style={styles.readyHint}>
             {multiShopCheckout ? `Chats with ${confirmEntries.length} sellers are ready.` : 'Seller chat is ready.'}
           </Text>

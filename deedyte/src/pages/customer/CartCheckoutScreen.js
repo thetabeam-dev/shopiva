@@ -567,7 +567,14 @@ export default function CartCheckoutScreen({ navigation }) {
     });
     return {
       customer_id: String(uid),
-      shipping_address: street.trim(),
+      shipping_address: {
+        state: String(country || '').trim(),
+        city: city.trim(),
+        street_address: street.trim(),
+        area_1: area1.trim(),
+        area_2: area2.trim(),
+        zipcode: zip.trim(),
+      },
       shipping_city: city.trim(),
       shipping_summary: shippingSummary,
       delivery_location: selectedDelivery?.name || '',
@@ -784,7 +791,7 @@ export default function CartCheckoutScreen({ navigation }) {
     const checkout = buildCheckoutPayload(`wallet_${uid}_${Date.now()}`);
     setIsPaying(true);
     completeCheckoutOrder(checkout)
-      .then(() => {
+      .then((data) => {
         setIsPaying(false);
         navigation.replace('Payment-success', {
           reference: checkout.reference,
@@ -792,6 +799,7 @@ export default function CartCheckoutScreen({ navigation }) {
           shipping: shippingCost,
           total,
           itemCount: checkoutLines.length,
+          rooms: Array.isArray(data?.rooms) ? data.rooms : [],
         });
       })
       .catch((err) => {

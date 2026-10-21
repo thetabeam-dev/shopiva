@@ -341,6 +341,7 @@ async function notifyShopOfPayout(payout: {
       await sendFcmForActivities(token, title, message, null, {
         type: "order",
         order_id: orderId,
+        role: "vendor",
       });
     }
 

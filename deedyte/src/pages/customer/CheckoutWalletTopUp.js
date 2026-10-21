@@ -34,13 +34,14 @@ export default function CheckoutWalletTopUpScreen() {
     startedRef.current = true;
     setCompleting(true);
     try {
-      await completeCheckoutOrder(checkout);
+      const data = await completeCheckoutOrder(checkout);
       navigation.replace('Payment-success', {
         reference: checkout.reference,
         subtotal: Number(route.params?.subtotal) || 0,
         shipping: Number(route.params?.shipping) || 0,
         total: orderTotal,
         itemCount: Number(route.params?.itemCount) || 0,
+        rooms: Array.isArray(data?.rooms) ? data.rooms : [],
       });
     } catch (err) {
       startedRef.current = false;

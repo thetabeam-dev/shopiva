@@ -16,14 +16,20 @@ export function navigate(name, params) {
  */
 export function navigateToActivitiesScreen(screen, params) {
   if (!navigationRef.isReady()) return false;
+  const withHub = screen && screen !== 'Activities';
+  const routes = withHub
+    ? [{ name: 'Activities' }, { name: screen, params }]
+    : [{ name: 'Activities' }];
   navigationRef.dispatch(
     CommonActions.navigate({
       name: 'home',
       params: {
         screen: 'Activities',
         params: {
-          screen,
-          params,
+          state: {
+            index: routes.length - 1,
+            routes,
+          },
         },
       },
     }),

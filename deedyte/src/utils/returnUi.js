@@ -1,3 +1,5 @@
+import { formatShippingAddress } from './shippingAddress';
+
 /**
  * Maps backend order rows to the Orders / Order detail list shape.
  * @param {Record<string, unknown>} row
@@ -9,7 +11,7 @@ export function mapOrderRowToListItem(row) {
   const qty = Number(row.qty) || 0;
   const statusRaw = String(row.status ?? '').trim() || '—';
   const status = mapOrderStatusForFilter(statusRaw);
-  const location = String(row.shipping_address ?? '—').trim() || '—';
+  const location = formatShippingAddress(row.shipping_address, '—');
   const dateLabel = formatShortDate(row.date);
 
   return {

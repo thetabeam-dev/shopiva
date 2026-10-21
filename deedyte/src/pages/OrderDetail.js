@@ -26,6 +26,7 @@ import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../context/ProfileContext';
 import { payAcceptedOrder } from '../api/buyer';
 import { formatNaira } from '../utils/formatNaira';
+import { formatShippingAddress } from '../utils/shippingAddress';
 import { ProductCardMedia } from '../components/ProductCardMedia';
 import {
   fetchBuyerOrder,
@@ -117,13 +118,16 @@ function parseShippingAddress(input) {
   const phone = pickStr(obj, ['phone', 'phoneNumber', 'mobile']);
   const email = pickStr(obj, ['email']);
   const street = pickStr(obj, [
+    'street_address',
     'street',
     'address1',
     'addressLine1',
     'line1',
     'street1',
+    'area_1',
   ]);
   const street2 = pickStr(obj, [
+    'area_2',
     'address2',
     'addressLine2',
     'line2',
@@ -1405,7 +1409,7 @@ export default function OrderDetailScreen() {
               <View style={styles.deliveryAddressBody}>
                 <Text style={styles.deliveryAddressTitle}>Delivery Address</Text>
                 <Text style={styles.deliveryAddressText}>
-                  {String(orderInfo?.order?.shipping_address || 'Not available')}
+                  {formatShippingAddress(orderInfo?.order?.shipping_address)}
                 </Text>
               </View>
             </View>
@@ -1645,7 +1649,13 @@ export default function OrderDetailScreen() {
                     action: 'acceptance',
                     data: {
                       order_id: orderInfo.order.id,
+                      shop_id: orderInfo.order.shop_id,
+                      item_count: (Array.isArray(orderInfo?.order_items) ? orderInfo.order_items : []).reduce(
+                        (sum, item) => sum + (Number(item.units ?? item.unit ?? 1) || 0),
+                        0,
+                      ),
                       shipping_address: orderInfo.order.shipping_address,
+                      shipping_method: orderInfo.order.shipping_method,
                       event_type: 'acceptance',
                       stage: 'order_accepted',
                       actor_type: 'vendor',

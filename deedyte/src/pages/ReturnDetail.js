@@ -22,6 +22,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../utils/formatNaira';
+import { formatShippingAddress } from '../utils/shippingAddress';
 import { ProductCardMedia } from '../components/ProductCardMedia';
 import { fetchBuyerReturn, fetchOwnerShops, fetchShopReturnDetail, fetchShopOwner } from '../api';
 import { useDispatch, useSelector } from 'react-redux';
@@ -885,20 +886,7 @@ export default function ReturnDetailScreen() {
             <View style={styles.deliveryAddressBody}>
               <Text style={styles.deliveryAddressTitle}>Delivery Address</Text>
               <Text style={styles.deliveryAddressText}>
-                {(() => {
-                  const raw = returnInfo?.return?.shipping_address;
-                  if (!raw) return 'Not available';
-                  if (typeof raw === 'object') return Object.values(raw).filter(Boolean).join(', ') || 'Not available';
-                  try {
-                    const parsed = JSON.parse(String(raw));
-                    if (parsed && typeof parsed === 'object') {
-                      return Object.values(parsed).filter(Boolean).join(', ') || 'Not available';
-                    }
-                  } catch {
-                    /* plain text */
-                  }
-                  return String(raw);
-                })()}
+                {formatShippingAddress(returnInfo?.return?.shipping_address)}
               </Text>
             </View>
           </View>

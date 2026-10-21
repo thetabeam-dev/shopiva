@@ -171,7 +171,7 @@ function emitOrderUpdateToUser(
       "Order Update" /** title */,
       msg /**body */,
       "null" /** media */,
-      { type: "order", order_id: orderId } /** meta */,
+      { type: "order", order_id: orderId, role } /** meta */,
     );
     const { rows: [{ devicetoken: vendorDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
     if (event === "order_disputed") {
@@ -180,7 +180,7 @@ function emitOrderUpdateToUser(
         "Order Update" /** title */,
         msg /**body */,
         "null" /** media */,
-        { type: "order", order_id: orderId } /** meta */,
+        { type: "order", order_id: orderId, role } /** meta */,
       );
     }
   })

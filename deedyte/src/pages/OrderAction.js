@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +26,9 @@ import { connectChatSocket, emitSocketAck } from '../socket/chatSocket';
 import { set_orderInfo } from '../../redux/order';
 import { useDispatch } from 'react-redux';
 import { fetchShopOwner, uploadDeliveryEvidence } from '../api';
+import { getShippingZones } from '../api/shop';
+import { formatNaira } from '../utils/formatNaira';
+import { formatShippingAddress, shippingAddressState } from '../utils/shippingAddress';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
 
 const VendorRejectReason = [
@@ -137,6 +141,19 @@ function ConfirmCheckbox({ checked, onToggle, label, rowStyle }) {
   );
 }
 
+function shippingFeeChoices(actual, estimated) {
+  if (actual == null || estimated == null) return [];
+  const low = Math.ceil(Number(actual));
+  const high = Math.max(low, Math.ceil(Number(estimated)));
+  if (!Number.isFinite(low) || !Number.isFinite(high)) return [];
+  if (high === low) return [low];
+  const step = Math.max(1, Math.ceil((high - low) / 5));
+  const values = [low];
+  for (let amount = low + step; amount < high; amount += step) values.push(amount);
+  values.push(high);
+  return values;
+}
+
 function Acceptance({ acceptance_value, updateAccptance, data }) {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
@@ -151,6 +168,52 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
     useState(false);
   const [fulfillmentDuration, setFulfillmentDuration] = useState(null);
   const [shippingFee, setShippingFee] = useState('');
+  const [actualShippingFee, setActualShippingFee] = useState(null);
+  const [estimatedShippingFee, setEstimatedShippingFee] = useState(null);
+  const [feePickerOpen, setFeePickerOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const shopId = data?.shop_id;
+      const itemCount = Math.max(1, Math.round(Number(data?.item_count) || 1));
+      const address = `${formatShippingAddress(data?.shipping_address, '')} ${shippingAddressState(data?.shipping_address)} ${String(data?.shipping_method ?? '')}`.toLowerCase();
+      const user = await getStoredUser();
+      if (!shopId || !user?.id || !address) return;
+      try {
+        const zones = await getShippingZones(shopId, user.id);
+        let matched = null;
+        for (const zone of zones) {
+          const locations = Array.isArray(zone?.locations) ? zone.locations : [];
+          for (const location of locations) {
+            const name = String(location ?? '').trim().toLowerCase();
+            if (!name || !address.includes(name)) continue;
+            if (!matched || name.length > matched.name.length) {
+              matched = {
+                name,
+                baseFee: Number(zone.base_fee ?? zone.baseFee) || 0,
+                discountPercent: Number(zone.discount_percent ?? zone.discountPercent) || 0,
+              };
+            }
+          }
+        }
+        if (!matched || cancelled) return;
+        const discount = Math.min(100, Math.max(0, matched.discountPercent)) / 100;
+        const beforeBuffer = matched.baseFee * (1 + (itemCount - 1) * (1 - discount));
+        const actual = Math.ceil(beforeBuffer);
+        const estimated = Math.ceil(beforeBuffer + beforeBuffer * 0.3);
+        if (!cancelled) {
+          setActualShippingFee(actual);
+          setEstimatedShippingFee(estimated);
+        }
+      } catch {
+        if (!cancelled) setEstimatedShippingFee(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.shop_id, data?.item_count, data?.shipping_address, data?.shipping_method]);
 
   const navigation = useNavigation();
   useEffect(() => {
@@ -318,7 +381,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
               <View style={styles.processingCard}>
                 <Text style={styles.processingSectionTitle}>Delivery destination</Text>
                 <Text style={styles.processingSectionSubtitle}>
-                  {String(data?.shipping_address ?? '').trim() || 'No delivery address was provided.'}
+                  {formatShippingAddress(data?.shipping_address)}
                 </Text>
                 <Text style={styles.processingFieldHint}>
                   Buyer&apos;s full delivery address and landmark
@@ -326,17 +389,23 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
               </View>
 
               <View style={styles.processingCard}>
-                <Text style={styles.processingSectionTitle}>Set Shipping Fee</Text>
-                <Text style={styles.processingFieldLabel}>Shipping fee (₦)</Text>
-                <TextInput
-                  value={shippingFee}
-                  onChangeText={txt => setShippingFee(txt.replace(/[^\d.]/g, ''))}
-                  keyboardType="decimal-pad"
-                  placeholder="0"
-                  placeholderTextColor="#AAA"
-                  style={[styles.textInput, styles.acceptanceFormInput]}
-                  accessibilityLabel="Shipping fee"
-                />
+                <Text style={styles.processingSectionTitle}>Set shipping fee</Text>
+                <Text style={styles.processingFieldHint}>
+                  Choose a fee from your zone rate
+                  {actualShippingFee == null ? '' : ` (${formatNaira(actualShippingFee)})`}
+                  {' '}up to the estimate with a 30% safety buffer
+                  {estimatedShippingFee == null ? '' : ` (${formatNaira(estimatedShippingFee)})`}.
+                </Text>
+                <Pressable
+                  style={styles.feePickerButton}
+                  onPress={() => setFeePickerOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose shipping fee"
+                >
+                  <Text style={shippingFee ? styles.feePickerValue : styles.feePickerPlaceholder}>
+                    {shippingFee ? formatNaira(Number(shippingFee)) : 'Select a shipping fee'}
+                  </Text>
+                </Pressable>
               </View>
 
               <View style={styles.processingCard}>
@@ -469,6 +538,17 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                     );
                     return;
                   }
+                  if (
+                    actualShippingFee != null &&
+                    estimatedShippingFee != null &&
+                    (shippingFeeAmount < actualShippingFee || shippingFeeAmount > estimatedShippingFee)
+                  ) {
+                    Alert.alert(
+                      'Shipping fee',
+                      `Choose a fee from ${formatNaira(actualShippingFee)} to ${formatNaira(estimatedShippingFee)}.`,
+                    );
+                    return;
+                  }
                   setLoading(!loading);
                   const u = await getStoredUser();
                   
@@ -520,6 +600,56 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                 <Text style={styles.btnAcceptText}>Accept</Text>
               </Pressable>
             </View>
+          <Modal
+            visible={feePickerOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setFeePickerOpen(false)}
+          >
+            <View style={styles.feeModalRoot}>
+              <Pressable style={styles.feeModalBackdrop} onPress={() => setFeePickerOpen(false)} accessibilityLabel="Close" />
+              <View style={styles.feeModalCard}>
+                <Text style={styles.processingSectionTitle}>Choose shipping fee</Text>
+                <Text style={styles.processingFieldHint}>
+                  From your zone rate to the estimate with a 30% safety buffer.
+                </Text>
+                <ScrollView style={styles.feeModalList}>
+                  {shippingFeeChoices(actualShippingFee, estimatedShippingFee).map((amount) => {
+                    const selected = Number(shippingFee) === amount;
+                    return (
+                      <Pressable
+                        key={String(amount)}
+                        style={[styles.feeOption, selected && styles.feeOptionSelected]}
+                        onPress={() => {
+                          setShippingFee(String(amount));
+                          setFeePickerOpen(false);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={formatNaira(amount)}
+                      >
+                        <Text style={[styles.feeOptionText, selected && styles.feeOptionTextSelected]}>
+                          {formatNaira(amount)}
+                        </Text>
+                        <Text style={styles.feeOptionNote}>
+                          {amount === Math.ceil(actualShippingFee)
+                            ? 'Zone rate'
+                            : amount === Math.ceil(estimatedShippingFee)
+                              ? 'With 30% buffer'
+                              : 'In between'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {actualShippingFee == null ? (
+                    <Text style={styles.processingFieldHint}>Shipping fees are not available for this address yet.</Text>
+                  ) : null}
+                </ScrollView>
+                <Pressable style={styles.feeModalClose} onPress={() => setFeePickerOpen(false)} accessibilityRole="button">
+                  <Text style={styles.feeModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
           </FormKeyboardAvoiding>
         )}
       </>
@@ -2228,6 +2358,35 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E7EB',
   },
+  feePickerButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 7,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  feePickerValue: { fontSize: 16, fontWeight: '700', color: '#111111' },
+  feePickerPlaceholder: { fontSize: 16, color: '#9CA3AF' },
+  feeModalRoot: { flex: 1, justifyContent: 'center', padding: 20 },
+  feeModalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  feeModalCard: { backgroundColor: '#FFFFFF', borderRadius: 7, padding: 16, maxHeight: '80%' },
+  feeModalList: { marginTop: 8 },
+  feeOption: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  feeOptionSelected: { borderColor: '#00926E', backgroundColor: '#E8F6F1' },
+  feeOptionText: { fontSize: 16, fontWeight: '700', color: '#111111' },
+  feeOptionTextSelected: { color: '#00926E' },
+  feeOptionNote: { marginTop: 2, fontSize: 12, color: '#6B7280' },
+  feeModalClose: { marginTop: 14, alignItems: 'center', paddingVertical: 10 },
+  feeModalCloseText: { fontSize: 15, fontWeight: '700', color: '#00926E' },
   processingSectionTitle: {
     fontSize: 17,
     fontWeight: '700',
