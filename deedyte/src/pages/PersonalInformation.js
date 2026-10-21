@@ -14,8 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
-import Geolocation from '@react-native-community/geolocation';
-import { requestLocationPermission } from '../utils/deviceLocation';
+import { readExactLocation } from '../utils/deviceLocation';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -410,37 +409,22 @@ function LocationBlock({ value, onChangeText }) {
     geocodeAbortRef.current = controller;
 
     setLocateBusy(true);
-    requestLocationPermission()
-      .then(granted => {
-        if (!granted) {
-          setLocateBusy(false);
-          return;
-        }
-        Geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
+    readExactLocation()
+      .then(async ({ latitude, longitude }) => {
         try {
-          const data = await reverseGeocodeNominatim(lat, lon, controller.signal);
+          const data = await reverseGeocodeNominatim(latitude, longitude, controller.signal);
           const line = formatAddressFromNominatim(data);
-          onChangeText(line || `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+          onChangeText(line || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
         } catch {
-          onChangeText(`${lat.toFixed(5)}, ${lon.toFixed(5)}`);
+          onChangeText(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
         } finally {
           setLocateBusy(false);
         }
-      },
-      (err) => {
-        setLocateBusy(false);
-        Alert.alert(
-          'Location',
-          err?.message || 'Could not read your position. Enable location permission in Settings.',
-        );
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 },
-    );
       })
-      .catch(() => setLocateBusy(false));
+      .catch((err) => {
+        setLocateBusy(false);
+        Alert.alert('Location', err instanceof Error ? err.message : 'Could not read your position.');
+      });
   }, [onChangeText]);
 
   const canClear = value.length > 0;

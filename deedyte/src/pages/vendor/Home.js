@@ -3,13 +3,12 @@ import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Tex
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NotificationBell } from '../../components/NotificationBell';
 import { useProfile } from '../../context/ProfileContext';
 import { fetchOwnerShops, fetchShopOrders } from '../../api/shop';
 import { getStorefrontProduct, getStorefrontProducts } from '../../api/storefront';
 import { mapOrderRowToListItem } from '../../utils/buyerUi';
 import { formatNaira } from '../../utils/formatNaira';
-import { getCurrentCoordinates, requestLocationPermission, reverseGeocodeToPlace } from '../../utils/deviceLocation';
+import { readExactLocation, reverseGeocodeToPlace } from '../../utils/deviceLocation';
 
 /** Vendor-only dashboard — not shared with customer flows or `HomeStackScreen`. */
 const BRAND = '#00926E';
@@ -310,15 +309,7 @@ export default function HomeScreen() {
     if (locating) return;
     setLocating(true);
     try {
-      let granted = false;
-      for (let attempt = 0; attempt < 5 && !granted; attempt += 1) {
-        granted = await requestLocationPermission();
-      }
-      if (!granted) {
-        Alert.alert('Location', 'Allow location access to save where you are.');
-        return;
-      }
-      const coords = await getCurrentCoordinates();
+      const coords = await readExactLocation();
       const place = await reverseGeocodeToPlace(coords.latitude, coords.longitude);
       const saved = await saveProfileFields({
         location: {
@@ -339,44 +330,40 @@ export default function HomeScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      header: () => (
-        <View style={[styles.headerBar, { paddingTop: insets.top }]}>
-          <View style={styles.identity}>
-            {shopLogo ? (
-              <Image source={{ uri: shopLogo }} style={styles.shopLogo} />
-            ) : (
-              <View style={[styles.shopLogo, styles.shopLogoFallback]}>
-                <Text style={styles.shopLogoLetter}>{shopName.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
-            <View style={styles.identityText}>
-              <Text style={styles.shopName} numberOfLines={1}>{shopName}</Text>
-              {locationLabel ? (
-                <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => { void onSetLocation(); }}
-                  disabled={locating}
-                  style={styles.locationBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="Set your location"
-                >
-                  {locating ? (
-                    <ActivityIndicator size="small" color={BRAND} />
-                  ) : (
-                    <Icon name="location-outline" size={18} color={BRAND} />
-                  )}
-                </TouchableOpacity>
-              )}
+      headerTitleAlign: 'left',
+      headerLeft:  () => (
+        <View style={styles.identity}>
+          {shopLogo ? (
+            <Image source={{ uri: shopLogo }} style={styles.shopLogo} />
+          ) : (
+            <View style={[styles.shopLogo, styles.shopLogoFallback]}>
+              <Text style={styles.shopLogoLetter}>{shopName.charAt(0).toUpperCase()}</Text>
             </View>
+          )}
+          <View style={styles.identityText}>
+            <Text style={styles.shopName} numberOfLines={1}>{shopName}</Text>
+            {locationLabel ? (
+              <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
+            ) : (
+              <TouchableOpacity
+                onPress={() => { void onSetLocation(); }}
+                disabled={locating}
+                style={styles.locationBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Set your location"
+              >
+                {locating ? (
+                  <ActivityIndicator size="small" color={BRAND} />
+                ) : (
+                  <Icon name="location-outline" size={18} color={BRAND} />
+                )}
+              </TouchableOpacity>
+            )}
           </View>
-          <NotificationBell
-            onPress={() => navigation.navigate('Notifications')}
-          />
         </View>
       ),
     });
-  }, [navigation, insets.top, shopLogo, shopName, locationLabel, locating, onSetLocation]);
+  }, [navigation, shopLogo, shopName, locationLabel, locating, onSetLocation]);
 
   return (
     <View style={[styles.root, { paddingTop: 15 }]}>
@@ -461,20 +448,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    paddingLeft: 0,
-    paddingRight: 12,
-    paddingBottom: 8,
-  },
   identity: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    maxWidth: 240,
   },
   shopLogo: {
     width: 36,

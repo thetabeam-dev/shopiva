@@ -44,8 +44,7 @@ import DeliveryPolicyModal from '../components/DeliveryPolicyModal';
 import { mapOrderRowToListItem } from '../utils/buyerUi';
 import { formatNaira } from '../utils/formatNaira';
 import {
-  getCurrentCoordinates,
-  requestLocationPermission,
+  readExactLocation,
   reverseGeocodeToPlace,
 } from '../utils/deviceLocation';
 import { useSelector } from 'react-redux';
@@ -711,15 +710,7 @@ export default function ProfileShopInfoScreen() {
   const onUseMyLocation = useCallback(async () => {
     setLocating(true);
     try {
-      const granted = await requestLocationPermission();
-      if (!granted) {
-        Alert.alert(
-          'Location',
-          'Permission was denied. You can still edit location fields after we add manual entry.',
-        );
-        return;
-      }
-      const c = await getCurrentCoordinates();
+      const c = await readExactLocation();
       const place = await reverseGeocodeToPlace(c.latitude, c.longitude);
       setLocationState(prev => ({
         ...prev,

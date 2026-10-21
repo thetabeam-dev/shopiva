@@ -21,8 +21,7 @@ import {
 } from '../../api/user';
 import { getStoredAccessToken, getStoredPreAuthChoice, getStoredUser, saveSession } from '../../auth/session';
 import {
-  getCurrentCoordinates,
-  requestLocationPermission,
+  readExactLocation,
   reverseGeocodeToPlace,
 } from '../../utils/deviceLocation';
 import { AUTH } from './theme';
@@ -58,15 +57,7 @@ export default function OnboardingProfileScreen({ navigation }) {
   const useDeviceLocation = useCallback(async () => {
     setLocLoading(true);
     try {
-      const ok = await requestLocationPermission();
-      if (!ok) {
-        Alert.alert(
-          'Location off',
-          'No problem — enter your city, state, and country in the fields below.',
-        );
-        return;
-      }
-      const { latitude, longitude } = await getCurrentCoordinates();
+      const { latitude, longitude } = await readExactLocation();
       const place = await reverseGeocodeToPlace(latitude, longitude);
       const hasAny = place.city || place.state || place.country;
       if (!hasAny) {

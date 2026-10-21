@@ -25,8 +25,7 @@ import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
 import {
-  getCurrentCoordinates,
-  requestLocationPermission,
+  readExactLocation,
   reverseGeocodeToPlace,
 } from '../../utils/deviceLocation';
 import SelectDeliveryLocationModal from '../../components/SelectDeliveryLocationModal';
@@ -444,13 +443,7 @@ export default function CartCheckoutScreen({ navigation }) {
     setIsLocating(true);
     setFormBanner('');
     try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        setFormBanner('Location permission was denied. You can still enter your address manually.');
-        return;
-      }
-
-      const { latitude, longitude } = await getCurrentCoordinates();
+      const { latitude, longitude } = await readExactLocation();
       const place = await reverseGeocodeToPlace(latitude, longitude);
       const nextStreet = String(place?.street ?? '').trim();
       const nextZip = String(place?.zip ?? '').trim();
