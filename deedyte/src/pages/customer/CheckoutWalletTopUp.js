@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -7,6 +7,7 @@ import { fetchWallet } from '../../api/user';
 import { completeCheckoutOrder } from '../../api/buyer';
 import { connectChatSocket } from '../../socket/chatSocket';
 import { formatNaira } from '../../utils/formatNaira';
+import WalletProcessingOverlay from '../../components/WalletProcessingOverlay';
 
 const TEAL = '#00926e';
 
@@ -29,8 +30,8 @@ export default function CheckoutWalletTopUpScreen() {
   const checkout = route.params?.checkout;
 
   const finishCheckout = useCallback(async (balanceNaira) => {
-    if (startedRef.current || !checkout) return;
-    if (!Number.isFinite(balanceNaira) || balanceNaira + 0.5 < orderTotal) return;
+    if (startedRef.current || !checkout) return false;
+    if (!Number.isFinite(balanceNaira) || balanceNaira + 0.5 < orderTotal) return false;
     startedRef.current = true;
     setCompleting(true);
     try {
@@ -43,13 +44,24 @@ export default function CheckoutWalletTopUpScreen() {
         itemCount: Number(route.params?.itemCount) || 0,
         rooms: Array.isArray(data?.rooms) ? data.rooms : [],
       });
+      return true;
     } catch (err) {
       startedRef.current = false;
       setCompleting(false);
       const message = err instanceof Error ? err.message : 'Could not complete checkout.';
       Alert.alert('Checkout', message);
+      return false;
     }
   }, [checkout, navigation, orderTotal, route.params?.itemCount, route.params?.shipping, route.params?.subtotal]);
+
+  const refreshWallet = useCallback(async () => {
+    const row = await fetchWallet();
+    setWallet(row);
+    const kobo = Number(row?.balance_kobo);
+    const next = Number.isFinite(kobo) ? kobo / 100 : balance;
+    if (Number.isFinite(kobo)) setBalance(next);
+    return next;
+  }, [balance]);
 
   useEffect(() => {
     let alive = true;
@@ -75,25 +87,48 @@ export default function CheckoutWalletTopUpScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      fetchWallet()
-        .then((row) => {
-          if (cancelled) return;
-          setWallet(row);
-          const kobo = Number(row?.balance_kobo);
-          if (Number.isFinite(kobo)) {
+      const pull = () => {
+        fetchWallet()
+          .then((row) => {
+            if (cancelled) return;
+            setWallet(row);
+            const kobo = Number(row?.balance_kobo);
+            if (!Number.isFinite(kobo)) return;
             const next = kobo / 100;
             setBalance(next);
             void finishCheckout(next);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setWallet(null);
-        });
+          })
+          .catch(() => {
+            if (!cancelled) setWallet(null);
+          });
+      };
+      pull();
+      const timer = setInterval(pull, 4000);
       return () => {
         cancelled = true;
+        clearInterval(timer);
       };
     }, [finishCheckout]),
   );
+
+  const confirmTransfer = async () => {
+    setCompleting(true);
+    try {
+      const next = await refreshWallet();
+      const placed = await finishCheckout(next);
+      if (!placed) {
+        setCompleting(false);
+        Alert.alert(
+          'Transfer not received yet',
+          `Your wallet balance is ${formatNaira(next)}. Transfer ${formatNaira(roundUpToTen(Math.max(0, orderTotal - next)))} and this screen will place the order as soon as it arrives.`,
+        );
+      }
+    } catch (err) {
+      setCompleting(false);
+      const message = err instanceof Error ? err.message : 'Could not check your wallet.';
+      Alert.alert('Wallet', message);
+    }
+  };
 
   const shortfall = Math.max(0, orderTotal - balance);
   const transferAmount = roundUpToTen(shortfall);
@@ -109,14 +144,9 @@ export default function CheckoutWalletTopUpScreen() {
   };
 
   return (
+    <>
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Text style={styles.lead}>Transfer this amount to your wallet. The order is placed automatically once the top-up arrives.</Text>
-      {completing ? (
-        <View style={styles.waiting}>
-          <ActivityIndicator color={TEAL} />
-          <Text style={styles.waitingText}>Wallet topped up. Completing your order…</Text>
-        </View>
-      ) : null}
 
       <View style={styles.amountCard}>
         <Text style={styles.amountLabel}>Amount to transfer</Text>
@@ -181,13 +211,15 @@ export default function CheckoutWalletTopUpScreen() {
 
       <Pressable
         style={styles.button}
-        onPress={() => navigation.goBack()}
+        onPress={() => { void confirmTransfer(); }}
         accessibilityRole="button"
         accessibilityLabel="I've sent the money"
       >
         <Text style={styles.buttonText}>I've sent the money</Text>
       </Pressable>
     </ScrollView>
+    <WalletProcessingOverlay visible={completing} label="Processing payment…" />
+    </>
   );
 }
 

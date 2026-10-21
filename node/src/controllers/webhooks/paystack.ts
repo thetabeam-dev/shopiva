@@ -10,12 +10,11 @@ import { getIo } from "../../index.js";
 import { ordersTransformer as buyerOrdersTransformer } from "../../transformers/buyer/orders.js";
 import { ordersTransformer as vendorOrdersTransformer } from "../../transformers/business/orders.js";
 import { GetShopOwnerByShopIdService } from "../../services/business/shop.js";
-import { sendFcmForActivities } from "../../services/firebaseConfig.js";
-import { createAndEmitNotification } from "../../services/notifications.js";
 import { creditWalletFromPaystack } from "../../models/wallet.js";
 import { nairaLabel, pushWalletFcm } from "../../services/walletPush.js";
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
-import { ensurePaidOrderChatRoom } from "../../services/buyer/checkoutConfirm.js";
+import { ensurePaidOrderChatRoom, notifyVendorOfPurchase } from "../../services/buyer/checkoutConfirm.js";
+import { createEscrowForOrder } from "../../models/escrow.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
 
@@ -265,43 +264,31 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
         };
         const orderId = await OrderHandler.newOrder(newOrder);
         try {
+          const { id: vendorId } = await GetShopOwnerByShopIdService(Number(shop_id));
+          await createEscrowForOrder({
+            orderId: Number(orderId),
+            buyerId: userId,
+            vendorId: Number(vendorId),
+            amountNaira: subtotal + shipping_fee,
+            status: "held",
+          });
+        } catch (err) {
+          console.error("checkout escrow row failed", err);
+        }
+        try {
           const created = await ensurePaidOrderChatRoom(userId, Number(orderId), shop_id);
           if (Array.isArray(created)) rooms.push(...created);
         } catch (err) {
           console.error("checkout chat room failed", err);
         }
-        try {
-          const { id: vendorId } = await GetShopOwnerByShopIdService(Number(shop_id));
-          await createAndEmitNotification({
-            recipientId: Number(vendorId),
-            title: "New order",
-            message: "A customer just made a purchase from your shop.",
-            sourceType: "order",
-            sourceId: Number(orderId),
-            role: "vendor",
-          });
-          const tokenResult = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [vendorId]);
-          const vendorToken = String(tokenResult.rows[0]?.devicetoken ?? "").trim();
-          const itemCount = items.reduce((sum: number, item: { unit?: number; quantity?: number }) => {
-            const qty = Number(item?.unit ?? item?.quantity ?? 0);
-            return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
-          }, 0);
-          const orderTotal = subtotal + shipping_fee;
-          const count = itemCount || items.length;
-          const itemLabel = count === 1 ? "item" : "items";
-          const totalLabel = `₦${orderTotal.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          if (vendorToken) {
-            sendFcmForActivities(
-              vendorToken,
-              "New Order Received",
-              `You have a new order for ${count} ${itemLabel} totaling ${totalLabel}.`,
-              null,
-              { type: "order", order_id: orderId, role: "vendor" },
-            );
-          }
-        } catch (err) {
-          console.error("vendor new-order notification failed", err);
-        }
+        const itemCount = items.reduce((sum: number, item: { unit?: number; quantity?: number }) => {
+          const qty = Number(item?.unit ?? item?.quantity ?? 0);
+          return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
+        }, 0);
+        await notifyVendorOfPurchase(shop_id, orderId, {
+          itemCount: itemCount || items.length,
+          total: subtotal + shipping_fee,
+        });
 
         await OrderHandler.orderEvent({
           order_id: String(orderId),

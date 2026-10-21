@@ -216,11 +216,6 @@ export default function PaymentSuccessScreen({ navigation, route }) {
             <Text style={styles.primaryBtnText}>Continue to chat</Text>
           )}
         </Pressable> */}
-        {reference && confirmError ? (
-          <Text style={styles.helperMuted}>
-            Your payment went through; if chat setup fails, tap the error above to retry or contact support with your reference.
-          </Text>
-        ) : null}
         <Pressable
           style={styles.secondaryBtn}
           onPress={() => parentTabNav?.navigate('Activities')}

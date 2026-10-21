@@ -24,6 +24,7 @@ import { fetchWallet } from '../../api/user';
 import { getStorefrontShopDelivery } from '../../api/storefront';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
+import WalletProcessingOverlay from '../../components/WalletProcessingOverlay';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
 import {
   readExactLocation,
@@ -375,7 +376,8 @@ export default function CartCheckoutScreen({ navigation }) {
     }
   }, [checkoutLines, selectedDelivery]);
   const escrowCharge = 200;
-  const total = Math.max(0, subtotal + shippingCost + escrowCharge);
+  const chargedShipping = estimatedShippingFee != null ? estimatedShippingFee : shippingCost;
+  const total = Math.max(0, subtotal + chargedShipping + escrowCharge);
 
   useEffect(() => {
     const shopIds = [
@@ -523,10 +525,19 @@ export default function CartCheckoutScreen({ navigation }) {
     const feeByShop = new Map();
     if (selectedDelivery?.perShop?.length) {
       for (const shopFee of selectedDelivery.perShop) {
-        feeByShop.set(
-          shopFee.shopId,
-          computeMultiItemShippingFee(shopFee.itemCount, shopFee.fee, shopFee.discountPercent),
+        const shopLines = checkoutLines.filter(
+          (line) => parseShopId(line.shop_id) === shopFee.shopId,
         );
+        const items = (shopLines.length ? shopLines : [{ qty: shopFee.itemCount }]).map((line) => ({
+          quantity: Math.max(1, Math.round(Number(line.qty) || 1)),
+        }));
+        const estimate = calculateEstimatedShippingFee({
+          baseShippingFee: Number(shopFee.fee) || 0,
+          additionalItemDiscountPercent: Number(shopFee.discountPercent) || 0,
+          safetyBufferPercent: 30,
+          items,
+        });
+        feeByShop.set(shopFee.shopId, estimate.estimatedShippingFee);
       }
     }
     const shopCount = Object.keys(
@@ -555,7 +566,7 @@ export default function CartCheckoutScreen({ navigation }) {
       if (Number.isFinite(numericShopId) && feeByShop.has(numericShopId)) {
         shopShipping = feeByShop.get(numericShopId) || 0;
       } else if (shopCount === 1) {
-        shopShipping = shippingCost;
+        shopShipping = chargedShipping;
       }
       return {
         shop_id: shopId,
@@ -584,7 +595,7 @@ export default function CartCheckoutScreen({ navigation }) {
       reference,
     };
   }, [
-    street, area1, area2, city, zip, country, user?.id, selectedDelivery, checkoutLines, shippingCost,
+    street, area1, area2, city, zip, country, user?.id, selectedDelivery, checkoutLines, chargedShipping,
   ]);
 
   const onPaystackCheckout = useCallback(() => {
@@ -650,7 +661,7 @@ export default function CartCheckoutScreen({ navigation }) {
         navigation.replace('Payment-success', {
           reference: refStr,
           subtotal,
-          shipping: shippingCost,
+          shipping: chargedShipping,
           total: total,
           itemCount: checkoutLines.length,
         });
@@ -661,7 +672,7 @@ export default function CartCheckoutScreen({ navigation }) {
         navigation.replace('Payment-failed', {
           reason: 'Payment was cancelled before completion.',
           subtotal,
-          shipping: shippingCost,
+          shipping: chargedShipping,
           total,
         });
       },
@@ -675,7 +686,7 @@ export default function CartCheckoutScreen({ navigation }) {
         navigation.replace('payment-failed', {
           reason: msg,
           subtotal,
-          shipping: shippingCost,
+          shipping: chargedShipping,
           total,
         });
       },
@@ -689,7 +700,7 @@ export default function CartCheckoutScreen({ navigation }) {
     checkoutLines,
     selectedDelivery,
     deliveryLocations.length,
-    shippingCost,
+    chargedShipping,
     street,
     city,
     zip,
@@ -781,7 +792,7 @@ export default function CartCheckoutScreen({ navigation }) {
         walletBalance: walletBalance || 0,
         transferAmount: Math.ceil(shortfall / 10) * 10,
         subtotal,
-        shipping: shippingCost,
+        shipping: chargedShipping,
         itemCount: checkoutLines.length,
         checkout: buildCheckoutPayload(`wallet_${uid}_${Date.now()}`),
       });
@@ -796,7 +807,7 @@ export default function CartCheckoutScreen({ navigation }) {
         navigation.replace('Payment-success', {
           reference: checkout.reference,
           subtotal,
-          shipping: shippingCost,
+          shipping: chargedShipping,
           total,
           itemCount: checkoutLines.length,
           rooms: Array.isArray(data?.rooms) ? data.rooms : [],
@@ -807,7 +818,7 @@ export default function CartCheckoutScreen({ navigation }) {
         const message = err instanceof Error ? err.message : 'Could not complete checkout.';
         Alert.alert('Checkout', message);
       });
-  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, shippingCost, checkoutLines.length, buildCheckoutPayload]);
+  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, chargedShipping, checkoutLines.length, buildCheckoutPayload]);
 
   const inputStyle = (key) => [
     styles.input,
@@ -1280,6 +1291,7 @@ export default function CartCheckoutScreen({ navigation }) {
             </View>
           </View>
         ) : null}
+        <WalletProcessingOverlay visible={isPaying} label="Processing payment…" />
       </View>
     </KeyboardAvoidingView>
   );

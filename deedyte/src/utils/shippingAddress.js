@@ -10,9 +10,25 @@ export function parseShippingAddress(raw) {
     const parsed = JSON.parse(text);
     if (parsed && typeof parsed === 'object') return parsed;
   } catch {
-    return null;
+    const loose = {};
+    const pattern = /([A-Za-z0-9_]+)\s*:\s*"([^"]*)"/g;
+    let match = pattern.exec(text);
+    while (match) {
+      loose[match[1]] = match[2];
+      match = pattern.exec(text);
+    }
+    if (Object.keys(loose).length) return loose;
   }
   return null;
+}
+
+function capitalizeWords(value) {
+  return String(value ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 /**
@@ -24,7 +40,7 @@ export function formatShippingAddress(raw, emptyLabel = 'Not available') {
   const parsed = parseShippingAddress(raw);
   if (!parsed) {
     const text = String(raw ?? '').trim();
-    return text || emptyLabel;
+    return text ? capitalizeWords(text) : emptyLabel;
   }
   const parts = [
     parsed.street_address ?? parsed.street,
@@ -32,9 +48,9 @@ export function formatShippingAddress(raw, emptyLabel = 'Not available') {
     parsed.area_2 ?? parsed.area2,
     parsed.city,
     parsed.state,
-    parsed.zipcode ?? parsed.zip,
+    parsed.zipcode ?? parsed.zip_code ?? parsed.zip,
   ]
-    .map((part) => String(part ?? '').trim())
+    .map((part) => capitalizeWords(part))
     .filter(Boolean);
   return parts.join(', ') || emptyLabel;
 }

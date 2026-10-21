@@ -26,7 +26,8 @@ import { connectChatSocket, emitSocketAck } from '../socket/chatSocket';
 import { set_orderInfo } from '../../redux/order';
 import { useDispatch } from 'react-redux';
 import { fetchShopOwner, uploadDeliveryEvidence } from '../api';
-import { getShippingZones } from '../api/shop';
+import { getStorefrontShopDelivery } from '../api/storefront';
+import { normalizeShopDelivery } from '../utils/vendorDelivery';
 import { formatNaira } from '../utils/formatNaira';
 import { formatShippingAddress, shippingAddressState } from '../utils/shippingAddress';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
@@ -41,7 +42,7 @@ const VendorRejectReason = [
   { label: 'shipping delay', value: 'shipping_delay' },
   { label: 'duplicate order', value: 'duplicate_order' },
   { label: 'product discontinued', value: 'product_discontinued' },
-  { label: 'other', value: 'other' },
+  { label: 'shipping fees are not enough', value: 'incompatible_shipping_fee' },
 ];
 
 /** Used when vendor commits to a delivery / ship-by window. */
@@ -166,7 +167,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
   const [confirmFulfillOnTime, setConfirmFulfillOnTime] = useState(false);
   const [confirmPerformancePolicy, setConfirmPerformancePolicy] =
     useState(false);
-  const [fulfillmentDuration, setFulfillmentDuration] = useState(null);
   const [shippingFee, setShippingFee] = useState('');
   const [actualShippingFee, setActualShippingFee] = useState(null);
   const [estimatedShippingFee, setEstimatedShippingFee] = useState(null);
@@ -177,29 +177,19 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
     (async () => {
       const shopId = data?.shop_id;
       const itemCount = Math.max(1, Math.round(Number(data?.item_count) || 1));
-      const address = `${formatShippingAddress(data?.shipping_address, '')} ${shippingAddressState(data?.shipping_address)} ${String(data?.shipping_method ?? '')}`.toLowerCase();
-      const user = await getStoredUser();
-      if (!shopId || !user?.id || !address) return;
+      const stateName = shippingAddressState(data?.shipping_address).trim().toLowerCase();
+      if (!shopId || !stateName) return;
       try {
-        const zones = await getShippingZones(shopId, user.id);
-        let matched = null;
-        for (const zone of zones) {
-          const locations = Array.isArray(zone?.locations) ? zone.locations : [];
-          for (const location of locations) {
-            const name = String(location ?? '').trim().toLowerCase();
-            if (!name || !address.includes(name)) continue;
-            if (!matched || name.length > matched.name.length) {
-              matched = {
-                name,
-                baseFee: Number(zone.base_fee ?? zone.baseFee) || 0,
-                discountPercent: Number(zone.discount_percent ?? zone.discountPercent) || 0,
-              };
-            }
-          }
-        }
-        if (!matched || cancelled) return;
-        const discount = Math.min(100, Math.max(0, matched.discountPercent)) / 100;
-        const beforeBuffer = matched.baseFee * (1 + (itemCount - 1) * (1 - discount));
+        const raw = await getStorefrontShopDelivery(shopId);
+        const delivery = normalizeShopDelivery(raw);
+        const loc = delivery?.locations?.find((row) => {
+          const name = String(row?.name ?? '').trim().toLowerCase();
+          return name === stateName || name.replace(/\s+state$/, '') === stateName;
+        });
+        if (!loc || cancelled) return;
+        const baseFee = Number(loc.fee) || 0;
+        const discount = Math.min(100, Math.max(0, Number(loc.discountPercent) || 0)) / 100;
+        const beforeBuffer = baseFee * (1 + (itemCount - 1) * (1 - discount));
         const actual = Math.ceil(beforeBuffer);
         const estimated = Math.ceil(beforeBuffer + beforeBuffer * 0.3);
         if (!cancelled) {
@@ -391,7 +381,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
               <View style={styles.processingCard}>
                 <Text style={styles.processingSectionTitle}>Set shipping fee</Text>
                 <Text style={styles.processingFieldHint}>
-                  Choose a fee from your zone rate
+                  Fees for {shippingAddressState(data?.shipping_address).replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'the delivery state'}, from your zone rate
                   {actualShippingFee == null ? '' : ` (${formatNaira(actualShippingFee)})`}
                   {' '}up to the estimate with a 30% safety buffer
                   {estimatedShippingFee == null ? '' : ` (${formatNaira(estimatedShippingFee)})`}.
@@ -435,31 +425,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                     rowStyle={styles.processingCheckboxRow}
                   />
                 </View>
-              </View>
-
-              <View style={styles.processingCard}>
-                <Text style={styles.processingFieldLabel}>
-                  Estimated ship time
-                </Text>
-                <Text style={styles.processingFieldHint}>
-                  When do you plan to hand this order to the carrier? This helps
-                  set customer expectations.
-                </Text>
-                <Dropdown
-                  style={styles.processingDropdown}
-                  containerStyle={styles.dropdownContainer}
-                  placeholderStyle={styles.placeholderStyle}
-                  selectedTextStyle={styles.selectedTextStyle}
-                  itemTextStyle={styles.processingDropdownItem}
-                  iconStyle={styles.iconStyle}
-                  data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                  maxHeight={280}
-                  labelField="label"
-                  valueField="value"
-                  placeholder="Select timeframe"
-                  value={fulfillmentDuration}
-                  onChange={item => setFulfillmentDuration(item.value)}
-                />
               </View>
 
               <View style={styles.processingCard}>
@@ -520,16 +485,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                     );
                     return;
                   }
-                  if (
-                    fulfillmentDuration == null ||
-                    fulfillmentDuration === ''
-                  ) {
-                    Alert.alert(
-                      'Ship time required',
-                      'Select when you will ship this order so the customer sees an accurate commitment.',
-                    );
-                    return;
-                  }
                   const shippingFeeAmount = Number(shippingFee);
                   if (!Number.isFinite(shippingFeeAmount) || shippingFeeAmount < 0 || shippingFee.trim() === '') {
                     Alert.alert(
@@ -565,11 +520,8 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                           fulfill_on_time: true,
                           performance_policy: true,
                         },
-                        fulfillment_duration: fulfillmentDuration,
-                        fulfillment_duration_label: FULFILLMENT_TIMEFRAME_OPTIONS.find(
-                          o => o.value === fulfillmentDuration
-                        )?.label ?? null,
                         shipping_fee: shippingFeeAmount,
+                        estimated_shipping_fee: estimatedShippingFee,
                       },
                       notes: note,
                       actor_id: u.id,
@@ -603,19 +555,25 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
           <Modal
             visible={feePickerOpen}
             transparent
-            animationType="fade"
+            animationType="slide"
             onRequestClose={() => setFeePickerOpen(false)}
           >
             <View style={styles.feeModalRoot}>
               <Pressable style={styles.feeModalBackdrop} onPress={() => setFeePickerOpen(false)} accessibilityLabel="Close" />
-              <View style={styles.feeModalCard}>
+              <View style={[styles.feeModalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                <View style={styles.feeModalGrabberWrap}>
+                  <View style={styles.feeModalGrabber} />
+                </View>
                 <Text style={styles.processingSectionTitle}>Choose shipping fee</Text>
                 <Text style={styles.processingFieldHint}>
-                  From your zone rate to the estimate with a 30% safety buffer.
+                  {shippingAddressState(data?.shipping_address)
+                    ? `Fees for ${shippingAddressState(data?.shipping_address).replace(/\b\w/g, (letter) => letter.toUpperCase())}, from your zone rate to the estimate with a 30% safety buffer.`
+                    : 'From your zone rate to the estimate with a 30% safety buffer.'}
                 </Text>
                 <ScrollView style={styles.feeModalList}>
-                  {shippingFeeChoices(actualShippingFee, estimatedShippingFee).map((amount) => {
+                  {shippingFeeChoices(actualShippingFee, estimatedShippingFee).map((amount, _index, list) => {
                     const selected = Number(shippingFee) === amount;
+                    const recommended = amount === Math.min(...list);
                     return (
                       <Pressable
                         key={String(amount)}
@@ -625,14 +583,21 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                           setFeePickerOpen(false);
                         }}
                         accessibilityRole="button"
-                        accessibilityLabel={formatNaira(amount)}
+                        accessibilityLabel={recommended ? `${formatNaira(amount)}, recommended` : formatNaira(amount)}
                       >
-                        <Text style={[styles.feeOptionText, selected && styles.feeOptionTextSelected]}>
-                          {formatNaira(amount)}
-                        </Text>
+                        <View style={styles.feeOptionTitleRow}>
+                          <Text style={[styles.feeOptionText, selected && styles.feeOptionTextSelected]}>
+                            {formatNaira(amount)}
+                          </Text>
+                          {recommended ? (
+                            <View style={styles.feeRecommendedBadge}>
+                              <Text style={styles.feeRecommendedBadgeText}>Recommended</Text>
+                            </View>
+                          ) : null}
+                        </View>
                         <Text style={styles.feeOptionNote}>
-                          {amount === Math.ceil(actualShippingFee)
-                            ? 'Zone rate'
+                          {recommended
+                            ? 'Low shipping fees encourage more buyers'
                             : amount === Math.ceil(estimatedShippingFee)
                               ? 'With 30% buffer'
                               : 'In between'}
@@ -644,6 +609,48 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                     <Text style={styles.processingFieldHint}>Shipping fees are not available for this address yet.</Text>
                   ) : null}
                 </ScrollView>
+                <Pressable
+                  style={styles.feeRejectBtn}
+                  onPress={() => {
+                    Alert.alert(
+                      'Reject this order?',
+                      'The shipping fee options are not enough to deliver this order. You will not be able to reinstate it after you reject it.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Reject order',
+                          style: 'destructive',
+                          onPress: async () => {
+                            setFeePickerOpen(false);
+                            setLoading(true);
+                            const u = await getStoredUser();
+                            const response = await emitSocketAck('order_acceptance', {
+                              ...data,
+                              stage: 'order_rejected',
+                              outcome: 'failure',
+                              meta: {
+                                ...(data.meta && typeof data.meta === 'object' ? data.meta : {}),
+                                reason: 'incompatible_shipping_fee',
+                              },
+                              notes: 'Shipping fee options are not enough to deliver this order.',
+                              actor_id: u?.id,
+                            });
+                            setLoading(false);
+                            if (response.success) {
+                              dispatch(set_orderInfo(response.result));
+                              navigation.goBack();
+                            }
+                          },
+                        },
+                      ],
+                    );
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reject because shipping fees are not enough"
+                >
+                  <Text style={styles.feeRejectBtnText}>Fees are not enough</Text>
+                  <Text style={styles.feeOptionNote}>Reject this order</Text>
+                </Pressable>
                 <Pressable style={styles.feeModalClose} onPress={() => setFeePickerOpen(false)} accessibilityRole="button">
                   <Text style={styles.feeModalCloseText}>Close</Text>
                 </Pressable>
@@ -665,7 +672,6 @@ function Processing({ data }) {
   const [loading, setLoading] = useState(false);
   const [startedProcessing, setStartedProcessing] = useState(false);
   const [shipWithinCommitment, setShipWithinCommitment] = useState(false);
-  const [fulfillmentDuration, setFulfillmentDuration] = useState(null);
 
   useEffect(() => {
     connectChatSocket();
@@ -675,10 +681,6 @@ function Processing({ data }) {
     ...(data.meta && typeof data.meta === 'object' ? data.meta : {}),
     started_processing: startedProcessing,
     ship_within_commitment: shipWithinCommitment,
-    fulfillment_duration: fulfillmentDuration,
-    fulfillment_duration_label:
-      FULFILLMENT_TIMEFRAME_OPTIONS.find(o => o.value === fulfillmentDuration)
-        ?.label ?? null,
   });
 
   const validateProcessing = () => {
@@ -686,13 +688,6 @@ function Processing({ data }) {
       Alert.alert(
         'Confirmations required',
         'Check both boxes to confirm you are processing this order on schedule.',
-      );
-      return false;
-    }
-    if (fulfillmentDuration == null || fulfillmentDuration === '') {
-      Alert.alert(
-        'Ship time required',
-        'Select when you expect to ship so the customer sees an accurate window.',
       );
       return false;
     }
@@ -752,30 +747,6 @@ function Processing({ data }) {
               </View>
             </View>
 
-            <View style={styles.processingCard}>
-              <Text style={styles.processingFieldLabel}>
-                Estimated ship time
-              </Text>
-              <Text style={styles.processingFieldHint}>
-                When do you plan to hand this order to the carrier? This helps
-                set customer expectations.
-              </Text>
-              <Dropdown
-                style={styles.processingDropdown}
-                containerStyle={styles.dropdownContainer}
-                placeholderStyle={styles.placeholderStyle}
-                selectedTextStyle={styles.selectedTextStyle}
-                itemTextStyle={styles.processingDropdownItem}
-                iconStyle={styles.iconStyle}
-                data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                maxHeight={280}
-                labelField="label"
-                valueField="value"
-                placeholder="Select timeframe"
-                value={fulfillmentDuration}
-                onChange={item => setFulfillmentDuration(item.value)}
-              />
-            </View>
             <View style={[styles.processingCard, styles.acceptDisclaimerCard]}>
               <Text style={styles.acceptIntroText}>
                 By confirming, you state that the order is being prepared for
@@ -1126,7 +1097,6 @@ function OutForDelivery({ data }) {
   const [confirmOutForDelivery, setConfirmOutForDelivery] = useState(false);
   const [finalDeliveryHandler, setFinalDeliveryHandler] = useState(null);
   const [riderContact, setRiderContact] = useState('');
-  const [expectedDelivery, setExpectedDelivery] = useState(null);
 
   useEffect(() => {
     connectChatSocket();
@@ -1144,11 +1114,6 @@ function OutForDelivery({ data }) {
       finalDeliveryHandler,
     ),
     rider_contact: riderContact.trim() || null,
-    expected_delivery: expectedDelivery,
-    expected_delivery_label: optionLabel(
-      FULFILLMENT_TIMEFRAME_OPTIONS,
-      expectedDelivery,
-    ),
   });
 
   const validate = () => {
@@ -1163,13 +1128,6 @@ function OutForDelivery({ data }) {
       Alert.alert(
         'Final delivery',
         'Select who is handling the final delivery.',
-      );
-      return false;
-    }
-    if (expectedDelivery == null || expectedDelivery === '') {
-      Alert.alert(
-        'Expected delivery',
-        'Select when you expect this order to be delivered.',
       );
       return false;
     }
@@ -1266,29 +1224,6 @@ function OutForDelivery({ data }) {
               />
             </View>
 
-            <View style={styles.processingCard}>
-              <Text style={styles.processingFieldLabel}>
-                When do you expect this order to be delivered?
-              </Text>
-              <Text style={styles.processingFieldHint}>
-                Sets customer expectations for arrival or pickup completion.
-              </Text>
-              <Dropdown
-                style={styles.processingDropdown}
-                containerStyle={styles.dropdownContainer}
-                placeholderStyle={styles.placeholderStyle}
-                selectedTextStyle={styles.selectedTextStyle}
-                itemTextStyle={styles.processingDropdownItem}
-                iconStyle={styles.iconStyle}
-                data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                maxHeight={280}
-                labelField="label"
-                valueField="value"
-                placeholder="Select timeframe"
-                value={expectedDelivery}
-                onChange={item => setExpectedDelivery(item.value)}
-              />
-            </View>
           </ScrollView>
 
           <View
@@ -2369,9 +2304,18 @@ const styles = StyleSheet.create({
   },
   feePickerValue: { fontSize: 16, fontWeight: '700', color: '#111111' },
   feePickerPlaceholder: { fontSize: 16, color: '#9CA3AF' },
-  feeModalRoot: { flex: 1, justifyContent: 'center', padding: 20 },
+  feeModalRoot: { flex: 1, justifyContent: 'flex-end' },
   feeModalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  feeModalCard: { backgroundColor: '#FFFFFF', borderRadius: 7, padding: 16, maxHeight: '80%' },
+  feeModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    maxHeight: '88%',
+  },
+  feeModalGrabberWrap: { alignItems: 'center', marginBottom: 8 },
+  feeModalGrabber: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E0E0E0' },
   feeModalList: { marginTop: 8 },
   feeOption: {
     borderWidth: 1,
@@ -2383,10 +2327,28 @@ const styles = StyleSheet.create({
   },
   feeOptionSelected: { borderColor: '#00926E', backgroundColor: '#E8F6F1' },
   feeOptionText: { fontSize: 16, fontWeight: '700', color: '#111111' },
+  feeOptionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  feeRecommendedBadge: {
+    backgroundColor: '#E8F6F1',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  feeRecommendedBadgeText: { fontSize: 12, fontWeight: '700', color: '#00926E' },
   feeOptionTextSelected: { color: '#00926E' },
   feeOptionNote: { marginTop: 2, fontSize: 12, color: '#6B7280' },
   feeModalClose: { marginTop: 14, alignItems: 'center', paddingVertical: 10 },
   feeModalCloseText: { fontSize: 15, fontWeight: '700', color: '#00926E' },
+  feeRejectBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#F3C3C3',
+    backgroundColor: '#FEF2F2',
+    borderRadius: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  feeRejectBtnText: { fontSize: 15, fontWeight: '700', color: '#B42318' },
   processingSectionTitle: {
     fontSize: 17,
     fontWeight: '700',

@@ -10,8 +10,9 @@ import { GetShopOwnerByShopIdService } from "../business/shop.js";
 import { OrderHandler } from "../webhook/paystack.js";
 import type { NewOrder } from "../../types/paystack.js";
 import { sendNotificationEmail } from "../email.js";
-import { emitUnpaidOrderToVendor } from "../../socket/order.js";
+import { emitBuyerPaymentToVendor, emitUnpaidOrderToVendor } from "../../socket/order.js";
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
+import { createEscrowForOrder } from "../../models/escrow.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -171,6 +172,18 @@ export async function createUnpaidCheckoutOrders(
       tracking_number: "",
     };
     const orderId = await OrderHandler.newOrder(newOrder);
+    try {
+      const owner = await GetShopOwnerByShopIdService(Number(shopId));
+      await createEscrowForOrder({
+        orderId: Number(orderId),
+        buyerId: buyerUserId,
+        vendorId: Number(owner?.id),
+        amountNaira: subtotal,
+        status: "locked",
+      });
+    } catch (err) {
+      console.error("unpaid checkout escrow row failed", err);
+    }
     await OrderHandler.orderEvent({
       order_id: String(orderId),
       event_type: "checkout",
@@ -210,7 +223,7 @@ const VENDOR_PURCHASE_TITLE = "New order";
 const VENDOR_PURCHASE_MESSAGE = "A customer just made a purchase from your shop.";
 const VENDOR_PURCHASE_FCM_TITLE = "New Order Received";
 
-async function notifyVendorOfPurchase(
+export async function notifyVendorOfPurchase(
   shopId: unknown,
   orderId: unknown,
   summary?: { itemCount: number; total: number },
@@ -220,6 +233,8 @@ async function notifyVendorOfPurchase(
     const vendorId = Number(owner?.id);
     const sourceId = Number(orderId);
     if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(sourceId) || sourceId <= 0) return;
+
+    await emitBuyerPaymentToVendor(sourceId, vendorId);
 
     const pool = await db();
     const { rows: existing } = await pool.query(
@@ -554,6 +569,18 @@ export async function confirmCartCheckoutAndCreateChatRoom(
             tracking_number: "",
           };
           const orderId = await OrderHandler.newOrder(newOrder);
+          try {
+            const owner = await GetShopOwnerByShopIdService(Number(order.shop_id));
+            await createEscrowForOrder({
+              orderId: Number(orderId),
+              buyerId: buyerUserId,
+              vendorId: Number(owner?.id),
+              amountNaira: Number(order.subtotal) + Number(order.shipping_fee),
+              status: "held",
+            });
+          } catch (err) {
+            console.error("checkout escrow row failed", err);
+          }
           const itemCount = order.items.reduce((sum, item) => {
             const qty = Number(item.unit ?? item.quantity ?? 0);
             return sum + (Number.isFinite(qty) && qty > 0 ? qty : 0);
