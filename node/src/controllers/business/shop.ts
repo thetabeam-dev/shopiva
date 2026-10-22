@@ -11,6 +11,7 @@
  */
 
 import type { Request, Response } from "express";
+import { scanMessage } from "../../utils/messageModeration.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 import {
     CreateShopService,
@@ -176,6 +177,10 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
         }
         const descriptionStr =
             typeof description === "string" ? description.trim().slice(0, DESCRIPTION_MAX) : null;
+        if (descriptionStr && !scanMessage(descriptionStr).isAllowed) {
+            res.status(400).json({ success: false, error: "Shop descriptions cannot include contact details or links." });
+            return;
+        }
         const allowedVendorTypes = ["manufacturer", "reseller", "dropshipper"] as const;
         const vendorType =
             typeof vendorTypeBody === "string" && allowedVendorTypes.includes(vendorTypeBody as typeof allowedVendorTypes[number])
@@ -298,6 +303,10 @@ export async function UpdateShopController(req: Request, res: Response) {
         }
         if (Array.isArray(categories) && categories.length > 3) {
             res.status(400).json({ error: "A shop can have at most 3 categories." });
+            return;
+        }
+        if (typeof description === "string" && description.trim() && !scanMessage(description).isAllowed) {
+            res.status(400).json({ error: "Shop descriptions cannot include contact details or links." });
             return;
         }
 

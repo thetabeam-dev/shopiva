@@ -26,6 +26,7 @@ import {
   reverseGeocodeToPlace,
 } from '../../utils/deviceLocation';
 import FormKeyboardAvoiding from '../../components/FormKeyboardAvoiding';
+import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../../auth/session';
 import { formatMvpCategoryLabel } from '../../utils/mvpCategory';
 import { shopRecordHasLocation } from '../../utils/shopLocation';
@@ -62,6 +63,7 @@ export default function ShopSetupScreen() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
+  const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [country, setCountry] = useState('Nigeria');
   const [zipcode, setZipcode] = useState('');
   const [coords, setCoords] = useState(
@@ -168,7 +170,7 @@ export default function ShopSetupScreen() {
       try {
         const place = await reverseGeocodeToPlace(c.latitude, c.longitude);
         if (!city.trim()) setCity(place.city || '');
-        if (!stateName.trim()) setStateName(place.state || '');
+        if (!stateName.trim()) setStateName(matchNigerianState(place.state || ''));
         if (!country.trim()) setCountry(place.country || '');
       } catch {
         // Coordinates alone are still useful.
@@ -401,12 +403,29 @@ export default function ShopSetupScreen() {
           onChangeText={setCity}
           placeholder="City"
         />
-        <LabeledInput
-          label="State"
-          required
-          value={stateName}
-          onChangeText={setStateName}
-          placeholder="State"
+        <View style={styles.inputBlock}>
+        <Text style={styles.label}>State<Text style={styles.required}> *</Text></Text>
+        <TouchableOpacity
+          style={[styles.input, styles.statePicker]}
+          onPress={() => setStatePickerOpen(true)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Select state"
+        >
+          <Text style={stateName ? styles.stateValue : styles.statePlaceholder}>
+            {stateName || 'Select a state'}
+          </Text>
+          <Icon name="chevron-down" size={18} color="#6B7280" />
+        </TouchableOpacity>
+        </View>
+        <NigerianStatePickerModal
+          visible={statePickerOpen}
+          selected={stateName}
+          onClose={() => setStatePickerOpen(false)}
+          onSelect={(next) => {
+            setStateName(next);
+            setStatePickerOpen(false);
+          }}
         />
         <LabeledInput
           label="Country"
@@ -556,6 +575,14 @@ const styles = StyleSheet.create({
     color: '#222222',
     marginBottom: 6,
   },
+  statePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+  },
+  stateValue: { fontSize: 16, color: '#111111' },
+  statePlaceholder: { fontSize: 16, color: '#A0A0A0' },
   input: {
     height: 46,
     borderWidth: 1,

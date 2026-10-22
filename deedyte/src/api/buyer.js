@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { apiFetchAuth, apiFetchAuthMultipart } from './client';
+import { apiFetch, apiFetchAuth, apiFetchAuthMultipart } from './client';
 
 /**
  * @param {Response} res
@@ -17,6 +17,17 @@ async function readJson(res) {
   }
   return data;
 }
+/** Escrow fee in naira for a goods subtotal in naira. Backend calculates from kobo. */
+export async function fetchEscrowFee(subtotalNaira) {
+  const subtotalKobo = Math.round(Number(subtotalNaira) * 100);
+  if (!Number.isFinite(subtotalKobo) || subtotalKobo <= 0) return 0;
+  const res = await apiFetch(`/escrow-fee?subtotal=${subtotalKobo}`);
+  const data = await readJson(res);
+  const kobo = Number(data?.escrow_fee);
+  if (!Number.isFinite(kobo) || kobo < 0) throw new Error('Could not load the escrow fee.');
+  return kobo / 100;
+}
+
 /** @returns {Promise<{ orders: unknown[] }>} */
 export async function fetchBuyerOrders() {
   const res = await apiFetchAuth('/buyer/orders');

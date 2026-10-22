@@ -32,6 +32,7 @@ import { GetShopOwnerByShopIdService } from "./services/business/shop.js";
 import { sendNotificationEmail } from "./services/email.js";
 import paystackTools from "./utils/paystack.js";
 import { creditOrderPayoutToWallet, storePaystackVirtualAccount } from "./models/wallet.js";
+import { calculateEscrowFee, policy } from "./utils/escrow.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -217,6 +218,17 @@ app.get("/return/:orderId", async (req, res) => {
   console.log("id:", rows[0]);
 
   res.json({ ok: true, id: rows[0] });
+});
+
+app.get("/escrow-fee", async(req, res) => {
+  let {
+    subtotal
+  } = req.query;
+
+  let escrow_fee = calculateEscrowFee(Number(subtotal) as number, policy);
+  res.status(201).send({
+    escrow_fee: escrow_fee
+  });
 });
 
 app.post("/update-fcm", async (req, res) => {

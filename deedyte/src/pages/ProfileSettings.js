@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import CategoryKnowMore from '../components/CategoryKnowMore';
+import NigerianStatePickerModal, { matchNigerianState } from '../components/NigerianStatePickerModal';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -68,6 +69,7 @@ export default function ProfileSettings() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
+  const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [country, setCountry] = useState('Nigeria');
   const [zipcode, setZipcode] = useState('');
   const [coords, setCoords] = useState(/** @type {{ latitude: number; longitude: number } | null} */ (null));
@@ -129,7 +131,7 @@ export default function ProfileSettings() {
       try {
         const place = await reverseGeocodeToPlace(c.latitude, c.longitude);
         if (!city.trim()) setCity(place.city || '');
-        if (!stateName.trim()) setStateName(place.state || '');
+        if (!stateName.trim()) setStateName(matchNigerianState(place.state || ''));
         if (!country.trim()) setCountry(place.country || '');
       } catch {
         // Silent: coordinates are still useful even when reverse geocode fails.
@@ -393,7 +395,29 @@ export default function ProfileSettings() {
 
               <LabeledInput label="Address (optional)" value={address} onChangeText={setAddress} placeholder="Street address" />
               <LabeledInput label="City" required value={city} onChangeText={setCity} placeholder="City" />
-              <LabeledInput label="State" required value={stateName} onChangeText={setStateName} placeholder="State" />
+              <View style={styles.inputBlock}>
+                <Text style={styles.label}>State<Text style={styles.required}> *</Text></Text>
+                <Pressable
+                  style={[styles.input, styles.statePicker]}
+                  onPress={() => setStatePickerOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select state"
+                >
+                  <Text style={stateName ? styles.stateValue : styles.statePlaceholder}>
+                    {stateName || 'Select a state'}
+                  </Text>
+                  <Icon name="chevron-down" size={18} color={MUTED} />
+                </Pressable>
+              </View>
+              <NigerianStatePickerModal
+                visible={statePickerOpen}
+                selected={stateName}
+                onClose={() => setStatePickerOpen(false)}
+                onSelect={(next) => {
+                  setStateName(next);
+                  setStatePickerOpen(false);
+                }}
+              />
               <LabeledInput label="Country" value={country} onChangeText={setCountry} placeholder="Country" />
               <LabeledInput label="Zip code (optional)" value={zipcode} onChangeText={setZipcode} placeholder="Zip code" />
             </ScrollView>
@@ -669,6 +693,13 @@ const styles = StyleSheet.create({
     color: '#222222',
     marginBottom: 6,
   },
+  statePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stateValue: { fontSize: 14, color: '#111111' },
+  statePlaceholder: { fontSize: 14, color: '#A0A0A0' },
   input: {
     height: 46,
     borderWidth: 1,

@@ -25,6 +25,7 @@ import {
   reverseGeocodeToPlace,
 } from '../../utils/deviceLocation';
 import { AUTH } from './theme';
+import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
 
 const GENDERS = [
   { key: 'male', label: 'Male' },
@@ -42,6 +43,7 @@ export default function OnboardingProfileScreen({ navigation }) {
   const [gender, setGender] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
+  const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [country, setCountry] = useState('Nigeria');
   const [submitting, setSubmitting] = useState(false);
   /** Set when GPS + geocode succeeds — included in saved `location`; cleared when user edits fields manually. */
@@ -68,7 +70,7 @@ export default function OnboardingProfileScreen({ navigation }) {
         return;
       }
       if (place.city) setCity(place.city);
-      if (place.state) setState(place.state);
+      if (place.state) setState(matchNigerianState(place.state));
       if (place.country) setCountry(place.country);
       setDeviceCoords({ latitude, longitude });
     } catch (e) {
@@ -260,16 +262,27 @@ export default function OnboardingProfileScreen({ navigation }) {
         />
 
         <Text style={styles.label}>State / region</Text>
-        <TextInput
+        <TouchableOpacity
           style={styles.input}
-          placeholder="State or region"
-          placeholderTextColor={AUTH.textMuted}
-          value={state}
-          onChangeText={(t) => {
+          onPress={() => setStatePickerOpen(true)}
+          disabled={submitting || locLoading}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Select state"
+        >
+          <Text style={state ? styles.stateValue : styles.statePlaceholder}>
+            {state || 'Select a state'}
+          </Text>
+        </TouchableOpacity>
+        <NigerianStatePickerModal
+          visible={statePickerOpen}
+          selected={state}
+          onClose={() => setStatePickerOpen(false)}
+          onSelect={(next) => {
             clearDeviceCoords();
-            setState(t);
+            setState(next);
+            setStatePickerOpen(false);
           }}
-          editable={!submitting && !locLoading}
         />
 
         <Text style={styles.label}>Country</Text>
@@ -339,7 +352,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: AUTH.text,
     backgroundColor: AUTH.inputBg,
+    justifyContent: 'center',
   },
+  stateValue: { fontSize: 16, color: AUTH.text },
+  statePlaceholder: { fontSize: 16, color: AUTH.textMuted },
   genderRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

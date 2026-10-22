@@ -17,6 +17,7 @@ import { readExactLocation } from '../utils/deviceLocation';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BLACK, MUTED, settingsFormStyles as s } from './settingsFields';
+import NigerianStatePickerModal, { matchNigerianState } from '../components/NigerianStatePickerModal';
 
 const WINDOW_W = Dimensions.get('window').width;
 const MAP_HEIGHT = 240;
@@ -84,6 +85,7 @@ export default function SettingsLocationScreen() {
   const [longitude, setLongitude] = useState(DEFAULT_REGION.longitude);
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
+  const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [country, setCountry] = useState('Nigeria');
   const [geocodeBusy, setGeocodeBusy] = useState(false);
   const [locateBusy, setLocateBusy] = useState(false);
@@ -100,7 +102,7 @@ export default function SettingsLocationScreen() {
       .then((data) => {
         const addr = data?.address;
         setCity(pickCity(addr));
-        setRegion(pickRegion(addr));
+        setRegion(matchNigerianState(pickRegion(addr)));
         setCountry(pickCountry(addr) || 'Nigeria');
       })
       .catch((e) => {
@@ -250,15 +252,26 @@ export default function SettingsLocationScreen() {
           </Field>
           <View style={s.divider} />
           <Field label="Region / state (optional)">
-            <TextInput
-              value={region}
-              onChangeText={setRegion}
-              placeholder="Region or state"
-              placeholderTextColor={MUTED}
+            <Pressable
+              onPress={() => setStatePickerOpen(true)}
               style={s.input}
-              autoCapitalize="words"
-            />
+              accessibilityRole="button"
+              accessibilityLabel="Select state"
+            >
+              <Text style={region ? { fontSize: 16, color: BLACK } : { fontSize: 16, color: MUTED }}>
+                {region || 'Select a state'}
+              </Text>
+            </Pressable>
           </Field>
+          <NigerianStatePickerModal
+            visible={statePickerOpen}
+            selected={region}
+            onClose={() => setStatePickerOpen(false)}
+            onSelect={(next) => {
+              setRegion(next);
+              setStatePickerOpen(false);
+            }}
+          />
           <View style={s.divider} />
           <Field label="Country">
             <TextInput

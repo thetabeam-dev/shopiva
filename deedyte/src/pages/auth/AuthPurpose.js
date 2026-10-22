@@ -40,7 +40,7 @@ export default function AuthPurposeScreen({ navigation }) {
         return;
       }
       await setPreAuthChoice('customer');
-      navigation.replace('Login', { allowSkip: true, intentRole: 'customer' });
+      navigation.navigate('Login', { allowSkip: true, intentRole: 'customer' });
     } catch (e) {
       setAccessNotice({
         title: 'Customer access',
@@ -53,7 +53,7 @@ export default function AuthPurposeScreen({ navigation }) {
 
   const goVendor = useCallback(() => {
     void setPreAuthChoice('vendor');
-    navigation.replace('Login', { allowSkip: false, intentRole: 'vendor' });
+    navigation.navigate('Login', { allowSkip: false, intentRole: 'vendor' });
   }, [navigation, setPreAuthChoice]);
 
   return (

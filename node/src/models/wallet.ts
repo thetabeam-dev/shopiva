@@ -551,8 +551,25 @@ export async function creditUserWallet(
       `UPDATE wallets SET balance_kobo = balance_kobo + $2, updated_at = NOW() WHERE id = $1`,
       [row.id, kobo],
     );
+    const balance = await client.query<{ balance_kobo: string }>(
+      `SELECT balance_kobo FROM wallets WHERE id = $1`,
+      [row.id],
+    );
+    const transactions = await client.query(
+      `SELECT id, type, amount_kobo, reference, status, description, created_at
+       FROM wallet_transactions
+       WHERE wallet_id = $1
+       ORDER BY created_at DESC
+       LIMIT 30`,
+      [row.id],
+    );
     await client.query("COMMIT");
-    return { credited: true };
+    return {
+      credited: true,
+      userId: uid,
+      balance_kobo: balance.rows[0]?.balance_kobo ?? null,
+      transactions: transactions.rows,
+    };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

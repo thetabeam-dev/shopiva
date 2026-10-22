@@ -15,6 +15,7 @@ import { nairaLabel, pushWalletFcm } from "../../services/walletPush.js";
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
 import { ensurePaidOrderChatRoom, notifyVendorOfPurchase } from "../../services/buyer/checkoutConfirm.js";
 import { createEscrowForOrder } from "../../models/escrow.js";
+import { calculateEscrowFee, policy } from "../../utils/escrow.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 const secret = process.env.PAYSTACK_SECRET_KEY;
 
@@ -179,9 +180,12 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
     const reference = String(body.reference ?? "").trim() || `wallet_${userId}_${Date.now()}`;
     const shippingAddress = persistShippingAddress(body.shipping_address);
     const tax = Number(body.tax) || 0;
-    const dueNaira = orders.reduce((sum, order) => {
-      return sum + (Number(order.subtotal) || 0) + (Number(order.shipping_fee) || 0);
-    }, tax + 200);
+    const goodsNaira = orders.reduce((sum, order) => sum + (Number(order.subtotal) || 0), 0);
+    const shippingNaira = orders.reduce((sum, order) => sum + (Number(order.shipping_fee) || 0), 0);
+    const escrowNaira = goodsNaira > 0
+      ? calculateEscrowFee(Math.round(goodsNaira * 100), policy) / 100
+      : 0;
+    const dueNaira = goodsNaira + shippingNaira + tax + escrowNaira;
 
     const pool = await db();
     const io = getIo();

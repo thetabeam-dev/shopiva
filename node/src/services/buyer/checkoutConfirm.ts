@@ -13,6 +13,7 @@ import { sendNotificationEmail } from "../email.js";
 import { emitBuyerPaymentToVendor, emitUnpaidOrderToVendor } from "../../socket/order.js";
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
 import { createEscrowForOrder } from "../../models/escrow.js";
+import { calculateEscrowFee, policy } from "../../utils/escrow.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -497,10 +498,14 @@ export async function confirmCartCheckoutAndCreateChatRoom(
   const ship = Math.max(0, Number(shippingNaira) || 0);
   const metadataOrders = metadataOrdersFromVerifyData(d);
 
-  let subtotalNaira = 200; //Escrow Fee
+  let goodsNaira = 0;
   for (const line of lines) {
-    subtotalNaira += Number(line.quantity) * Number(line.unit_price);
+    goodsNaira += Number(line.quantity) * Number(line.unit_price);
   }
+  const escrowFromCart = goodsNaira > 0
+    ? calculateEscrowFee(Math.round(goodsNaira * 100), policy) / 100
+    : 0;
+  const subtotalNaira = goodsNaira + escrowFromCart;
 
   if (!lines.length) {
     const existing = await chatModel.listRoomsForUserByOrderId(buyerUserId, txnId);
@@ -543,7 +548,9 @@ export async function confirmCartCheckoutAndCreateChatRoom(
         0,
       );
       const shippingNaira = metadataShip > 0 ? metadataShip : ship;
-      const escrowNaira = 200;
+      const escrowNaira = goodsNaira > 0
+        ? calculateEscrowFee(Math.round(goodsNaira * 100), policy) / 100
+        : 0;
       const expectedKobo = Math.round((goodsNaira + shippingNaira + escrowNaira) * 100);
       if (Math.abs(amountKobo - expectedKobo) <= 150) {
         const meta = d.metadata && typeof d.metadata === "object"

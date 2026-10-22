@@ -20,6 +20,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import CategoryKnowMore from '../components/CategoryKnowMore';
+import { scanMessage } from '../moderation/messageModeration';
 import {
   errorCodes,
   isErrorWithCode,
@@ -388,8 +389,10 @@ export default function ProfileShopInfoScreen() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState(/** @type {string[]} */ ([]));
-  const [shopProducts, setShopProducts] = useState(/** @type {Record<string, unknown>[]} */ ([]));
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [descriptionPolicyOpen, setDescriptionPolicyOpen] = useState(false);
+  const [category, setCategory] = useState(/** @type {string[]} */([]));
+  const [shopProducts, setShopProducts] = useState(/** @type {Record<string, unknown>[]} */([]));
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [locationState, setLocationState] = useState({ ...DEFAULT_LOCATION });
@@ -442,7 +445,7 @@ export default function ProfileShopInfoScreen() {
   const [bvnDraft, setBvnDraft] = useState('');
   const [bvnBusy, setBvnBusy] = useState(false);
   const [modalDeliveryPolicy, setModalDeliveryPolicy] = useState(false);
-  const [mediaBusy, setMediaBusy] = useState(/** @type {null | 'logo' | 'banner'} */ (null));
+  const [mediaBusy, setMediaBusy] = useState(/** @type {null | 'logo' | 'banner'} */(null));
 
   const uid = user?.id;
 
@@ -550,7 +553,7 @@ export default function ProfileShopInfoScreen() {
    * for the next render). When `silent`, skip the success alert (used by modal
    * Done buttons so we don't double-prompt).
    *
-   * @param {{ silent?: boolean; openingHours?: Record<string, string> }} [opts]
+   * @param {{ silent?: boolean; openingHours?: Record<string, string>; description?: string }} [opts]
    */
   const persist = useCallback(
     async opts => {
@@ -569,17 +572,19 @@ export default function ProfileShopInfoScreen() {
       setSaving(true);
       try {
         const hoursToSave = opts?.openingHours ?? openingHours;
+        const descriptionToSave = opts?.description ?? description;
         const locPayload = { ...locationState, openingHours: hoursToSave };
         const body = buildUpdateBody(shopRow, {
           name,
           slug,
-          description,
+          description: descriptionToSave,
           category,
           contactEmail,
           contactPhone,
           location: locPayload,
         });
         await updateVendorShop(activeShopId, uid, body);
+        if (opts?.description != null) setDescription(descriptionToSave);
         await refresh().catch(() => { });
         await load();
         if (!opts?.silent) Alert.alert('Saved', 'Your shop has been updated.');
@@ -1108,7 +1113,11 @@ export default function ProfileShopInfoScreen() {
 
           <SectionHeader
             title="Description"
-            onEdit={() => setModalDesc(true)}
+            onEdit={() => {
+              setDescriptionDraft(description);
+              setDescriptionPolicyOpen(false);
+              setModalDesc(true);
+            }}
           />
           <Text style={styles.bodyText}>
             {description.trim() || 'Add a short description for buyers.'}
@@ -1348,12 +1357,50 @@ export default function ProfileShopInfoScreen() {
         visible={modalDesc}
         title="Description"
         saving={saving}
-        onClose={() => !saving && setModalDesc(false)}
-        onSave={() => persistAndClose(() => setModalDesc(false))}
+        onClose={() => {
+          if (saving || descriptionPolicyOpen) return;
+          setModalDesc(false);
+        }}
+        onSave={() => {
+          if (descriptionDraft.trim() && !scanMessage(descriptionDraft).isAllowed) {
+            setDescriptionPolicyOpen(true);
+            return;
+          }
+          persistAndClose(() => setModalDesc(false), { description: descriptionDraft });
+        }}
+        notice={descriptionPolicyOpen ? (
+          <View style={styles.descPolicyRoot} pointerEvents="box-none">
+            <Pressable
+              style={styles.descPolicyBackdrop}
+              onPress={() => setDescriptionPolicyOpen(false)}
+              accessibilityLabel="Dismiss"
+            />
+            <View style={[styles.descPolicySheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <View style={styles.descPolicyHandle} />
+              <Text style={styles.descPolicyTitle}>Description not saved</Text>
+              <Text style={styles.descPolicyBody}>
+                Sharing personal contact details or external links in your shop description is not allowed on DeeDyte.
+
+                This policy helps protect buyers and sellers from fraud, keeps transactions secure, and ensures that orders and payments remain traceable on the platform.
+
+                Please keep your business interactions and transactions within DeeDyte.
+              </Text>
+              <Text style={styles.descPolicyWarning}>Repeated attempts may lead to account restrictions.</Text>
+              <Pressable
+                onPress={() => setDescriptionPolicyOpen(false)}
+                style={({ pressed }) => [styles.descPolicyCta, pressed && styles.descPolicyCtaPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Got it"
+              >
+                <Text style={styles.descPolicyCtaText}>Got it</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
       >
         <TextInput
-          value={description}
-          onChangeText={setDescription}
+          value={descriptionDraft}
+          onChangeText={setDescriptionDraft}
           style={[styles.modalInput, styles.modalInputTall]}
           multiline
           textAlignVertical="top"
@@ -1794,8 +1841,8 @@ function TimePickerModal({
   );
 }
 
-/** @param {{ visible: boolean; title: string; children: unknown; onClose: () => void; onSave: () => void; saving?: boolean }} props */
-function FormModal({ visible, title, children, onClose, onSave, saving }) {
+/** @param {{ visible: boolean; title: string; children: unknown; onClose: () => void; onSave: () => void; saving?: boolean; notice?: unknown }} props */
+function FormModal({ visible, title, children, onClose, onSave, saving, notice }) {
   return (
     <Modal
       visible={visible}
@@ -1836,6 +1883,7 @@ function FormModal({ visible, title, children, onClose, onSave, saving }) {
             </Pressable>
           </View>
         </View>
+        {notice}
       </View>
     </Modal>
   );
@@ -2359,6 +2407,70 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 28,
     maxHeight: '85%',
+  },
+  descPolicyRoot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 30,
+    elevation: 30,
+    justifyContent: 'flex-end',
+  },
+  descPolicyBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  descPolicySheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+  },
+  descPolicyHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0E0E0',
+    marginBottom: 16,
+  },
+  descPolicyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: BLACK,
+    marginBottom: 12,
+  },
+  descPolicyBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#667781',
+    marginBottom: 14,
+  },
+  descPolicyWarning: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: '#B45309',
+    marginBottom: 22,
+  },
+  descPolicyCta: {
+    backgroundColor: '#075E54',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  descPolicyCtaPressed: { opacity: 0.9 },
+  descPolicyCtaText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   formModalScroll: {
     flexGrow: 0,

@@ -19,7 +19,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../../context/ProfileContext';
-import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder, completeCheckoutOrder } from '../../api/buyer';
+import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder, completeCheckoutOrder, fetchEscrowFee } from '../../api/buyer';
 import { fetchWallet } from '../../api/user';
 import { getStorefrontShopDelivery } from '../../api/storefront';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
@@ -375,9 +375,28 @@ export default function CartCheckoutScreen({ navigation }) {
       return null;
     }
   }, [checkoutLines, selectedDelivery]);
-  const escrowCharge = 200;
+  const [escrowCharge, setEscrowCharge] = useState(null);
   const chargedShipping = estimatedShippingFee != null ? estimatedShippingFee : shippingCost;
-  const total = Math.max(0, subtotal + chargedShipping + escrowCharge);
+  const total = Math.max(0, subtotal + chargedShipping + (escrowCharge || 0));
+
+  useEffect(() => {
+    if (!(subtotal > 0)) {
+      setEscrowCharge(0);
+      return;
+    }
+    let cancelled = false;
+    setEscrowCharge(null);
+    fetchEscrowFee(subtotal)
+      .then((fee) => {
+        if (!cancelled) setEscrowCharge(fee);
+      })
+      .catch(() => {
+        if (!cancelled) setEscrowCharge(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subtotal]);
 
   useEffect(() => {
     const shopIds = [
@@ -722,6 +741,10 @@ export default function CartCheckoutScreen({ navigation }) {
       setFormBanner('Your cart is empty. Add items before paying.');
       return;
     }
+    if (escrowCharge == null) {
+      Alert.alert('Escrow fee', 'The escrow fee is still loading. Wait a moment and try again.');
+      return;
+    }
     if (hasEmptyRequiredFields) {
       showBottomToast('Please fill in all required fields.');
       return;
@@ -745,6 +768,7 @@ export default function CartCheckoutScreen({ navigation }) {
     setOrderSummaryOpen(true);
   }, [
     subtotal,
+    escrowCharge,
     hasEmptyRequiredFields,
     hasBlockingErrors,
     showBottomToast,
@@ -1120,7 +1144,7 @@ export default function CartCheckoutScreen({ navigation }) {
                   </View>
                   <View style={styles.orderModalTotalRow}>
                     <Text style={styles.orderModalTotalLabel}>Escrow charges</Text>
-                    <Text style={styles.orderModalTotalValue}>{formatNaira(escrowCharge)}</Text>
+                    <Text style={styles.orderModalTotalValue}>{escrowCharge == null ? '…' : formatNaira(escrowCharge)}</Text>
                   </View>
                   <View style={[styles.orderModalTotalRow, styles.orderModalTotalRowGrand]}>
                     <Text style={styles.orderModalGrandLabel}>Total</Text>

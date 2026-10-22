@@ -22,9 +22,14 @@ function fcmMssg(
   event: string,
   amounts?: { shipping: number; goods: number },
   role?: string | null,
+  stage?: string | null,
+  cancelledBySelf?: boolean,
 ) {
   switch (event) {
     case "order_acceptance": {
+      if (String(stage ?? "") === "order_rejected") {
+        return "The seller rejected your order. Open DeeDyte to see the reason.";
+      }
       const shipping = Number(amounts?.shipping ?? 0);
       const goods = Number(amounts?.goods ?? 0);
       const total = shipping + goods + ESCROW_FEE;
@@ -53,7 +58,14 @@ function fcmMssg(
       return "A dispute has been raised for this order. We’ll review the matter and keep you informed.";
 
     case "order_cancelled":
-      return "Your order has been cancelled. If a refund applies, we’ll provide updates on its progress.";
+      if (role === "vendor") {
+        return cancelledBySelf
+          ? "You cancelled this order."
+          : "The buyer cancelled this order. Open DeeDyte to see the details.";
+      }
+      return cancelledBySelf
+        ? "You cancelled this order. If a refund applies, we’ll provide updates on its progress."
+        : "The seller cancelled your order. If a refund applies, we’ll provide updates on its progress.";
 
     default:
       return "There’s a new update regarding your order. Open DeeDyte to see the details.";
@@ -128,6 +140,8 @@ function emitOrderUpdateToUser(
   orderId: string | any,
   actorId: string | any,
   notificationRole: unknown,
+  stage?: unknown,
+  cancelledBySelf?: boolean,
 ): void {
   const id = parseRecipientUserId(userId);
   if (id == null) {
@@ -155,7 +169,7 @@ function emitOrderUpdateToUser(
         goods: Number.isFinite(goods) ? goods : 0,
       };
     }
-    const msg = fcmMssg(event, amounts, role);
+    const msg = fcmMssg(event, amounts, role, stage != null ? String(stage) : null, cancelledBySelf);
     if (role && Number.isFinite(sourceId) && sourceId > 0) {
       await createAndEmitNotification({
         recipientId: id,
@@ -206,6 +220,7 @@ async function broadcastOrderUpdate(
   actorType: unknown,
   actorId: unknown,
   recipient: unknown,
+  stage?: unknown,
 ): Promise<OrderSocketPayload> {
   const { result, vendorList, customerList } = await buildOrderLists(orderId);
   const actor = String(actorType ?? "").toLowerCase();
@@ -215,9 +230,9 @@ async function broadcastOrderUpdate(
   const actorList = listForRole(actor, vendorList, customerList);
   const recipientList = listForRole(recipientRole, vendorList, customerList);
 
-  emitOrderUpdateToUser(recipient, event, result, recipientList, orderId, actorId, recipientRole);
-  if (event === "order_confirmed") {
-    emitOrderUpdateToUser(actorId, event, result, actorList, orderId, actorId, actor);
+  emitOrderUpdateToUser(recipient, event, result, recipientList, orderId, actorId, recipientRole, stage);
+  if (event === "order_confirmed" || event === "order_cancelled") {
+    emitOrderUpdateToUser(actorId, event, result, actorList, orderId, actorId, actor, stage, event === "order_cancelled");
   }
 
   return { result, list: actorList };
@@ -321,6 +336,10 @@ export const handleOrderAcceptance = async (
               [order_id, excessKobo],
             );
             if (credit.credited) {
+              notifyUser(buyerId, "wallet_credited", {
+                balance_kobo: credit.balance_kobo,
+                transactions: credit.transactions ?? [],
+              });
               const refundMessage = `${nairaLabel(excessNaira)} from your shipping fee was returned to your wallet.`;
               await createAndEmitNotification({
                 recipientId: buyerId,
@@ -343,6 +362,7 @@ export const handleOrderAcceptance = async (
         actor_type,
         actor_id,
         recipient,
+        stage,
       );
       if (typeof ack === "function") {
         ack({
@@ -890,6 +910,145 @@ export const handleOrderCancellation = async (
     );
 
     if (rows.length > 0) {
+      const beforeShip = await p.query<{
+        fulfillment_status: string | null;
+        amount_paid: string | number | null;
+        shipping_fee: string | number | null;
+        customer_id: string | number | null;
+        payment_status: string | null;
+        ownerid: string | number | null;
+      }>(
+        `SELECT o.fulfillment_status, o.amount_paid, o.shipping_fee, o.customer_id, o.payment_status, s.ownerid
+         FROM orders o
+         LEFT JOIN shops s ON s.id::text = trim(o.shop_id::text)
+         WHERE o.id = $1`,
+        [order_id],
+      );
+      const priorStatus = String(beforeShip.rows[0]?.fulfillment_status ?? "");
+      const afterShipping = ["order_shipping", "order_out_for_delivery"].includes(priorStatus);
+      const shipped = afterShipping || [
+        "order_delivered",
+        "order_confirmed",
+        "order_completed",
+      ].includes(priorStatus);
+      const paid = String(beforeShip.rows[0]?.payment_status ?? "").toLowerCase() === "success";
+      const buyerId = Number(beforeShip.rows[0]?.customer_id);
+      const vendorId = Number(beforeShip.rows[0]?.ownerid);
+      const goodsNaira = Number(beforeShip.rows[0]?.amount_paid ?? 0);
+      const shippingNaira = Number(beforeShip.rows[0]?.shipping_fee ?? 0);
+      const buyerCancelled = String(actor_type ?? "") === "customer";
+      const vendorCancelled = String(actor_type ?? "") === "vendor";
+      if (paid && Number.isFinite(buyerId) && buyerId > 0) {
+        try {
+          if (vendorCancelled || !shipped) {
+            const refundNaira = goodsNaira + shippingNaira;
+            if (refundNaira > 0) {
+              const refundKobo = Math.round(refundNaira * 100);
+              const credit = await creditUserWallet(
+                buyerId,
+                refundKobo,
+                `order:${order_id}:cancel-refund`,
+                `Refund for cancelled order #${order_id}`,
+              );
+              await p.query(
+                `UPDATE escrow_transactions
+                 SET amount_refunded_kobo = amount_refunded_kobo + $2,
+                     status = CASE
+                       WHEN amount_refunded_kobo + $2 >= amount_held_kobo THEN 'refunded'
+                       ELSE 'partially_refunded'
+                     END,
+                     refunded_at = NOW(),
+                     updated_at = NOW()
+                 WHERE order_id = $1
+                   AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+                [order_id, refundKobo],
+              );
+              if (credit.credited) {
+                notifyUser(buyerId, "wallet_credited", {
+                  balance_kobo: credit.balance_kobo,
+                  transactions: credit.transactions ?? [],
+                });
+                const refundMessage = vendorCancelled
+                  ? `${nairaLabel(refundNaira)} was returned to your wallet, including the shipping fee, because the seller cancelled this order.`
+                  : `${nairaLabel(refundNaira)} was returned to your wallet, including the shipping fee, because this order was cancelled before shipping.`;
+                await createAndEmitNotification({
+                  recipientId: buyerId,
+                  title: "Order refund",
+                  message: refundMessage,
+                  sourceType: "order",
+                  sourceId: Number(order_id),
+                  role: "buyer",
+                });
+                await pushWalletFcm(buyerId, "Order refund", refundMessage);
+              }
+            }
+          } else if (buyerCancelled && afterShipping && goodsNaira > 0) {
+            const goodsKobo = Math.round(goodsNaira * 100);
+            const shippingKobo = Math.round(Math.max(0, shippingNaira) * 100);
+            const credit = await creditUserWallet(
+              buyerId,
+              goodsKobo,
+              `order:${order_id}:cancel-goods-refund`,
+              `Item refund for cancelled order #${order_id}`,
+            );
+            let vendorCredit: Awaited<ReturnType<typeof creditUserWallet>> | null = null;
+            if (shippingKobo > 0 && Number.isFinite(vendorId) && vendorId > 0) {
+              vendorCredit = await creditUserWallet(
+                vendorId,
+                shippingKobo,
+                `order:${order_id}:cancel-shipping-payout`,
+                `Shipping fee for cancelled order #${order_id}`,
+              );
+            }
+            await p.query(
+              `UPDATE escrow_transactions
+               SET amount_refunded_kobo = amount_refunded_kobo + $2,
+                   amount_released_kobo = amount_released_kobo + $3,
+                   status = 'partially_refunded',
+                   refunded_at = NOW(),
+                   updated_at = NOW()
+               WHERE order_id = $1
+                 AND amount_released_kobo + amount_refunded_kobo + $2 + $3 <= amount_held_kobo`,
+              [order_id, goodsKobo, shippingKobo],
+            );
+            if (credit.credited) {
+              notifyUser(buyerId, "wallet_credited", {
+                balance_kobo: credit.balance_kobo,
+                transactions: credit.transactions ?? [],
+              });
+              const refundMessage = `${nairaLabel(goodsNaira)} was returned to your wallet. The shipping fee stays with the seller because this order was already shipped.`;
+              await createAndEmitNotification({
+                recipientId: buyerId,
+                title: "Order refund",
+                message: refundMessage,
+                sourceType: "order",
+                sourceId: Number(order_id),
+                role: "buyer",
+              });
+              await pushWalletFcm(buyerId, "Order refund", refundMessage);
+            }
+            if (vendorCredit?.credited) {
+              notifyUser(vendorId, "wallet_credited", {
+                balance_kobo: vendorCredit.balance_kobo,
+                transactions: vendorCredit.transactions ?? [],
+              });
+              const shippingMessage = `${nairaLabel(shippingNaira)} shipping fee for order #${order_id} was added to your wallet because the buyer cancelled after shipping.`;
+              await createAndEmitNotification({
+                recipientId: vendorId,
+                title: "Shipping fee",
+                message: shippingMessage,
+                sourceType: "order",
+                sourceId: Number(order_id),
+                role: "vendor",
+              });
+              await pushWalletFcm(vendorId, "Shipping fee", shippingMessage);
+            }
+          }
+        } catch (refundErr) {
+          console.error("[order] cancel wallet refund failed:", refundErr);
+        }
+      }
+
       await updateFulfillmentStatus(stage, order_id);
 
       const metaObj =

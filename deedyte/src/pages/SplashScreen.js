@@ -1,5 +1,5 @@
-import { useNavigation } from "@react-navigation/native";
-import { useEffect } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useCallback, useEffect, useRef } from "react";
 import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
 // import "../assets/Deedyte.png"
 
@@ -9,14 +9,21 @@ const h = Dimensions.get("screen").height;
 export function SplashScreen(){
 
     let navigation = useNavigation()
+    const continued = useRef(false)
 
     useEffect(() => {
-        setTimeout(() => {
-            navigation.navigate("AuthPurpose"); 
-            // navigation.navigate("Shop-Onboarding"); 
+        const timer = setTimeout(() => {
+            continued.current = true
+            navigation.replace("AuthPurpose");
         }, 2000);
-       
+        return () => clearTimeout(timer);
     }, [navigation])
+
+    useFocusEffect(useCallback(() => {
+        if (!continued.current) return undefined;
+        navigation.replace("AuthPurpose");
+        return undefined;
+    }, [navigation]))
 
     
 
