@@ -26,29 +26,36 @@ const HomeStack = createNativeStackNavigator();
 
 
 
-export function VendorHomeStackScreen(){
+export function VendorHomeStackScreen() {
 
 
-    return(
-        <HomeStack.Navigator>
-          <HomeStack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={({ navigation }) => ({
-              title: '',
-              headerBackVisible: false,
-              headerShadowVisible: false,
-              headerStyle: styles.homeHeaderBar,
-              headerRight: () => (
+  return (
+    <HomeStack.Navigator>
+      <HomeStack.Screen
+        name="Home"
+        component={HomeScreen}
+        options={({ navigation }) => ({
+          title: '',
+          headerBackVisible: false,
+          headerShadowVisible: false,
+          headerStyle: styles.homeHeaderBar,
+          headerRight: () => (
+            Platform.OS === "ios" ?
+              <NotificationBell
+                onPress={() => navigation.navigate('Notifications')}
+                style={{ marginTop: 10 }}
+              /> :
+              <View style={{ paddingTop: 10 }}>
                 <NotificationBell
                   onPress={() => navigation.navigate('Notifications')}
-                  style={{ marginTop: 10 }}
+                  style={{ marginTop: 0, height: 30, width: 32, backgroundColor: "#fff", display: "flex", justifyContent: "center", alignItems: "center" }}
                 />
-              ),
-            })}
-          />
+              </View>
+          ),
+        })}
+      />
 
-        {/* <HomeStack.Screen
+      {/* <HomeStack.Screen
             name="vendors"
             component={VendorsScreen}
             options={({ navigation }) => ({
@@ -136,28 +143,28 @@ export function VendorHomeStackScreen(){
             headerStyle: { backgroundColor: '#FFFFFF' },
             }}
         /> */}
-        <HomeStack.Screen
-          name="Notifications"
-          component={NotificationsScreen}
-          options={{ title: 'Notifications', headerShadowVisible: false }}
-        />
-        <HomeStack.Screen name="Order-detail" component={OrderDetailScreen} options={{ title: 'Order detail', headerBackVisible: false, headerShadowVisible: false }} />
-        <HomeStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ title: 'Dispute detail', headerBackVisible: false, headerShadowVisible: false }} />
-        <HomeStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ title: 'Return detail', headerBackVisible: false, headerShadowVisible: false }} />
-        <HomeStack.Screen
-          name="Inbox"
-          component={ChatRoomScreen}
-          options={{
-            title: 'Inbox',
-            headerBackVisible: true,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: '#075E54' },
-            headerTintColor: '#FFFFFF',
-            headerTitleStyle: { color: '#FFFFFF', fontWeight: '600' },
-          }}
-        />
+      <HomeStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Notifications', headerShadowVisible: false }}
+      />
+      <HomeStack.Screen name="Order-detail" component={OrderDetailScreen} options={{ title: 'Order detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ title: 'Dispute detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ title: 'Return detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen
+        name="Inbox"
+        component={ChatRoomScreen}
+        options={{
+          title: 'Inbox',
+          headerBackVisible: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#075E54' },
+          headerTintColor: '#FFFFFF',
+          headerTitleStyle: { color: '#FFFFFF', fontWeight: '600' },
+        }}
+      />
     </HomeStack.Navigator>
-    )
+  )
 }
 
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../hooks/useAuth';
@@ -60,8 +60,8 @@ export function NotificationBell({ onPress, style }) {
 const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
-    top: -6,
-    right: -8,
+    top: Platform.OS === 'ios' ? -6 : -.5,
+    right: Platform.OS === 'ios' ? -8 : 1,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
