@@ -673,14 +673,16 @@ export default function OrderDetailScreen() {
           : key === 'held'
             ? 'Amount held'
             : 'Escrow amount';
-    const rawTotal =
-      orderInfo?.order?.total_paid ?? orderInfo?.order?.amount_paid;
+    const rawTotal = auth.activeRole === 'vendor'
+      ? orderInfo?.order?.amount_paid
+      : (orderInfo?.order?.total_paid ?? orderInfo?.order?.amount_paid);
     const num = Number(rawTotal);
     const valueText = Number.isFinite(num) ? fmt(num) : '—';
     return { theme, amountLabel, amountValue: valueText };
   }, [
     fmt,
     orderInfo?.order?.escrow_status,
+    auth.activeRole,
     orderInfo?.order?.total_paid,
     orderInfo?.order?.amount_paid,
   ]);
@@ -1340,8 +1342,10 @@ export default function OrderDetailScreen() {
                   (Array.isArray(orderInfo?.order_items)
                     ? orderInfo.order_items.reduce((acc, curr) => acc + Number(curr.total_price || 0), 0)
                     : 0) +
-                  (auth.activeRole === 'vendor' ? 0 : 200) +
-                  Number(orderInfo?.order?.shipping_fee || 0),
+                  ((['unpaid', 'payment_received', ''].includes(String(orderInfo?.order?.fulfillment_status ?? ''))
+                    ? 0
+                    : Number(orderInfo?.order?.shipping_fee || 0)) +
+                  (auth.activeRole === 'vendor' ? 0 : 200)),
                 )}
               </Text>
             </View>
@@ -1562,9 +1566,12 @@ export default function OrderDetailScreen() {
                 0,
               )
               : 0;
-            const showEscrowFee = auth.activeRole !== 'vendor';
+            const isVendor = auth.activeRole === 'vendor';
+            const status = String(orderInfo?.order?.fulfillment_status ?? '');
+            const shippingPending = status === '' || status === 'unpaid' || status === 'payment_received';
+            const showEscrowFee = !isVendor;
             const escrowFee = showEscrowFee ? 200 : 0;
-            const shipping = Number(orderInfo?.order?.shipping_fee || 0);
+            const shipping = shippingPending ? 0 : Number(orderInfo?.order?.shipping_fee || 0);
             const total = subtotal + escrowFee + shipping;
             return (
               <>
@@ -1573,7 +1580,11 @@ export default function OrderDetailScreen() {
                   <MoneyRow label="Escrow Fee" value={fmt(200)} muted />
                 ) : null}
                 <MoneyRow label="Discount" value={fmt(0)} muted />
-                <MoneyRow label="Shipping Cost" value={fmt(shipping)} muted />
+                <MoneyRow
+                  label="Shipping Cost"
+                  value={shippingPending ? 'Pending' : fmt(shipping)}
+                  muted
+                />
                 <MoneyRow label="Tax" value={fmt(0)} muted />
                 <View style={styles.moneyDivider} />
                 <MoneyRow label="Total" value={fmt(total)} bold />
@@ -1655,6 +1666,7 @@ export default function OrderDetailScreen() {
                       ),
                       shipping_address: orderInfo.order.shipping_address,
                       shipping_method: orderInfo.order.shipping_method,
+                      shipping_fee: orderInfo.order.shipping_fee,
                       event_type: 'acceptance',
                       stage: 'order_accepted',
                       actor_type: 'vendor',

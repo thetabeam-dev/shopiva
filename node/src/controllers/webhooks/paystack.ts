@@ -253,7 +253,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
           customer_id: customerId,
           shop_id: String(shop_id ?? ""),
           amount_paid: subtotal,
-          shipping_fee,
+          shipping_fee: 0,
           tax,
           charges: 0,
           total_paid: subtotal,
@@ -291,7 +291,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
         }, 0);
         await notifyVendorOfPurchase(shop_id, orderId, {
           itemCount: itemCount || items.length,
-          total: subtotal + shipping_fee,
+          total: subtotal,
         });
 
         await OrderHandler.orderEvent({
@@ -302,7 +302,12 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
           actor_id: customerId,
           outcome: "success",
           notes: `Payment received from wallet - Reference: ${reference}`,
-          meta: JSON.stringify({ channel: "wallet", paid_at: new Date().toISOString() }),
+          meta: JSON.stringify({
+            channel: "wallet",
+            paid_at: new Date().toISOString(),
+            shipping_fee_status: "pending",
+            estimated_shipping_fee: shipping_fee,
+          }),
         });
 
         for (const item of items as Array<Record<string, unknown>>) {

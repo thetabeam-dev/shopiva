@@ -25,4 +25,21 @@ export async function createEscrowForOrder(input: {
      ) VALUES ($1, $2, $3, 'NGN', $4, $5)`,
     [orderId, buyerId, vendorId, amountHeldKobo, input.status],
   );
+  await syncOrderEscrowStatus(orderId);
+}
+
+/** Copy the escrow row status onto orders.escrow_status. */
+export async function syncOrderEscrowStatus(orderId: number): Promise<void> {
+  const id = Number(orderId);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const pool = await db();
+  await pool.query(
+    `UPDATE orders o
+     SET escrow_status = e.status,
+         updated_at = NOW()
+     FROM escrow_transactions e
+     WHERE e.order_id = o.id
+       AND o.id = $1`,
+    [id],
+  );
 }

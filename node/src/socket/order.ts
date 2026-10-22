@@ -7,6 +7,7 @@ import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 import { creditUserWallet } from "../models/wallet.js";
+import { syncOrderEscrowStatus } from "../models/escrow.js";
 import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 
 const ESCROW_FEE = 200;
@@ -297,13 +298,22 @@ export const handleOrderAcceptance = async (
           `SELECT shipping_fee, customer_id FROM orders WHERE id = $1`,
           [order_id],
         );
-        const chargedShipping = Number(current.rows[0]?.shipping_fee ?? 0);
         const buyerId = Number(current.rows[0]?.customer_id);
-        const estimatedFee = Number(metaObj?.estimated_shipping_fee);
-        const deductedShipping =
-          Number.isFinite(estimatedFee) && estimatedFee > chargedShipping
-            ? estimatedFee
-            : chargedShipping;
+        const paidEvent = await p.query<{ meta: unknown }>(
+          `SELECT meta FROM order_events
+           WHERE order_id = $1 AND stage = 'payment_received'
+           ORDER BY created_at DESC LIMIT 1`,
+          [order_id],
+        );
+        const paidMeta = paidEvent.rows[0]?.meta;
+        const paidRecord = paidMeta && typeof paidMeta === "object"
+          ? (paidMeta as Record<string, unknown>)
+          : {};
+        const chargedEstimate = Number(paidRecord.estimated_shipping_fee);
+        const clientEstimate = Number(metaObj?.estimated_shipping_fee);
+        const deductedShipping = [chargedEstimate, clientEstimate, Number(current.rows[0]?.shipping_fee ?? 0)]
+          .filter((value) => Number.isFinite(value) && value > 0)
+          .reduce((max, value) => Math.max(max, value), 0);
         await p.query(
           `UPDATE orders
            SET shipping_fee = $1,
@@ -321,19 +331,6 @@ export const handleOrderAcceptance = async (
               excessKobo,
               `order:${order_id}:shipping-refund:${Math.round(deductedShipping * 100)}-${Math.round(shippingFee * 100)}`,
               `Shipping fee refund for order #${order_id}`,
-            );
-            await p.query(
-              `UPDATE escrow_transactions
-               SET amount_refunded_kobo = amount_refunded_kobo + $2,
-                   status = CASE
-                     WHEN amount_refunded_kobo + $2 >= amount_held_kobo THEN 'refunded'
-                     ELSE 'partially_refunded'
-                   END,
-                   refunded_at = NOW(),
-                   updated_at = NOW()
-               WHERE order_id = $1
-                 AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
-              [order_id, excessKobo],
             );
             if (credit.credited) {
               notifyUser(buyerId, "wallet_credited", {
@@ -950,19 +947,20 @@ export const handleOrderCancellation = async (
                 `order:${order_id}:cancel-refund`,
                 `Refund for cancelled order #${order_id}`,
               );
-              await p.query(
-                `UPDATE escrow_transactions
-                 SET amount_refunded_kobo = amount_refunded_kobo + $2,
-                     status = CASE
-                       WHEN amount_refunded_kobo + $2 >= amount_held_kobo THEN 'refunded'
-                       ELSE 'partially_refunded'
-                     END,
-                     refunded_at = NOW(),
-                     updated_at = NOW()
-                 WHERE order_id = $1
-                   AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
-                [order_id, refundKobo],
-              );
+              const goodsKobo = Math.round(Math.max(0, goodsNaira) * 100);
+              if (goodsKobo > 0) {
+                await p.query(
+                  `UPDATE escrow_transactions
+                   SET amount_refunded_kobo = amount_refunded_kobo + $2,
+                       status = 'refunded',
+                       refunded_at = NOW(),
+                       updated_at = NOW()
+                   WHERE order_id = $1
+                     AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+                  [order_id, goodsKobo],
+                );
+                await syncOrderEscrowStatus(Number(order_id));
+              }
               if (credit.credited) {
                 notifyUser(buyerId, "wallet_credited", {
                   balance_kobo: credit.balance_kobo,
@@ -1003,14 +1001,14 @@ export const handleOrderCancellation = async (
             await p.query(
               `UPDATE escrow_transactions
                SET amount_refunded_kobo = amount_refunded_kobo + $2,
-                   amount_released_kobo = amount_released_kobo + $3,
-                   status = 'partially_refunded',
+                   status = 'refunded',
                    refunded_at = NOW(),
                    updated_at = NOW()
                WHERE order_id = $1
-                 AND amount_released_kobo + amount_refunded_kobo + $2 + $3 <= amount_held_kobo`,
-              [order_id, goodsKobo, shippingKobo],
+                 AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+              [order_id, goodsKobo],
             );
+            await syncOrderEscrowStatus(Number(order_id));
             if (credit.credited) {
               notifyUser(buyerId, "wallet_credited", {
                 balance_kobo: credit.balance_kobo,

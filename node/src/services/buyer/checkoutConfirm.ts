@@ -264,11 +264,11 @@ export async function notifyVendorOfPurchase(
         if (itemCount == null || total == null) {
           const { rows: totals } = await pool.query<{ item_count: number; total: number }>(
             `SELECT COALESCE(SUM(oi.units), 0)::int AS item_count,
-                    COALESCE(o.amount_paid, 0) + COALESCE(o.shipping_fee, 0) AS total
+                    COALESCE(o.amount_paid, 0) AS total
              FROM orders o
              LEFT JOIN order_items oi ON oi.order_id = o.id
              WHERE o.id = $1
-             GROUP BY o.amount_paid, o.shipping_fee`,
+             GROUP BY o.amount_paid`,
             [sourceId],
           );
           itemCount = Number(totals[0]?.item_count ?? 0);
@@ -562,7 +562,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
             customer_id: String(buyerUserId),
             shop_id: String(order.shop_id ?? 0),
             amount_paid: order.subtotal,
-            shipping_fee: order.shipping_fee,
+            shipping_fee: 0,
             tax: 0,
             charges: 0,
             total_paid: order.subtotal,
@@ -594,7 +594,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
           }, 0);
           await notifyVendorOfPurchase(order.shop_id, orderId, {
             itemCount: itemCount || order.items.length,
-            total: Number(order.subtotal ?? 0) + Number(order.shipping_fee ?? 0),
+            total: Number(order.subtotal ?? 0),
           });
           await OrderHandler.orderEvent({
             order_id: String(orderId),
@@ -604,7 +604,11 @@ export async function confirmCartCheckoutAndCreateChatRoom(
             actor_id: String(buyerUserId),
             outcome: "success",
             notes: `Payment received via Paystack - Reference: ${ref}`,
-            meta: JSON.stringify({ paystack_charge_id: txnId }),
+            meta: JSON.stringify({
+              paystack_charge_id: txnId,
+              shipping_fee_status: "pending",
+              estimated_shipping_fee: Number(order.shipping_fee ?? 0),
+            }),
           });
           for (const item of order.items) {
             const qty = Number(item.unit ?? item.quantity ?? 0);
