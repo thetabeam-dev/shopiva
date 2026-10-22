@@ -180,6 +180,7 @@ export async function createUnpaidCheckoutOrders(
         buyerId: buyerUserId,
         vendorId: Number(owner?.id),
         amountNaira: subtotal,
+        goodsNaira: subtotal,
         status: "locked",
       });
     } catch (err) {
@@ -583,6 +584,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
               buyerId: buyerUserId,
               vendorId: Number(owner?.id),
               amountNaira: Number(order.subtotal) + Number(order.shipping_fee),
+              goodsNaira: Number(order.subtotal),
               status: "held",
             });
           } catch (err) {

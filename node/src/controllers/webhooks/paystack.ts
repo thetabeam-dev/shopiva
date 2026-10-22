@@ -274,6 +274,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
             buyerId: userId,
             vendorId: Number(vendorId),
             amountNaira: subtotal + shipping_fee,
+            goodsNaira: subtotal,
             status: "held",
           });
         } catch (err) {

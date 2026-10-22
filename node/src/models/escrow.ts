@@ -1,10 +1,12 @@
 import { db } from "../config/database.js";
+import { calculateEscrowFee, policy } from "../utils/escrow.js";
 
 export async function createEscrowForOrder(input: {
   orderId: number;
   buyerId: number;
   vendorId: number;
   amountNaira: number;
+  goodsNaira: number;
   status: "held" | "locked";
 }): Promise<void> {
   const orderId = Number(input.orderId);
@@ -15,15 +17,19 @@ export async function createEscrowForOrder(input: {
   if (!Number.isFinite(vendorId) || vendorId <= 0) return;
 
   const amountHeldKobo = Math.max(0, Math.round(Number(input.amountNaira) * 100));
+  const goodsKobo = Math.round(Number(input.goodsNaira) * 100);
+  const feeKobo = Number.isFinite(goodsKobo) && goodsKobo > 0
+    ? calculateEscrowFee(goodsKobo, policy)
+    : 0;
   const pool = await db();
   const existing = await pool.query(`SELECT id FROM escrow_transactions WHERE order_id = $1 LIMIT 1`, [orderId]);
   if (existing.rows.length) return;
 
   await pool.query(
     `INSERT INTO escrow_transactions (
-       order_id, buyer_id, vendor_id, currency, amount_held_kobo, status
-     ) VALUES ($1, $2, $3, 'NGN', $4, $5)`,
-    [orderId, buyerId, vendorId, amountHeldKobo, input.status],
+       order_id, buyer_id, vendor_id, currency, amount_held_kobo, fee_kobo, status
+     ) VALUES ($1, $2, $3, 'NGN', $4, $5, $6)`,
+    [orderId, buyerId, vendorId, amountHeldKobo, feeKobo, input.status],
   );
   await syncOrderEscrowStatus(orderId);
 }

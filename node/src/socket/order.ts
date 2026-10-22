@@ -9,8 +9,7 @@ import { sendFcmForActivities } from "../services/firebaseConfig.js";
 import { creditUserWallet } from "../models/wallet.js";
 import { syncOrderEscrowStatus } from "../models/escrow.js";
 import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
-
-const ESCROW_FEE = 200;
+import { calculateEscrowFee, policy } from "../utils/escrow.js";
 
 function naira(amount: number) {
   return amount.toLocaleString("en-NG", {
@@ -33,7 +32,10 @@ function fcmMssg(
       }
       const shipping = Number(amounts?.shipping ?? 0);
       const goods = Number(amounts?.goods ?? 0);
-      const total = shipping + goods + ESCROW_FEE;
+      const escrow = goods > 0
+        ? calculateEscrowFee(Math.round(goods * 100), policy) / 100
+        : 0;
+      const total = shipping + goods + escrow;
       return `The seller has accepted your order and set the shipping fee at ₦${naira(shipping)}. The total amount for your order is ₦${naira(total)}. Any unused funds will be refunded to your DeeDyte wallet. Your order is now being processed.`;
     }
 

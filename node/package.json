@@ -15,7 +15,7 @@
     "local": "nodemon",
     "stop": "pm2 stop ecosystem.config.cjs",
     "restart": "pm2 restart ecosystem.config.cjs",
-    "migrate": "tsc src/database/migrate.ts --outDir dist/database --module nodenext --target esnext --moduleResolution nodenext --esModuleInterop --skipLibCheck && npx dotenv-cli -e .env -- node dist/database/migrate.js",
+    "migrate": "tsc src/database/migrate.ts --outDir dist --rootDir src --module nodenext --target esnext --moduleResolution nodenext --esModuleInterop --skipLibCheck && npx dotenv-cli -e .env -- node dist/database/migrate.js",
     "migrate:baseline": "npx dotenv-cli -e ./.env -- npx --yes tsx src/database/baseline-migrations.ts",
     "seed:demo": "npx dotenv-cli -e ./.env -- npx --yes tsx src/database/seed-vendors-products.ts",
     "db:reset-products": "npx dotenv-cli -e ./.env -- npx --yes tsx src/database/reset-products-inventory.ts",

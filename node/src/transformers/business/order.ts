@@ -12,10 +12,23 @@ export const orderTransformer = async (
     let shopId;
     let orderRef;
 
-    const { rows: [order] } = await pool.query(
+    const { rows: [orderRow] } = await pool.query(
         `SELECT * FROM orders WHERE id = $1`,
         [orderId]
     );
+    let feeKobo = 0;
+    try {
+        const { rows: [escrowRow] } = await pool.query(
+            `SELECT fee_kobo FROM escrow_transactions WHERE order_id = $1 LIMIT 1`,
+            [orderId]
+        );
+        feeKobo = Number(escrowRow?.fee_kobo ?? 0);
+    } catch {
+        feeKobo = 0;
+    }
+    const order = orderRow
+        ? { ...orderRow, escrow_fee: Number.isFinite(feeKobo) ? feeKobo / 100 : 0 }
+        : orderRow;
 
     const { rows: [room] } = await pool.query(
         `SELECT * 

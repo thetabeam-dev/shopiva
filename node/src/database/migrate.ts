@@ -103,6 +103,14 @@ async function runMigrations() {
         console.log(`✅ Successfully executed: ${file}\n`);
       } catch (error: any) {
         await client.query("ROLLBACK");
+        if (error?.code === "42P07" || error?.code === "42710") {
+          await client.query(
+            "INSERT INTO migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING",
+            [migrationName],
+          );
+          console.log(`⏭️  ${file} is already in the database, marked as executed\n`);
+          continue;
+        }
         console.error(`❌ Error executing ${file}:`, error.message);
         throw error;
       }

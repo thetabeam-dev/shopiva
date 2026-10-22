@@ -421,6 +421,7 @@ export default function OrderDetailScreen() {
   const autoPayStarted = useRef(false);
   const onMakePaymentRef = useRef(() => { });
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const escrowCharge = Number(orderInfo?.order?.escrow_fee ?? 0);
 
   useEffect(() => {
     if (statusKey !== 'order_confirmed') return undefined;
@@ -1345,7 +1346,7 @@ export default function OrderDetailScreen() {
                   ((['unpaid', 'payment_received', ''].includes(String(orderInfo?.order?.fulfillment_status ?? ''))
                     ? 0
                     : Number(orderInfo?.order?.shipping_fee || 0)) +
-                  (auth.activeRole === 'vendor' ? 0 : 200)),
+                  (auth.activeRole === 'vendor' ? 0 : (escrowCharge || 0))),
                 )}
               </Text>
             </View>
@@ -1570,14 +1571,14 @@ export default function OrderDetailScreen() {
             const status = String(orderInfo?.order?.fulfillment_status ?? '');
             const shippingPending = status === '' || status === 'unpaid' || status === 'payment_received';
             const showEscrowFee = !isVendor;
-            const escrowFee = showEscrowFee ? 200 : 0;
+            const escrowFee = showEscrowFee ? (escrowCharge || 0) : 0;
             const shipping = shippingPending ? 0 : Number(orderInfo?.order?.shipping_fee || 0);
             const total = subtotal + escrowFee + shipping;
             return (
               <>
                 <MoneyRow label="Subtotal" value={fmt(subtotal)} muted />
                 {showEscrowFee ? (
-                  <MoneyRow label="Escrow Fee" value={fmt(200)} muted />
+                  <MoneyRow label="Escrow Fee" value={fmt(escrowCharge)} muted />
                 ) : null}
                 <MoneyRow label="Discount" value={fmt(0)} muted />
                 <MoneyRow
