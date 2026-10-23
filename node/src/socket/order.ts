@@ -28,7 +28,17 @@ function fcmMssg(
   switch (event) {
     case "order_acceptance": {
       if (String(stage ?? "") === "order_rejected") {
-        return "The seller rejected your order. Open DeeDyte to see the reason.";
+        const refunded = Number(amounts?.goods ?? 0) + Number(amounts?.shipping ?? 0);
+        if (role === "vendor") {
+          return cancelledBySelf
+            ? (refunded > 0
+              ? `You rejected this order. The buyer was refunded ${nairaLabel(refunded)}, including the shipping fee.`
+              : "You rejected this order.")
+            : "This order was rejected.";
+        }
+        return refunded > 0
+          ? `The seller rejected your order. ${nairaLabel(refunded)}, including the shipping fee, was returned to your wallet.`
+          : "The seller rejected your order. Open DeeDyte to see the reason.";
       }
       const shipping = Number(amounts?.shipping ?? 0);
       const goods = Number(amounts?.goods ?? 0);
@@ -165,10 +175,25 @@ function emitOrderUpdateToUser(
         `SELECT shipping_fee, amount_paid FROM orders WHERE id = $1`,
         [orderId],
       );
-      const fee = Number(rows[0]?.shipping_fee ?? 0);
+      const storedFee = Number(rows[0]?.shipping_fee ?? 0);
       const goods = Number(rows[0]?.amount_paid ?? 0);
+      let shipping = Number.isFinite(storedFee) ? storedFee : 0;
+      if (String(stage ?? "") === "order_rejected") {
+        const paid = await pool.query<{ meta: unknown }>(
+          `SELECT meta FROM order_events
+           WHERE order_id = $1 AND stage = 'payment_received'
+           ORDER BY created_at DESC LIMIT 1`,
+          [orderId],
+        );
+        const paidMeta = paid.rows[0]?.meta;
+        const paidRecord = paidMeta && typeof paidMeta === "object"
+          ? (paidMeta as Record<string, unknown>)
+          : {};
+        const estimated = Number(paidRecord.estimated_shipping_fee);
+        if (Number.isFinite(estimated) && estimated > shipping) shipping = estimated;
+      }
       amounts = {
-        shipping: Number.isFinite(fee) ? fee : 0,
+        shipping,
         goods: Number.isFinite(goods) ? goods : 0,
       };
     }
@@ -233,9 +258,20 @@ async function broadcastOrderUpdate(
   const actorList = listForRole(actor, vendorList, customerList);
   const recipientList = listForRole(recipientRole, vendorList, customerList);
 
+  const rejected = event === "order_acceptance" && String(stage ?? "") === "order_rejected";
   emitOrderUpdateToUser(recipient, event, result, recipientList, orderId, actorId, recipientRole, stage);
-  if (event === "order_confirmed" || event === "order_cancelled") {
-    emitOrderUpdateToUser(actorId, event, result, actorList, orderId, actorId, actor, stage, event === "order_cancelled");
+  if (event === "order_confirmed" || event === "order_cancelled" || rejected) {
+    emitOrderUpdateToUser(
+      actorId,
+      event,
+      result,
+      actorList,
+      orderId,
+      actorId,
+      actor,
+      stage,
+      event === "order_cancelled" || rejected,
+    );
   }
 
   return { result, list: actorList };
@@ -293,6 +329,70 @@ export const handleOrderAcceptance = async (
       const fulfillment_duration = metaObj?.fulfillment_duration ?? null;
       if (fulfillment_duration != null) {
         await updateShipping(fulfillment_duration, order_id);
+      }
+      if (String(stage ?? "") === "order_rejected") {
+        try {
+          const current = await p.query<{
+            amount_paid: string | number | null;
+            shipping_fee: string | number | null;
+            customer_id: string | number | null;
+            payment_status: string | null;
+          }>(
+            `SELECT amount_paid, shipping_fee, customer_id, payment_status FROM orders WHERE id = $1`,
+            [order_id],
+          );
+          const paid = String(current.rows[0]?.payment_status ?? "").toLowerCase() === "success";
+          const buyerId = Number(current.rows[0]?.customer_id);
+          const goodsNaira = Number(current.rows[0]?.amount_paid ?? 0);
+          const storedShipping = Number(current.rows[0]?.shipping_fee ?? 0);
+          const paidEvent = await p.query<{ meta: unknown }>(
+            `SELECT meta FROM order_events
+             WHERE order_id = $1 AND stage = 'payment_received'
+             ORDER BY created_at DESC LIMIT 1`,
+            [order_id],
+          );
+          const paidMeta = paidEvent.rows[0]?.meta;
+          const paidRecord = paidMeta && typeof paidMeta === "object"
+            ? (paidMeta as Record<string, unknown>)
+            : {};
+          const estimated = Number(paidRecord.estimated_shipping_fee);
+          const shippingNaira = Math.max(
+            Number.isFinite(storedShipping) ? storedShipping : 0,
+            Number.isFinite(estimated) ? estimated : 0,
+          );
+          const refundNaira = Math.max(0, goodsNaira) + Math.max(0, shippingNaira);
+          if (paid && refundNaira > 0 && Number.isFinite(buyerId) && buyerId > 0) {
+            const refundKobo = Math.round(refundNaira * 100);
+            const credit = await creditUserWallet(
+              buyerId,
+              refundKobo,
+              `order:${order_id}:reject-refund`,
+              `Refund for rejected order #${order_id}`,
+            );
+            const goodsKobo = Math.round(Math.max(0, goodsNaira) * 100);
+            if (goodsKobo > 0) {
+              await p.query(
+                `UPDATE escrow_transactions
+                 SET amount_refunded_kobo = amount_refunded_kobo + $2,
+                     status = 'refunded',
+                     refunded_at = NOW(),
+                     updated_at = NOW()
+                 WHERE order_id = $1
+                   AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+                [order_id, goodsKobo],
+              );
+              await syncOrderEscrowStatus(Number(order_id));
+            }
+            if (credit.credited) {
+              notifyUser(buyerId, "wallet_credited", {
+                balance_kobo: credit.balance_kobo,
+                transactions: credit.transactions ?? [],
+              });
+            }
+          }
+        } catch (refundErr) {
+          console.error("[order] reject refund failed:", refundErr);
+        }
       }
       const shippingFee = Number(metaObj?.shipping_fee);
       if (Number.isFinite(shippingFee) && shippingFee >= 0 && stage !== "order_rejected") {
@@ -445,7 +545,6 @@ export const handleOrderProcessing = async (
       const metaObj =
         meta && typeof meta === "object" ? (meta as Record<string, any>) : null;
       const fulfillment_duration = metaObj?.fulfillment_duration ?? null;
-      console.log("meta: ", meta);
       if (fulfillment_duration != null) {
         await updateShipping(fulfillment_duration, order_id);
       }
@@ -1113,11 +1212,245 @@ export const handleOrderCancellation = async (
   }
 };
 
+/** Remind the vendor every 30 minutes about a paid order they have not accepted yet. */
+export async function remindVendorsOfUnacceptedOrders(): Promise<void> {
+  const pool = await db();
+  const { rows } = await pool.query<{
+    id: string | number;
+    ownerid: string | number | null;
+  }>(
+    `SELECT o.id, s.ownerid
+     FROM orders o
+     LEFT JOIN shops s ON s.id = o.shop_id
+     WHERE o.fulfillment_status = 'payment_received'
+       AND COALESCE(
+         (
+           SELECT e.created_at FROM order_events e
+           WHERE e.order_id = o.id AND e.stage = 'payment_received'
+           ORDER BY e.created_at DESC
+           LIMIT 1
+         ),
+         o.created_at
+       ) <= NOW() - INTERVAL '30 minutes'
+       AND COALESCE(
+         (
+           SELECT e.created_at FROM order_events e
+           WHERE e.order_id = o.id AND e.stage = 'payment_received'
+           ORDER BY e.created_at DESC
+           LIMIT 1
+         ),
+         o.created_at
+       ) > NOW() - INTERVAL '2 hours'
+       AND NOT EXISTS (
+         SELECT 1 FROM order_events r
+         WHERE r.order_id = o.id
+           AND r.stage = 'acceptance_reminder'
+           AND r.created_at > NOW() - INTERVAL '30 minutes'
+       )`,
+  );
+
+  for (const order of rows) {
+    try {
+      const vendorId = Number(order.ownerid);
+      if (!Number.isFinite(vendorId) || vendorId <= 0) continue;
+
+      const inserted = await pool.query(
+        `INSERT INTO order_events
+           (order_id, event_type, stage, actor_type, actor_id, outcome, notes, meta, created_at)
+         SELECT $1, 'acceptance_reminder', 'acceptance_reminder', 'system', NULL, 'success', $2, $3::jsonb, NOW()
+         WHERE EXISTS (
+           SELECT 1 FROM orders WHERE id = $1 AND fulfillment_status = 'payment_received'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM order_events
+           WHERE order_id = $1
+             AND stage = 'acceptance_reminder'
+             AND created_at > NOW() - INTERVAL '30 minutes'
+         )
+         RETURNING id`,
+        [
+          order.id,
+          "Vendor reminded to accept the order",
+          JSON.stringify({ reason: "acceptance_reminder" }),
+        ],
+      );
+      if (inserted.rowCount === 0) continue;
+
+      const message = `Order #${order.id} is still waiting for you to accept it. If you do not accept it within 2 hours of payment, it will be cancelled and the buyer will be refunded.`;
+      const notificationRole = appRoleToNotificationRole("vendor");
+      if (notificationRole) {
+        await createAndEmitNotification({
+          recipientId: vendorId,
+          title: "Order waiting",
+          message,
+          sourceType: "order",
+          sourceId: Number(order.id),
+          role: notificationRole,
+        });
+      }
+      const token = await pool.query<{ devicetoken: string | null }>(
+        `SELECT devicetoken FROM users WHERE id = $1`,
+        [vendorId],
+      );
+      const deviceToken = String(token.rows[0]?.devicetoken ?? "").trim();
+      if (deviceToken) {
+        await sendFcmForActivities(deviceToken, "Order waiting", message, null, {
+          type: "order",
+          order_id: order.id,
+          role: notificationRole,
+        });
+      }
+    } catch (err) {
+      console.error("[order] acceptance reminder failed", order.id, err);
+    }
+  }
+}
+
+/** Cancel paid orders the vendor has not accepted within 2 hours, refund the buyer, and notify both sides. */
+export async function expireUnacceptedOrders(): Promise<void> {
+  const pool = await db();
+  const { rows } = await pool.query<{
+    id: string | number;
+    customer_id: string | number | null;
+    ownerid: string | number | null;
+    amount_paid: string | number | null;
+    shipping_fee: string | number | null;
+  }>(
+    `SELECT o.id, o.customer_id, s.ownerid, o.amount_paid, o.shipping_fee
+     FROM orders o
+     LEFT JOIN shops s ON s.id = o.shop_id
+     WHERE o.fulfillment_status = 'payment_received'
+       AND COALESCE(
+         (
+           SELECT e.created_at FROM order_events e
+           WHERE e.order_id = o.id AND e.stage = 'payment_received'
+           ORDER BY e.created_at DESC
+           LIMIT 1
+         ),
+         o.created_at
+       ) <= NOW() - INTERVAL '2 hours'`,
+  );
+
+  for (const order of rows) {
+    try {
+      const claimed = await pool.query(
+        `UPDATE orders
+         SET fulfillment_status = 'order_cancelled', updated_at = NOW()
+         WHERE id = $1 AND fulfillment_status = 'payment_received'`,
+        [order.id],
+      );
+      if (claimed.rowCount === 0) continue;
+
+      await pool.query(
+        `INSERT INTO order_events
+           (order_id, event_type, stage, actor_type, actor_id, outcome, notes, meta, created_at)
+         VALUES ($1, 'order_cancelled', 'order_cancelled', 'system', NULL, 'success', $2, $3::jsonb, NOW())`,
+        [
+          order.id,
+          "Vendor did not accept the order within 2 hours",
+          JSON.stringify({ reason: "vendor_acceptance_timeout" }),
+        ],
+      );
+
+      const paidEvent = await pool.query<{ meta: unknown }>(
+        `SELECT meta FROM order_events
+         WHERE order_id = $1 AND stage = 'payment_received'
+         ORDER BY created_at DESC LIMIT 1`,
+        [order.id],
+      );
+      const paidMeta = paidEvent.rows[0]?.meta;
+      const paidRecord = paidMeta && typeof paidMeta === "object"
+        ? (paidMeta as Record<string, unknown>)
+        : {};
+      const estimated = Number(paidRecord.estimated_shipping_fee);
+      const storedShipping = Number(order.shipping_fee ?? 0);
+      const shippingNaira = Math.max(
+        Number.isFinite(storedShipping) ? storedShipping : 0,
+        Number.isFinite(estimated) ? estimated : 0,
+      );
+      const goodsNaira = Number(order.amount_paid ?? 0);
+      const refundNaira = Math.max(0, goodsNaira) + Math.max(0, shippingNaira);
+      const buyerId = Number(order.customer_id);
+      const vendorId = Number(order.ownerid);
+
+      if (refundNaira > 0 && Number.isFinite(buyerId) && buyerId > 0) {
+        const credit = await creditUserWallet(
+          buyerId,
+          Math.round(refundNaira * 100),
+          `order:${order.id}:unaccepted-refund`,
+          `Refund because order #${order.id} was not accepted within 2 hours`,
+        );
+        const goodsKobo = Math.round(Math.max(0, goodsNaira) * 100);
+        if (goodsKobo > 0) {
+          await pool.query(
+            `UPDATE escrow_transactions
+             SET amount_refunded_kobo = amount_refunded_kobo + $2,
+                 status = 'refunded',
+                 refunded_at = NOW(),
+                 updated_at = NOW()
+             WHERE order_id = $1
+               AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+            [order.id, goodsKobo],
+          );
+          await syncOrderEscrowStatus(Number(order.id));
+        }
+        if (credit.credited) {
+          notifyUser(buyerId, "wallet_credited", {
+            balance_kobo: credit.balance_kobo,
+            transactions: credit.transactions ?? [],
+          });
+        }
+      }
+
+      const refundedLabel = refundNaira > 0 ? nairaLabel(refundNaira) : "";
+      const buyerMsg = refundNaira > 0
+        ? `The seller did not accept your order within 2 hours, so it was cancelled. ${refundedLabel}, including the shipping fee, was returned to your wallet.`
+        : "The seller did not accept your order within 2 hours, so it was cancelled.";
+      const vendorMsg = refundNaira > 0
+        ? `You did not accept this order within 2 hours, so it was cancelled. The buyer was refunded ${refundedLabel}, including the shipping fee.`
+        : "You did not accept this order within 2 hours, so it was cancelled.";
+
+      const { result, vendorList, customerList } = await buildOrderLists(order.id);
+      const notifySide = async (userId: number, role: "customer" | "vendor", message: string, list: unknown[]) => {
+        if (!Number.isFinite(userId) || userId <= 0) return;
+        notifyUser(userId, "order_cancelled", { result, list });
+        const notificationRole = appRoleToNotificationRole(role);
+        if (notificationRole) {
+          await createAndEmitNotification({
+            recipientId: userId,
+            title: "Order update",
+            message,
+            sourceType: "order",
+            sourceId: Number(order.id),
+            role: notificationRole,
+          });
+        }
+        const token = await pool.query<{ devicetoken: string | null }>(
+          `SELECT devicetoken FROM users WHERE id = $1`,
+          [userId],
+        );
+        const deviceToken = String(token.rows[0]?.devicetoken ?? "").trim();
+        if (deviceToken) {
+          await sendFcmForActivities(deviceToken, "Order Update", message, null, {
+            type: "order",
+            order_id: order.id,
+            role: notificationRole,
+          });
+        }
+      };
+
+      await notifySide(buyerId, "customer", buyerMsg, customerList);
+      await notifySide(vendorId, "vendor", vendorMsg, vendorList);
+    } catch (err) {
+      console.error("[order] unaccepted timeout failed", order.id, err);
+    }
+  }
+}
+
 async function updateFulfillmentStatus(
   fulfillment_status: unknown,
   order_id: unknown,
 ) {
-  console.log(order_id);
   const pool = await db();
   return await pool.query(
     `UPDATE orders SET fulfillment_status = $1 WHERE id = $2`,

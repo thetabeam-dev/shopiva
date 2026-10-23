@@ -327,6 +327,23 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
             }
           }
         }
+
+
+        // const { scheduleOrderJobs } = require("./order-queue");
+
+        // async function createOrder(orderInput) {
+        //   // Save the order in PostgreSQL first.
+        //   const order = await orderRepository.create({
+        //     ...orderInput,
+        //     status: "AWAITING_VENDOR",
+        //   });
+
+        //   // Schedule reminders and cancellation.
+        //   await scheduleOrderJobs(order);
+
+        //   return order;
+        // }
+
       }),
     );
 

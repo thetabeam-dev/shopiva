@@ -32,6 +32,7 @@ import { GetShopOwnerByShopIdService } from "./services/business/shop.js";
 import { sendNotificationEmail } from "./services/email.js";
 import paystackTools from "./utils/paystack.js";
 import { creditOrderPayoutToWallet, storePaystackVirtualAccount } from "./models/wallet.js";
+import { expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
@@ -220,7 +221,7 @@ app.get("/return/:orderId", async (req, res) => {
   res.json({ ok: true, id: rows[0] });
 });
 
-app.get("/escrow-fee", async(req, res) => {
+app.get("/escrow-fee", async (req, res) => {
   let {
     subtotal
   } = req.query;
@@ -421,6 +422,15 @@ const server = app.listen(process.env.PORT, async () => {
       } catch (error) {
         console.log(error);
       }
+    }
+  });
+
+  nodeCron.schedule("0 * * * * *", async () => {
+    try {
+      await remindVendorsOfUnacceptedOrders();
+      await expireUnacceptedOrders();
+    } catch (error) {
+      console.log(error);
     }
   });
 });
