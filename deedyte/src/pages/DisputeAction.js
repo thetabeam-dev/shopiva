@@ -26,10 +26,8 @@ import { set_orderInfo } from "../../redux/order";
 import { useDispatch } from "react-redux";
 import { fetchShopOwner } from "../api";
 import FormKeyboardAvoiding from "../components/FormKeyboardAvoiding";
-import {
-    readExactLocation,
-    reverseGeocodeToPlace,
-} from "../utils/deviceLocation";
+import { reverseGeocodeToPlace } from "../utils/deviceLocation";
+import { useLocationLookup } from "../hooks/useLocationLookup";
 import { set_disputeInfo } from "../../redux/dispute";
 import { set_disputeList } from "../../redux/disputes";
 
@@ -186,6 +184,7 @@ function Acceptance({ data }) {
     const [addressState, setAddressState] = useState("");
     const [addressCountry, setAddressCountry] = useState(DEFAULT_RETURN_COUNTRY);
     const [locatingAddress, setLocatingAddress] = useState(false);
+    const { locate, locationOverlay } = useLocationLookup();
     const [showErrors, setShowErrors] = useState(false);
 
     const navigation = useNavigation();
@@ -218,7 +217,8 @@ function Acceptance({ data }) {
     const onUseDeviceLocation = useCallback(async () => {
         setLocatingAddress(true);
         try {
-            const coords = await readExactLocation();
+            const coords = await locate();
+            if (!coords) return;
             const place = await reverseGeocodeToPlace(
                 coords.latitude,
                 coords.longitude
@@ -236,7 +236,7 @@ function Acceptance({ data }) {
         } finally {
             setLocatingAddress(false);
         }
-    }, []);
+    }, [locate]);
     useEffect(() => {
         connectChatSocket();
     }, [])
@@ -244,6 +244,7 @@ function Acceptance({ data }) {
 
     return (
         <>
+            {locationOverlay}
             <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
                 {loading && <Spinner />}
                 <ScrollView

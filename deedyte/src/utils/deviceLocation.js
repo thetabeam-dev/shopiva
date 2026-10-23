@@ -1,4 +1,4 @@
-import { Alert, AppState, Linking, PermissionsAndroid, Platform } from 'react-native';
+import { Alert, Linking, PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import DeviceInfo from 'react-native-device-info';
 
@@ -10,6 +10,18 @@ const PERMISSION_RATIONALE = {
   buttonNegative: 'Deny',
   buttonNeutral: 'Cancel',
 };
+
+export class LocationError extends Error {
+  /**
+   * @param {'denied' | 'blocked' | 'services_off' | 'timeout' | 'unavailable' | 'cancelled'} code
+   * @param {string} message
+   */
+  constructor(code, message) {
+    super(message);
+    this.name = 'LocationError';
+    this.code = code;
+  }
+}
 
 function openAppLocationSettings() {
   Alert.alert(
@@ -44,33 +56,38 @@ function openDeviceLocationSettings() {
 
 async function androidLocationGranted(interactive) {
   const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-  if (await PermissionsAndroid.check(fine)) return true;
+  if (await PermissionsAndroid.check(fine)) return 'granted';
   const result = await PermissionsAndroid.request(fine, PERMISSION_RATIONALE);
-  if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
-  if (interactive && result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) openAppLocationSettings();
-  return false;
+  if (result === PermissionsAndroid.RESULTS.GRANTED) return 'granted';
+  if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+    if (interactive) openAppLocationSettings();
+    return 'blocked';
+  }
+  return 'denied';
 }
 
 function iosLocationGranted(interactive) {
   return new Promise((resolve) => {
     const geo = /** @type {{ requestAuthorization?: Function }} */ (Geolocation);
     if (typeof geo.requestAuthorization !== 'function') {
-      resolve(true);
+      resolve('granted');
       return;
     }
     let settled = false;
-    const finish = (granted) => {
+    const finish = (status) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(granted);
+      resolve(status);
     };
-    const timer = setTimeout(() => finish(false), 8000);
+    const started = Date.now();
+    const timer = setTimeout(() => finish('denied'), 8000);
     geo.requestAuthorization(
-      () => finish(true),
+      () => finish('granted'),
       () => {
-        if (interactive) openAppLocationSettings();
-        finish(false);
+        const blocked = Date.now() - started < 400;
+        if (interactive && blocked) openAppLocationSettings();
+        finish(blocked ? 'blocked' : 'denied');
       },
     );
   });
@@ -99,27 +116,16 @@ export async function requestLocationPermission(options = {}) {
   }
 
   try {
-    if (Platform.OS === 'android') return await androidLocationGranted(interactive);
-    return await iosLocationGranted(interactive);
+    const status = Platform.OS === 'android'
+      ? await androidLocationGranted(interactive)
+      : await iosLocationGranted(interactive);
+    return status === 'granted';
   } catch {
     return false;
   }
 }
 
-function waitUntilAppResumes() {
-  return new Promise((resolve) => {
-    let leftApp = AppState.currentState !== 'active';
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') leftApp = true;
-      if (leftApp && state === 'active') {
-        sub.remove();
-        resolve();
-      }
-    });
-  });
-}
-
-async function deviceLocationIsOn() {
+export async function deviceLocationServicesOn() {
   try {
     return await Promise.race([
       DeviceInfo.isLocationEnabled(),
@@ -132,51 +138,48 @@ async function deviceLocationIsOn() {
   }
 }
 
-function openDeviceLocationSettingsDirect() {
-  if (Platform.OS === 'android') {
-    Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS').catch(() => Linking.openSettings());
-    return;
-  }
-  Linking.openSettings();
-}
-
-async function ensureDeviceLocationOn() {
-  let enabled = await deviceLocationIsOn();
-  while (!enabled) {
-    openDeviceLocationSettingsDirect();
-    await waitUntilAppResumes();
-    enabled = await deviceLocationIsOn();
-  }
-}
-
-async function ensureLocationAccessGranted() {
-  const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-  while (true) {
-    if (Platform.OS === 'android') {
-      if (await PermissionsAndroid.check(fine)) return;
-      const result = await PermissionsAndroid.request(fine, PERMISSION_RATIONALE);
-      if (result === PermissionsAndroid.RESULTS.GRANTED) return;
-      if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-        await Linking.openSettings();
-        await waitUntilAppResumes();
-      }
-      continue;
-    }
-    const granted = await iosLocationGranted(false);
-    if (granted) return;
-    await Linking.openSettings();
-    await waitUntilAppResumes();
-  }
-}
-
 /**
- * Turns device location on, asks until permission is granted, then reads a fresh GPS fix.
+ * One GPS attempt. Rejects with LocationError instead of opening settings in a loop.
+ * @param {{ isCancelled?: () => boolean }} [options]
  * @returns {Promise<{ latitude: number; longitude: number }>}
  */
-export async function readExactLocation() {
-  await ensureDeviceLocationOn();
-  await ensureLocationAccessGranted();
-  return getCurrentCoordinates({ exact: true });
+export async function readExactLocation(options = {}) {
+  if (options.isCancelled?.()) {
+    throw new LocationError('cancelled', 'Location lookup was cancelled.');
+  }
+  const servicesOn = await deviceLocationServicesOn();
+  if (options.isCancelled?.()) {
+    throw new LocationError('cancelled', 'Location lookup was cancelled.');
+  }
+  if (!servicesOn) {
+    throw new LocationError(
+      'services_off',
+      'Turn on location on this device, then try again. You can also enter the address manually.',
+    );
+  }
+
+  let access = 'denied';
+  if (Platform.OS === 'android') {
+    access = await androidLocationGranted(false);
+  } else {
+    access = await iosLocationGranted(false);
+  }
+  if (options.isCancelled?.()) {
+    throw new LocationError('cancelled', 'Location lookup was cancelled.');
+  }
+  if (access === 'blocked') {
+    throw new LocationError(
+      'blocked',
+      'Location access is turned off for Deedyte. Allow it in settings, or enter the address manually.',
+    );
+  }
+  if (access !== 'granted') {
+    throw new LocationError(
+      'denied',
+      'Location permission was denied. You can enter the address manually.',
+    );
+  }
+  return getCurrentCoordinates({ exact: true, isCancelled: options.isCancelled });
 }
 
 /**
@@ -193,31 +196,39 @@ export function getCurrentCoordinates(options = {}) {
       handler(value);
     };
     const timer = setTimeout(() => {
-      finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
-    }, 12000);
+      finish(reject, new LocationError('timeout', 'We could not get your location in time. Enter your city and state manually.'));
+    }, 10000);
     Geolocation.getCurrentPosition(
       (pos) => {
+        if (options.isCancelled?.()) {
+          finish(reject, new LocationError('cancelled', 'Location lookup was cancelled.'));
+          return;
+        }
         finish(resolve, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         });
       },
       (err) => {
+        if (options.isCancelled?.()) {
+          finish(reject, new LocationError('cancelled', 'Location lookup was cancelled.'));
+          return;
+        }
         const code = Number(err?.code);
         if (code === 1) {
-          finish(reject, new Error('Location permission was denied. Allow location access and try again.'));
+          finish(reject, new LocationError('denied', 'Location permission was denied. You can enter the address manually.'));
           return;
         }
-        if (code === 2 || code === 3) {
-          finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
+        if (code === 3) {
+          finish(reject, new LocationError('timeout', 'We could not get your location in time. Enter your city and state manually.'));
           return;
         }
-        finish(reject, new Error('We could not get your location. Enter your city and state manually.'));
+        finish(reject, new LocationError('unavailable', 'We could not get your location. Enter your city and state manually.'));
       },
       {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: options.exact ? 0 : 60000,
+        enableHighAccuracy: Boolean(options.exact),
+        timeout: 10000,
+        maximumAge: options.exact ? 5000 : 60000,
       },
     );
   });

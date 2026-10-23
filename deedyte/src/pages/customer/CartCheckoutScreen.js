@@ -26,10 +26,8 @@ import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
 import WalletProcessingOverlay from '../../components/WalletProcessingOverlay';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
-import {
-  readExactLocation,
-  reverseGeocodeToPlace,
-} from '../../utils/deviceLocation';
+import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
+import { useLocationLookup } from '../../hooks/useLocationLookup';
 import SelectDeliveryLocationModal from '../../components/SelectDeliveryLocationModal';
 import {
   computeMultiItemShippingFee,
@@ -217,6 +215,7 @@ export default function CartCheckoutScreen({ navigation }) {
     /** @type {Map<number, NonNullable<ReturnType<typeof normalizeShopDelivery>>>} */(new Map()),
   );
   const [isLocating, setIsLocating] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
 
   const [touchedSubmit, setTouchedSubmit] = useState(false);
   const [formBanner, setFormBanner] = useState('');
@@ -489,7 +488,9 @@ export default function CartCheckoutScreen({ navigation }) {
     setIsLocating(true);
     setFormBanner('');
     try {
-      const { latitude, longitude } = await readExactLocation();
+      const coords = await locate();
+      if (!coords) return;
+      const { latitude, longitude } = coords;
       const place = await reverseGeocodeToPlace(latitude, longitude);
       const nextStreet = String(place?.street ?? '').trim();
       const nextZip = String(place?.zip ?? '').trim();
@@ -524,7 +525,7 @@ export default function CartCheckoutScreen({ navigation }) {
     } finally {
       setIsLocating(false);
     }
-  }, [isLocating, showBottomToast]);
+  }, [isLocating, locate, showBottomToast]);
 
   useEffect(
     () => () => {
@@ -948,6 +949,7 @@ export default function CartCheckoutScreen({ navigation }) {
               <View style={styles.card}>
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.cardTitle}>Shipping address</Text>
+                  {locationOverlay}
                   <Pressable
                     onPress={onUseCurrentLocation}
                     disabled={isLocating}

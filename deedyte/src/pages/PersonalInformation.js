@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
-import { readExactLocation } from '../utils/deviceLocation';
+import { useLocationLookup } from '../hooks/useLocationLookup';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -393,6 +393,7 @@ function ReadOnlyRow({ icon, value, onPress, hint }) {
 
 function LocationBlock({ value, onChangeText }) {
   const [locateBusy, setLocateBusy] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
   const geocodeAbortRef = useRef(null);
 
   useEffect(() => {
@@ -409,8 +410,13 @@ function LocationBlock({ value, onChangeText }) {
     geocodeAbortRef.current = controller;
 
     setLocateBusy(true);
-    readExactLocation()
-      .then(async ({ latitude, longitude }) => {
+    locate()
+      .then(async (coords) => {
+        if (!coords) {
+          setLocateBusy(false);
+          return;
+        }
+        const { latitude, longitude } = coords;
         try {
           const data = await reverseGeocodeNominatim(latitude, longitude, controller.signal);
           const line = formatAddressFromNominatim(data);
@@ -425,12 +431,13 @@ function LocationBlock({ value, onChangeText }) {
         setLocateBusy(false);
         Alert.alert('Location', err instanceof Error ? err.message : 'Could not read your position.');
       });
-  }, [onChangeText]);
+  }, [locate, onChangeText]);
 
   const canClear = value.length > 0;
 
   return (
     <View style={styles.locationBlock}>
+      {locationOverlay}
       <Text style={styles.locationHeading}>Location</Text>
       <Text style={styles.locationSub}>
         {"Use your device's GPS to fill the address, or type below."}

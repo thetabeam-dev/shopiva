@@ -20,12 +20,18 @@ import {
   updateUserProfileFields,
 } from '../../api/user';
 import { getStoredAccessToken, getStoredPreAuthChoice, getStoredUser, saveSession } from '../../auth/session';
-import {
-  readExactLocation,
-  reverseGeocodeToPlace,
-} from '../../utils/deviceLocation';
+import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
+import { useLocationLookup } from '../../hooks/useLocationLookup';
 import { AUTH } from './theme';
 import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
+
+function nigerianMobilePayload(value) {
+  let digits = String(value ?? '').replace(/\D/g, '');
+  if (digits.startsWith('234')) digits = digits.slice(3);
+  digits = digits.replace(/^0+/, '');
+  if (!/^[789]\d{9}$/.test(digits)) return null;
+  return `+234${digits}`;
+}
 
 const GENDERS = [
   { key: 'male', label: 'Male' },
@@ -51,15 +57,20 @@ export default function OnboardingProfileScreen({ navigation }) {
     /** @type {{ latitude: number; longitude: number } | null} */ (null),
   );
   const [locLoading, setLocLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const { locate, locationOverlay } = useLocationLookup();
 
   const clearDeviceCoords = useCallback(() => {
     setDeviceCoords(null);
   }, []);
 
   const useDeviceLocation = useCallback(async () => {
+    if (locLoading) return;
     setLocLoading(true);
     try {
-      const { latitude, longitude } = await readExactLocation();
+      const coords = await locate();
+      if (!coords) return;
+      const { latitude, longitude } = coords;
       const place = await reverseGeocodeToPlace(latitude, longitude);
       const hasAny = place.city || place.state || place.country;
       if (!hasAny) {
@@ -85,14 +96,15 @@ export default function OnboardingProfileScreen({ navigation }) {
     } finally {
       setLocLoading(false);
     }
-  }, []);
+  }, [locLoading, locate]);
 
   const onContinue = useCallback(async () => {
-    const digits = whatsapp.replace(/\D/g, '');
-    if (digits.length < 10) {
-      Alert.alert('WhatsApp number', 'Enter a valid number (include country code if needed).');
+    const phonePayload = nigerianMobilePayload(whatsapp);
+    if (!phonePayload) {
+      setPhoneError('Enter a valid Nigerian mobile number, for example 8012345678.');
       return;
     }
+    setPhoneError('');
     if (!gender) {
       Alert.alert('Gender', 'Please select an option.');
       return;
@@ -135,9 +147,6 @@ export default function OnboardingProfileScreen({ navigation }) {
       );
       return;
     }
-
-    const trimmed = whatsapp.trim();
-    const phonePayload = trimmed.startsWith('+') ? trimmed : `+${digits}`;
 
     setSubmitting(true);
     try {
@@ -197,6 +206,7 @@ export default function OnboardingProfileScreen({ navigation }) {
       style={[styles.flex, { paddingTop: insets.top + 16 }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {locationOverlay}
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
@@ -205,16 +215,25 @@ export default function OnboardingProfileScreen({ navigation }) {
         <Text style={styles.title}>Almost there</Text>
         <Text style={styles.sub}>WhatsApp, gender, and where you&apos;re based.</Text>
 
-        <Text style={styles.label}>WhatsApp number</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="+2348012345678"
-          placeholderTextColor={AUTH.textMuted}
-          keyboardType="phone-pad"
-          value={whatsapp}
-          onChangeText={setWhatsapp}
-          editable={!submitting}
-        />
+        <Text style={styles.label}>Phone number</Text>
+        <View style={styles.phoneRow}>
+          <View style={styles.dialCode}>
+            <Text style={styles.dialCodeText}>+234</Text>
+          </View>
+          <TextInput
+            style={[styles.input, styles.phoneInput]}
+            placeholder="8012345678"
+            placeholderTextColor={AUTH.textMuted}
+            keyboardType="phone-pad"
+            value={whatsapp}
+            onChangeText={(value) => {
+              setWhatsapp(value);
+              if (phoneError) setPhoneError('');
+            }}
+            editable={!submitting}
+          />
+        </View>
+        {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
 
         <Text style={styles.label}>Gender</Text>
         <View style={styles.genderRow}>
@@ -342,6 +361,34 @@ const styles = StyleSheet.create({
     color: AUTH.text,
     marginBottom: 8,
     marginTop: 14,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dialCode: {
+    height: 52,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: AUTH.border,
+    backgroundColor: AUTH.inputBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialCodeText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: AUTH.text,
+  },
+  phoneInput: {
+    flex: 1,
+  },
+  fieldError: {
+    marginTop: 6,
+    color: '#B42318',
+    fontSize: 13,
   },
   input: {
     height: 52,

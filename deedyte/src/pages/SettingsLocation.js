@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import MapView from 'react-native-maps';
-import { readExactLocation } from '../utils/deviceLocation';
+import { useLocationLookup } from '../hooks/useLocationLookup';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BLACK, MUTED, settingsFormStyles as s } from './settingsFields';
@@ -87,6 +87,7 @@ export default function SettingsLocationScreen() {
   const [region, setRegion] = useState('');
   const [statePickerOpen, setStatePickerOpen] = useState(false);
   const [country, setCountry] = useState('Nigeria');
+  const { locate, locationOverlay } = useLocationLookup();
   const [geocodeBusy, setGeocodeBusy] = useState(false);
   const [locateBusy, setLocateBusy] = useState(false);
 
@@ -143,8 +144,10 @@ export default function SettingsLocationScreen() {
 
   const useCurrentLocation = useCallback(() => {
     setLocateBusy(true);
-    readExactLocation()
-      .then(({ latitude, longitude }) => {
+    locate()
+      .then((coords) => {
+        if (!coords) return;
+        const { latitude, longitude } = coords;
         const next = {
           latitude,
           longitude,
@@ -160,7 +163,7 @@ export default function SettingsLocationScreen() {
         Alert.alert('Location', err instanceof Error ? err.message : 'Could not read your position.');
       })
       .finally(() => setLocateBusy(false));
-  }, [scheduleGeocode]);
+  }, [locate, scheduleGeocode]);
 
   const onSave = useCallback(() => {
     const parts = [city.trim(), region.trim(), country.trim()].filter(Boolean);
@@ -176,6 +179,7 @@ export default function SettingsLocationScreen() {
 
   return (
     <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
+      {locationOverlay}
       <ScrollView
         style={s.scroll}
         contentContainerStyle={[

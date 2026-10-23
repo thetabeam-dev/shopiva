@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -44,10 +45,8 @@ import { isVendorAccountRole } from '../profile/normalizeUser';
 import DeliveryPolicyModal from '../components/DeliveryPolicyModal';
 import { mapOrderRowToListItem } from '../utils/buyerUi';
 import { formatNaira } from '../utils/formatNaira';
-import {
-  readExactLocation,
-  reverseGeocodeToPlace,
-} from '../utils/deviceLocation';
+import { reverseGeocodeToPlace } from '../utils/deviceLocation';
+import { useLocationLookup } from '../hooks/useLocationLookup';
 import { useSelector } from 'react-redux';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
 import { parseShopCategories } from '../utils/shopCategories';
@@ -378,6 +377,7 @@ export default function ProfileShopInfoScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
   const [shopsList, setShopsList] = useState(
     /** @type {Record<string, unknown>[]} */([]),
   );
@@ -715,7 +715,8 @@ export default function ProfileShopInfoScreen() {
   const onUseMyLocation = useCallback(async () => {
     setLocating(true);
     try {
-      const c = await readExactLocation();
+      const c = await locate();
+      if (!c) return;
       const place = await reverseGeocodeToPlace(c.latitude, c.longitude);
       setLocationState(prev => ({
         ...prev,
@@ -732,7 +733,7 @@ export default function ProfileShopInfoScreen() {
     } finally {
       setLocating(false);
     }
-  }, []);
+  }, [locate]);
 
   const policies = shopRow?.policies;
 
@@ -985,6 +986,7 @@ export default function ProfileShopInfoScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
+      {locationOverlay}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{
@@ -1843,6 +1845,25 @@ function TimePickerModal({
 
 /** @param {{ visible: boolean; title: string; children: unknown; onClose: () => void; onSave: () => void; saving?: boolean; notice?: unknown }} props */
 function FormModal({ visible, title, children, onClose, onSave, saving, notice }) {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardHeight(0);
+      return undefined;
+    }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
+
   return (
     <Modal
       visible={visible}
@@ -1850,7 +1871,7 @@ function FormModal({ visible, title, children, onClose, onSave, saving, notice }
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.formModalRoot}>
+      <View style={[styles.formModalRoot, keyboardHeight > 0 && { paddingBottom: keyboardHeight }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.formModalCard}>
           <Text style={styles.modalTitle}>{title}</Text>

@@ -8,7 +8,8 @@ import { fetchOwnerShops, fetchShopOrders } from '../../api/shop';
 import { getStorefrontProduct, getStorefrontProducts } from '../../api/storefront';
 import { mapOrderRowToListItem } from '../../utils/buyerUi';
 import { formatNaira } from '../../utils/formatNaira';
-import { readExactLocation, reverseGeocodeToPlace } from '../../utils/deviceLocation';
+import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
+import { useLocationLookup } from '../../hooks/useLocationLookup';
 
 /** Vendor-only dashboard — not shared with customer flows or `HomeStackScreen`. */
 const BRAND = '#00926E';
@@ -190,6 +191,7 @@ export default function HomeScreen() {
   const userId = Number(user?.id);
   const [primaryShop, setPrimaryShop] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [locating, setLocating] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
 
   const [orders, setOrders] = useState(/** @type {ReturnType<typeof mapOrderRowToListItem>[]} */ ([]));
   const [ordersTotalCount, setOrdersTotalCount] = useState(0);
@@ -309,7 +311,8 @@ export default function HomeScreen() {
     if (locating) return;
     setLocating(true);
     try {
-      const coords = await readExactLocation();
+      const coords = await locate();
+      if (!coords) return;
       const place = await reverseGeocodeToPlace(coords.latitude, coords.longitude);
       const saved = await saveProfileFields({
         location: {
@@ -326,7 +329,7 @@ export default function HomeScreen() {
     } finally {
       setLocating(false);
     }
-  }, [locating, saveProfileFields]);
+  }, [locating, locate, saveProfileFields]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -367,6 +370,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: 15 }]}>
+      {locationOverlay}
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}

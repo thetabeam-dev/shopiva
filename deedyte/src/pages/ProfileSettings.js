@@ -25,10 +25,10 @@ import { createVendorShop, fetchOwnerShops, hasVendorShop, updateVendorShop } fr
 import { updateUserRole } from '../api/user';
 import {
   getCurrentCoordinates,
-  readExactLocation,
   requestLocationPermission,
   reverseGeocodeToPlace,
 } from '../utils/deviceLocation';
+import { useLocationLookup } from '../hooks/useLocationLookup';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
 import { shopRecordHasLocation } from '../utils/shopLocation';
@@ -74,6 +74,7 @@ export default function ProfileSettings() {
   const [zipcode, setZipcode] = useState('');
   const [coords, setCoords] = useState(/** @type {{ latitude: number; longitude: number } | null} */ (null));
   const [locating, setLocating] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
   const [submittingSetup, setSubmittingSetup] = useState(false);
   const setupHint = useMemo(() => {
     if (coords) {
@@ -126,7 +127,8 @@ export default function ProfileSettings() {
   const onUseMyLocation = async () => {
     setLocating(true);
     try {
-      const c = await readExactLocation();
+      const c = await locate();
+      if (!c) return;
       setCoords(c);
       try {
         const place = await reverseGeocodeToPlace(c.latitude, c.longitude);
@@ -241,6 +243,7 @@ export default function ProfileSettings() {
 
   return (
     <>
+      {locationOverlay}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[

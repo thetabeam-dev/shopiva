@@ -21,10 +21,10 @@ import { createVendorShop, fetchOwnerShops, hasVendorShop, updateVendorShop } fr
 import { fetchCurrentUserOrStatus, updateUserRole } from '../../api/user';
 import {
   getCurrentCoordinates,
-  readExactLocation,
   requestLocationPermission,
   reverseGeocodeToPlace,
 } from '../../utils/deviceLocation';
+import { useLocationLookup } from '../../hooks/useLocationLookup';
 import FormKeyboardAvoiding from '../../components/FormKeyboardAvoiding';
 import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../../auth/session';
@@ -70,6 +70,7 @@ export default function ShopSetupScreen() {
     /** @type {{ latitude: number; longitude: number } | null} */ (null),
   );
   const [locating, setLocating] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
   const [submittingSetup, setSubmittingSetup] = useState(false);
   const [existingShopId, setExistingShopId] = useState(/** @type {number | null} */ (null));
 
@@ -165,7 +166,8 @@ export default function ShopSetupScreen() {
   const onUseMyLocation = async () => {
     setLocating(true);
     try {
-      const c = await readExactLocation();
+      const c = await locate();
+      if (!c) return;
       setCoords(c);
       try {
         const place = await reverseGeocodeToPlace(c.latitude, c.longitude);
@@ -262,6 +264,7 @@ export default function ShopSetupScreen() {
 
   return (
     <>
+    {locationOverlay}
     <FormKeyboardAvoiding offset={0} style={styles.flex}>
       <ScrollView
         style={styles.flex}

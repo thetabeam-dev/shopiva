@@ -4,7 +4,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useProfile } from '../context/ProfileContext';
 import { fetchShopDetails, updateVendorShop } from '../api/shop';
 import { resolvePrimaryShopId } from '../utils/vendorShippingGate';
-import { readExactLocation, reverseGeocodeToPlace } from '../utils/deviceLocation';
+import { reverseGeocodeToPlace } from '../utils/deviceLocation';
+import { useLocationLookup } from '../hooks/useLocationLookup';
 
 function locationObject(raw) {
   if (raw && typeof raw === 'object') return raw;
@@ -31,6 +32,7 @@ export default function VendorShopLocationGate() {
   const [open, setOpen] = useState(false);
   const [shopId, setShopId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const { locate, locationOverlay } = useLocationLookup();
 
   const checkLocation = useCallback(async () => {
     const uid = Number(userId);
@@ -66,7 +68,8 @@ export default function VendorShopLocationGate() {
     if (!shopId || !Number.isFinite(uid)) return;
     setBusy(true);
     try {
-      const coords = await readExactLocation();
+      const coords = await locate();
+      if (!coords) return;
       const place = await reverseGeocodeToPlace(coords.latitude, coords.longitude);
       const shop = await fetchShopDetails(shopId, uid);
       const current = locationObject(shop.location ?? shop.Location);
@@ -113,6 +116,7 @@ export default function VendorShopLocationGate() {
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => {}}>
+      {locationOverlay}
       <View style={styles.root}>
         <View style={styles.card}>
           <View style={styles.iconWrap}>
