@@ -822,26 +822,42 @@ export default function CartCheckoutScreen({ navigation }) {
       });
       return;
     }
-    const uid = Number(user?.id);
-    const checkout = buildCheckoutPayload(`wallet_${uid}_${Date.now()}`);
-    setIsPaying(true);
-    completeCheckoutOrder(checkout)
-      .then((data) => {
-        setIsPaying(false);
-        navigation.replace('Payment-success', {
-          reference: checkout.reference,
-          subtotal,
-          shipping: chargedShipping,
-          total,
-          itemCount: checkoutLines.length,
-          rooms: Array.isArray(data?.rooms) ? data.rooms : [],
-        });
-      })
-      .catch((err) => {
-        setIsPaying(false);
-        const message = err instanceof Error ? err.message : 'Could not complete checkout.';
-        Alert.alert('Checkout', message);
-      });
+    Alert.alert(
+      'Confirm Checkout',
+      'Are you sure you want to proceed with checkout? Please review your order details and confirm to continue with payment.',
+      [
+        {
+          text: 'Cancel',
+          style: 'destructive',
+        },
+        {
+          text: 'Checkout',
+          onPress: () => {
+            const uid = Number(user?.id);
+            const checkout = buildCheckoutPayload(`wallet_${uid}_${Date.now()}`);
+            setIsPaying(true);
+            completeCheckoutOrder(checkout)
+              .then((data) => {
+                setIsPaying(false);
+                navigation.replace('Payment-success', {
+                  reference: checkout.reference,
+                  subtotal,
+                  shipping: chargedShipping,
+                  total,
+                  itemCount: checkoutLines.length,
+                  rooms: Array.isArray(data?.rooms) ? data.rooms : [],
+                });
+              })
+              .catch((err) => {
+                setIsPaying(false);
+                const message = err instanceof Error ? err.message : 'Could not complete checkout.';
+                Alert.alert('Checkout', message);
+              });
+          },
+        },
+      ],
+    );
+
   }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, chargedShipping, checkoutLines.length, buildCheckoutPayload]);
 
   const inputStyle = (key) => [

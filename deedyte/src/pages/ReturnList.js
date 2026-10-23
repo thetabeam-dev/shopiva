@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: COLOR.NEUTRAL,
-    borderRadius: 18,
+    borderRadius: 7,
     padding: 16,
     ...Platform.select({
       ios: {

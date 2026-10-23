@@ -5,30 +5,32 @@ export async function GET() {
   try {
     const pool = getPool();
 
-    const [usersRes, productsRes, inventoryRes, shopsRes, shopKycRes, ordersRes, returnsRes, disputesRes, cartRes, transactionsRes] = await Promise.all([
-      pool.query('SELECT COUNT(*)::int AS count FROM users'),
-      pool.query('SELECT COUNT(*)::int AS count FROM products'),
-      pool.query('SELECT COUNT(*)::int AS count FROM inventory'),
-      pool.query('SELECT COUNT(*)::int AS count FROM shops'),
-      pool.query('SELECT COUNT(*)::int AS count FROM shops WHERE NOT isverified'),
-      pool.query('SELECT COUNT(*)::int AS count FROM orders'),
-      pool.query('SELECT COUNT(*)::int AS count FROM returns'),
-      pool.query('SELECT COUNT(*)::int AS count FROM disputes'),
-      pool.query('SELECT COUNT(*)::int AS count FROM cart_items'),
-      pool.query('SELECT COUNT(*)::int AS count FROM paystack_transactions'),
-    ]);
+    const { rows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM users) AS users,
+        (SELECT COUNT(*)::int FROM products) AS products,
+        (SELECT COUNT(*)::int FROM inventory) AS inventory,
+        (SELECT COUNT(*)::int FROM shops) AS shops,
+        (SELECT COUNT(*)::int FROM shops WHERE NOT isverified) AS "shopKyc",
+        (SELECT COUNT(*)::int FROM orders) AS orders,
+        (SELECT COUNT(*)::int FROM returns) AS returns,
+        (SELECT COUNT(*)::int FROM disputes) AS disputes,
+        (SELECT COUNT(*)::int FROM cart_items) AS cart,
+        (SELECT COUNT(*)::int FROM paystack_transactions) AS transactions
+    `);
+    const counts = rows[0] ?? {};
 
     return NextResponse.json({
-      users: usersRes.rows[0]?.count ?? 0,
-      products: productsRes.rows[0]?.count ?? 0,
-      inventory: inventoryRes.rows[0]?.count ?? 0,
-      shops: shopsRes.rows[0]?.count ?? 0,
-      shopKyc: shopKycRes.rows[0]?.count ?? 0,
-      orders: ordersRes.rows[0]?.count ?? 0,
-      returns: returnsRes.rows[0]?.count ?? 0,
-      disputes: disputesRes.rows[0]?.count ?? 0,
-      cart: cartRes.rows[0]?.count ?? 0,
-      transactions: transactionsRes.rows[0]?.count ?? 0,
+      users: counts.users ?? 0,
+      products: counts.products ?? 0,
+      inventory: counts.inventory ?? 0,
+      shops: counts.shops ?? 0,
+      shopKyc: counts.shopKyc ?? 0,
+      orders: counts.orders ?? 0,
+      returns: counts.returns ?? 0,
+      disputes: counts.disputes ?? 0,
+      cart: counts.cart ?? 0,
+      transactions: counts.transactions ?? 0,
     });
   } catch (err) {
     console.error(err);

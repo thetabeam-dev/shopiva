@@ -1959,14 +1959,15 @@ function CancelOrder({ data }) {
             text: 'Confirm cancellation',
             style: 'destructive',
             onPress: submitCancellation,
-          },
-          {
-            text: 'Raise dispute instead',
-            onPress: () =>
-              navigation.navigate('Open-dispute', {
-                orderId: data?.order_id,
-              }),
-          },
+          }
+          // ,
+          // {
+          //   text: 'Raise dispute instead',
+          //   onPress: () =>
+          //     navigation.navigate('Open-dispute', {
+          //       orderId: data?.order_id,
+          //     }),
+          // },
         ],
       );
       return;

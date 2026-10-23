@@ -170,6 +170,96 @@ function StatusPill({ theme, label }) {
   );
 }
 
+const RETURN_PROGRESS_STEPS = [
+  { label: 'Pending', icon: 'time-outline', statuses: ['return_initiated'] },
+  { label: 'Accepted', icon: 'checkmark-done-outline', statuses: ['return_accepted'] },
+  { label: 'Processing', icon: 'cube-outline', statuses: ['return_processing'] },
+  { label: 'Shipping', icon: 'boat-outline', statuses: ['return_shipping'] },
+  { label: 'Out For PickUp', icon: 'car-outline', statuses: ['return_out_for_delivery'] },
+  { label: 'Delivered', icon: 'bag-check-outline', statuses: ['return_delivered'] },
+  { label: 'Confirmed', icon: 'shield-checkmark-outline', statuses: ['return_confirmed'] },
+];
+
+function returnProgressIndex(statusKey) {
+  const key = String(statusKey ?? '').toLowerCase();
+  return RETURN_PROGRESS_STEPS.findIndex(step => step.statuses.includes(key));
+}
+
+function ReturnProgress({ statusKey }) {
+  const current = returnProgressIndex(statusKey);
+  const stopped = ['return_cancelled', 'return_cancellation'].includes(
+    String(statusKey ?? '').toLowerCase(),
+  );
+  const reached = index => !stopped && current >= index;
+  const topRow = RETURN_PROGRESS_STEPS.slice(0, 4).map((step, index) => ({ step, index }));
+  const bottomRow = RETURN_PROGRESS_STEPS.slice(4)
+    .map((step, offset) => ({ step, index: offset + 4 }))
+    .reverse();
+
+  const renderStep = ({ step, index }, { lineToLeft = false, drop = false } = {}) => {
+    const done = !stopped && current >= 0 && index < current;
+    const active = !stopped && index === current;
+    const nextIndex = index + 1;
+    const showSideLine = nextIndex < RETURN_PROGRESS_STEPS.length && (lineToLeft || index < 3);
+    return (
+      <View key={step.label} style={styles.progressItem}>
+        {showSideLine ? (
+          <View
+            style={[
+              lineToLeft ? styles.progressLineLeft : styles.progressLine,
+              reached(nextIndex) && styles.progressLineOn,
+            ]}
+          />
+        ) : null}
+        {drop ? (
+          <View style={[styles.progressDrop, reached(4) && styles.progressLineOn]} />
+        ) : null}
+        <View
+          style={[
+            styles.progressIcon,
+            done && styles.progressIconDone,
+            active && styles.progressIconActive,
+          ]}
+        >
+          <Icon
+            name={active ? step.icon.replace('-outline', '') : step.icon}
+            size={22}
+            color={done || active ? '#FFFFFF' : '#9CA3AF'}
+          />
+        </View>
+        <Text
+          style={[
+            styles.progressLabel,
+            (done || active) && styles.progressLabelOn,
+          ]}
+          numberOfLines={1}
+        >
+          {step.label}
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.progressSection}>
+      <SectionLabel>Return progress</SectionLabel>
+      <Text style={styles.progressSubtitle}>Track where your return is right now</Text>
+      <View style={styles.progressCard}>
+        <View style={[styles.progressRow, styles.progressRowGap]}>
+          {topRow.map(item => renderStep(item, { drop: item.index === 3 }))}
+        </View>
+        <View style={styles.progressRow}>
+          <View style={styles.progressSpacer} />
+          {bottomRow.map(item => renderStep(item, { lineToLeft: item.index < RETURN_PROGRESS_STEPS.length - 1 }))}
+        </View>
+      </View>
+      {stopped ? (
+        <Text style={styles.progressStopped}>This return is cancelled.</Text>
+      ) : null}
+    </View>
+  );
+}
+
 function SectionLabel({ children }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
@@ -344,8 +434,8 @@ export default function ReturnDetailScreen() {
     }
   }, [route, auth.activeRole, dispatch]);
 
-  const payKey = String(returnInfo?.return?.status ?? 'paid').toLowerCase();
-  const payTheme = RETURN_PAY_THEME[payKey] ?? RETURN_PAY_THEME.paid;
+  const payKey = String(statusKey ?? returnInfo?.return?.status ?? 'return_initiated').toLowerCase();
+  const payTheme = RETURN_PAY_THEME[payKey] ?? RETURN_STATUS_THEME[payKey] ?? RETURN_PAY_THEME.return_initiated;
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -369,6 +459,7 @@ export default function ReturnDetailScreen() {
           <Text style={{ fontWeight: 700, fontSize: 18 }}>
             Return #{returnNumber}
           </Text>
+          
           <StatusPill theme={payTheme} />
         </View>
       ),
@@ -387,7 +478,7 @@ export default function ReturnDetailScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, returnNumber, openActions, payTheme]);
+  }, [navigation, returnNumber, openActions, payTheme, statusKey]);
   const statusTheme =
     RETURN_STATUS_THEME[returnInfo?.return?.status] ?? 'Not Available';
   const fmt = useCallback(n => {
@@ -878,6 +969,8 @@ export default function ReturnDetailScreen() {
           </View>
         </View>
 
+        <ReturnProgress statusKey={statusKey ?? returnInfo?.return?.status} />
+
         <View style={styles.deliveryCard}>
           <View style={styles.deliveryAddressRow}>
             <View style={styles.deliveryPin}>
@@ -904,7 +997,7 @@ export default function ReturnDetailScreen() {
             <SummaryRow
               icon="pricetag-outline"
               label="Tracking Number"
-              value={String(returnInfo?.return?.tracking_number || 'Awaiting shipment')}
+              value={String(returnInfo?.return?.tracking_number || 'Not Available')}
               last
             />
           </View>
@@ -1045,16 +1138,15 @@ export default function ReturnDetailScreen() {
             )}
             muted
           />
-          <MoneyRow label="Discount" value={fmt(0)} muted />
+          {/* <MoneyRow label="Discount" value={fmt(0)} muted />
           <MoneyRow
             label="Shipping Cost"
             value={
-              // returnInfo?.return?.return_shipping_fee &&
               fmt(returnInfo?.return?.return_shipping_fee)
             }
             muted
           />
-          <MoneyRow label="Tax" value={fmt(0)} muted />
+          <MoneyRow label="Tax" value={fmt(0)} muted /> */}
           <View style={styles.moneyDivider} />
           <MoneyRow
             label="Total"
@@ -1470,6 +1562,94 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   summaryHeroStatusText: { fontSize: 15, fontWeight: '700' },
+  progressSection: {
+    marginTop: 0,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  progressSubtitle: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  progressCard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 0,
+    marginBottom: 8,
+    ...sectionShadow,
+  },
+  progressRow: { flexDirection: 'row' },
+  progressRowGap: { marginBottom: 22 },
+  progressItem: {
+    width: '25%',
+    alignItems: 'center',
+    marginBottom: 14,
+    position: 'relative',
+  },
+  progressSpacer: { width: '25%' },
+  progressLine: {
+    position: 'absolute',
+    top: 26,
+    left: '50%',
+    right: '-50%',
+    height: 3,
+    backgroundColor: '#E5E7EB',
+    zIndex: 0,
+  },
+  progressLineLeft: {
+    position: 'absolute',
+    top: 26,
+    right: '50%',
+    left: '-50%',
+    height: 3,
+    backgroundColor: '#E5E7EB',
+    zIndex: 0,
+  },
+  progressLineOn: { backgroundColor: '#00926E' },
+  progressDrop: {
+    position: 'absolute',
+    top: 76,
+    left: '50%',
+    marginLeft: -1.5,
+    width: 3,
+    height: 64,
+    backgroundColor: '#E5E7EB',
+    zIndex: 0,
+  },
+  progressIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E5E7EB',
+    zIndex: 1,
+  },
+  progressIconDone: { backgroundColor: '#00926E' },
+  progressIconActive: {
+    backgroundColor: '#00926E',
+    borderWidth: 3,
+    borderColor: '#B7E4D6',
+  },
+  progressLabel: {
+    marginTop: 8,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  progressLabelOn: { color: '#111111' },
+  progressStopped: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#6B7280',
+  },
   summaryTurnTip: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 10 },
   summaryTurnTipText: { flex: 1, fontSize: 13, lineHeight: 18, color: '#374151' },
   deliveryCard: {

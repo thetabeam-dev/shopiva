@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: WHITE,
-    borderRadius: 18,
+    borderRadius: 7,
     padding: 16,
     ...Platform.select({
       ios: {

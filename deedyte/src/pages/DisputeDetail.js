@@ -382,31 +382,27 @@ export default function DisputeDetailScreen() {
     );
   }
 
-  const renderOrderItems = useCallback((dispute, index) => {
-
+  const renderOrderItems = useCallback((item, index) => {
     return (
-      <>
-
-        <View style={styles.tableRow}>
-          <Text style={[styles.tableCell, styles.tableHName]} numberOfLines={2}>
-            {dispute.name ?? '—'}
-          </Text>
-          <Text style={styles.tableCell}>
-            {dispute.qty != null ? String(dispute.qty) : '—'}
-          </Text>
-          <Text style={styles.tableCell}>
-            {dispute.unit_price != null
-              ? formatNaira(dispute.unit_price)
-              : '—'}
-          </Text>
-          <Text style={styles.tableCellStrong}>
-            {dispute.total_price != null
-              ? formatNaira(dispute.total_price)
-              : '—'}
-          </Text>
-        </View>
-      </>
-    )
+      <View key={String(item.item_id ?? item.id ?? index)} style={styles.tableRow}>
+        <Text style={[styles.tableCell, styles.tableHName]} numberOfLines={2}>
+          {item.name ?? '—'}
+        </Text>
+        <Text style={styles.tableCell}>
+          {item.qty != null ? String(item.qty) : '—'}
+        </Text>
+        <Text style={styles.tableCell}>
+          {item.unit_price != null
+            ? formatNaira(item.unit_price)
+            : '—'}
+        </Text>
+        <Text style={styles.tableCellStrong}>
+          {item.total_price != null
+            ? formatNaira(item.total_price)
+            : '—'}
+        </Text>
+      </View>
+    );
   }, [])
 
 

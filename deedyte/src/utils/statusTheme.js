@@ -208,6 +208,13 @@ export const RETURN_STATUS_THEME = {
     text: '#374151',
     label: 'Cancelled',
   },
+
+  return_cancelled: {
+    bg: '#F3F4F6',
+    dot: '#6B7280',
+    text: '#374151',
+    label: 'Cancelled',
+  },
 };
 
 export const RETURN_PAY_THEME = {
@@ -219,9 +226,9 @@ export const RETURN_PAY_THEME = {
   },
 
   return_accepted: {
-    bg: '#EFF6FF',
-    dot: '#2563EB',
-    text: '#1D4ED8',
+    bg: '#FEF3C7',
+    dot: '#D97706',
+    text: '#92400E',
     label: 'Accepted',
   },
 
@@ -233,9 +240,44 @@ export const RETURN_PAY_THEME = {
   },
 
   return_shipping: {
-    bg: '#EEF2FF',
-    dot: '#6366F1',
-    text: '#3730A3',
-    label: 'Refunded',
+    bg: '#EFF6FF',
+    dot: '#2563EB',
+    text: '#1D4ED8',
+    label: 'Shipping',
+  },
+
+  return_out_for_delivery: {
+    bg: '#E0F2FE',
+    dot: '#0284C7',
+    text: '#075985',
+    label: 'Out for delivery',
+  },
+
+  return_delivered: {
+    bg: '#F0FDF4',
+    dot: '#22C55E',
+    text: '#166534',
+    label: 'Delivered',
+  },
+
+  return_confirmed: {
+    bg: '#ECFEFF',
+    dot: '#0891B2',
+    text: '#155E75',
+    label: 'Confirmed',
+  },
+
+  return_cancelled: {
+    bg: '#F3F4F6',
+    dot: '#6B7280',
+    text: '#374151',
+    label: 'Cancelled',
+  },
+
+  return_cancellation: {
+    bg: '#F3F4F6',
+    dot: '#6B7280',
+    text: '#374151',
+    label: 'Cancelled',
   },
 };

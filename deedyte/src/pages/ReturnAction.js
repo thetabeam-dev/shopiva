@@ -167,7 +167,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
     const [confirmFulfillOnTime, setConfirmFulfillOnTime] = useState(false);
     const [confirmPerformancePolicy, setConfirmPerformancePolicy] =
         useState(false);
-    const [fulfillmentDuration, setFulfillmentDuration] = useState(null);
 
     const navigation = useNavigation();
     useEffect(() => {
@@ -355,32 +354,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
 
                         <View style={styles.processingCard}>
                             <Text style={styles.processingFieldLabel}>
-                                Estimated ship time
-                            </Text>
-                            <Text style={styles.processingFieldHint}>
-                                When do you plan to ship? This helps set vendor expectations.
-                            </Text>
-                            <Dropdown
-                                style={styles.processingDropdown}
-                                containerStyle={styles.dropdownContainer}
-                                placeholderStyle={styles.placeholderStyle}
-                                selectedTextStyle={styles.selectedTextStyle}
-                                itemTextStyle={styles.processingDropdownItem}
-                                iconStyle={styles.iconStyle}
-                                data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                                maxHeight={280}
-                                labelField="label"
-                                valueField="value"
-                                placeholder="Select timeframe"
-                                value={fulfillmentDuration}
-                                onChange={(item) =>
-                                    setFulfillmentDuration(item.value)
-                                }
-                            />
-                        </View>
-
-                        <View style={styles.processingCard}>
-                            <Text style={styles.processingFieldLabel}>
                                 Notes (optional)
                             </Text>
                             <Text style={styles.processingFieldHint}>
@@ -440,19 +413,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                                     );
                                     return;
                                 }
-                                if (
-                                    fulfillmentDuration == null ||
-                                    fulfillmentDuration === ""
-                                ) {
-                                    Alert.alert(
-                                        "Ship time required",
-                                        "Select when you will ship this return so the vendor sees an accurate commitment."
-                                    );
-                                    return;
-                                }
-                                
-                                
-
                                 async function AcceptReturnHandler() {
                                     setLoading(!loading);
                                     const u = await getStoredUser();
@@ -469,11 +429,6 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                                                     fulfill_on_time: true,
                                                     performance_policy: true,
                                                 },
-                                                fulfillment_duration: fulfillmentDuration,
-                                                fulfillment_duration_label: FULFILLMENT_TIMEFRAME_OPTIONS.find(
-                                                    (o) => o.value ===
-                                                        fulfillmentDuration
-                                                )?.label ?? null,
                                             },
                                             notes: note,
                                             actor_id: u.id,
@@ -519,7 +474,6 @@ function Processing({ data }) {
 
     const [startedProcessing, setStartedProcessing] = useState(false);
     const [shipWithinCommitment, setShipWithinCommitment] = useState(false);
-    const [fulfillmentDuration, setFulfillmentDuration] = useState(null);
     const [loading, setLoading] = useState(false);
     useEffect(() => {
         connectChatSocket();
@@ -529,10 +483,6 @@ function Processing({ data }) {
         ...(data.meta && typeof data.meta === "object" ? data.meta : {}),
         started_processing: startedProcessing,
         ship_within_commitment: shipWithinCommitment,
-        fulfillment_duration: fulfillmentDuration,
-        fulfillment_duration_label:
-            FULFILLMENT_TIMEFRAME_OPTIONS.find((o) => o.value === fulfillmentDuration)
-                ?.label ?? null,
     });
 
     const validateProcessing = () => {
@@ -540,13 +490,6 @@ function Processing({ data }) {
             Alert.alert(
                 "Confirmations required",
                 "Check both boxes to confirm you are processing this return on schedule."
-            );
-            return false;
-        }
-        if (fulfillmentDuration == null || fulfillmentDuration === "") {
-            Alert.alert(
-                "Ship time required",
-                "Select when you expect to ship so the vendor sees an accurate window."
             );
             return false;
         }
@@ -604,30 +547,6 @@ function Processing({ data }) {
                     </View>
                 </View>
 
-                <View style={styles.processingCard}>
-                    <Text style={styles.processingFieldLabel}>
-                        Estimated ship time
-                    </Text>
-                    <Text style={styles.processingFieldHint}>
-                        When do you plan to hand this return to the carrier? This
-                        helps set vendor expectations.
-                    </Text>
-                    <Dropdown
-                        style={styles.processingDropdown}
-                        containerStyle={styles.dropdownContainer}
-                        placeholderStyle={styles.placeholderStyle}
-                        selectedTextStyle={styles.selectedTextStyle}
-                        itemTextStyle={styles.processingDropdownItem}
-                        iconStyle={styles.iconStyle}
-                        data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                        maxHeight={280}
-                        labelField="label"
-                        valueField="value"
-                        placeholder="Select timeframe"
-                        value={fulfillmentDuration}
-                        onChange={(item) => setFulfillmentDuration(item.value)}
-                    />
-                </View>
                 <View
                     style={[
                         styles.processingCard,
@@ -954,8 +873,6 @@ function OutForDelivery({ data }) {
     const [confirmOutForDelivery, setConfirmOutForDelivery] = useState(false);
     const [finalDeliveryHandler, setFinalDeliveryHandler] = useState(null);
     const [riderContact, setRiderContact] = useState("");
-    const [expectedDelivery, setExpectedDelivery] = useState(null);
-
     useEffect(() => {
         connectChatSocket();
     }, []);
@@ -972,11 +889,6 @@ function OutForDelivery({ data }) {
             finalDeliveryHandler
         ),
         rider_contact: riderContact.trim() || null,
-        expected_delivery: expectedDelivery,
-        expected_delivery_label: optionLabel(
-            FULFILLMENT_TIMEFRAME_OPTIONS,
-            expectedDelivery
-        ),
     });
 
     const validate = () => {
@@ -991,13 +903,6 @@ function OutForDelivery({ data }) {
             Alert.alert(
                 "Final delivery",
                 "Select who is handling the final delivery."
-            );
-            return false;
-        }
-        if (expectedDelivery == null || expectedDelivery === "") {
-            Alert.alert(
-                "Expected delivery",
-                "Select when you expect this return to be delivered."
             );
             return false;
         }
@@ -1090,29 +995,6 @@ function OutForDelivery({ data }) {
                     />
                 </View>
 
-                <View style={styles.processingCard}>
-                    <Text style={styles.processingFieldLabel}>
-                        When do you expect this return to be delivered?
-                    </Text>
-                    <Text style={styles.processingFieldHint}>
-                        Sets vendor expectations for arrival or pickup completion.
-                    </Text>
-                    <Dropdown
-                        style={styles.processingDropdown}
-                        containerStyle={styles.dropdownContainer}
-                        placeholderStyle={styles.placeholderStyle}
-                        selectedTextStyle={styles.selectedTextStyle}
-                        itemTextStyle={styles.processingDropdownItem}
-                        iconStyle={styles.iconStyle}
-                        data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                        maxHeight={280}
-                        labelField="label"
-                        valueField="value"
-                        placeholder="Select timeframe"
-                        value={expectedDelivery}
-                        onChange={(item) => setExpectedDelivery(item.value)}
-                    />
-                </View>
             </ScrollView>
 
             <View
