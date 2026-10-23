@@ -1221,7 +1221,7 @@ export async function remindVendorsOfUnacceptedOrders(): Promise<void> {
   }>(
     `SELECT o.id, s.ownerid
      FROM orders o
-     LEFT JOIN shops s ON s.id = o.shop_id
+     LEFT JOIN shops s ON s.id::text = trim(o.shop_id::text)
      WHERE o.fulfillment_status = 'payment_received'
        AND COALESCE(
          (
@@ -1318,7 +1318,7 @@ export async function expireUnacceptedOrders(): Promise<void> {
   }>(
     `SELECT o.id, o.customer_id, s.ownerid, o.amount_paid, o.shipping_fee
      FROM orders o
-     LEFT JOIN shops s ON s.id = o.shop_id
+     LEFT JOIN shops s ON s.id::text = trim(o.shop_id::text)
      WHERE o.fulfillment_status = 'payment_received'
        AND COALESCE(
          (

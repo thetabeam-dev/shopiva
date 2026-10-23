@@ -465,6 +465,34 @@ export async function DeleteUserService(id: number, payload: DeleteAccountPayloa
             [anonymizedUserRef, String(userId)]
         );
 
+        // Wallet rows reference users without ON DELETE CASCADE.
+        await executeIfTableExists(
+            client,
+            "wallet_transactions",
+            `DELETE FROM wallet_transactions
+             WHERE wallet_id IN (SELECT id FROM wallets WHERE user_id = $1)`,
+            [userId]
+        );
+        await executeIfTableExists(
+            client,
+            "virtual_accounts",
+            `DELETE FROM virtual_accounts
+             WHERE wallet_id IN (SELECT id FROM wallets WHERE user_id = $1)`,
+            [userId]
+        );
+        await executeIfTableExists(
+            client,
+            "wallets",
+            "DELETE FROM wallets WHERE user_id = $1",
+            [userId]
+        );
+        await executeIfTableExists(
+            client,
+            "escrow_transactions",
+            "DELETE FROM escrow_transactions WHERE buyer_id = $1 OR vendor_id = $1",
+            [userId]
+        );
+
         // Best-effort cleanup before hard delete.
         await executeIfTableExists(client, "cart_items", "DELETE FROM cart_items WHERE user_id = $1", [userId]);
         await executeIfTableExists(client, "chat_message_reads", "DELETE FROM chat_message_reads WHERE user_id = $1", [userId]);
