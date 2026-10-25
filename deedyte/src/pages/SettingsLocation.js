@@ -210,7 +210,7 @@ export default function SettingsLocationScreen() {
               showsBuildings={false}
               mapType="standard"
             >
-              <UrlTile urlTemplate={tomtomTileUrl()} maximumZ={22} zIndex={-1} />
+              <UrlTile urlTemplate={tomtomTileUrl()} maximumZ={22} />
             </MapView>
             <View style={styles.pinOverlay} pointerEvents="none">
               <Icon name="location-sharp" size={42} color={BLACK} style={styles.pinIcon} />

@@ -3,6 +3,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import VendorsScreen from '../../pages/customer/Vendors';
 import ExploreBrowse from '../../pages/customer/ExploreBrowse';
+import ExploreMap from '../../pages/customer/ExploreMap';
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
 import CartScreen from '../../pages/customer/Cart';
@@ -82,6 +83,11 @@ export function ExploreStackScreen() {
         options={{ title: 'Explore', headerShadowVisible: false }}
       />
       <ExploreStack.Screen
+        name="Explore-map"
+        component={ExploreMap}
+        options={{ title: 'Explore map', headerShadowVisible: false }}
+      />
+      <ExploreStack.Screen
         name="State-shops"
         component={VendorsScreen}
         options={({ navigation, route }) => ({
@@ -93,7 +99,7 @@ export function ExploreStackScreen() {
         name="Area-shops"
         component={VendorsScreen}
         options={{
-          title: 'Shops in this area',
+          title: 'Shops In This Area',
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#FFFFFF' },
           headerTitleStyle: { fontWeight: '700' },
