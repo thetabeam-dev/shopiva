@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../../utils/formatNaira';
 
 function normalizeAmount(value) {
@@ -13,6 +14,7 @@ function normalizeAmount(value) {
  * @param {{ navigation: import('@react-navigation/native').NavigationProp<Record<string, object | undefined>>; route: { params?: Record<string, unknown> } }} props
  */
 export default function PaymentFailedScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const subtotal = normalizeAmount(route?.params?.subtotal);
   const shipping = normalizeAmount(route?.params?.shipping);
   const total = normalizeAmount(route?.params?.total || subtotal + shipping);
@@ -22,7 +24,7 @@ export default function PaymentFailedScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 28 + insets.bottom }]} showsVerticalScrollIndicator={false}>
         <View style={styles.heroWrap}>
           <View style={styles.heroGlow}>
             <View style={styles.iconCircle}>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchWalletTransactions } from '../api/user';
 import { connectChatSocket } from '../socket/chatSocket';
 import WalletTransactionRow from '../components/WalletTransactionRow';
@@ -9,6 +10,7 @@ import WalletTransactionRow from '../components/WalletTransactionRow';
 const TEAL = '#00926e';
 
 export default function WalletHistoryScreen() {
+  const insets = useSafeAreaInsets();
   const [transactions, setTransactions] = useState([]);
 
   const load = useCallback(() => {
@@ -51,7 +53,7 @@ export default function WalletHistoryScreen() {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
       {transactions.map(item => (
         <WalletTransactionRow key={String(item.id)} item={item} />
       ))}

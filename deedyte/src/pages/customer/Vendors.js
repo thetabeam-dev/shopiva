@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import ShopPolicyViewerModal from '../../components/ShopPolicyViewerModal';
 import { ShopOverflowMenu } from '../../components/ShopOverflowMenu';
@@ -559,6 +560,7 @@ function VendorLocationSheet({
  * @param {{ route: import('@react-navigation/native').RouteProp<Record<string, object | undefined>, 'vendors'>; navigation: import('@react-navigation/native').NativeStackNavigationProp<Record<string, object | undefined>, 'vendors'> }} props
  */
 export default function VendorScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const category = ALL_CATEGORY;
   const [searchQuery, setSearchQuery] = useState('');
   const [vendors, setVendors] = useState([]);
@@ -1024,7 +1026,7 @@ export default function VendorScreen({ route, navigation }) {
               colors={['#00926e']}
             />
           }
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: 28 + insets.bottom }]}
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           ListEmptyComponent={
             <Text style={styles.muted}>

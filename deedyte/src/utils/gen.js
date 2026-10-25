@@ -43,6 +43,17 @@ class Tools {
     return uniqueId;
   }
 
+  /**
+   * Android system navigation. iOS has no equivalent setting.
+   * mode 0 = 3-button, 1 = 2-button, 2 = gesture, -1 = unknown.
+   */
+  static async getNavigationMode() {
+    if (Platform.OS !== 'android' || !NativeModules.NavigationMode) {
+      return { mode: -1, name: Platform.OS === 'android' ? 'unknown' : 'unsupported' };
+    }
+    return NativeModules.NavigationMode.getNavigationMode();
+  }
+
   static generateId(length) {
     const chars =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

@@ -13,6 +13,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useProfile } from '../context/ProfileContext';
 import { fetchShopPayoutAccount } from '../api/shop';
 import { fetchWallet, withdrawWalletMoney } from '../api/user';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../utils/formatNaira';
 import WalletConfirmSheet from '../components/WalletConfirmSheet';
 import WalletPinModals from '../components/WalletPinModals';
@@ -28,6 +29,7 @@ function field(row, snake, camel) {
 }
 
 export default function WalletWithdrawScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { user } = useProfile();
   const userId = Number(user?.id);
@@ -95,7 +97,7 @@ export default function WalletWithdrawScreen() {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]} keyboardShouldPersistTaps="handled">
       <Text style={styles.label}>Amount</Text>
       <TextInput
         value={amount}
