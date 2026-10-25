@@ -925,7 +925,17 @@ export default function VendorScreen({ route, navigation }) {
     setFilterVisible(false);
   }, []);
 
+  const shopIdOrder = useMemo(() => {
+    const raw = route.params?.shopIds;
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    return raw.map(id => String(id));
+  }, [route.params?.shopIds]);
+
   const displayedVendors = useMemo(() => {
+    if (shopIdOrder) {
+      const byId = new Map(vendors.map(v => [String(v.id), v]));
+      return shopIdOrder.map(id => byId.get(id)).filter(Boolean);
+    }
     const query = searchQuery.trim().toLowerCase();
     return vendors.filter(v => {
       const canon = normalizeVendorState(vendorStateRaw(v));
@@ -939,7 +949,7 @@ export default function VendorScreen({ route, navigation }) {
       const city = String(v?.city ?? v?.location?.city ?? '').toLowerCase();
       return name.includes(query) || city.includes(query);
     });
-  }, [vendors, locationFilter, searchQuery]);
+  }, [vendors, locationFilter, searchQuery, shopIdOrder]);
 
   const handleSelectLocation = useCallback(stateName => {
     setLocationFilter(stateName);

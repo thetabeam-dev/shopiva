@@ -12,7 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView from 'react-native-maps';
+import MapView, { UrlTile } from 'react-native-maps';
+import { tomtomTileUrl } from '../utils/tomtom';
 import { useLocationLookup } from '../hooks/useLocationLookup';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -208,7 +209,9 @@ export default function SettingsLocationScreen() {
               showsPointsOfInterest
               showsBuildings={false}
               mapType="standard"
-            />
+            >
+              <UrlTile urlTemplate={tomtomTileUrl()} maximumZ={22} zIndex={-1} />
+            </MapView>
             <View style={styles.pinOverlay} pointerEvents="none">
               <Icon name="location-sharp" size={42} color={BLACK} style={styles.pinIcon} />
             </View>
