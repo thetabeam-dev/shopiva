@@ -85,7 +85,7 @@ export function ExploreStackScreen() {
       <ExploreStack.Screen
         name="Explore-map"
         component={ExploreMap}
-        options={{ title: 'Explore map', headerShadowVisible: false }}
+        options={{ title: 'Explore Map', headerShadowVisible: false }}
       />
       <ExploreStack.Screen
         name="State-shops"
