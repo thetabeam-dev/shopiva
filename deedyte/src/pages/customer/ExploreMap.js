@@ -57,6 +57,7 @@ export default function ExploreMap({ navigation, route }) {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [showMe, setShowMe] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mapBox, setMapBox] = useState(null);
   const mapRef = useRef(null);
   const mapListRef = useRef(null);
   const searchRef = useRef(null);
@@ -159,6 +160,22 @@ export default function ExploreMap({ navigation, route }) {
     }
   };
 
+  const zoomBy = (factor) => {
+    const region = mapRegion ?? {
+      latitude: savedLatitude ?? 9.082,
+      longitude: savedLongitude ?? 8.6753,
+      latitudeDelta: savedCoord ? 0.2 : 8,
+      longitudeDelta: savedCoord ? 0.2 : 8,
+    };
+    const next = {
+      ...region,
+      latitudeDelta: Math.min(40, Math.max(0.002, region.latitudeDelta * factor)),
+      longitudeDelta: Math.min(40, Math.max(0.002, region.longitudeDelta * factor)),
+    };
+    setMapRegion(next);
+    mapRef.current?.animateToRegion(next, 180);
+  };
+
   const goToMyLocation = () => {
     if (!savedCoord) {
       Alert.alert('Location', 'Your saved profile location does not include coordinates.');
@@ -241,11 +258,17 @@ export default function ExploreMap({ navigation, route }) {
         </View>
       ) : null}
 
-      <View style={styles.mapWrap}>
+      <View
+        style={styles.mapWrap}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          if (width > 0 && height > 0) setMapBox({ width, height });
+        }}
+      >
         <MapView
           ref={mapRef}
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          style={styles.map}
+          style={mapBox ?? styles.map}
           initialRegion={{
             latitude: savedCoord?.latitude ?? 9.082,
             longitude: savedCoord?.longitude ?? 8.6753,
@@ -255,7 +278,7 @@ export default function ExploreMap({ navigation, route }) {
           onRegionChangeComplete={setMapRegion}
           showsMyLocationButton={false}
           toolbarEnabled={false}
-          mapPadding={{ top: 12, right: 12, bottom: 210, left: 12 }}
+          mapPadding={{ top: 72, right: 12, bottom: 210, left: 12 }}
           mapType={Platform.OS === 'android' ? 'none' : 'standard'}
         >
           {Platform.OS === 'android' ? (
@@ -280,16 +303,34 @@ export default function ExploreMap({ navigation, route }) {
           ))}
         </MapView>
         <View style={styles.overlay} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.locateBtn}
-          onPress={goToMyLocation}
-          accessibilityRole="button"
-          accessibilityLabel="Show my location"
-        >
-          <Icon name="locate" size={22} color="#111111" />
-        </TouchableOpacity>
+          <View style={styles.zoomStack}>
+            <TouchableOpacity
+              style={styles.zoomBtn}
+              onPress={() => zoomBy(0.8)}
+              accessibilityRole="button"
+              accessibilityLabel="Zoom in"
+            >
+              <Icon name="add" size={22} color="#111111" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.zoomBtn}
+              onPress={() => zoomBy(1.25)}
+              accessibilityRole="button"
+              accessibilityLabel="Zoom out"
+            >
+              <Icon name="remove" size={22} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.locateBtn}
+            onPress={goToMyLocation}
+            accessibilityRole="button"
+            accessibilityLabel="Show my location"
+          >
+            <Icon name="locate" size={22} color="#111111" />
+          </TouchableOpacity>
 
-        <View style={styles.mapSheet} pointerEvents="box-none">
+          <View style={styles.mapSheet} pointerEvents="box-none">
             <View style={styles.mapSheetHead}>
               <Text style={styles.mapSheetTitle}>
                 <Text style={styles.mapSheetCount}>({visibleShops.length})</Text> Shops In This Area
@@ -317,7 +358,7 @@ export default function ExploreMap({ navigation, route }) {
                 keyExtractor={(item) => String(item.shop.id)}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.mapCardRow}
-                onScrollToIndexFailed={() => {}}
+                onScrollToIndexFailed={() => { }}
                 renderItem={({ item }) => {
                   const cover = shopCover(item.shop);
                   const place = shopPlace(item.shop);
@@ -353,8 +394,10 @@ export default function ExploreMap({ navigation, route }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   searchWrap: {
-    marginTop: 8,
-    marginHorizontal: 16,
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
     height: 48,
     borderRadius: 24,
     backgroundColor: '#F3F4F6',
@@ -362,19 +405,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     gap: 8,
-    zIndex: 3,
-    elevation: 3,
+    zIndex: 6,
+    elevation: 6,
   },
   searchInput: { flex: 1, fontSize: 16, color: '#111111' },
   suggestError: {
-    marginHorizontal: 16,
-    marginBottom: 8,
+    position: 'absolute',
+    top: 68,
+    left: 16,
+    right: 16,
     color: '#B42318',
     fontSize: 13,
+    zIndex: 6,
   },
   suggestBox: {
-    marginHorizontal: 16,
-    marginBottom: 8,
+    position: 'absolute',
+    top: 68,
+    left: 16,
+    right: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 7,
     borderWidth: 1,
@@ -397,14 +445,34 @@ const styles = StyleSheet.create({
   suggestSub: { marginTop: 1, fontSize: 12, color: '#6B7280' },
   mapWrap: {
     flex: 1,
-    marginTop: 8,
-    minHeight: 280,
   },
-  map: { flex: 1 },
+  map: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 5,
     elevation: 8,
+    // marginBottom: 20
+  },
+  zoomStack: {
+    position: 'absolute',
+    right: 16,
+    bottom: 304,
+    zIndex: 6,
+    gap: 8,
+  },
+  zoomBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
   },
   locateBtn: {
     position: 'absolute',

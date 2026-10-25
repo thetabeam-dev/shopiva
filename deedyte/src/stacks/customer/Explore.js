@@ -85,7 +85,11 @@ export function ExploreStackScreen() {
       <ExploreStack.Screen
         name="Explore-map"
         component={ExploreMap}
-        options={{ title: 'Explore Map', headerShadowVisible: false }}
+        options={{
+          title: 'Explore Map',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFFFFF' },
+        }}
       />
       <ExploreStack.Screen
         name="State-shops"

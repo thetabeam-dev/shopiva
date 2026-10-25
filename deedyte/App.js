@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Alert, Appearance, Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WIPE_STORAGE_ON_LAUNCH } from './src/auth/devAuth';
 import { clearAllDeedyteStorage } from './src/auth/session';
 import { getPaystackPublicKey, isPaystackConfigured, warnIfPaystackLiveInDev } from './src/config/paystack';
 import { getPaystackProvider } from './src/paystack/paystackNativeGate';
 import NavigationHandler from './src/navigation/index';
+
+function AndroidSystemNavInset({ children }) {
+  const insets = useSafeAreaInsets();
+  const bottom = Platform.OS === 'android' ? insets.bottom : 0;
+  return <View style={{ flex: 1, paddingBottom: bottom }}>{children}</View>;
+}
 import {
   getFcmToken,
   requestPermission,
@@ -210,6 +216,7 @@ function App() {
         {versionCheck.isLatest || versionCheck.isUpdating ? (
           <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider style={{ flex: 1 }}>
+              <AndroidSystemNavInset>
               {PaystackProvider ? (
                 <PaystackProvider
                   publicKey={paystackPublicKey}
@@ -222,6 +229,7 @@ function App() {
               ) : (
                 appBody
               )}
+              </AndroidSystemNavInset>
             </SafeAreaProvider>
           </GestureHandlerRootView>
         ) : null}
