@@ -4,7 +4,9 @@ import {
   Alert,
   Dimensions,
   Image,
+  Keyboard,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +21,8 @@ import { getVendorsOnMapByCategory } from '../../api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../context/ProfileContext';
 import { placeDetails, suggestPlaces, tomtomTileUrl } from '../../utils/tomtom';
+import { getCurrentCoordinates, requestLocationPermission, reverseGeocodeToPlace } from '../../utils/deviceLocation';
+import { updateUserProfileFields } from '../../api/user';
 import {
   shopCover,
   shopPlace,
@@ -135,7 +139,7 @@ function distanceKm(from, to) {
  */
 export default function ExploreMap({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { user } = useProfile();
+  const { user, refresh } = useProfile();
   const savedCoord = storedUserCoordinate(user);
   const savedLatitude = savedCoord?.latitude;
   const savedLongitude = savedCoord?.longitude;
@@ -255,6 +259,7 @@ export default function ExploreMap({ navigation, route }) {
   }, [visibleShops, showMe, savedCoord, webReady]);
 
   const selectPlace = async (option) => {
+    Keyboard.dismiss();
     setQuery(option.label);
     setSuggestionsOpen(false);
     searchRef.current?.blur();
@@ -297,23 +302,63 @@ export default function ExploreMap({ navigation, route }) {
     mapRef.current?.animateToRegion(region, 400);
   };
 
-  const goToMyLocation = () => {
-    if (!savedCoord) {
-      Alert.alert('Location', 'Your saved profile location does not include coordinates.');
-      return;
+  const openPersonalLocation = () => {
+    navigation.navigate('Profile', { screen: 'profile-personal-information' });
+  };
+
+  const goToMyLocation = async () => {
+    let coord = savedCoord;
+    let label = String(user?.locationDisplay ?? '').trim()
+      || [user?.locationObj?.city, user?.locationObj?.state].filter(Boolean).join(', ');
+    if (!coord) {
+      if (!user?.id) {
+        openPersonalLocation();
+        return;
+      }
+      const granted = await requestLocationPermission({ interactive: true });
+      if (!granted) {
+        openPersonalLocation();
+        return;
+      }
+      try {
+        const coords = await getCurrentCoordinates({ exact: true });
+        const place = await reverseGeocodeToPlace(coords.latitude, coords.longitude);
+        const out = await updateUserProfileFields(user.id, {
+          location: {
+            city: place.city || '',
+            state: place.state || '',
+            country: place.country || 'Nigeria',
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          },
+        });
+        if (!out.ok) {
+          Alert.alert('Location', out.message || 'Could not save your location.');
+          return;
+        }
+        await refresh().catch(() => {});
+        coord = { latitude: coords.latitude, longitude: coords.longitude };
+        label = [place.city, place.state].filter(Boolean).join(', ') || label;
+      } catch (error) {
+        const code = error?.code;
+        if (code === 'denied' || code === 'blocked' || code === 'services_off') {
+          openPersonalLocation();
+          return;
+        }
+        Alert.alert('Location', error instanceof Error ? error.message : 'Could not read your location.');
+        return;
+      }
     }
     const region = {
-      ...savedCoord,
+      ...coord,
       latitudeDelta: 0.12,
       longitudeDelta: 0.12,
     };
-    const label = String(user?.locationDisplay ?? '').trim()
-      || [user?.locationObj?.city, user?.locationObj?.state].filter(Boolean).join(', ');
     setQuery(label);
     setSuggestions([]);
     setSuggestionsOpen(false);
     setShowMe(true);
-    setSelectedPlace(savedCoord);
+    setSelectedPlace(coord);
     moveMap(region);
   };
 
@@ -371,17 +416,17 @@ export default function ExploreMap({ navigation, route }) {
       {suggestions.length > 0 && suggestionsOpen ? (
         <View style={styles.suggestBox}>
           {suggestions.map((option) => (
-            <TouchableOpacity
+            <Pressable
               key={option.key}
               style={styles.suggestRow}
-              onPress={() => selectPlace(option)}
+              onPressIn={() => selectPlace(option)}
             >
               <Icon name="location-outline" size={16} color="#00926E" />
               <View style={styles.suggestCopy}>
                 <Text style={styles.suggestLabel} numberOfLines={1}>{option.label}</Text>
                 <Text style={styles.suggestSub} numberOfLines={1}>{option.subtitle}</Text>
               </View>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
       ) : null}
@@ -591,8 +636,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     overflow: 'hidden',
-    zIndex: 3,
-    elevation: 3,
+    zIndex: 12,
+    elevation: 12,
   },
   suggestRow: {
     flexDirection: 'row',

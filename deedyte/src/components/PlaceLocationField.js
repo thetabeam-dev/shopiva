@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getCurrentCoordinates, requestLocationPermission, reverseGeocodeToPlace } from '../utils/deviceLocation';
 import { placeDetails, suggestPlaces } from '../utils/tomtom';
@@ -8,12 +8,18 @@ import { placeDetails, suggestPlaces } from '../utils/tomtom';
  * GPS fix or a Google place the user picks. Free text is not a saved location.
  * @param {{ onPlace: (place: { label: string; city: string; state: string; country: string; latitude: number; longitude: number }) => void; onClear?: () => void; disabled?: boolean }} props
  */
-export default function PlaceLocationField({ onPlace, onClear, disabled }) {
-  const [text, setText] = useState('');
+export default function PlaceLocationField({ onPlace, onClear, disabled, initialValue }) {
+  const [text, setText] = useState(String(initialValue ?? ''));
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const next = String(initialValue ?? '').trim();
+    if (!next) return;
+    setText((current) => (current.trim() ? current : next));
+  }, [initialValue]);
 
   useEffect(() => {
     const q = text.trim();
@@ -38,6 +44,8 @@ export default function PlaceLocationField({ onPlace, onClear, disabled }) {
   }, [text, open]);
 
   const choosePlace = async (option) => {
+    if (busy) return;
+    Keyboard.dismiss();
     setBusy(true);
     setError('');
     setOpen(false);
@@ -115,13 +123,13 @@ export default function PlaceLocationField({ onPlace, onClear, disabled }) {
       {open && suggestions.length > 0 ? (
         <View style={styles.list}>
           {suggestions.map((option) => (
-            <TouchableOpacity key={option.placeId} style={styles.row} onPress={() => choosePlace(option)}>
+            <Pressable key={option.placeId} style={styles.row} onPressIn={() => choosePlace(option)}>
               <Icon name="location-outline" size={16} color="#00926E" />
               <View style={styles.copy}>
                 <Text style={styles.label} numberOfLines={1}>{option.label}</Text>
                 {option.subtitle ? <Text style={styles.sub} numberOfLines={1}>{option.subtitle}</Text> : null}
               </View>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
       ) : null}
