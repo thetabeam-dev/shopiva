@@ -5,8 +5,10 @@ import {
   Dimensions,
   Image,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -23,6 +25,7 @@ import { useProfile } from '../../context/ProfileContext';
 import { placeDetails, suggestPlaces, tomtomTileUrl } from '../../utils/tomtom';
 import { getCurrentCoordinates, requestLocationPermission, reverseGeocodeToPlace } from '../../utils/deviceLocation';
 import { updateUserProfileFields } from '../../api/user';
+import PlaceLocationField from '../../components/PlaceLocationField';
 import {
   shopCover,
   shopPlace,
@@ -74,7 +77,8 @@ function tomtomLeafletHtml(tileUrl) {
   .tip b { display: block; font-size: 13px; color: #111; }
   .tip span { display: block; margin-top: 2px; font-size: 11px; color: #4B5563; }
   .tip em { display: block; margin-top: 4px; font-size: 12px; font-style: normal; font-weight: 700; color: #00926E; }
-  .you { background: #1A73E8; color: #fff; border-radius: 12px; padding: 4px 8px; font: 700 12px sans-serif; }
+  .you { width: 22px; height: 22px; border-radius: 11px; background: rgba(26,115,232,0.18); display: flex; align-items: center; justify-content: center; }
+  .you i { width: 14px; height: 14px; border-radius: 7px; background: #1A73E8; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(26,115,232,0.35); display: block; }
   .leaflet-div-icon { background: transparent; border: none; }
 </style>
 </head>
@@ -104,7 +108,7 @@ function tomtomLeafletHtml(tileUrl) {
       L.marker([shop.latitude, shop.longitude], { icon: icon }).on('click', function () { post({ type: 'shop', id: shop.id }); }).addTo(pins);
     });
     if (me) {
-      const icon = L.divIcon({ className: '', html: '<div class="you">You</div>', iconSize: [48, 24], iconAnchor: [24, 12] });
+      const icon = L.divIcon({ className: '', html: '<div class="you"><i></i></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
       L.marker([me.latitude, me.longitude], { icon: icon, zIndexOffset: 1000 }).addTo(pins);
     }
   };
@@ -151,6 +155,8 @@ export default function ExploreMap({ navigation, route }) {
   const [mapRegion, setMapRegion] = useState(null);
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [showMe, setShowMe] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [locationPickerBusy, setLocationPickerBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mapBox, setMapBox] = useState(null);
   const mapRef = useRef(null);
@@ -302,64 +308,97 @@ export default function ExploreMap({ navigation, route }) {
     mapRef.current?.animateToRegion(region, 400);
   };
 
-  const openPersonalLocation = () => {
-    navigation.navigate('Profile', { screen: 'profile-personal-information' });
-  };
-
-  const goToMyLocation = async () => {
-    let coord = savedCoord;
-    let label = String(user?.locationDisplay ?? '').trim()
-      || [user?.locationObj?.city, user?.locationObj?.state].filter(Boolean).join(', ');
-    if (!coord) {
-      if (!user?.id) {
-        openPersonalLocation();
-        return;
-      }
-      const granted = await requestLocationPermission({ interactive: true });
-      if (!granted) {
-        openPersonalLocation();
-        return;
-      }
-      try {
-        const coords = await getCurrentCoordinates({ exact: true });
-        const place = await reverseGeocodeToPlace(coords.latitude, coords.longitude);
-        const out = await updateUserProfileFields(user.id, {
-          location: {
-            city: place.city || '',
-            state: place.state || '',
-            country: place.country || 'Nigeria',
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-          },
-        });
-        if (!out.ok) {
-          Alert.alert('Location', out.message || 'Could not save your location.');
-          return;
-        }
-        await refresh().catch(() => {});
-        coord = { latitude: coords.latitude, longitude: coords.longitude };
-        label = [place.city, place.state].filter(Boolean).join(', ') || label;
-      } catch (error) {
-        const code = error?.code;
-        if (code === 'denied' || code === 'blocked' || code === 'services_off') {
-          openPersonalLocation();
-          return;
-        }
-        Alert.alert('Location', error instanceof Error ? error.message : 'Could not read your location.');
-        return;
-      }
-    }
-    const region = {
-      ...coord,
-      latitudeDelta: 0.12,
-      longitudeDelta: 0.12,
-    };
+  const showSavedLocation = (coord, label) => {
     setQuery(label);
     setSuggestions([]);
     setSuggestionsOpen(false);
     setShowMe(true);
     setSelectedPlace(coord);
-    moveMap(region);
+    setLocationPickerOpen(false);
+    moveMap({
+      ...coord,
+      latitudeDelta: 0.12,
+      longitudeDelta: 0.12,
+    });
+  };
+
+  const saveProfileLocation = async (place) => {
+    if (!user?.id) {
+      Alert.alert('Location', 'Sign in to save your location.');
+      return false;
+    }
+    const out = await updateUserProfileFields(user.id, {
+      location: {
+        city: place.city || '',
+        state: place.state || '',
+        country: place.country || 'Nigeria',
+        latitude: place.latitude,
+        longitude: place.longitude,
+      },
+    });
+    if (!out.ok) {
+      Alert.alert('Location', out.message || 'Could not save your location.');
+      return false;
+    }
+    await refresh().catch(() => {});
+    return true;
+  };
+
+  const goToMyLocation = async () => {
+    const savedLabel = String(user?.locationDisplay ?? '').trim()
+      || [user?.locationObj?.city, user?.locationObj?.state].filter(Boolean).join(', ');
+    if (savedCoord) {
+      showSavedLocation(savedCoord, savedLabel);
+      return;
+    }
+    try {
+      const granted = await requestLocationPermission({ interactive: true });
+      if (!granted) {
+        setLocationPickerOpen(true);
+        return;
+      }
+      const coords = await getCurrentCoordinates({ exact: true });
+      const latitude = Number(coords?.latitude);
+      const longitude = Number(coords?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        setLocationPickerOpen(true);
+        return;
+      }
+      const place = await reverseGeocodeToPlace(latitude, longitude);
+      const saved = await saveProfileLocation({
+        city: place.city || '',
+        state: place.state || '',
+        country: place.country || 'Nigeria',
+        latitude,
+        longitude,
+      });
+      if (!saved) {
+        setLocationPickerOpen(true);
+        return;
+      }
+      showSavedLocation(
+        { latitude, longitude },
+        [place.city, place.state].filter(Boolean).join(', ') || savedLabel,
+      );
+    } catch {
+      setLocationPickerOpen(true);
+    }
+  };
+
+  const pickLocationFromModal = async (place) => {
+    if (!place || locationPickerBusy) return;
+    if (!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) return;
+    setLocationPickerBusy(true);
+    try {
+      const saved = await saveProfileLocation(place);
+      if (!saved) return;
+      showSavedLocation(
+        { latitude: place.latitude, longitude: place.longitude },
+        place.label || [place.city, place.state].filter(Boolean).join(', '),
+      );
+    } finally {
+      setLocationPickerBusy(false);
+    }
   };
 
   const focusShop = (shop, coordinate) => {
@@ -595,12 +634,76 @@ export default function ExploreMap({ navigation, route }) {
           </View>
         </View>
       </View>
+
+      <Modal
+        visible={locationPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!locationPickerBusy) setLocationPickerOpen(false);
+        }}
+      >
+        <View style={styles.locationModalRoot}>
+          <ScrollView
+            contentContainerStyle={styles.locationModalScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.locationModalCard}>
+              <View style={styles.locationModalIcon}>
+                <Icon name="location-outline" size={36} color="#00926E" />
+              </View>
+              <Text style={styles.locationModalTitle}>Set your location</Text>
+              <Text style={styles.locationModalBody}>
+                We could not read your position. Type a city or area and choose a suggestion so shops near you can show on the map.
+              </Text>
+              <PlaceLocationField
+                disabled={locationPickerBusy}
+                onPlace={pickLocationFromModal}
+              />
+              {locationPickerBusy ? <ActivityIndicator color="#00926E" style={{ marginTop: 16 }} /> : null}
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  locationModalRoot: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  locationModalScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  locationModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+  },
+  locationModalIcon: { alignItems: 'center', marginBottom: 10 },
+  locationModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111111',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  locationModalBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
   searchWrap: {
     position: 'absolute',
     top: 12,
