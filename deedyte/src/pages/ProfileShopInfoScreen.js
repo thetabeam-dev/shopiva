@@ -1859,6 +1859,12 @@ function FormModal({ visible, title, children, onClose, onSave, saving, notice }
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (event) => {
+      // Android already resizes the window (adjustResize). Adding the keyboard
+      // height again lifts the sheet to the top of the screen.
+      if (Platform.OS === 'android') {
+        setKeyboardHeight(0);
+        return;
+      }
       const windowHeight = Dimensions.get('window').height;
       const screenY = event.endCoordinates?.screenY;
       const overlap = typeof screenY === 'number' ? windowHeight - screenY : 0;
