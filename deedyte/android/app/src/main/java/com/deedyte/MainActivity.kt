@@ -1,7 +1,6 @@
 package com.thetabeam.shopiva
 
 import android.os.Bundle
-import androidx.core.view.WindowCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -15,17 +14,6 @@ class MainActivity : ReactActivity() {
    */
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
-    keepContentAboveSystemNavigation()
-  }
-
-  override fun onResume() {
-    super.onResume()
-    keepContentAboveSystemNavigation()
-  }
-
-  /** 3-button navigation must not cover screen content. */
-  private fun keepContentAboveSystemNavigation() {
-    WindowCompat.setDecorFitsSystemWindows(window, true)
   }
 
   /**
