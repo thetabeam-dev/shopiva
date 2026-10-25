@@ -751,6 +751,12 @@ export class shop{
               s.location,
               m.average_rating,
               m.review_count,
+              regexp_replace(COALESCE(s.category::text, ''), '[{}"]', '', 'g') AS categories,
+              (
+                SELECT ROUND(AVG(z.base_fee))::int
+                FROM shipping_zones z
+                WHERE z.shop_id = s.id
+              ) AS average_shipping_fee,
               COALESCE((
                 SELECT json_agg(json_build_object('thumbnail_url', thumb.thumbnail_url))
                 FROM (

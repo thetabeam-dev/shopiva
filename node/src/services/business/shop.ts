@@ -269,6 +269,8 @@ export type ShopDiscoverVendorRow = Omit<ShopMapVendorRow, "lat" | "lng"> & {
     ratingAverage?: number | null;
     reviewCount?: number;
     products?: { thumbnail_url: string }[];
+    categories?: string[];
+    averageShippingFee?: number | null;
 };
 
 /** Map UI category keys (e.g. from mvp_category.json) to common DB forms like health_beauty. */
@@ -383,6 +385,13 @@ export async function GetShopsForDiscoverByCategoryService(category: string): Pr
             ratingAverage,
             reviewCount,
             products,
+            categories: String(r.categories ?? "")
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean),
+            averageShippingFee: Number.isFinite(Number(r.average_shipping_fee))
+                ? Number(r.average_shipping_fee)
+                : null,
         });
     }
     return out;
