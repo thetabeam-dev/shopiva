@@ -6,6 +6,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -78,6 +79,7 @@ export default function ExploreBrowse({ navigation }) {
   const [showUserLocation, setShowUserLocation] = useState(false);
   const [locationReady, setLocationReady] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
+  const [showMe, setShowMe] = useState(false);
   const [mapRegion, setMapRegion] = useState(null);
   const mapRef = useRef(null);
   const mapListRef = useRef(null);
@@ -225,6 +227,7 @@ export default function ExploreBrowse({ navigation }) {
       Alert.alert('Location', 'Save your location on your profile so the map can open it.');
       return;
     }
+    setShowMe(true);
     mapRef.current?.animateToRegion({
       latitude: savedCoord.latitude,
       longitude: savedCoord.longitude,
@@ -343,7 +346,7 @@ export default function ExploreBrowse({ navigation }) {
         >
           <MapView
             ref={mapRef}
-            provider={PROVIDER_GOOGLE}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
             style={mapHeight > 0 ? { width: '100%', height: mapHeight } : styles.map}
             initialRegion={{
               latitude: savedCoord?.latitude ?? 9.082,
@@ -358,6 +361,14 @@ export default function ExploreBrowse({ navigation }) {
             loadingEnabled
             mapPadding={{ top: 12, right: 12, bottom: 210, left: 12 }}
           >
+            {showMe && savedCoord ? (
+              <Marker
+                coordinate={savedCoord}
+                pinColor="#1A73E8"
+                title="You"
+                zIndex={2}
+              />
+            ) : null}
             {mapShops.map(({ shop, coordinate }) => (
               <Marker
                 key={String(shop.id)}
