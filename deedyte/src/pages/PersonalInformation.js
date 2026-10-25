@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import PlaceLocationField from '../components/PlaceLocationField';
+import { storedUserCoordinate } from '../utils/exploreMap';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -139,6 +140,7 @@ export default function PersonalInformationScreen() {
     if (!user?.id) return;
     setName(initialNameFor(user));
     setLocation(user.locationDisplay ?? '');
+    setLocationCoords(storedUserCoordinate(user));
     setGender(user.gender ?? null);
   }, [user?.id, user?.profileName, user?.displayName, user?.email, user?.locationDisplay, user?.gender]);
 
@@ -326,6 +328,7 @@ export default function PersonalInformationScreen() {
         </View>
 
         <LocationBlock
+          savedLabel={location}
           onPlace={(place) => {
             if (!place) {
               setLocation('');
@@ -412,14 +415,14 @@ function ReadOnlyRow({ icon, value, onPress, hint }) {
   return <View style={styles.readOnlyRow}>{row}</View>;
 }
 
-function LocationBlock({ onPlace }) {
+function LocationBlock({ onPlace, savedLabel }) {
   return (
     <View style={styles.locationBlock}>
       <Text style={styles.locationHeading}>Location</Text>
       <Text style={styles.locationSub}>
-        Use your location, or type a place and choose a Google suggestion.
+        Use your location, or type a place and choose a suggestion.
       </Text>
-      <PlaceLocationField onPlace={onPlace} onClear={() => onPlace(null)} />
+      <PlaceLocationField initialValue={savedLabel} onPlace={onPlace} onClear={() => onPlace(null)} />
     </View>
   );
 }
