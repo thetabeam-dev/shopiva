@@ -16,13 +16,13 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, UrlTile, PROVIDER_GOOGLE } from 'react-native-maps';
 import { getVendorsOnMapByCategory } from '../../api';
 import { useProfile } from '../../context/ProfileContext';
 import { getCurrentCoordinates, requestLocationPermission } from '../../utils/deviceLocation';
 import { normalizeVendorState, vendorStateRaw } from './Vendors';
 
-import { placeDetails, suggestPlaces } from '../../utils/googlePlaces';
+import { placeDetails, suggestPlaces, tomtomTileUrl } from '../../utils/tomtom';
 
 const WINDOW_W = Dimensions.get('window').width;
 const CARD_W = Math.round(WINDOW_W * 0.62);
@@ -360,7 +360,13 @@ export default function ExploreBrowse({ navigation }) {
             toolbarEnabled={false}
             loadingEnabled
             mapPadding={{ top: 12, right: 12, bottom: 210, left: 12 }}
+            mapType={Platform.OS === 'android' ? 'none' : 'standard'}
           >
+            <UrlTile
+              urlTemplate={tomtomTileUrl()}
+              maximumZ={22}
+              zIndex={-1}
+            />
             {showMe && savedCoord ? (
               <Marker
                 coordinate={savedCoord}
@@ -393,7 +399,7 @@ export default function ExploreBrowse({ navigation }) {
               <TouchableOpacity
                 style={styles.mapSheetAction}
                 onPress={() => navigation.navigate('Area-shops', {
-                  shops: visibleShops.map((item) => item.shop),
+                  shopIds: visibleShops.map((item) => item.shop.id),
                 })}
                 accessibilityRole="button"
                 accessibilityLabel="See shops in this area"

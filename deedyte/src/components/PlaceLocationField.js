@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getCurrentCoordinates, requestLocationPermission, reverseGeocodeToPlace } from '../utils/deviceLocation';
-import { placeDetails, suggestPlaces } from '../utils/googlePlaces';
+import { placeDetails, suggestPlaces } from '../utils/tomtom';
 
 /**
  * GPS fix or a Google place the user picks. Free text is not a saved location.

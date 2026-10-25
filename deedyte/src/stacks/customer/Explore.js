@@ -2,7 +2,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import VendorsScreen from '../../pages/customer/Vendors';
-import AreaShopsScreen from '../../pages/customer/AreaShops';
 import ExploreBrowse from '../../pages/customer/ExploreBrowse';
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
@@ -92,7 +91,7 @@ export function ExploreStackScreen() {
       />
       <ExploreStack.Screen
         name="Area-shops"
-        component={AreaShopsScreen}
+        component={VendorsScreen}
         options={{
           title: 'Shops in this area',
           headerShadowVisible: false,
