@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { getVendorsOnMapByCategory } from '../../api';
 import { useProfile } from '../../context/ProfileContext';
 import { placeDetails, suggestPlaces, tomtomTileUrl } from '../../utils/tomtom';
@@ -25,6 +25,17 @@ import {
 } from '../../utils/exploreMap';
 
 const MAP_CARD_W = Math.round(Dimensions.get('window').width * 0.72);
+
+function distanceKm(from, to) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const dLat = toRad(to.latitude - from.latitude);
+  const dLng = toRad(to.longitude - from.longitude);
+  const lat1 = toRad(from.latitude);
+  const lat2 = toRad(to.latitude);
+  const arc = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(arc), Math.sqrt(1 - arc));
+}
 
 /**
  * @param {{
@@ -43,6 +54,7 @@ export default function ExploreMap({ navigation, route }) {
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionError, setSuggestionError] = useState('');
   const [mapRegion, setMapRegion] = useState(null);
+  const [selectedPlace, setSelectedPlace] = useState(null);
   const [showMe, setShowMe] = useState(false);
   const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
@@ -104,17 +116,20 @@ export default function ExploreMap({ navigation, route }) {
     };
   }, [query, suggestionsOpen]);
 
-  const mapShops = useMemo(() => {
-    const search = query.trim().toLowerCase();
-    return vendors
-      .filter((shop) => !search
-        || String(shop?.name ?? '').toLowerCase().includes(search)
-        || shopPlace(shop).toLowerCase().includes(search))
+  const mapShops = useMemo(() => (
+    vendors
       .map((shop) => ({ shop, coordinate: vendorCoordinate(shop) }))
-      .filter((pin) => pin.coordinate);
-  }, [vendors, query]);
+      .filter((pin) => pin.coordinate)
+  ), [vendors]);
 
   const visibleShops = useMemo(() => {
+    if (selectedPlace) {
+      const ranked = mapShops
+        .map((pin) => ({ ...pin, distanceKm: distanceKm(selectedPlace, pin.coordinate) }))
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+      const nearby = ranked.filter((pin) => pin.distanceKm <= 25);
+      return (nearby.length ? nearby : ranked.slice(0, 8));
+    }
     if (!mapRegion) return mapShops;
     const latHalf = Number(mapRegion.latitudeDelta) / 2;
     const lngHalf = Number(mapRegion.longitudeDelta) / 2;
@@ -123,7 +138,7 @@ export default function ExploreMap({ navigation, route }) {
       Math.abs(coordinate.latitude - mapRegion.latitude) <= latHalf
       && Math.abs(coordinate.longitude - mapRegion.longitude) <= lngHalf
     ));
-  }, [mapShops, mapRegion]);
+  }, [mapShops, mapRegion, selectedPlace]);
 
   const selectPlace = async (option) => {
     setQuery(option.label);
@@ -132,6 +147,7 @@ export default function ExploreMap({ navigation, route }) {
     try {
       const { latitude, longitude } = await placeDetails(option.placeId);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+      setSelectedPlace({ latitude, longitude });
       mapRef.current?.animateToRegion({
         latitude,
         longitude,
@@ -167,7 +183,6 @@ export default function ExploreMap({ navigation, route }) {
   };
 
   const openShop = (shop) => navigation.navigate('Vendor', { vendor: shop, category: '__all__' });
-  const showSuggestions = suggestionsOpen && (suggestions.length > 0 || Boolean(suggestionError));
 
   return (
     <View style={styles.screen}>
@@ -194,6 +209,7 @@ export default function ExploreMap({ navigation, route }) {
               setQuery('');
               setSuggestions([]);
               setSuggestionsOpen(false);
+              setSelectedPlace(null);
               searchRef.current?.blur();
             }}
             accessibilityRole="button"
@@ -228,7 +244,8 @@ export default function ExploreMap({ navigation, route }) {
       <View style={styles.mapWrap}>
         <MapView
           ref={mapRef}
-          style={StyleSheet.absoluteFill}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          style={styles.map}
           initialRegion={{
             latitude: savedCoord?.latitude ?? 9.082,
             longitude: savedCoord?.longitude ?? 8.6753,
@@ -238,15 +255,21 @@ export default function ExploreMap({ navigation, route }) {
           onRegionChangeComplete={setMapRegion}
           showsMyLocationButton={false}
           toolbarEnabled={false}
-          loadingEnabled
           mapPadding={{ top: 12, right: 12, bottom: 210, left: 12 }}
           mapType={Platform.OS === 'android' ? 'none' : 'standard'}
         >
-          <UrlTile urlTemplate={tomtomTileUrl()} maximumZ={22} />
+          {Platform.OS === 'android' ? (
+            <UrlTile
+              urlTemplate={tomtomTileUrl()}
+              maximumZ={22}
+              flipY={false}
+              shouldReplaceMapContent
+            />
+          ) : null}
           {showMe && savedCoord ? (
             <Marker coordinate={savedCoord} pinColor="#1A73E8" title="You" zIndex={2} />
           ) : null}
-          {mapShops.map(({ shop, coordinate }) => (
+          {visibleShops.map(({ shop, coordinate }) => (
             <Marker
               key={String(shop.id)}
               coordinate={coordinate}
@@ -256,7 +279,7 @@ export default function ExploreMap({ navigation, route }) {
             />
           ))}
         </MapView>
-
+        <View style={styles.overlay} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.locateBtn}
           onPress={goToMyLocation}
@@ -266,8 +289,7 @@ export default function ExploreMap({ navigation, route }) {
           <Icon name="locate" size={22} color="#111111" />
         </TouchableOpacity>
 
-        {!showSuggestions ? (
-          <View style={styles.mapSheet} pointerEvents="box-none">
+        <View style={styles.mapSheet} pointerEvents="box-none">
             <View style={styles.mapSheetHead}>
               <Text style={styles.mapSheetTitle}>
                 <Text style={styles.mapSheetCount}>({visibleShops.length})</Text> Shops In This Area
@@ -322,7 +344,7 @@ export default function ExploreMap({ navigation, route }) {
               />
             )}
           </View>
-        ) : null}
+        </View>
       </View>
     </View>
   );
@@ -331,10 +353,8 @@ export default function ExploreMap({ navigation, route }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   searchWrap: {
-    position: 'absolute',
-    top: 8,
-    left: 16,
-    right: 16,
+    marginTop: 8,
+    marginHorizontal: 16,
     height: 48,
     borderRadius: 24,
     backgroundColor: '#F3F4F6',
@@ -347,21 +367,14 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 16, color: '#111111' },
   suggestError: {
-    position: 'absolute',
-    top: 64,
-    left: 16,
-    right: 16,
+    marginHorizontal: 16,
     marginBottom: 8,
     color: '#B42318',
     fontSize: 13,
-    zIndex: 3,
-    elevation: 3,
   },
   suggestBox: {
-    position: 'absolute',
-    top: 64,
-    left: 16,
-    right: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
     backgroundColor: '#FFFFFF',
     borderRadius: 7,
     borderWidth: 1,
@@ -383,12 +396,23 @@ const styles = StyleSheet.create({
   suggestLabel: { fontSize: 15, fontWeight: '600', color: '#111111' },
   suggestSub: { marginTop: 1, fontSize: 12, color: '#6B7280' },
   mapWrap: {
+    flex: 1,
+    marginTop: 8,
+    minHeight: 280,
+  },
+  map: { flex: 1 },
+  overlay: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+    elevation: 8,
   },
   locateBtn: {
     position: 'absolute',
-    right: 12,
-    bottom: 212,
+    right: 16,
+    bottom: 248,
+    zIndex: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -405,7 +429,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 30,
+    bottom: 12,
+    zIndex: 4,
   },
   mapSheetHead: {
     flexDirection: 'row',

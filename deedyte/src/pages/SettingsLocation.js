@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { UrlTile } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { tomtomTileUrl } from '../utils/tomtom';
 import { useLocationLookup } from '../hooks/useLocationLookup';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -200,6 +200,7 @@ export default function SettingsLocationScreen() {
           <View style={[styles.mapWrap, { width: MAP_WIDTH, height: MAP_HEIGHT }]}>
             <MapView
               ref={mapRef}
+              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
               style={StyleSheet.absoluteFill}
               initialRegion={DEFAULT_REGION}
               onRegionChangeComplete={onRegionChangeComplete}
@@ -208,9 +209,11 @@ export default function SettingsLocationScreen() {
               showsCompass={false}
               showsPointsOfInterest
               showsBuildings={false}
-              mapType="standard"
+              mapType={Platform.OS === 'android' ? 'none' : 'standard'}
             >
-              <UrlTile urlTemplate={tomtomTileUrl()} maximumZ={22} />
+              {Platform.OS === 'android' ? (
+                <UrlTile urlTemplate={tomtomTileUrl()} maximumZ={22} shouldReplaceMapContent />
+              ) : null}
             </MapView>
             <View style={styles.pinOverlay} pointerEvents="none">
               <Icon name="location-sharp" size={42} color={BLACK} style={styles.pinIcon} />
