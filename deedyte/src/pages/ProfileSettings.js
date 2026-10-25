@@ -30,6 +30,7 @@ import {
 } from '../utils/deviceLocation';
 import { useLocationLookup } from '../hooks/useLocationLookup';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
+import PlaceLocationField from '../components/PlaceLocationField';
 import { formatMvpCategoryLabel } from '../utils/mvpCategory';
 import { shopRecordHasLocation } from '../utils/shopLocation';
 import {
@@ -198,8 +199,8 @@ export default function ProfileSettings() {
       Alert.alert('Category', 'Select at least one shop category.');
       return;
     }
-    if (!city.trim() || !stateName.trim()) {
-      Alert.alert('Shop location', 'Enter the city and state. Zip code is optional.');
+    if (!coords || !city.trim() || !stateName.trim()) {
+      Alert.alert('Shop location', 'Use your current location or choose a suggested place so we can save coordinates.');
       return;
     }
 
@@ -378,26 +379,18 @@ export default function ProfileSettings() {
               </Pressable>
               {categoriesError ? <Text style={styles.locationHint}>{categoriesError}</Text> : null}
 
-              <View style={styles.locationHeaderRow}>
-                <Text style={styles.label}>Shop location</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    void onUseMyLocation();
-                  }}
-                  style={styles.locationBtn}
-                  disabled={locating}
-                >
-                  {locating ? (
-                    <ActivityIndicator size="small" color={BRAND} />
-                  ) : (
-                    <Text style={styles.locationBtnText}>Use device location</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.locationHint}>{setupHint}</Text>
-
+              <Text style={styles.label}>Shop location</Text>
+              <Text style={styles.locationHint}>Use your location or choose a suggested place. Coordinates are saved with it.</Text>
+              <PlaceLocationField
+                onClear={() => setCoords(null)}
+                onPlace={(place) => {
+                  setCity(place.city);
+                  if (place.state) setStateName(matchNigerianState(place.state) || place.state);
+                  if (place.country) setCountry(place.country);
+                  setCoords({ latitude: place.latitude, longitude: place.longitude });
+                }}
+              />
               <LabeledInput label="Address (optional)" value={address} onChangeText={setAddress} placeholder="Street address" />
-              <LabeledInput label="City" required value={city} onChangeText={setCity} placeholder="City" />
               <View style={styles.inputBlock}>
                 <Text style={styles.label}>State<Text style={styles.required}> *</Text></Text>
                 <Pressable

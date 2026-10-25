@@ -69,11 +69,8 @@ async function androidLocationGranted(interactive) {
 function iosLocationGranted(interactive) {
   return new Promise((resolve) => {
     const geo = /** @type {{ requestAuthorization?: Function }} */ (Geolocation);
-    if (typeof geo.requestAuthorization !== 'function') {
-      resolve('granted');
-      return;
-    }
     let settled = false;
+    let denied = false;
     const finish = (status) => {
       if (settled) return;
       settled = true;
@@ -81,10 +78,23 @@ function iosLocationGranted(interactive) {
       resolve(status);
     };
     const started = Date.now();
-    const timer = setTimeout(() => finish('denied'), 8000);
+    const timer = setTimeout(() => finish(denied ? 'denied' : 'granted'), 8000);
+    Geolocation.getCurrentPosition(
+      () => finish('granted'),
+      (err) => {
+        if (Number(err?.code) === 1) {
+          denied = true;
+          return;
+        }
+        finish('granted');
+      },
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 },
+    );
+    if (typeof geo.requestAuthorization !== 'function') return;
     geo.requestAuthorization(
       () => finish('granted'),
       () => {
+        denied = true;
         const blocked = Date.now() - started < 400;
         if (interactive && blocked) openAppLocationSettings();
         finish(blocked ? 'blocked' : 'denied');
@@ -104,10 +114,10 @@ export async function requestLocationPermission(options = {}) {
     const servicesOn = await Promise.race([
       DeviceInfo.isLocationEnabled(),
       new Promise((resolve) => {
-        setTimeout(() => resolve(false), 4000);
+        setTimeout(() => resolve(null), 4000);
       }),
     ]);
-    if (!servicesOn) {
+    if (servicesOn === false) {
       if (interactive) openDeviceLocationSettings();
       return false;
     }

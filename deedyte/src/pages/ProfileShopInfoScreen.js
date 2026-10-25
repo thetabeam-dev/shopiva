@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -1364,11 +1365,12 @@ export default function ProfileShopInfoScreen() {
           setModalDesc(false);
         }}
         onSave={() => {
-          if (descriptionDraft.trim() && !scanMessage(descriptionDraft).isAllowed) {
+          const nextDescription = descriptionDraft.trim().slice(0, 300);
+          if (nextDescription && !scanMessage(nextDescription).isAllowed) {
             setDescriptionPolicyOpen(true);
             return;
           }
-          persistAndClose(() => setModalDesc(false), { description: descriptionDraft });
+          persistAndClose(() => setModalDesc(false), { description: nextDescription });
         }}
         notice={descriptionPolicyOpen ? (
           <View style={styles.descPolicyRoot} pointerEvents="box-none">
@@ -1402,12 +1404,14 @@ export default function ProfileShopInfoScreen() {
       >
         <TextInput
           value={descriptionDraft}
-          onChangeText={setDescriptionDraft}
+          onChangeText={(value) => setDescriptionDraft(value.slice(0, 300))}
           style={[styles.modalInput, styles.modalInputTall]}
           multiline
+          maxLength={300}
           textAlignVertical="top"
           placeholder="Tell buyers what you sell"
         />
+        <Text style={styles.descCount}>{descriptionDraft.length}/300</Text>
       </FormModal>
 
       <FormModal
@@ -1855,7 +1859,10 @@ function FormModal({ visible, title, children, onClose, onSave, saving, notice }
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (event) => {
-      setKeyboardHeight(event.endCoordinates?.height ?? 0);
+      const windowHeight = Dimensions.get('window').height;
+      const screenY = event.endCoordinates?.screenY;
+      const overlap = typeof screenY === 'number' ? windowHeight - screenY : 0;
+      setKeyboardHeight(Math.max(0, overlap));
     });
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => {
@@ -2515,6 +2522,7 @@ const styles = StyleSheet.create({
     color: BLACK,
   },
   modalInputTall: { minHeight: 120, textAlignVertical: 'top' },
+  descCount: { marginTop: 6, fontSize: 12, color: MUTED, textAlign: 'right' },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

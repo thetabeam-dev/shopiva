@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
-import { useLocationLookup } from '../hooks/useLocationLookup';
+import PlaceLocationField from '../components/PlaceLocationField';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -124,6 +124,7 @@ export default function PersonalInformationScreen() {
 
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
+  const [locationCoords, setLocationCoords] = useState(null);
   const [gender, setGender] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -163,8 +164,18 @@ export default function PersonalInformationScreen() {
     const g = genderToApi(gender);
     if (g) fields.gender = g;
     const locParsed = parseLocationString(location);
+    if (location.trim() && !locationCoords) {
+      Alert.alert('Location', 'Use your current location or choose a suggested place so we can save coordinates.');
+      return;
+    }
     if (locParsed.city || locParsed.state || locParsed.country) {
-      fields.location = locParsed;
+      fields.location = {
+        ...locParsed,
+        ...(locationCoords && {
+          latitude: locationCoords.latitude,
+          longitude: locationCoords.longitude,
+        }),
+      };
     }
     if (Object.keys(fields).length === 0) {
       Alert.alert('Nothing to save', 'Update your name, gender, or location, then try again.');
@@ -181,7 +192,7 @@ export default function PersonalInformationScreen() {
     } finally {
       setSaving(false);
     }
-  }, [user, name, gender, location, saveProfileFields]);
+  }, [user, name, gender, location, locationCoords, saveProfileFields]);
 
   const onEditImage = useCallback(async () => {
     if (!user?.id || uploadingPhoto) return;
@@ -314,7 +325,17 @@ export default function PersonalInformationScreen() {
           />
         </View>
 
-        <LocationBlock value={location} onChangeText={setLocation} />
+        <LocationBlock
+          onPlace={(place) => {
+            if (!place) {
+              setLocation('');
+              setLocationCoords(null);
+              return;
+            }
+            setLocation([place.city, place.state, place.country].filter(Boolean).join(', '));
+            setLocationCoords({ latitude: place.latitude, longitude: place.longitude });
+          }}
+        />
 
         <ReadOnlyRow icon="shield-checkmark-outline" value={user?.roleLabel} />
 
@@ -391,101 +412,14 @@ function ReadOnlyRow({ icon, value, onPress, hint }) {
   return <View style={styles.readOnlyRow}>{row}</View>;
 }
 
-function LocationBlock({ value, onChangeText }) {
-  const [locateBusy, setLocateBusy] = useState(false);
-  const { locate, locationOverlay } = useLocationLookup();
-  const geocodeAbortRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (geocodeAbortRef.current) geocodeAbortRef.current.abort();
-    };
-  }, []);
-
-  const useDeviceLocation = useCallback(() => {
-    if (geocodeAbortRef.current) {
-      geocodeAbortRef.current.abort();
-    }
-    const controller = new AbortController();
-    geocodeAbortRef.current = controller;
-
-    setLocateBusy(true);
-    locate()
-      .then(async (coords) => {
-        if (!coords) {
-          setLocateBusy(false);
-          return;
-        }
-        const { latitude, longitude } = coords;
-        try {
-          const data = await reverseGeocodeNominatim(latitude, longitude, controller.signal);
-          const line = formatAddressFromNominatim(data);
-          onChangeText(line || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        } catch {
-          onChangeText(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-        } finally {
-          setLocateBusy(false);
-        }
-      })
-      .catch((err) => {
-        setLocateBusy(false);
-        Alert.alert('Location', err instanceof Error ? err.message : 'Could not read your position.');
-      });
-  }, [locate, onChangeText]);
-
-  const canClear = value.length > 0;
-
+function LocationBlock({ onPlace }) {
   return (
     <View style={styles.locationBlock}>
-      {locationOverlay}
       <Text style={styles.locationHeading}>Location</Text>
       <Text style={styles.locationSub}>
-        {"Use your device's GPS to fill the address, or type below."}
+        Use your location, or type a place and choose a Google suggestion.
       </Text>
-
-      <Pressable
-        style={({ pressed }) => [styles.useLocBtn, pressed && styles.useLocBtnPressed]}
-        onPress={useDeviceLocation}
-        disabled={locateBusy}
-        accessibilityRole="button"
-        accessibilityLabel="Use current location"
-      >
-        {locateBusy ? (
-          <ActivityIndicator color={BLACK} />
-        ) : (
-          <>
-            <Icon name="navigate-outline" size={20} color={BLACK} />
-            <Text style={styles.useLocText}>Use current location</Text>
-          </>
-        )}
-      </Pressable>
-
-      <View style={[styles.fieldRow, styles.fieldRowMultiline]}>
-        <Icon name="location-outline" size={20} color={ICON_COLOR} style={[styles.fieldIcon, styles.fieldIconTop]} />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder="City, area, or full address"
-          placeholderTextColor={MUTED}
-          style={[styles.fieldInput, styles.fieldInputMultiline]}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
-        {canClear ? (
-          <Pressable
-            onPress={() => onChangeText('')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityRole="button"
-            accessibilityLabel="Clear location"
-            style={styles.clearTop}
-          >
-            <Icon name="close" size={18} color={CLEAR_ICON} />
-          </Pressable>
-        ) : (
-          <View style={[styles.endPlaceholder, styles.clearTop]} />
-        )}
-      </View>
+      <PlaceLocationField onPlace={onPlace} onClear={() => onPlace(null)} />
     </View>
   );
 }
