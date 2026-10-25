@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  FlatList,
   Image,
   Platform,
   StyleSheet,
@@ -13,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import { FlatList as GestureFlatList } from 'react-native-gesture-handler';
+import MapView, { Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { getVendorsOnMapByCategory } from '../../api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../context/ProfileContext';
@@ -43,10 +44,76 @@ function formatCategory(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function formatNaira(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return '—';
   return `₦${Math.round(amount).toLocaleString('en-NG')}`;
+}
+
+function tomtomLeafletHtml(tileUrl) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body, #map { margin: 0; height: 100%; width: 100%; background: #E7EEF2; }
+  .tip { width: 168px; background: #fff; border-radius: 7px; padding: 8px 10px; font-family: sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.16); }
+  .tip b { display: block; font-size: 13px; color: #111; }
+  .tip span { display: block; margin-top: 2px; font-size: 11px; color: #4B5563; }
+  .tip em { display: block; margin-top: 4px; font-size: 12px; font-style: normal; font-weight: 700; color: #00926E; }
+  .you { background: #1A73E8; color: #fff; border-radius: 12px; padding: 4px 8px; font: 700 12px sans-serif; }
+  .leaflet-div-icon { background: transparent; border: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([9.082, 8.6753], 6);
+  L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: 22, tileSize: 256 }).addTo(map);
+  const pins = L.layerGroup().addTo(map);
+  function post(payload) {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+  }
+  function region() {
+    const b = map.getBounds();
+    const c = map.getCenter();
+    post({ type: 'region', latitude: c.lat, longitude: c.lng, latitudeDelta: Math.abs(b.getNorth() - b.getSouth()), longitudeDelta: Math.abs(b.getEast() - b.getWest()) });
+  }
+  map.on('moveend', region);
+  window.moveTo = function (lat, lng, zoom) { map.setView([lat, lng], zoom); };
+  window.zoomBy = function (step) { map.setZoom(map.getZoom() + step); };
+  window.renderPins = function (shops, me) {
+    pins.clearLayers();
+    (shops || []).forEach(function (shop) {
+      const html = '<div class="tip"><b>' + shop.name + '</b><span>' + shop.categories + '</span><em>Avg shipping ' + shop.fee + '</em></div>';
+      const icon = L.divIcon({ className: '', html: html, iconSize: [168, 72], iconAnchor: [84, 72] });
+      L.marker([shop.latitude, shop.longitude], { icon: icon }).on('click', function () { post({ type: 'shop', id: shop.id }); }).addTo(pins);
+    });
+    if (me) {
+      const icon = L.divIcon({ className: '', html: '<div class="you">You</div>', iconSize: [48, 24], iconAnchor: [24, 12] });
+      L.marker([me.latitude, me.longitude], { icon: icon, zIndexOffset: 1000 }).addTo(pins);
+    }
+  };
+  setTimeout(region, 300);
+</script>
+</body>
+</html>`;
+}
+
+function zoomForDelta(delta) {
+  const span = Number(delta);
+  if (!Number.isFinite(span) || span <= 0) return 6;
+  return Math.max(3, Math.min(18, Math.round(Math.log2(360 / span))));
 }
 
 function distanceKm(from, to) {
@@ -83,6 +150,8 @@ export default function ExploreMap({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [mapBox, setMapBox] = useState(null);
   const mapRef = useRef(null);
+  const webRef = useRef(null);
+  const [webReady, setWebReady] = useState(false);
   const mapListRef = useRef(null);
   const searchRef = useRef(null);
 
@@ -107,13 +176,19 @@ export default function ExploreMap({ navigation, route }) {
 
   useEffect(() => {
     if (!Number.isFinite(savedLatitude) || !Number.isFinite(savedLongitude)) return;
-    mapRef.current?.animateToRegion({
+    const region = {
       latitude: savedLatitude,
       longitude: savedLongitude,
       latitudeDelta: 0.2,
       longitudeDelta: 0.2,
-    }, 400);
-  }, [savedLatitude, savedLongitude]);
+    };
+    setMapRegion(region);
+    if (Platform.OS === 'android') {
+      webRef.current?.injectJavaScript(`window.moveTo && window.moveTo(${savedLatitude}, ${savedLongitude}, ${zoomForDelta(0.2)}); true;`);
+      return;
+    }
+    mapRef.current?.animateToRegion(region, 400);
+  }, [savedLatitude, savedLongitude, webReady]);
 
   useEffect(() => {
     const search = query.trim();
@@ -165,6 +240,20 @@ export default function ExploreMap({ navigation, route }) {
     ));
   }, [mapShops, mapRegion, selectedPlace]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !webReady) return;
+    const pins = visibleShops.map(({ shop, coordinate }) => ({
+      id: shop.id,
+      name: escapeHtml(shop.name || 'Shop'),
+      categories: escapeHtml(shopCategories(shop).map(formatCategory).join(', ') || 'No categories'),
+      fee: escapeHtml(formatNaira(shop.averageShippingFee ?? shop.average_shipping_fee)),
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+    }));
+    const me = showMe && savedCoord ? savedCoord : null;
+    webRef.current?.injectJavaScript(`window.renderPins && window.renderPins(${JSON.stringify(pins)}, ${JSON.stringify(me)}); true;`);
+  }, [visibleShops, showMe, savedCoord, webReady]);
+
   const selectPlace = async (option) => {
     setQuery(option.label);
     setSuggestionsOpen(false);
@@ -173,12 +262,12 @@ export default function ExploreMap({ navigation, route }) {
       const { latitude, longitude } = await placeDetails(option.placeId);
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
       setSelectedPlace({ latitude, longitude });
-      mapRef.current?.animateToRegion({
+      moveMap({
         latitude,
         longitude,
         latitudeDelta: 0.12,
         longitudeDelta: 0.12,
-      }, 400);
+      });
     } catch (error) {
       Alert.alert('Location search', error instanceof Error ? error.message : 'Could not load that place.');
     }
@@ -196,8 +285,16 @@ export default function ExploreMap({ navigation, route }) {
       latitudeDelta: Math.min(40, Math.max(0.002, region.latitudeDelta * factor)),
       longitudeDelta: Math.min(40, Math.max(0.002, region.longitudeDelta * factor)),
     };
-    setMapRegion(next);
-    mapRef.current?.animateToRegion(next, 180);
+    moveMap(next);
+  };
+
+  const moveMap = (region) => {
+    setMapRegion(region);
+    if (Platform.OS === 'android') {
+      webRef.current?.injectJavaScript(`window.moveTo(${region.latitude}, ${region.longitude}, ${zoomForDelta(region.latitudeDelta)}); true;`);
+      return;
+    }
+    mapRef.current?.animateToRegion(region, 400);
   };
 
   const goToMyLocation = () => {
@@ -217,16 +314,15 @@ export default function ExploreMap({ navigation, route }) {
     setSuggestionsOpen(false);
     setShowMe(true);
     setSelectedPlace(savedCoord);
-    setMapRegion(region);
-    mapRef.current?.animateToRegion(region, 400);
+    moveMap(region);
   };
 
   const focusShop = (shop, coordinate) => {
-    mapRef.current?.animateToRegion({
+    moveMap({
       ...coordinate,
       latitudeDelta: 0.08,
       longitudeDelta: 0.08,
-    }, 350);
+    });
     const index = visibleShops.findIndex((pin) => pin.shop.id === shop.id);
     if (index >= 0) mapListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
   };
@@ -297,9 +393,37 @@ export default function ExploreMap({ navigation, route }) {
           if (width > 0 && height > 0) setMapBox({ width, height });
         }}
       >
+        {Platform.OS === 'android' ? (
+          <WebView
+            ref={webRef}
+            style={mapBox ?? styles.map}
+            originWhitelist={['*']}
+            source={{ html: tomtomLeafletHtml(tomtomTileUrl()) }}
+            javaScriptEnabled
+            domStorageEnabled
+            onLoadEnd={() => setWebReady(true)}
+            onMessage={(event) => {
+              let message = null;
+              try { message = JSON.parse(event.nativeEvent.data); } catch { message = null; }
+              if (!message) return;
+              if (message.type === 'region') {
+                setMapRegion({
+                  latitude: Number(message.latitude),
+                  longitude: Number(message.longitude),
+                  latitudeDelta: Number(message.latitudeDelta),
+                  longitudeDelta: Number(message.longitudeDelta),
+                });
+                return;
+              }
+              if (message.type === 'shop') {
+                const match = visibleShops.find((item) => String(item.shop.id) === String(message.id));
+                if (match) openShop(match.shop);
+              }
+            }}
+          />
+        ) : (
         <MapView
           ref={mapRef}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           style={mapBox ?? styles.map}
           initialRegion={{
             latitude: savedCoord?.latitude ?? 9.082,
@@ -311,16 +435,8 @@ export default function ExploreMap({ navigation, route }) {
           showsMyLocationButton={false}
           toolbarEnabled={false}
           mapPadding={{ top: 72, right: 12, bottom: 210, left: 12 }}
-          mapType={Platform.OS === 'android' ? 'none' : 'standard'}
+          mapType="standard"
         >
-          {Platform.OS === 'android' ? (
-            <UrlTile
-              urlTemplate={tomtomTileUrl()}
-              maximumZ={22}
-              flipY={false}
-              shouldReplaceMapContent
-            />
-          ) : null}
           {showMe && savedCoord ? (
             <Marker coordinate={savedCoord} pinColor="#1A73E8" title="You" zIndex={2} />
           ) : null}
@@ -330,25 +446,24 @@ export default function ExploreMap({ navigation, route }) {
               <Marker
                 key={String(shop.id)}
                 coordinate={coordinate}
-                pinColor="#00926E"
+                anchor={{ x: 0.5, y: 1 }}
                 tracksViewChanges={false}
-                onPress={() => focusShop(shop, coordinate)}
+                onPress={() => openShop(shop)}
               >
-                <Callout tooltip onPress={() => openShop(shop)}>
-                  <View style={styles.tip}>
-                    <Text style={styles.tipName} numberOfLines={1}>{shop.name || 'Shop'}</Text>
-                    <Text style={styles.tipMeta} numberOfLines={2}>
-                      {categories.length ? categories.join(', ') : 'No categories'}
-                    </Text>
-                    <Text style={styles.tipFee}>
-                      Avg shipping {formatNaira(shop.averageShippingFee ?? shop.average_shipping_fee)}
-                    </Text>
-                  </View>
-                </Callout>
+                <View style={styles.tip} collapsable={false}>
+                  <Text style={styles.tipName} numberOfLines={1}>{shop.name || 'Shop'}</Text>
+                  <Text style={styles.tipMeta} numberOfLines={2}>
+                    {categories.length ? categories.join(', ') : 'No categories'}
+                  </Text>
+                  <Text style={styles.tipFee}>
+                    Avg shipping {formatNaira(shop.averageShippingFee ?? shop.average_shipping_fee)}
+                  </Text>
+                </View>
               </Marker>
             );
           })}
         </MapView>
+        )}
         <View style={styles.overlay} pointerEvents="box-none">
           <View style={[styles.zoomStack, { bottom: 304 + insets.bottom }]}>
             <TouchableOpacity
@@ -377,7 +492,7 @@ export default function ExploreMap({ navigation, route }) {
             <Icon name="locate" size={22} color="#111111" />
           </TouchableOpacity>
 
-          <View style={[styles.mapSheet, { bottom: 12 + insets.bottom }]} pointerEvents="box-none">
+          <View style={[styles.mapSheet, { bottom: 12 + insets.bottom }]} collapsable={false}>
             <View style={styles.mapSheetHead}>
               <Text style={styles.mapSheetTitle}>
                 <Text style={styles.mapSheetCount}>({visibleShops.length})</Text> Shops In This Area
@@ -398,9 +513,10 @@ export default function ExploreMap({ navigation, route }) {
             ) : visibleShops.length === 0 ? (
               <Text style={styles.mapSheetEmpty}>No shops in this part of the map.</Text>
             ) : (
-              <FlatList
+              <GestureFlatList
                 ref={mapListRef}
                 horizontal
+                nestedScrollEnabled
                 data={visibleShops}
                 keyExtractor={(item) => String(item.shop.id)}
                 showsHorizontalScrollIndicator={false}
@@ -500,7 +616,6 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 5,
-    elevation: 8,
     // marginBottom: 20
   },
   zoomStack: {
@@ -570,15 +685,30 @@ const styles = StyleSheet.create({
   },
   mapCardRow: { paddingHorizontal: 16, gap: 12, marginBottom: Platform.OS === 'android' ? 40 : 10 },
   tip: {
-    width: 210,
+    width: 168,
     backgroundColor: '#FFFFFF',
     borderRadius: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 6,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.16,
+    shadowRadius: 2,
   },
-  tipName: { fontSize: 15, fontWeight: '700', color: '#111111' },
-  tipMeta: { marginTop: 4, fontSize: 12, color: '#4B5563' },
-  tipFee: { marginTop: 6, fontSize: 13, fontWeight: '700', color: '#00926E' },
+  tipName: { fontSize: 13, fontWeight: '700', color: '#111111' },
+  tipMeta: { marginTop: 2, fontSize: 11, color: '#4B5563' },
+  tipFee: { marginTop: 4, fontSize: 12, fontWeight: '700', color: '#00926E' },
+  tipTail: {
+    position: 'absolute',
+    bottom: -6,
+    alignSelf: 'center',
+    width: 10,
+    height: 10,
+    backgroundColor: '#FFFFFF',
+    transform: [{ rotate: '45deg' }],
+  },
   mapCard: {
     width: MAP_CARD_W,
     backgroundColor: '#FFFFFF',
