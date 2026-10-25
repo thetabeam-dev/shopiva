@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import MapView, { Callout, Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { getVendorsOnMapByCategory } from '../../api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../context/ProfileContext';
@@ -26,6 +26,28 @@ import {
 } from '../../utils/exploreMap';
 
 const MAP_CARD_W = Math.round(Dimensions.get('window').width * 0.72);
+
+function shopCategories(shop) {
+  const raw = shop?.categories;
+  const list = Array.isArray(raw)
+    ? raw
+    : String(raw ?? shop?.category ?? '')
+      .replace(/[{}"]/g, '')
+      .split(',');
+  return list.map((item) => String(item).trim()).filter(Boolean);
+}
+
+function formatCategory(value) {
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatNaira(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '—';
+  return `₦${Math.round(amount).toLocaleString('en-NG')}`;
+}
 
 function distanceKm(from, to) {
   const toRad = (value) => (value * Math.PI) / 180;
@@ -183,12 +205,20 @@ export default function ExploreMap({ navigation, route }) {
       Alert.alert('Location', 'Your saved profile location does not include coordinates.');
       return;
     }
-    setShowMe(true);
-    mapRef.current?.animateToRegion({
+    const region = {
       ...savedCoord,
-      latitudeDelta: 0.05,
-      longitudeDelta: 0.05,
-    }, 400);
+      latitudeDelta: 0.12,
+      longitudeDelta: 0.12,
+    };
+    const label = String(user?.locationDisplay ?? '').trim()
+      || [user?.locationObj?.city, user?.locationObj?.state].filter(Boolean).join(', ');
+    setQuery(label);
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+    setShowMe(true);
+    setSelectedPlace(savedCoord);
+    setMapRegion(region);
+    mapRef.current?.animateToRegion(region, 400);
   };
 
   const focusShop = (shop, coordinate) => {
@@ -294,15 +324,30 @@ export default function ExploreMap({ navigation, route }) {
           {showMe && savedCoord ? (
             <Marker coordinate={savedCoord} pinColor="#1A73E8" title="You" zIndex={2} />
           ) : null}
-          {visibleShops.map(({ shop, coordinate }) => (
-            <Marker
-              key={String(shop.id)}
-              coordinate={coordinate}
-              pinColor="#00926E"
-              tracksViewChanges={false}
-              onPress={() => focusShop(shop, coordinate)}
-            />
-          ))}
+          {visibleShops.map(({ shop, coordinate }) => {
+            const categories = shopCategories(shop).map(formatCategory);
+            return (
+              <Marker
+                key={String(shop.id)}
+                coordinate={coordinate}
+                pinColor="#00926E"
+                tracksViewChanges={false}
+                onPress={() => focusShop(shop, coordinate)}
+              >
+                <Callout tooltip onPress={() => openShop(shop)}>
+                  <View style={styles.tip}>
+                    <Text style={styles.tipName} numberOfLines={1}>{shop.name || 'Shop'}</Text>
+                    <Text style={styles.tipMeta} numberOfLines={2}>
+                      {categories.length ? categories.join(', ') : 'No categories'}
+                    </Text>
+                    <Text style={styles.tipFee}>
+                      Avg shipping {formatNaira(shop.averageShippingFee ?? shop.average_shipping_fee)}
+                    </Text>
+                  </View>
+                </Callout>
+              </Marker>
+            );
+          })}
         </MapView>
         <View style={styles.overlay} pointerEvents="box-none">
           <View style={[styles.zoomStack, { bottom: 304 + insets.bottom }]}>
@@ -524,6 +569,16 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   mapCardRow: { paddingHorizontal: 16, gap: 12, marginBottom: Platform.OS === 'android' ? 40 : 10 },
+  tip: {
+    width: 210,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  tipName: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  tipMeta: { marginTop: 4, fontSize: 12, color: '#4B5563' },
+  tipFee: { marginTop: 6, fontSize: 13, fontWeight: '700', color: '#00926E' },
   mapCard: {
     width: MAP_CARD_W,
     backgroundColor: '#FFFFFF',
