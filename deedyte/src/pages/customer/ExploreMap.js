@@ -285,6 +285,11 @@ export default function ExploreMap({ navigation, route }) {
   };
 
   const zoomBy = (factor) => {
+    if (Platform.OS === 'android') {
+      const step = factor < 1 ? 1 : -1;
+      webRef.current?.injectJavaScript(`window.zoomBy && window.zoomBy(${step}); true;`);
+      return;
+    }
     const region = mapRegion ?? {
       latitude: savedLatitude ?? 9.082,
       longitude: savedLongitude ?? 8.6753,
