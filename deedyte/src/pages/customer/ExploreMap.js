@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     padding: 14,
     color: '#6B7280',
   },
-  mapCardRow: { paddingHorizontal: 16, gap: 12 },
+  mapCardRow: { paddingHorizontal: 16, gap: 12, marginBottom: 40 },
   mapCard: {
     width: MAP_CARD_W,
     backgroundColor: '#FFFFFF',
