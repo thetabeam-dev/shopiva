@@ -6,7 +6,6 @@ import {
   Dimensions,
   FlatList,
   Image,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { getVendorsOnMapByCategory } from '../../api';
+import { useProfile } from '../../context/ProfileContext';
 import { getCurrentCoordinates, requestLocationPermission } from '../../utils/deviceLocation';
 import { normalizeVendorState, vendorStateRaw } from './Vendors';
 
@@ -40,6 +40,17 @@ function vendorCoordinate(vendor) {
   return { latitude, longitude };
 }
 
+function storedUserCoordinate(user) {
+  const loc = user?.raw?.location;
+  if (!loc || typeof loc !== 'object' || Array.isArray(loc)) return null;
+  const coords = loc.coordinates && typeof loc.coordinates === 'object' ? loc.coordinates : loc;
+  const latitude = Number(coords.latitude ?? coords.lat);
+  const longitude = Number(coords.longitude ?? coords.lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+}
+
 function shopPlace(vendor) {
   const city = String(vendor?.city ?? '').trim();
   const state = normalizeVendorState(vendorStateRaw(vendor));
@@ -53,6 +64,8 @@ function shopPlace(vendor) {
  * @param {{ navigation: import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> }} props
  */
 export default function ExploreBrowse({ navigation }) {
+  const { user } = useProfile();
+  const savedCoord = storedUserCoordinate(user);
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,8 +77,7 @@ export default function ExploreBrowse({ navigation }) {
   const [suggestionError, setSuggestionError] = useState('');
   const [showUserLocation, setShowUserLocation] = useState(false);
   const [locationReady, setLocationReady] = useState(false);
-  const [userCoord, setUserCoord] = useState(null);
-  const [locating, setLocating] = useState(false);
+  const [mapHeight, setMapHeight] = useState(0);
   const [mapRegion, setMapRegion] = useState(null);
   const mapRef = useRef(null);
   const mapListRef = useRef(null);
@@ -114,14 +126,14 @@ export default function ExploreBrowse({ navigation }) {
   }, [ensureLocation]);
 
   useEffect(() => {
-    if (!searchActive || !userCoord) return;
+    if (!searchActive || !savedCoord) return;
     mapRef.current?.animateToRegion({
-      latitude: userCoord.latitude,
-      longitude: userCoord.longitude,
+      latitude: savedCoord.latitude,
+      longitude: savedCoord.longitude,
       latitudeDelta: 0.2,
       longitudeDelta: 0.2,
     }, 400);
-  }, [searchActive, userCoord]);
+  }, [searchActive, savedCoord?.latitude, savedCoord?.longitude]);
 
   useEffect(() => {
     const q = query.trim();
@@ -208,32 +220,17 @@ export default function ExploreBrowse({ navigation }) {
     ));
   }, [mapShops, mapRegion]);
 
-  const goToMyLocation = async () => {
-    if (locating) return;
-    setLocating(true);
-    try {
-      const granted = await requestLocationPermission({ interactive: true });
-      setShowUserLocation(granted);
-      setLocationReady(granted);
-      if (!granted) return;
-      let coords = null;
-      try {
-        coords = await getCurrentCoordinates({ exact: false });
-      } catch {
-        coords = await getCurrentCoordinates({ exact: true });
-      }
-      setUserCoord(coords);
-      mapRef.current?.animateToRegion({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 400);
-    } catch (e) {
-      Alert.alert('Location', e instanceof Error ? e.message : 'Could not get your location.');
-    } finally {
-      setLocating(false);
+  const goToMyLocation = () => {
+    if (!savedCoord) {
+      Alert.alert('Location', 'Save your location on your profile so the map can open it.');
+      return;
     }
+    mapRef.current?.animateToRegion({
+      latitude: savedCoord.latitude,
+      longitude: savedCoord.longitude,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    }, 400);
   };
 
   const focusShop = (shop, coordinate) => {
@@ -336,16 +333,23 @@ export default function ExploreBrowse({ navigation }) {
         </View>
       ) : null}
       {searchActive ? (
-        <View style={styles.mapWrap}>
+        <View
+          style={styles.mapWrap}
+          collapsable={false}
+          onLayout={(event) => {
+            const next = Math.round(event.nativeEvent.layout.height);
+            if (next > 0 && next !== mapHeight) setMapHeight(next);
+          }}
+        >
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
-            style={styles.map}
+            style={mapHeight > 0 ? { width: '100%', height: mapHeight } : styles.map}
             initialRegion={{
-              latitude: userCoord?.latitude ?? 9.082,
-              longitude: userCoord?.longitude ?? 8.6753,
-              latitudeDelta: userCoord ? 0.2 : 8,
-              longitudeDelta: userCoord ? 0.2 : 8,
+              latitude: savedCoord?.latitude ?? 9.082,
+              longitude: savedCoord?.longitude ?? 8.6753,
+              latitudeDelta: savedCoord ? 0.2 : 8,
+              longitudeDelta: savedCoord ? 0.2 : 8,
             }}
             onRegionChangeComplete={setMapRegion}
             showsUserLocation={showUserLocation}
@@ -370,11 +374,7 @@ export default function ExploreBrowse({ navigation }) {
             accessibilityRole="button"
             accessibilityLabel="Show my location"
           >
-            {locating ? (
-              <ActivityIndicator size="small" color="#00926E" />
-            ) : (
-              <Icon name="locate" size={22} color="#111111" />
-            )}
+            <Icon name="locate" size={22} color="#111111" />
           </TouchableOpacity>
           <View style={styles.mapSheet} pointerEvents="box-none">
             <View style={styles.mapSheetHead}>
@@ -563,8 +563,8 @@ const styles = StyleSheet.create({
   suggestCopy: { flex: 1 },
   suggestLabel: { fontSize: 15, fontWeight: '600', color: '#111111' },
   suggestSub: { marginTop: 1, fontSize: 12, color: '#6B7280' },
-  mapWrap: { flex: 1, marginHorizontal: 16, marginBottom: 12, minHeight: 280, borderRadius: 7, overflow: Platform.OS === 'android' ? 'hidden' : 'visible' },
-  map: { ...StyleSheet.absoluteFillObject },
+  mapWrap: { flex: 1, marginHorizontal: 16, marginBottom: 12, minHeight: 280 },
+  map: { flex: 1 },
   locateBtn: {
     position: 'absolute',
     right: 12,
