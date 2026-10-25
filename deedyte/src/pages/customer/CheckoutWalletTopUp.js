@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { fetchWallet } from '../../api/user';
 import { completeCheckoutOrder } from '../../api/buyer';
 import { connectChatSocket } from '../../socket/chatSocket';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../../utils/formatNaira';
 import WalletProcessingOverlay from '../../components/WalletProcessingOverlay';
 
@@ -19,6 +20,7 @@ function roundUpToTen(amount) {
 }
 
 export default function CheckoutWalletTopUpScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute();
   const orderTotal = Number(route.params?.orderTotal) || 0;
@@ -145,7 +147,7 @@ export default function CheckoutWalletTopUpScreen() {
 
   return (
     <>
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]}>
       <Text style={styles.lead}>Transfer this amount to your wallet. The order is placed automatically once the top-up arrives.</Text>
 
       <View style={styles.amountCard}>

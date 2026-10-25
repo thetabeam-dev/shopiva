@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../hooks/useAuth';
@@ -34,6 +35,7 @@ const FILTERS = [
 ];
 
 export default function NotificationsScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { activeRole } = useAuth();
@@ -173,7 +175,7 @@ export default function NotificationsScreen() {
       data={visibleItems}
       keyExtractor={(item) => String(item.id)}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load('refresh')} />}
-      contentContainerStyle={visibleItems.length === 0 ? styles.emptyList : styles.list}
+      contentContainerStyle={visibleItems.length === 0 ? styles.emptyList : [styles.list, { paddingBottom: 8 + insets.bottom }]}
       ListEmptyComponent={<Text style={styles.empty}>No notifications yet</Text>}
       renderItem={({ item }) => {
         const unread = item.status !== 'read';

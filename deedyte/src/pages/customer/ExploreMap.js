@@ -15,6 +15,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 import { getVendorsOnMapByCategory } from '../../api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../context/ProfileContext';
 import { placeDetails, suggestPlaces, tomtomTileUrl } from '../../utils/tomtom';
 import {
@@ -44,6 +45,7 @@ function distanceKm(from, to) {
  * }} props
  */
 export default function ExploreMap({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const { user } = useProfile();
   const savedCoord = storedUserCoordinate(user);
   const savedLatitude = savedCoord?.latitude;
@@ -303,7 +305,7 @@ export default function ExploreMap({ navigation, route }) {
           ))}
         </MapView>
         <View style={styles.overlay} pointerEvents="box-none">
-          <View style={styles.zoomStack}>
+          <View style={[styles.zoomStack, { bottom: 304 + insets.bottom }]}>
             <TouchableOpacity
               style={styles.zoomBtn}
               onPress={() => zoomBy(0.8)}
@@ -322,7 +324,7 @@ export default function ExploreMap({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={styles.locateBtn}
+            style={[styles.locateBtn, { bottom: 300 + insets.bottom }]}
             onPress={goToMyLocation}
             accessibilityRole="button"
             accessibilityLabel="Show my location"
@@ -330,7 +332,7 @@ export default function ExploreMap({ navigation, route }) {
             <Icon name="locate" size={22} color="#111111" />
           </TouchableOpacity>
 
-          <View style={styles.mapSheet} pointerEvents="box-none">
+          <View style={[styles.mapSheet, { bottom: 12 + insets.bottom }]} pointerEvents="box-none">
             <View style={styles.mapSheetHead}>
               <Text style={styles.mapSheetTitle}>
                 <Text style={styles.mapSheetCount}>({visibleShops.length})</Text> Shops In This Area
@@ -476,8 +478,8 @@ const styles = StyleSheet.create({
   },
   locateBtn: {
     position: 'absolute',
-    right: 16,
-    bottom: 248,
+    left: 16,
+    bottom: 300,
     zIndex: 6,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -521,7 +523,7 @@ const styles = StyleSheet.create({
     padding: 14,
     color: '#6B7280',
   },
-  mapCardRow: { paddingHorizontal: 16, gap: 12 },
+  mapCardRow: { paddingHorizontal: 16, gap: 12, marginBottom: Platform.OS === 'android' ? 40 : 10 },
   mapCard: {
     width: MAP_CARD_W,
     backgroundColor: '#FFFFFF',

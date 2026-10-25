@@ -1,4 +1,5 @@
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { normalizeVendorState, vendorStateRaw } from './Vendors';
 
@@ -16,6 +17,7 @@ function shopPlace(vendor) {
 }
 
 export default function AreaShopsScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute();
   const shops = Array.isArray(route.params?.shops) ? route.params.shops : [];
@@ -24,7 +26,7 @@ export default function AreaShopsScreen() {
     <FlatList
       data={shops}
       keyExtractor={(item) => String(item.id)}
-      contentContainerStyle={shops.length === 0 ? styles.emptyWrap : styles.list}
+      contentContainerStyle={shops.length === 0 ? styles.emptyWrap : [styles.list, { paddingBottom: 16 + insets.bottom }]}
       ListEmptyComponent={<Text style={styles.empty}>No shops in this part of the map.</Text>}
       renderItem={({ item }) => {
         const cover = shopCover(item);

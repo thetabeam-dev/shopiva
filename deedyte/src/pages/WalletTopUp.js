@@ -3,12 +3,14 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchWallet } from '../api/user';
 
 const TEAL = '#00926e';
 const QUICK = [500, 1000, 2000, 5000, 10000, 20000];
 
 export default function WalletTopUpScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [amount, setAmount] = useState('0');
   const [wallet, setWallet] = useState(null);
@@ -41,7 +43,7 @@ export default function WalletTopUpScreen() {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]} keyboardShouldPersistTaps="handled">
       {/* <View style={styles.bankTab}>
         <Text style={styles.bankTabText}>Bank</Text>
       </View> */}
