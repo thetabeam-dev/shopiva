@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   Modal,
   Platform,
@@ -10,16 +11,18 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSelector } from 'react-redux';
 import { getStorefrontProduct, getStorefrontProducts, getVendorsOnMapByCategory } from '../../api';
 import { addBuyerCartLine, fetchBuyerCart } from '../../api/buyer';
+import { fetchWallet } from '../../api/user';
+import { connectChatSocket } from '../../socket/chatSocket';
 import { useProfile } from '../../context/ProfileContext';
 import { NotificationBell } from '../../components/NotificationBell';
 import { selectCategoryRows } from '../../../redux/categoriesSlice';
@@ -54,12 +57,30 @@ function formatCategoryLabel(category) {
     .join(' ');
 }
 
-const SORTS = [
-  { key: 'relevance', label: 'Relevance' },
-  { key: 'az', label: 'A-Z' },
-  { key: 'za', label: 'Z-A' },
-  { key: 'price_asc', label: 'Price ascending' },
-  { key: 'price_desc', label: 'Price descending' },
+const BANNER_W = Dimensions.get('window').width - 32;
+
+const BANNERS = [
+  {
+    id: 'nearby',
+    kicker: 'Near you',
+    title: 'Shops close to your location',
+    body: 'Open Explore to see vendors around you.',
+    icon: 'location',
+  },
+  {
+    id: 'shipping',
+    kicker: 'Delivery',
+    title: 'See the shipping fee first',
+    body: 'Every shop here can estimate delivery before you pay.',
+    icon: 'cube',
+  },
+  {
+    id: 'escrow',
+    kicker: 'Protected',
+    title: 'Your payment stays in escrow',
+    body: 'Funds are held until the order is on its way.',
+    icon: 'shield-checkmark',
+  },
 ];
 
 function locationLabel(user) {
@@ -86,22 +107,14 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [sortKey, setSortKey] = useState('relevance');
-  const [sortOpen, setSortOpen] = useState(false);
-  const [layout, setLayout] = useState('grid');
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const [wallet, setWallet] = useState(null);
+  const [walletRefreshing, setWalletRefreshing] = useState(false);
   const [cartBusyId, setCartBusyId] = useState('');
   const [cartProductIds, setCartProductIds] = useState(() => new Set());
   const [variantSheet, setVariantSheet] = useState(
     /** @type {null | { item: Record<string, unknown>; variants: Record<string, unknown>[]; selected: number | null }} */ (null),
   );
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [draftCategory, setDraftCategory] = useState('all');
-  const [draftMin, setDraftMin] = useState('');
-  const [draftMax, setDraftMax] = useState('');
-
   const categories = useMemo(() => {
     const seen = new Set();
     const names = [];
@@ -169,49 +182,52 @@ export default function HomeScreen() {
     loadArrivals().catch(() => {});
   }, [loadArrivals]);
 
-  const visibleArrivals = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const min = minPrice.trim() === '' ? null : Number(minPrice);
-    const max = maxPrice.trim() === '' ? null : Number(maxPrice);
-    const filtered = arrivals.filter(item => {
-      if (selectedCategory !== 'all' && categoryKey(item.category) !== categoryKey(selectedCategory)) {
-        return false;
-      }
-      if (query && !String(item.title ?? '').toLowerCase().includes(query)) return false;
-      if (min != null && Number.isFinite(min) && item.price < min) return false;
-      if (max != null && Number.isFinite(max) && item.price > max) return false;
-      return true;
+  const loadWallet = useCallback(() => {
+    if (!user?.id) {
+      setWallet(null);
+      return Promise.resolve();
+    }
+    setWalletRefreshing(true);
+    return fetchWallet()
+      .then(setWallet)
+      .catch(() => setWallet(null))
+      .finally(() => setWalletRefreshing(false));
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadWallet();
+    }, [loadWallet]),
+  );
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let alive = true;
+    let socket = null;
+    const onWalletCredited = (payload) => {
+      const kobo = Number(payload?.balance_kobo);
+      if (!Number.isFinite(kobo)) return;
+      setWallet(current => ({ ...(current ?? {}), balance_kobo: kobo }));
+    };
+    void connectChatSocket().then((next) => {
+      if (!alive || !next) return;
+      socket = next;
+      next.on('wallet_credited', onWalletCredited);
     });
-    const sorted = [...filtered];
-    if (sortKey === 'az') sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sortKey === 'za') sorted.sort((a, b) => b.title.localeCompare(a.title));
-    else if (sortKey === 'price_asc') sorted.sort((a, b) => a.price - b.price);
-    else if (sortKey === 'price_desc') sorted.sort((a, b) => b.price - a.price);
-    return sorted;
-  }, [arrivals, selectedCategory, searchQuery, minPrice, maxPrice, sortKey]);
+    return () => {
+      alive = false;
+      socket?.off('wallet_credited', onWalletCredited);
+    };
+  }, [user?.id]);
 
-  const filtersActive = selectedCategory !== 'all' || minPrice.trim() !== '' || maxPrice.trim() !== '';
+  const walletKobo = Number(wallet?.balance_kobo);
+  const walletBalance = Number.isFinite(walletKobo) ? walletKobo / 100 : 0;
+  const walletAddress = String(wallet?.address ?? '').trim();
 
-  const openFilters = () => {
-    setDraftCategory(selectedCategory);
-    setDraftMin(minPrice);
-    setDraftMax(maxPrice);
-    setSortOpen(false);
-    setFilterOpen(true);
-  };
-
-  const applyFilters = () => {
-    setSelectedCategory(draftCategory);
-    setMinPrice(draftMin.replace(/[^\d.]/g, ''));
-    setMaxPrice(draftMax.replace(/[^\d.]/g, ''));
-    setFilterOpen(false);
-  };
-
-  const clearFilters = () => {
-    setDraftCategory('all');
-    setDraftMin('');
-    setDraftMax('');
-  };
+  const visibleArrivals = useMemo(() => {
+    if (selectedCategory === 'all') return arrivals;
+    return arrivals.filter(item => categoryKey(item.category) === categoryKey(selectedCategory));
+  }, [arrivals, selectedCategory]);
 
   const loadCartProducts = useCallback(async () => {
     try {
@@ -327,12 +343,12 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={[styles.bell, filtersActive && styles.bellActive]}
-            onPress={openFilters}
+            style={styles.bell}
+            onPress={() => navigation.navigate('ProductSearch')}
             accessibilityRole="button"
-            accessibilityLabel="Filter products"
+            accessibilityLabel="Search products"
           >
-            <Icon name="options-outline" size={22} color={filtersActive ? '#FFFFFF' : '#111111'} />
+            <Icon name="search-outline" size={22} color="#111111" />
           </TouchableOpacity>
           <NotificationBell
             onPress={() => navigation.navigate('Notifications')}
@@ -340,69 +356,6 @@ export default function HomeScreen() {
           />
         </View>
       </View>
-
-      <View style={styles.searchRow}>
-        <View style={styles.searchField}>
-          <Icon name="search-outline" size={18} color="#8A8A8A" />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search products"
-            placeholderTextColor="#9A9A9A"
-            style={styles.searchInput}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
-              <Icon name="close-circle" size={18} color="#B0B0B0" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        <View style={styles.searchActions}>
-          <TouchableOpacity
-            style={styles.sortBtn}
-            onPress={() => setSortOpen(open => !open)}
-            accessibilityRole="button"
-            accessibilityLabel="Sort products"
-          >
-            <Icon name="swap-vertical-outline" size={20} color="#111111" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.sortBtn}
-            onPress={() => setLayout(current => (current === 'grid' ? 'list' : 'grid'))}
-            accessibilityRole="button"
-            accessibilityLabel={layout === 'grid' ? 'Show products as a list' : 'Show products as boxes'}
-          >
-            <Icon name={layout === 'grid' ? 'list-outline' : 'grid-outline'} size={20} color="#111111" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      {sortOpen ? (
-        <View style={styles.sortMenu}>
-          {SORTS.map(option => {
-            const selected = option.key === sortKey;
-            return (
-              <TouchableOpacity
-                key={option.key}
-                style={[styles.sortItem, selected && styles.sortItemOn]}
-                onPress={() => {
-                  setSortKey(option.key);
-                  setSortOpen(false);
-                }}
-              >
-                <Text style={styles.sortItemText}>{option.label}</Text>
-                <Icon
-                  name={selected ? 'radio-button-on' : 'radio-button-off'}
-                  size={18}
-                  color={selected ? '#00926E' : '#C5C5C5'}
-                />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ) : null}
 
       <ScrollView
         horizontal
@@ -443,22 +396,92 @@ export default function HomeScreen() {
           />
         }
       >
-      {/* <View style={styles.promo}>
-        <Icon name="checkmark" size={16} color="#1F8A4C" />
-        <Text style={styles.promoText}>Free shipping</Text>
-        <Text style={styles.promoDivider}>|</Text>
-        <Icon name="checkmark" size={16} color="#1F8A4C" />
-        <Text style={styles.promoText}>Price adjustment within 30 days</Text>
-        <Icon name="chevron-forward" size={16} color="#8A8A8A" />
-      </View> */}
+      {user?.id ? (
+        <View style={styles.walletCard}>
+          <View style={styles.walletTop}>
+            <Text style={styles.walletLabel}>Available balance</Text>
+            <TouchableOpacity
+              onPress={() => { void loadWallet(); }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh wallet"
+            >
+              {walletRefreshing ? (
+                <ActivityIndicator color="#00926E" size="small" />
+              ) : (
+                <Icon name="refresh" size={22} color="#00926E" />
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.walletBalanceRow}>
+            <Text style={styles.walletValue}>{formatNaira(wallet ? walletBalance : 0)}</Text>
+            <TouchableOpacity
+              style={styles.walletAddress}
+              onPress={() => {
+                if (!walletAddress) return;
+                Clipboard.setString(walletAddress);
+                Alert.alert('Copied', 'Address copied to clipboard.');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Copy wallet address"
+            >
+              <Text style={styles.walletAddressText} numberOfLines={1}>
+                Address {walletAddress || 'Not available'}
+              </Text>
+              <Icon name="copy-outline" size={16} color="#00926E" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.bannerBlock}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={BANNER_W + 10}
+          decelerationRate="fast"
+          contentContainerStyle={styles.bannerRow}
+          onMomentumScrollEnd={(event) => {
+            const index = Math.round(event.nativeEvent.contentOffset.x / (BANNER_W + 10));
+            setBannerIndex(Math.max(0, Math.min(BANNERS.length - 1, index)));
+          }}
+        >
+          {BANNERS.map((banner) => (
+            <View key={banner.id} style={styles.banner}>
+              <View style={styles.bannerWash} />
+              <View style={styles.bannerOrb} />
+              <View style={styles.bannerOrbSmall} />
+              <View style={styles.bannerCopy}>
+                <View style={styles.bannerKickerPill}>
+                  <Text style={styles.bannerKicker}>{banner.kicker}</Text>
+                </View>
+                <Text style={styles.bannerTitle}>{banner.title}</Text>
+                <Text style={styles.bannerBody}>{banner.body}</Text>
+              </View>
+              <View style={styles.bannerIconWrap}>
+                <Icon name={banner.icon} size={28} color="#FFFFFF" />
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+        <View style={styles.bannerDots}>
+          {BANNERS.map((banner, index) => (
+            <View
+              key={banner.id}
+              style={[styles.bannerDot, index === bannerIndex && styles.bannerDotOn]}
+            />
+          ))}
+        </View>
+      </View>
 
       {loading ? (
-        <View style={layout === 'list' ? styles.list : styles.grid}>
-          {Array.from({ length: layout === 'list' ? 4 : 6 }, (_, index) => (
-            <View key={index} style={layout === 'list' ? styles.listCard : styles.card}>
-              <View style={[layout === 'list' ? styles.listImage : styles.cardImage, styles.bone]} />
-              <View style={layout === 'list' ? styles.listBody : null}>
-                <View style={[styles.boneLine, { width: '92%', marginTop: layout === 'list' ? 0 : 8 }]} />
+        <View style={styles.grid}>
+          {Array.from({ length: 6 }, (_, index) => (
+            <View key={index} style={styles.card}>
+              <View style={[styles.cardImage, styles.bone]} />
+              <View>
+                <View style={[styles.boneLine, { width: '92%', marginTop: 8 }]} />
                 <View style={[styles.boneLine, { width: '64%', marginTop: 6 }]} />
                 <View style={[styles.boneLine, { width: '48%', marginTop: 8, height: 12 }]} />
               </View>
@@ -466,21 +489,20 @@ export default function HomeScreen() {
           ))}
         </View>
       ) : (
-        <View style={layout === 'list' ? styles.list : styles.grid}>
+        <View style={styles.grid}>
           {visibleArrivals.map(item => {
             const showCompare = item.comparePrice > item.price && item.price > 0;
             const { rating, count } = shopRating(item.shop);
-            const asList = layout === 'list';
             const inCart = cartProductIds.has(String(item.id));
             return (
               <TouchableOpacity
                 key={`${item.shop?.id}-${item.id}`}
-                style={asList ? styles.listCard : styles.card}
+                style={styles.card}
                 activeOpacity={0.9}
                 onPress={() => openProduct(item)}
               >
-                <ProductCardMedia uri={item.uri} style={asList ? styles.listImage : styles.cardImage} />
-                <View style={asList ? styles.listBody : null}>
+                <ProductCardMedia uri={item.uri} style={styles.cardImage} />
+                <View>
                 <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
                 <View style={styles.ratingRow}>
                   {[1, 2, 3, 4, 5].map(star => (
@@ -525,11 +547,9 @@ export default function HomeScreen() {
       )}
       {!loading && visibleArrivals.length === 0 ? (
         <Text style={styles.empty}>
-          {searchQuery.trim()
-            ? `No products match “${searchQuery.trim()}”.`
-            : selectedCategory === 'all'
-              ? 'No products yet. Explore shops to see what is in stock.'
-              : `No products in ${formatCategoryLabel(selectedCategory)}.`}
+          {selectedCategory === 'all'
+            ? 'No products yet. Explore shops to see what is in stock.'
+            : `No products in ${formatCategoryLabel(selectedCategory)}.`}
         </Text>
       ) : null}
     </ScrollView>
@@ -610,65 +630,6 @@ export default function HomeScreen() {
       </View>
     </Modal>
 
-    <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-      <View style={styles.modalFill}>
-      <Pressable style={styles.sheetBackdrop} onPress={() => setFilterOpen(false)} />
-      <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}>
-          <TouchableOpacity onPress={() => setFilterOpen(false)} hitSlop={8}>
-            <Icon name="close" size={22} color="#111111" />
-          </TouchableOpacity>
-          <Text style={styles.sheetTitle}>Filters</Text>
-          <TouchableOpacity onPress={clearFilters}>
-            <Text style={styles.clearText}>Clear</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>Price</Text>
-          <Text style={styles.sectionHint}>Set a range in naira</Text>
-          <View style={styles.priceInputs}>
-            <TextInput
-              value={draftMin}
-              onChangeText={setDraftMin}
-              placeholder="Min (₦)"
-              placeholderTextColor="#9A9A9A"
-              keyboardType="decimal-pad"
-              style={styles.priceInput}
-            />
-            <TextInput
-              value={draftMax}
-              onChangeText={setDraftMax}
-              placeholder="Max (₦)"
-              placeholderTextColor="#9A9A9A"
-              keyboardType="decimal-pad"
-              style={styles.priceInput}
-            />
-          </View>
-
-          <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Category</Text>
-          <Text style={styles.sectionHint}>Pick one to focus</Text>
-          {['all', ...categories].map(item => {
-            const selected = categoryKey(item) === categoryKey(draftCategory);
-            return (
-              <TouchableOpacity
-                key={item}
-                style={[styles.sheetOption, selected && styles.sheetOptionOn]}
-                onPress={() => setDraftCategory(item)}
-              >
-                <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextOn]}>
-                  {item === 'all' ? 'All' : formatCategoryLabel(item)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
-          <Text style={styles.applyText}>Apply</Text>
-        </TouchableOpacity>
-      </View>
-      </View>
-    </Modal>
     </View>
   );
 }
@@ -845,19 +806,116 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   chipUnderlineSpacer: { marginTop: 6, height: 2 },
-  promo: {
-    marginTop: 4,
+  walletCard: {
+    marginTop: 12,
     marginHorizontal: 16,
-    backgroundColor: '#F3F8F4',
-    borderRadius: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 7,
+    padding: 18,
+  },
+  walletTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  walletLabel: { color: '#6B7280', fontSize: 13 },
+  walletBalanceRow: {
+    marginTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  walletValue: { color: '#111111', fontSize: 32, fontWeight: '800', flexShrink: 0 },
+  walletAddress: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: '52%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 7,
+    backgroundColor: '#FFFFFF',
+  },
+  walletAddressText: { color: '#111111', fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  bannerBlock: { marginTop: 12 },
+  bannerRow: { paddingHorizontal: 16, gap: 10 },
+  banner: {
+    width: BANNER_W,
+    minHeight: 148,
+    borderRadius: 7,
+    backgroundColor: '#00926E',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  bannerWash: {
+    position: 'absolute',
+    left: -30,
+    bottom: -46,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  bannerOrb: {
+    position: 'absolute',
+    right: -28,
+    top: -36,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  bannerOrbSmall: {
+    position: 'absolute',
+    right: 54,
+    bottom: -22,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  bannerCopy: { flex: 1, paddingRight: 12 },
+  bannerKickerPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  bannerKicker: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  bannerTitle: {
+    marginTop: 10,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  bannerBody: { marginTop: 6, fontSize: 13, lineHeight: 18, color: 'rgba(255,255,255,0.88)' },
+  bannerIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerDots: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
     gap: 6,
   },
-  promoText: { fontSize: 13, color: '#222222', flexShrink: 1 },
-  promoDivider: { color: '#C5C5C5', marginHorizontal: 2 },
+  bannerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D5D5D5' },
+  bannerDotOn: { width: 16, backgroundColor: '#00926E' },
   grid: {
     paddingHorizontal: 12,
     paddingTop: 12,

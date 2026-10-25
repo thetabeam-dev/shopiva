@@ -86,7 +86,7 @@ function App() {
       void clearAllDeedyteStorage();
     }
     warnIfPaystackLiveInDev();
-    void requestLocationPermission({ interactive: false });
+    void requestLocationPermission({ interactive: true });
   }, []);
 
   useEffect(() => {

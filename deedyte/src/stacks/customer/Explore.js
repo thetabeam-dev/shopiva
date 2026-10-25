@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import VendorsScreen from '../../pages/customer/Vendors';
+import AreaShopsScreen from '../../pages/customer/AreaShops';
 import ExploreBrowse from '../../pages/customer/ExploreBrowse';
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
@@ -88,6 +89,16 @@ export function ExploreStackScreen() {
           ...exploreOpt(navigation),
           title: route.params?.state ? `Shops in ${route.params.state}` : 'Shops',
         })}
+      />
+      <ExploreStack.Screen
+        name="Area-shops"
+        component={AreaShopsScreen}
+        options={{
+          title: 'Shops in this area',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTitleStyle: { fontWeight: '700' },
+        }}
       />
       <ExploreStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <ExploreStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />

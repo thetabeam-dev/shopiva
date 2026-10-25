@@ -3,6 +3,7 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import FirebaseCore
+import GoogleMaps
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,6 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     
+    GMSServices.provideAPIKey("AIzaSyBu01frNxi974hzrPfLAsvl1i2bnMahkz8")
     FirebaseApp.configure()
     // Required for FCM on iOS — without this, APNs never registers and FCM delivery fails.
     application.registerForRemoteNotifications()

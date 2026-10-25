@@ -41,7 +41,7 @@ import {
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NAME_MAX = 255;
 const SLUG_MAX = 255;
-const DESCRIPTION_MAX = 5000;
+const DESCRIPTION_MAX = 300;
 
 function splitCategoryList(raw: string): string[] {
     const text = raw.trim();
@@ -305,7 +305,9 @@ export async function UpdateShopController(req: Request, res: Response) {
             res.status(400).json({ error: "A shop can have at most 3 categories." });
             return;
         }
-        if (typeof description === "string" && description.trim() && !scanMessage(description).isAllowed) {
+        const descriptionStr =
+            typeof description === "string" ? description.trim().slice(0, DESCRIPTION_MAX) : description;
+        if (typeof descriptionStr === "string" && descriptionStr && !scanMessage(descriptionStr).isAllowed) {
             res.status(400).json({ error: "Shop descriptions cannot include contact details or links." });
             return;
         }
@@ -315,7 +317,7 @@ export async function UpdateShopController(req: Request, res: Response) {
             shopId: req.params.shopId as unknown as number,
             name,
             slug,
-            description,
+            description: descriptionStr,
             logo,
             banner,
             category: categories,

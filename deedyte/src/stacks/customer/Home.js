@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import HomeScreen from "../../pages/customer/Home";
+import ProductSearchScreen from "../../pages/customer/ProductSearch";
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
 import CartScreen from '../../pages/customer/Cart';
@@ -89,6 +90,16 @@ export function HomeStackScreen() {
         name="Home"
         component={HomeScreen}
         options={{ headerShown: false }}
+      />
+      <HomeStack.Screen
+        name="ProductSearch"
+        component={ProductSearchScreen}
+        options={{
+          title: 'Search',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTitleStyle: { fontWeight: '700' },
+        }}
       />
       <HomeStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <HomeStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />

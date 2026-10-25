@@ -24,6 +24,7 @@ import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
 import { useLocationLookup } from '../../hooks/useLocationLookup';
 import { AUTH } from './theme';
 import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
+import PlaceLocationField from '../../components/PlaceLocationField';
 
 function nigerianMobilePayload(value) {
   let digits = String(value ?? '').replace(/\D/g, '');
@@ -112,8 +113,8 @@ export default function OnboardingProfileScreen({ navigation }) {
     const cityOk = city.trim().length >= 2;
     const regionOk = state.trim().length >= 2;
     const countryOk = country.trim().length >= 2;
-    if (!cityOk || !regionOk || !countryOk) {
-      Alert.alert('Location', 'Fill in city, state / region, and country (at least 2 characters each).');
+    if (!deviceCoords || !cityOk || !regionOk) {
+      Alert.alert('Location', 'Use your current location or choose a suggested place so we can save coordinates.');
       return;
     }
 
@@ -251,33 +252,17 @@ export default function OnboardingProfileScreen({ navigation }) {
 
         <Text style={styles.label}>Where you&apos;re based</Text>
         <Text style={styles.locHint}>
-          Use your phone&apos;s GPS to fill city and country, or type them yourself.
+          Use your location, or type a place and choose a suggestion. A location is saved only when it has coordinates.
         </Text>
-        <TouchableOpacity
-          style={[styles.locBtn, (submitting || locLoading) && styles.locBtnDisabled]}
-          onPress={useDeviceLocation}
-          disabled={submitting || locLoading}
-          activeOpacity={0.85}
-        >
-          {locLoading ? (
-            <ActivityIndicator color={AUTH.primary} />
-          ) : (
-            <Icon name="navigate-outline" size={22} color="#000000" />
-          )}
-          <Text style={styles.locBtnText}>Use current location</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label}>City</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="City"
-          placeholderTextColor={AUTH.textMuted}
-          value={city}
-          onChangeText={(t) => {
-            clearDeviceCoords();
-            setCity(t);
+        <PlaceLocationField
+          disabled={submitting}
+          onClear={clearDeviceCoords}
+          onPlace={(place) => {
+            setCity(place.city);
+            if (place.state) setState(matchNigerianState(place.state) || place.state);
+            if (place.country) setCountry(place.country);
+            setDeviceCoords({ latitude: place.latitude, longitude: place.longitude });
           }}
-          editable={!submitting && !locLoading}
         />
 
         <Text style={styles.label}>State / region</Text>

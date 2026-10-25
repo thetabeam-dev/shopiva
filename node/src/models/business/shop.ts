@@ -778,6 +778,9 @@ export class shop{
             WHERE s.isactive = true
               AND s.status IN ('active', 'pending_approval')
               AND EXISTS (
+                SELECT 1 FROM shipping_zones z WHERE z.shop_id = s.id
+              )
+              AND EXISTS (
                 SELECT 1
                 FROM products p
                 WHERE p.shop_id = s.id
