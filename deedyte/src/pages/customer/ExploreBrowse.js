@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   AppState,
   ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -63,6 +65,7 @@ export default function ExploreBrowse({ navigation }) {
   const [showUserLocation, setShowUserLocation] = useState(false);
   const [locationReady, setLocationReady] = useState(false);
   const [userCoord, setUserCoord] = useState(null);
+  const [locating, setLocating] = useState(false);
   const [mapRegion, setMapRegion] = useState(null);
   const mapRef = useRef(null);
   const mapListRef = useRef(null);
@@ -205,6 +208,34 @@ export default function ExploreBrowse({ navigation }) {
     ));
   }, [mapShops, mapRegion]);
 
+  const goToMyLocation = async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const granted = await requestLocationPermission({ interactive: true });
+      setShowUserLocation(granted);
+      setLocationReady(granted);
+      if (!granted) return;
+      let coords = null;
+      try {
+        coords = await getCurrentCoordinates({ exact: false });
+      } catch {
+        coords = await getCurrentCoordinates({ exact: true });
+      }
+      setUserCoord(coords);
+      mapRef.current?.animateToRegion({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 400);
+    } catch (e) {
+      Alert.alert('Location', e instanceof Error ? e.message : 'Could not get your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const focusShop = (shop, coordinate) => {
     mapRef.current?.animateToRegion({
       ...coordinate,
@@ -311,29 +342,40 @@ export default function ExploreBrowse({ navigation }) {
             provider={PROVIDER_GOOGLE}
             style={styles.map}
             initialRegion={{
-              latitude: 9.082,
-              longitude: 8.6753,
-              latitudeDelta: 8,
-              longitudeDelta: 8,
+              latitude: userCoord?.latitude ?? 9.082,
+              longitude: userCoord?.longitude ?? 8.6753,
+              latitudeDelta: userCoord ? 0.2 : 8,
+              longitudeDelta: userCoord ? 0.2 : 8,
             }}
             onRegionChangeComplete={setMapRegion}
             showsUserLocation={showUserLocation}
-            showsMyLocationButton={showUserLocation}
+            showsMyLocationButton={false}
+            toolbarEnabled={false}
+            loadingEnabled
             mapPadding={{ top: 12, right: 12, bottom: 210, left: 12 }}
           >
             {mapShops.map(({ shop, coordinate }) => (
               <Marker
                 key={String(shop.id)}
                 coordinate={coordinate}
-                anchor={{ x: 0.5, y: 1 }}
+                pinColor="#00926E"
+                tracksViewChanges={false}
                 onPress={() => focusShop(shop, coordinate)}
-              >
-                <View style={styles.mapPin}>
-                  <Icon name="location" size={28} color="#00926E" />
-                </View>
-              </Marker>
+              />
             ))}
           </MapView>
+          <TouchableOpacity
+            style={styles.locateBtn}
+            onPress={() => { void goToMyLocation(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Show my location"
+          >
+            {locating ? (
+              <ActivityIndicator size="small" color="#00926E" />
+            ) : (
+              <Icon name="locate" size={22} color="#111111" />
+            )}
+          </TouchableOpacity>
           <View style={styles.mapSheet} pointerEvents="box-none">
             <View style={styles.mapSheetHead}>
               <Text style={styles.mapSheetTitle}>Shops in this area</Text>
@@ -521,15 +563,23 @@ const styles = StyleSheet.create({
   suggestCopy: { flex: 1 },
   suggestLabel: { fontSize: 15, fontWeight: '600', color: '#111111' },
   suggestSub: { marginTop: 1, fontSize: 12, color: '#6B7280' },
-  mapWrap: { flex: 1, marginHorizontal: 16, marginBottom: 12 },
-  map: { flex: 1 },
-  mapPin: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  mapWrap: { flex: 1, marginHorizontal: 16, marginBottom: 12, minHeight: 280, borderRadius: 7, overflow: Platform.OS === 'android' ? 'hidden' : 'visible' },
+  map: { ...StyleSheet.absoluteFillObject },
+  locateBtn: {
+    position: 'absolute',
+    right: 12,
+    bottom: 228,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
   },
   mapSheet: {
     position: 'absolute',
