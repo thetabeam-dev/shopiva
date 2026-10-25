@@ -384,12 +384,12 @@ const styles = StyleSheet.create({
   suggestSub: { marginTop: 1, fontSize: 12, color: '#6B7280' },
   mapWrap: {
     ...StyleSheet.absoluteFillObject,
-  },
+    },
   locateBtn: {
     position: 'absolute',
     right: 12,
     bottom: 212,
-    width: 44,
+    width: 44,  
     height: 44,
     borderRadius: 22,
     backgroundColor: '#FFFFFF',
