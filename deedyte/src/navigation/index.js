@@ -27,13 +27,34 @@ import { DEFAULT_API_BASE_URL } from '../api/config';
 import { getMessaging } from '@react-native-firebase/messaging';
 import { getStoredUser } from '../auth/session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeModules, Platform } from 'react-native';
+
 
 export { navigationRef, navigate } from './root';
 
 /** Renders inside `<Provider>` so `useDispatch` and navigation share one Redux context. */
 function NavigationTree() {
   const dispatch = useDispatch();
-  const { signIn, status } = useAuth();
+  const { signIn, status, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    // The native module marks the referrer as consumed on first read, so it
+    // must not be read until a real account is signed in.
+    if (status !== 'signedIn' || !isAuthenticated) return;
+    NativeModules.InstallReferrer?.getReferrer()
+      .then((raw) => {
+        if (!raw) return;
+        const params = new URLSearchParams(raw);
+        const link = params.get('deeplink');
+        if (link) {
+          Alert.alert(JSON.stringify(link));
+          // e.g. https://www.deedyte.com/store/greg/product/123
+          // route it the same way you handle normal deep links
+        }
+      })
+      .catch(() => { });
+  }, [status, isAuthenticated]);
 
   const handleOAuthUrl = useCallback(
     async (url) => {
@@ -72,30 +93,30 @@ function NavigationTree() {
 
   useEffect(() => {
     if (status !== 'signedIn') return undefined;
-    connectChatSocket().catch(() => {});
+    connectChatSocket().catch(() => { });
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') connectChatSocket().catch(() => {});
+      if (next === 'active') connectChatSocket().catch(() => { });
     });
     return () => sub.remove();
   }, [status]);
 
   useEffect(() => {
-    async function getFcm () {
+    async function getFcm() {
       const u = await getStoredUser();
-      if(!u) return;
-      if(u.devicetoken) return;
+      if (!u) return;
+      if (u.devicetoken) return;
       const fcm = await AsyncStorage.getItem("fcm");
-      if(!fcm)return;
-      axios.post(`${DEFAULT_API_BASE_URL}/update-fcm`, { 
+      if (!fcm) return;
+      axios.post(`${DEFAULT_API_BASE_URL}/update-fcm`, {
         u_id: u?.id,
         fcm: fcm
       })
-      .then((res) => {
-        //  console.log(res.data)
-      })
-      .catch(err => {
-        //  console.log(err)
-      })
+        .then((res) => {
+          //  console.log(res.data)
+        })
+        .catch(err => {
+          //  console.log(err)
+        })
     }
     getFcm()
   }, []);
@@ -108,7 +129,7 @@ function NavigationTree() {
         axios.post(`${DEFAULT_API_BASE_URL}/update-fcm`, {
           u_id: u.id,
           fcm: token,
-        }).catch(() => {});
+        }).catch(() => { });
       });
       return () => {
         if (typeof unsub === 'function') unsub();

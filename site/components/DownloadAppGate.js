@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const APP_STORE_URL = "https://apps.apple.com/app/id6792328397";
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.thetabeam.shopiva";
+
+/**
+ * Play Store link that carries the current page as `deeplink` in the install
+ * referrer, so the app can open the same page after install.
+ * @param {string} pageUrl
+ */
+function playStoreUrlFor(pageUrl) {
+  if (!pageUrl) return PLAY_STORE_URL;
+  const referrer = `deeplink=${encodeURIComponent(pageUrl)}`;
+  return `${PLAY_STORE_URL}&referrer=${encodeURIComponent(referrer)}`;
+}
 
 const INFO_PAGES = [
   "about",
@@ -42,6 +53,12 @@ export function isWebAllowedPath(pathname) {
 }
 
 export default function DownloadAppGate() {
+  const [playStoreUrl, setPlayStoreUrl] = useState(PLAY_STORE_URL);
+
+  useEffect(() => {
+    setPlayStoreUrl(playStoreUrlFor(window.location.href));
+  }, []);
+
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -95,7 +112,7 @@ export default function DownloadAppGate() {
             <b>App Store</b>
           </a>
           <a
-            href={PLAY_STORE_URL}
+            href={playStoreUrl}
             target="_blank"
             rel="noopener noreferrer"
             style={buttonStyle}
