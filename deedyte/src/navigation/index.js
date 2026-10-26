@@ -15,6 +15,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { parseOAuthCallbackUrl, oauthErrorMessage } from '../api/oauth';
 import AuthBootstrap from '../auth/AuthBootstrap';
 import CategoryBootstrap from '../categories/CategoryBootstrap';
+import PushPermissionBootstrap from '../components/PushPermissionBootstrap';
 import { useAuth } from '../hooks/useAuth';
 import { Provider, useDispatch } from 'react-redux';
 import store from "../../redux/store"
@@ -100,25 +101,26 @@ function NavigationTree() {
   }, []);
 
   useEffect(() => {
-    getMessaging().onTokenRefresh(async(token) => {
-      // Send new token to your backend
-      // updateUserFcmToken(token);
-      const u = await getStoredUser();
-      console.log("device", token)
-
-      if(!token)return;
-      axios.post(`${DEFAULT_API_BASE_URL}/update-fcm`, {
-        u_id: u?.id,
-        fcm: token
-      })
-      .then((res) => {
-        // console.log(res.data)
-      })
-      .catch(err => {
-        // console.log(err)
-      })
-    });
-  }, [])
+    try {
+      const unsub = getMessaging().onTokenRefresh(async (token) => {
+        const u = await getStoredUser();
+        if (!token || !u?.id) return;
+        axios.post(`${DEFAULT_API_BASE_URL}/update-fcm`, {
+          u_id: u.id,
+          fcm: token,
+        }).catch(() => {});
+      });
+      return () => {
+        if (typeof unsub === 'function') unsub();
+      };
+    } catch (error) {
+      console.warn(
+        '[fcm] onTokenRefresh failed:',
+        error instanceof Error ? error.message : String(error),
+      );
+      return undefined;
+    }
+  }, []);
 
   return (
     <NavigationContainer
@@ -188,6 +190,7 @@ function NavigationHandler() {
         <Provider store={store}>
           <AuthBootstrap />
           <CategoryBootstrap />
+          <PushPermissionBootstrap />
           <NavigationTree />
         </Provider>
       </SafeAreaView>

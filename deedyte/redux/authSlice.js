@@ -149,10 +149,28 @@ const authSlice = createSlice({
       state.activeRole = next;
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase('auth/bootstrap/rejected', (state) => {
+      if (state.status === 'loading') {
+        state.status = 'signedOut';
+        state.isAuthenticated = false;
+        state.isGuest = false;
+      }
+    });
+  },
 });
 
 export const { applySignedIn, setSignedOut, setGuestSignedIn, setPreAuthBootstrap, setPreAuthChoiceSync, setActiveRoleSync } =
   authSlice.actions;
+
+async function fetchCurrentUserForBootstrap() {
+  return Promise.race([
+    fetchCurrentUserOrStatus(),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Authorization timed out.')), 12000);
+    }),
+  ]);
+}
 
 export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async (_, { dispatch, getState }) => {
   setUnauthorized401Suppressed(true);
@@ -170,7 +188,7 @@ export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async (_, { disp
     }
     const preferredRole = await getStoredActiveRole();
     const cached = await getStoredUser();
-    const r = await fetchCurrentUserOrStatus();
+    const r = await fetchCurrentUserForBootstrap();
 
     if (r.status === 401) {
       await clearSession();
@@ -261,6 +279,38 @@ export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async (_, { disp
       }),
     );
     await saveActiveRole(getState().auth.activeRole);
+  } catch (error) {
+    console.warn(
+      '[auth] bootstrap failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+    try {
+      const token = await getStoredAccessToken();
+      const cached = await getStoredUser();
+      if (token && cached && typeof cached === 'object') {
+        const preferredRole = await getStoredActiveRole();
+        const preAuthChoice = await getStoredPreAuthChoice();
+        const initialAppRoute = await resolveInitialAppRoute(cached, {
+          fromSignup: false,
+          preferredRole,
+          preAuthChoice,
+        });
+        dispatch(
+          applySignedIn({
+            mergedUser: cached,
+            preferredRole,
+            authenticated: true,
+            forceHome: false,
+            fromSignup: false,
+            initialAppRoute,
+          }),
+        );
+        return;
+      }
+    } catch {
+      // Fall through to signed-out so the boot spinner cannot hang.
+    }
+    dispatch(setSignedOut());
   } finally {
     setUnauthorized401Suppressed(false);
   }
