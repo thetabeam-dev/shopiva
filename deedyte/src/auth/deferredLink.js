@@ -163,8 +163,20 @@ function navigateToProduct(params, attempt = 0) {
   });
 }
 
+let onboardingInProgress = false;
+
+/**
+ * While the signup profile ("Almost there") is open, pending links wait; that
+ * screen clears this and opens the product once the profile is saved.
+ * @param {boolean} value
+ */
+export function setOnboardingInProgress(value) {
+  onboardingInProgress = value;
+}
+
 /** Opens the saved deferred product, if any, on the customer Home stack. */
 export async function openPendingDeferredProduct() {
+  if (onboardingInProgress) return;
   try {
     const target = productFromLink(await takePendingDeferredLink());
     if (!target) return;

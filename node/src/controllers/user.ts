@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import type { Request, Response } from "express";
-import { SignupService, SigninService, UpdateProfileService, UpdateEmailService, UpdatePhoneService, UpdatePhotoService, UpdatePasswordService, DeleteUserService, UpdateRoleService } from "../services/user.js";
+import { SignupService, SigninService, UpdateProfileService, UpdateEmailService, UpdatePhoneService, UpdatePhotoService, UpdatePasswordService, DeleteUserService, UpdateRoleService, AccountDeletionBlockedError, getAccountDeletionBlockers } from "../services/user.js";
 import {
     RequestPasswordResetPinService,
     ResetPasswordWithPinService,
@@ -130,6 +130,10 @@ export async function DeleteUserController(req: Request, res: Response) {
             message: "Account deleted successfully."
         });
     } catch (err) {
+        if (err instanceof AccountDeletionBlockedError) {
+            res.status(409).json({ error: err.message, blockers: err.blockers });
+            return;
+        }
         const message = err instanceof Error ? err.message : String(err);
         if (message.toLowerCase().includes("invalid password")) {
             res.status(403).json({ error: message });
@@ -144,6 +148,20 @@ export async function DeleteUserController(req: Request, res: Response) {
             return;
         }
         res.status(500).json({ error: message });
+    }
+}
+
+export async function AccountDeletionCheckController(req: AuthRequest, res: Response) {
+    const userId = Number(req.user?.id);
+    if (!Number.isFinite(userId) || userId <= 0) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    try {
+        const blockers = await getAccountDeletionBlockers(userId);
+        res.status(200).json({ canDelete: blockers.length === 0, blockers });
+    } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
     }
 }
 
@@ -168,6 +186,10 @@ export async function DeleteMyAccountController(req: AuthRequest, res: Response)
             message: "Account deleted successfully."
         });
     } catch (err) {
+        if (err instanceof AccountDeletionBlockedError) {
+            res.status(409).json({ error: err.message, blockers: err.blockers });
+            return;
+        }
         const message = err instanceof Error ? err.message : String(err);
         if (message.toLowerCase().includes("invalid password")) {
             res.status(403).json({ error: message });
