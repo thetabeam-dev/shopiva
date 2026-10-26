@@ -225,6 +225,19 @@ export async function updateUserProfileFields(userId, fields) {
  *   oauthReauthToken?: string;
  * }} [payload]
  */
+/**
+ * Server-side reasons the account can't be deleted yet (unfinished orders,
+ * returns, disputes, or wallet balance).
+ * @returns {Promise<{ ok: boolean; canDelete: boolean; blockers: string[]; message?: string }>}
+ */
+export async function checkAccountDeletion() {
+  const res = await apiFetchAuth('/api/account/deletion-check', { method: 'GET' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, canDelete: false, blockers: [], message: pickError(data, res) };
+  const blockers = Array.isArray(data?.blockers) ? data.blockers.map(String) : [];
+  return { ok: true, canDelete: blockers.length === 0, blockers };
+}
+
 export async function deleteAccount(payload = {}) {
   const res = await apiFetchAuth('/api/account', {
     method: 'DELETE',

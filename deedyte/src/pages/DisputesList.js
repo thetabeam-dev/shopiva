@@ -68,9 +68,18 @@ function statusLabel(key) {
   return key;
 }
 
+/** First product name on the disputed order, plus "+N more" for the rest. */
+function disputeProductTitle(item) {
+  const names = (Array.isArray(item?.order_items) ? item.order_items : [])
+    .map((line) => String(line?.name?.name ?? line?.name ?? '').trim())
+    .filter(Boolean);
+  if (!names.length) return '';
+  return names.length > 1 ? `${names[0]} +${names.length - 1} more` : names[0];
+}
+
 function DisputeCard({ item, onPress }) {
   const t = STATUS_THEME[item.status] ?? STATUS_THEME.open;
-  const title = item.reason || item.dispute_ref || 'Dispute';
+  const title = disputeProductTitle(item) || item.reason || 'Dispute';
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}

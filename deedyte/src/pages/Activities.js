@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom: 12,
+    marginBottom: 5,
   },
   optionIcon: {
     width: 44,

@@ -49,7 +49,7 @@ function statusThemeFor(raw) {
 
 function ReturnCard({ item, onPress }) {
   const t = statusThemeFor(item.statusRaw ?? item.status);
-  const title = item.customer || item.vendor || 'Return';
+  const title = String(item.product ?? '').trim() || 'Return';
   const statusText = String(item.status ?? '').split('_').join(' ');
   return (
     <Pressable

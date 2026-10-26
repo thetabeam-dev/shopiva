@@ -1,6 +1,6 @@
 
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import RootNavigator from './authentication';
 import {
   Alert,
@@ -26,103 +26,64 @@ import { connectChatSocket } from '../socket/chatSocket';
 import { DEFAULT_API_BASE_URL } from '../api/config';
 import { getMessaging } from '@react-native-firebase/messaging';
 import { getStoredUser } from '../auth/session';
-import { getStorefrontProduct, getStorefrontShop } from '../api/storefront';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NativeModules, Platform } from 'react-native';
+import {
+  discardPendingDeferredLink,
+  loadPendingDeferredLink,
+  openPendingDeferredProduct,
+  queueProductLink,
+} from '../auth/deferredLink';
 
 
 export { navigationRef, navigate } from './root';
 
-/**
- * Accepts `/store/<slug>/<id>` and `/store/<slug>/product/<id>`.
- * @param {string | null} link
- * @returns {{ slug: string; productId: number } | null}
- */
-function productFromLink(link) {
-  if (!link) return null;
-  let path = '';
-  try {
-    path = new URL(link).pathname;
-  } catch {
-    return null;
-  }
-  const segments = path.split('/').filter(Boolean).map(decodeURIComponent);
-  if (segments[0] !== 'store' || segments.length < 3) return null;
-  const productId = Number(segments[segments.length - 1]);
-  if (!Number.isInteger(productId) || productId <= 0) return null;
-  return { slug: segments[1], productId };
-}
-
-/**
- * Product needs the shop as `vendor`, same params as Home's `openProduct`.
- * @param {{ slug: string; productId: number }} target
- */
-async function productRouteParams(target) {
-  const [shopRes, productRes] = await Promise.all([
-    getStorefrontShop(target.slug).catch(() => null),
-    getStorefrontProduct(target.productId).catch(() => null),
-  ]);
-  const shop = shopRes?.shop && typeof shopRes.shop === 'object' ? shopRes.shop : null;
-  if (!shop?.id) return null;
-  const product = productRes?.product && typeof productRes.product === 'object' ? productRes.product : {};
-  const images = Array.isArray(product.images) ? product.images : [];
-  return {
-    vendor: shop,
-    productId: target.productId,
-    shop_id: shop.id,
-    product: {
-      id: target.productId,
-      title: product.name ?? product.title,
-      uri: product.image ?? images[0],
-      priceUsd: product.price,
-      currency: 'NGN',
-    },
-  };
-}
-
-/**
- * The navigator mounts after sign-in, so retry until it is ready.
- * @param {Record<string, unknown>} params
- */
-function navigateToProduct(params, attempt = 0) {
-  if (!navigationRef.isReady()) {
-    if (attempt < 20) setTimeout(() => navigateToProduct(params, attempt + 1), 250);
-    return;
-  }
-  navigationRef.navigate('home', {
-    screen: 'Home',
-    params: { screen: 'Product', params },
-  });
-}
-
-/** @param {{ slug: string; productId: number }} target */
-async function openDeferredProduct(target) {
-  const params = await productRouteParams(target);
-  if (params) navigateToProduct(params);
-}
-
 /** Renders inside `<Provider>` so `useDispatch` and navigation share one Redux context. */
 function NavigationTree() {
   const dispatch = useDispatch();
-  const { signIn, status, isAuthenticated } = useAuth();
+  const { signIn, status, activeRole, initialAppRoute, isGuest, setActiveRole, setPreAuthChoice } = useAuth();
+
+  const authRef = useRef({ status, activeRole, initialAppRoute, isGuest });
+  authRef.current = { status, activeRole, initialAppRoute, isGuest };
+  const switchingRole = useRef(false);
+
+  const handlePendingProduct = useCallback(async () => {
+    const auth = authRef.current;
+    if (auth.status === 'signedOut') {
+      // Splash and Login already take a pending link to customer sign-in.
+      const route = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : 'Splash';
+      if (route === 'Splash' || route === 'Login') return;
+      if (!(await loadPendingDeferredLink())) return;
+      await setPreAuthChoice('customer').catch(() => {});
+      navigationRef.navigate('Login', { allowSkip: true, intentRole: 'customer' });
+      return;
+    }
+    if (auth.status !== 'signedIn') return;
+    if (auth.activeRole === 'vendor') {
+      if (switchingRole.current || !(await loadPendingDeferredLink())) return;
+      switchingRole.current = true;
+      // The role change re-runs the effect below, which opens the product
+      // once the customer tabs are mounted.
+      try {
+        await setActiveRole('customer');
+      } catch {
+        void discardPendingDeferredLink();
+      } finally {
+        switchingRole.current = false;
+      }
+      return;
+    }
+    // New accounts land on "Almost there" first; that screen opens the
+    // product itself once the profile is saved.
+    if (auth.isGuest || auth.initialAppRoute === 'home') void openPendingDeferredProduct();
+  }, [setActiveRole, setPreAuthChoice]);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    // The native module marks the referrer as consumed on first read, so it
-    // must not be read until a real account is signed in.
-    if (status !== 'signedIn' || !isAuthenticated) return;
-    NativeModules.InstallReferrer?.getReferrer()
-      .then((raw) => {
-        if (!raw) return;
-        const params = new URLSearchParams(raw);
-        const link = params.get('deeplink');
-        const target = productFromLink(link);
-        if (target && store.getState().auth.activeRole !== 'vendor') {
-          void openDeferredProduct(target);
-        }
-      })
-      .catch(() => { });
-  }, [status, isAuthenticated]);
+    void handlePendingProduct();
+  }, [status, activeRole, initialAppRoute, isGuest, handlePendingProduct]);
+
+  const handleProductUrl = useCallback(async (url) => {
+    if (await queueProductLink(url)) void handlePendingProduct();
+  }, [handlePendingProduct]);
 
   const handleOAuthUrl = useCallback(
     async (url) => {
@@ -152,12 +113,16 @@ function NavigationTree() {
   useEffect(() => {
     const sub = Linking.addEventListener('url', ({ url }) => {
       void handleOAuthUrl(url);
+      void handleProductUrl(url);
     });
     Linking.getInitialURL().then((url) => {
-      if (url) void handleOAuthUrl(url);
+      if (url) {
+        void handleOAuthUrl(url);
+        void handleProductUrl(url);
+      }
     });
     return () => sub.remove();
-  }, [handleOAuthUrl]);
+  }, [handleOAuthUrl, handleProductUrl]);
 
   useEffect(() => {
     if (status !== 'signedIn') return undefined;

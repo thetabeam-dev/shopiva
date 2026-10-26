@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate, authenticateUser, verifyToken, type AuthRequest } from "../middleware/auth.js";
-import { DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, ListWalletTransactionsController, SendWalletController, WithdrawWalletController, CreateWalletPinController, VerifyWalletPinController, ChangeWalletPinController, RequestWalletPinResetController, VerifyWalletPinResetController, ResetWalletPinController } from "../controllers/user.js";
+import { AccountDeletionCheckController, DeleteMyAccountController, DeleteUserController, ForgotPasswordController, ResetPasswordController, SigninController, SignupController, UpdateEmailController, UpdatePasswordController, UpdatePhoneController, UpdatePhotoController, UpdateProfileController, UpdateRoleController, VerifyPasswordPinController, ListNotificationsController, MarkNotificationReadController, GetWalletController, GetWalletRecipientController, ListWalletTransactionsController, SendWalletController, WithdrawWalletController, CreateWalletPinController, VerifyWalletPinController, ChangeWalletPinController, RequestWalletPinResetController, VerifyWalletPinResetController, ResetWalletPinController } from "../controllers/user.js";
 import { UploadUserPhotoController, userPhotoUploadMiddleware } from "../controllers/userPhotoUpload.js";
 
 export const UserRouter = express.Router();
@@ -23,6 +23,7 @@ UserRouter.post("/user/authorization", verifyToken, async(req: AuthRequest, res)
 });
 
 // Protected routes (use middleware)
+UserRouter.get('/api/account/deletion-check', verifyToken, AccountDeletionCheckController);
 UserRouter.delete('/api/account', verifyToken, DeleteMyAccountController);
 UserRouter.delete('/user/delete/:id', authenticate, DeleteUserController);
 UserRouter.put('/user/role/update/:id', authenticate, UpdateRoleController);

@@ -41,6 +41,87 @@ async function executeIfTableExists(
     await client.query(sql, params);
 }
 
+const FINISHED_ORDER_STATUSES = ["unpaid", "order_confirmed", "order_completed", "order_cancelled", "order_rejected"];
+const FINISHED_RETURN_STATUSES = ["return_confirmed", "return_cancelled", "return_rejected"];
+const FINISHED_DISPUTE_STATUSES = ["resolved", "closed", "won", "lost", "denied", "dismissed", "refunded", "withdrawn"];
+
+export class AccountDeletionBlockedError extends Error {
+    blockers: string[];
+    constructor(blockers: string[]) {
+        super(`You can't delete your account yet: ${blockers.join(" ")}`);
+        this.name = "AccountDeletionBlockedError";
+        this.blockers = blockers;
+    }
+}
+
+async function countIfTableExists(
+    client: PoolClient,
+    tableName: string,
+    sql: string,
+    params: unknown[]
+): Promise<number> {
+    if (!(await tableExists(client, tableName))) return 0;
+    const { rows } = await client.query<{ n: string }>(sql, params);
+    return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Reasons the account can't be deleted yet, covering both the buyer side
+ * and any shops the user owns. Empty when deletion is allowed.
+ */
+export async function getAccountDeletionBlockers(userId: number, client?: PoolClient): Promise<string[]> {
+    const ownClient = client ? null : await (await db()).connect();
+    const c = client ?? ownClient!;
+    try {
+        const uid = String(userId);
+        const ownedShopIds = "SELECT id::text FROM shops WHERE ownerid = $1::int";
+
+        const orders = await countIfTableExists(
+            c,
+            "orders",
+            `SELECT COUNT(*) AS n FROM orders
+             WHERE (customer_id = $1 OR shop_id IN (${ownedShopIds}))
+               AND LOWER(COALESCE(fulfillment_status, '')) <> ALL($2::text[])`,
+            [uid, FINISHED_ORDER_STATUSES]
+        );
+        const returns = await countIfTableExists(
+            c,
+            "returns",
+            `SELECT COUNT(*) AS n FROM returns
+             WHERE (customer_id = $1 OR shop_id IN (${ownedShopIds}))
+               AND LOWER(COALESCE(status, '')) <> ALL($2::text[])`,
+            [uid, FINISHED_RETURN_STATUSES]
+        );
+        const disputes = await countIfTableExists(
+            c,
+            "disputes",
+            `SELECT COUNT(*) AS n FROM disputes d
+             WHERE (d.customer_id = $1::int
+                    OR d.order_id IN (SELECT o.id FROM orders o WHERE o.shop_id IN (${ownedShopIds})))
+               AND LOWER(COALESCE(d.status, '')) <> ALL($2::text[])`,
+            [uid, FINISHED_DISPUTE_STATUSES]
+        );
+        const walletKobo = await countIfTableExists(
+            c,
+            "wallets",
+            "SELECT COALESCE(SUM(balance_kobo), 0) AS n FROM wallets WHERE user_id = $1::int",
+            [uid]
+        );
+
+        const blockers: string[] = [];
+        if (orders > 0) blockers.push(`You have ${orders} order${orders === 1 ? "" : "s"} still in progress.`);
+        if (returns > 0) blockers.push(`You have ${returns} return${returns === 1 ? "" : "s"} still in progress.`);
+        if (disputes > 0) blockers.push(`You have ${disputes} open dispute${disputes === 1 ? "" : "s"}.`);
+        if (walletKobo > 0) {
+            const naira = (walletKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2 });
+            blockers.push(`Your wallet still has ₦${naira}. Withdraw it first.`);
+        }
+        return blockers;
+    } finally {
+        ownClient?.release();
+    }
+}
+
 function normalizeProvider(value: unknown): "local" | "google" | "facebook" | "apple" {
     const provider = String(value ?? "local").trim().toLowerCase();
     if (provider === "google" || provider === "facebook" || provider === "apple") {
@@ -409,6 +490,11 @@ export async function DeleteUserService(id: number, payload: DeleteAccountPayloa
                     `Re-authentication with ${provider} is required to delete this account.`
                 );
             }
+        }
+
+        const blockers = await getAccountDeletionBlockers(userId, client);
+        if (blockers.length > 0) {
+            throw new AccountDeletionBlockedError(blockers);
         }
 
         const anonymizedUserRef = `deleted_user_${userId}`;

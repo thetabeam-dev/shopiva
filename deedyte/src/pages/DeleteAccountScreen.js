@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +15,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { deleteAccount } from '../api/user';
+import { checkAccountDeletion, deleteAccount } from '../api/user';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../context/ProfileContext';
 import { clearAllDeedyteStorage } from '../auth/session';
@@ -58,8 +59,30 @@ export default function DeleteAccountScreen() {
   const [oauthReauthToken, setOauthReauthToken] = useState('');
   const [oauthBusy, setOauthBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [blockers, setBlockers] = useState(/** @type {string[]} */ ([]));
 
-  const canSubmit = acknowledged && (usesPassword ? password.trim().length > 0 : oauthReauthed);
+  const runDeletionCheck = useCallback(async () => {
+    setChecking(true);
+    try {
+      const out = await checkAccountDeletion();
+      setBlockers(out.ok ? out.blockers : [out.message || 'Could not check your account. Please try again.']);
+    } catch (e) {
+      setBlockers([e instanceof Error ? e.message : String(e)]);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      runDeletionCheck().catch(() => {});
+    }, [runDeletionCheck]),
+  );
+
+  const blocked = checking || blockers.length > 0;
+  const canSubmit =
+    !blocked && acknowledged && (usesPassword ? password.trim().length > 0 : oauthReauthed);
 
   const onDelete = () => {
     if (!canSubmit || submitting) return;
@@ -88,6 +111,9 @@ export default function DeleteAccountScreen() {
           };
 
       const result = await deleteAccount(payload);
+      if (!result.ok && result.status === 409) {
+        runDeletionCheck().catch(() => {});
+      }
       if (!result.ok) {
         Alert.alert('Could not delete account', result.message || 'Please try again.');
         return;
@@ -204,6 +230,43 @@ export default function DeleteAccountScreen() {
           </View>
           <Text style={[styles.legalText, { color: dark ? TEXT_LIGHT : TEXT_DARK }]}>Some transaction records may be retained where required by law.</Text>
         </View>
+
+        {checking ? (
+          <View style={styles.checkingRow}>
+            <ActivityIndicator color={DANGER} />
+            <Text style={[styles.warningBody, styles.checkingText, { color: dark ? MUTED_LIGHT : MUTED_DARK }]}>
+              Checking your orders, returns, disputes and wallet…
+            </Text>
+          </View>
+        ) : blockers.length > 0 ? (
+          <View
+            style={[
+              styles.formCard,
+              {
+                backgroundColor: dark ? CARD_DARK : CARD_LIGHT,
+                borderColor: DANGER,
+              },
+            ]}
+            accessibilityRole="alert"
+          >
+            <Text style={[styles.warningLead, { color: dark ? TEXT_LIGHT : TEXT_DARK }]}>
+              Finish these before deleting your account
+            </Text>
+            {blockers.map((item) => (
+              <Text key={item} style={[styles.warningItem, { color: dark ? MUTED_LIGHT : MUTED_DARK }]}>• {item}</Text>
+            ))}
+            <Pressable
+              style={({ pressed }) => [styles.reauthBtn, styles.recheckBtn, { borderColor: dark ? BORDER_DARK : BORDER_LIGHT }, pressed && { opacity: 0.88 }]}
+              onPress={() => {
+                runDeletionCheck().catch(() => {});
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Check again"
+            >
+              <Text style={[styles.reauthBtnText, { color: dark ? TEXT_LIGHT : TEXT_DARK }]}>Check again</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -406,6 +469,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  checkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  checkingText: {
+    marginBottom: 0,
+    marginLeft: 10,
+    flex: 1,
+  },
+  recheckBtn: {
+    marginTop: 12,
   },
   deleteBtn: {
     minHeight: 52,

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import {
   updateUserProfileFields,
 } from '../../api/user';
 import { getStoredAccessToken, getStoredPreAuthChoice, getStoredUser, saveSession } from '../../auth/session';
+import { openPendingDeferredProduct, setOnboardingInProgress } from '../../auth/deferredLink';
 import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
 import { useLocationLookup } from '../../hooks/useLocationLookup';
 import { AUTH } from './theme';
@@ -46,6 +47,11 @@ const GENDERS = [
  */
 export default function OnboardingProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  useState(() => setOnboardingInProgress(true));
+  useEffect(() => {
+    setOnboardingInProgress(true);
+    return () => setOnboardingInProgress(false);
+  }, []);
   const [whatsapp, setWhatsapp] = useState('');
   const [gender, setGender] = useState('');
   const [city, setCity] = useState('');
@@ -187,6 +193,8 @@ export default function OnboardingProfileScreen({ navigation }) {
             routes: [{ name: 'home' }],
           }),
         );
+        setOnboardingInProgress(false);
+        void openPendingDeferredProduct();
       } else {
         navigation.dispatch(
           CommonActions.reset({
