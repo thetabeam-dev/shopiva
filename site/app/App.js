@@ -21,6 +21,7 @@ import { Provider } from "react-redux";
 import { SessionProvider } from "next-auth/react";
 import store from "../redux/store";
 import AuthLayout from "../layouts/Auth";
+import DownloadAppGate, { isWebAllowedPath } from "../components/DownloadAppGate";
 
 // Entrepreneur Layout Imports
 import EntrepreneurRestrictedLayout from "../layouts/Entrepreneur/Restricted";
@@ -137,6 +138,16 @@ const isFreeLayout = (pathname) => {
  */
 export default function App({ session, children }) {
   const pathname = usePathname();
+
+  return (
+    <>
+      <AppShell session={session} pathname={pathname}>{children}</AppShell>
+      {isWebAllowedPath(pathname) ? null : <DownloadAppGate />}
+    </>
+  );
+}
+
+function AppShell({ session, pathname, children }) {
 
   // One authoritative shell for shared legal/company pages
   if (isPublicInfoPage(pathname)) {
