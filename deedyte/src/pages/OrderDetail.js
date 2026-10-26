@@ -252,7 +252,8 @@ const ORDER_PROGRESS_STEPS = [
   { label: 'Shipping', icon: 'boat-outline', statuses: ['order_shipping'] },
   { label: 'Out For PickUp', icon: 'car-outline', statuses: ['order_out_for_delivery'] },
   { label: 'Delivered', icon: 'bag-check-outline', statuses: ['order_delivered'] },
-  { label: 'Confirmed', icon: 'shield-checkmark-outline', statuses: ['order_confirmed', 'order_completed'] },
+  { label: 'Confirmed', icon: 'shield-checkmark-outline', statuses: ['order_confirmed'] },
+  { label: 'Completed', icon: 'wallet-outline', statuses: ['order_completed'] },
 ];
 
 function orderProgressIndex(statusKey) {
@@ -324,7 +325,7 @@ function OrderProgress({ statusKey }) {
           {topRow.map(item => renderStep(item, { drop: item.index === 3 }))}
         </View>
         <View style={styles.progressRow}>
-          <View style={styles.progressSpacer} />
+          {bottomRow.length < topRow.length ? <View style={styles.progressSpacer} /> : null}
           {bottomRow.map(item => renderStep(item, { lineToLeft: item.index < ORDER_PROGRESS_STEPS.length - 1 }))}
         </View>
       </View>
@@ -1643,7 +1644,7 @@ export default function OrderDetailScreen() {
                   value={shippingPending ? 'Pending' : fmt(shipping)}
                   muted
                 />
-                <MoneyRow label="Tax" value={fmt(0)} muted />
+                {/* <MoneyRow label="Tax" value={fmt(0)} muted /> */}
                 <View style={styles.moneyDivider} />
                 <MoneyRow label="Total" value={fmt(total)} bold />
                 {isVendor ? (
