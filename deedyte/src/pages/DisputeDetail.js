@@ -188,9 +188,17 @@ export default function DisputeDetailScreen() {
     [openActions],
   );
 
+  const loadedDisputeId = dispute?.id ?? dispute?.dispute?.id;
+  const disputeLoaded =
+    Boolean(dispute) &&
+    (disputeIdParam == null || String(loadedDisputeId) === String(disputeIdParam));
+  const statusKey = dispute?.status ?? 'open';
+  const pill = STATUS_PILL[statusKey] ?? STATUS_PILL.open;
+  const statusText = STATUS_DISPLAY[statusKey] ?? statusKey;
+
   useLayoutEffect(() => {
-    if (!dispute) {
-      navigation.setOptions({ headerRight: undefined });
+    if (!disputeLoaded) {
+      navigation.setOptions({ headerRight: undefined, headerTitle: '' });
       return undefined;
     }
 
@@ -219,11 +227,8 @@ export default function DisputeDetailScreen() {
       headerRight: renderHeaderRight,
     });
     return () => navigation.setOptions({ headerRight: undefined });
-  }, [navigation, dispute, renderHeaderRight]);
+  }, [navigation, dispute, disputeLoaded, renderHeaderRight, pill, statusText]);
 
-  const statusKey = dispute?.status ?? 'open';
-  const pill = STATUS_PILL[statusKey] ?? STATUS_PILL.open;
-  const statusText = STATUS_DISPLAY[statusKey] ?? statusKey;
   const isResolved = statusKey === 'resolved';
 
   const closeActions = () => setActionsOpen(false);

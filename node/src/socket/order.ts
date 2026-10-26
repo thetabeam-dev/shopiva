@@ -7,7 +7,7 @@ import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
 import { creditUserWallet } from "../models/wallet.js";
-import { syncOrderEscrowStatus } from "../models/escrow.js";
+import { recordEscrowRelease, reduceEscrowHeld, syncOrderEscrowStatus } from "../models/escrow.js";
 import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 import { calculateEscrowFee, policy } from "../utils/escrow.js";
 
@@ -435,6 +435,7 @@ export const handleOrderAcceptance = async (
               `Shipping fee refund for order #${order_id}`,
             );
             if (credit.credited) {
+              await reduceEscrowHeld(Number(order_id), excessKobo);
               notifyUser(buyerId, "wallet_credited", {
                 balance_kobo: credit.balance_kobo,
                 transactions: credit.transactions ?? [],
@@ -1098,6 +1099,9 @@ export const handleOrderCancellation = async (
                 `order:${order_id}:cancel-shipping-payout`,
                 `Shipping fee for cancelled order #${order_id}`,
               );
+              if (vendorCredit.credited) {
+                await recordEscrowRelease(Number(order_id), shippingKobo);
+              }
             }
             await p.query(
               `UPDATE escrow_transactions

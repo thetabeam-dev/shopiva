@@ -1,4 +1,5 @@
 import { db } from "../../config/database.js";
+import { productLabelsByParent } from "../productLabels.js";
 import type { OrderListRow } from "../../models/business/product.js";
 
 /**
@@ -38,6 +39,13 @@ export const returnsTransformer = async (
     const customer_email = u?.email ?? "";
     const customer_phone = u?.phone ?? "";
 
+    const productByReturn = await productLabelsByParent(
+        pool, "return_items", "return_id", returnRows.map((o: { id: number }) => Number(o.id))
+    );
+    const productByOrder = await productLabelsByParent(
+        pool, "order_items", "order_id", returnRows.map((o: { order_id: string }) => Number(o.order_id))
+    );
+
     return await Promise.all(returnRows.map(async(o: Record<string, unknown>): Promise<OrderListRow> => {
         const id = Number(o.order_id);
         
@@ -57,7 +65,7 @@ export const returnsTransformer = async (
             order_id: id,
             product_id: null,
             customer_id: o.customer_id as string,
-            product: "",
+            product: productByReturn.get(Number(o.id)) ?? productByOrder.get(id) ?? "",
             customer: customerName,
             customer_email,
             customer_phone,

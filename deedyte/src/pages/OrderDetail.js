@@ -577,6 +577,7 @@ export default function OrderDetailScreen() {
             ? 'paid'
             : 'unpaid';
   const payTheme = PAY_THEME[payKey] ?? PAY_THEME.unpaid;
+  const orderLoaded = Boolean(orderInfo?.order);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -613,7 +614,7 @@ export default function OrderDetailScreen() {
           <Text style={{ fontWeight: 700, fontSize: 18 }}>
             Order #{orderNumber}
           </Text>
-          <StatusPill theme={payTheme} />
+          {orderLoaded ? <StatusPill theme={payTheme} /> : null}
         </View>
       ),
       headerRight: () => (
@@ -631,7 +632,7 @@ export default function OrderDetailScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, orderNumber, openActions, payTheme]);
+  }, [navigation, orderNumber, openActions, payTheme, orderLoaded]);
   const statusTheme =
     STATUS_THEME[orderInfo?.order?.fulfillment_status] ?? 'Not Available';
   const isNaira = order && 'valueRupees' in order;

@@ -1,4 +1,5 @@
 import { db } from "../../config/database.js";
+import { productLabelsByParent } from "../productLabels.js";
 import type { OrderListRow } from "../../models/business/product.js";
 
 /**
@@ -21,6 +22,7 @@ export const ordersTransformer = async (
     }
 
     const orderPkIds = orderRows.map((o: { id: number }) => o.id);
+    const productByOrder = await productLabelsByParent(pool, "order_items", "order_id", orderPkIds);
 
     const { rows: qtyRows } = await pool.query(
         `SELECT order_id, COALESCE(SUM(units), 0)::int AS qty
@@ -71,7 +73,7 @@ export const ordersTransformer = async (
             order_id: id,
             product_id: null,
             customer_id: o.customer_id as string,
-            product: "",
+            product: productByOrder.get(id) ?? "",
             customer: customerName,
             customer_email,
             customer_phone,

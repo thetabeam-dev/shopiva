@@ -75,7 +75,7 @@ function OrderCard({ item, onPress, isVendor }) {
   const t = notAccepted
     ? { bg: '#FEF3C7', dot: '#D97706', text: '#92400E', label: 'Not accepted' }
     : statusThemeFor(item.status);
-  const title = item.customer || item.vendor || item.shop_name || 'Order';
+  const title = String(item.product ?? '').trim() || 'Order';
   const placed = item.dateLabel || item.date || item.created_at;
   const placedLabel = placed ? String(placed).slice(0, 12) : '—';
 

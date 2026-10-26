@@ -34,6 +34,7 @@ import paystackTools from "./utils/paystack.js";
 import { creditOrderPayoutToWallet, storePaystackVirtualAccount } from "./models/wallet.js";
 import { expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
+import { recordEscrowRelease } from "./models/escrow.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -437,6 +438,11 @@ const server = app.listen(process.env.PORT, async () => {
           commissionNaira: commission,
           netNaira: net,
         });
+        if (credited.credited) {
+          await recordEscrowRelease(Number(order.id), Math.round(gross * 100)).catch((err) =>
+            console.error("escrow release record failed", err),
+          );
+        }
         if (credited.credited && credited.userId) {
           getIo().to(`user:${credited.userId}`).emit("wallet_credited", {
             balance_kobo: credited.balance_kobo,

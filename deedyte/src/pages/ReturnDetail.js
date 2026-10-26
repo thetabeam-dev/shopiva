@@ -436,6 +436,7 @@ export default function ReturnDetailScreen() {
 
   const payKey = String(statusKey ?? returnInfo?.return?.status ?? 'return_initiated').toLowerCase();
   const payTheme = RETURN_PAY_THEME[payKey] ?? RETURN_STATUS_THEME[payKey] ?? RETURN_PAY_THEME.return_initiated;
+  const returnLoaded = Boolean(returnInfo?.return);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -459,8 +460,7 @@ export default function ReturnDetailScreen() {
           <Text style={{ fontWeight: 700, fontSize: 18 }}>
             Return #{returnNumber}
           </Text>
-          
-          <StatusPill theme={payTheme} />
+          {returnLoaded ? <StatusPill theme={payTheme} /> : null}
         </View>
       ),
       headerRight: () => (
@@ -478,7 +478,7 @@ export default function ReturnDetailScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, returnNumber, openActions, payTheme, statusKey]);
+  }, [navigation, returnNumber, openActions, payTheme, statusKey, returnLoaded]);
   const statusTheme =
     RETURN_STATUS_THEME[returnInfo?.return?.status] ?? 'Not Available';
   const fmt = useCallback(n => {
