@@ -1,12 +1,42 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NativeModules, Platform } from 'react-native';
+import { Linking, NativeModules, Platform } from 'react-native';
 import { getStorefrontProduct, getStorefrontShop } from '../api/storefront';
 import { navigationRef } from '../navigation/root';
 
 const KEY_PENDING_LINK = '@deedyte/deferred_link';
+const KEY_PENDING_LINK_AT = '@deedyte/deferred_link_at';
+/** A link the user never got to open is dropped after this long. */
+const PENDING_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** @type {Promise<string | null> | null} */
 let referrerRead = null;
+
+/** @param {string} url */
+async function savePendingLink(url) {
+  await AsyncStorage.multiSet([
+    [KEY_PENDING_LINK, url],
+    [KEY_PENDING_LINK_AT, String(Date.now())],
+  ]).catch(() => {});
+}
+
+/** @returns {Promise<string | null>} */
+async function readStoredLink() {
+  const pairs = await AsyncStorage.multiGet([KEY_PENDING_LINK, KEY_PENDING_LINK_AT]).catch(() => null);
+  const link = pairs?.[0]?.[1] ?? null;
+  if (!link) return null;
+  const savedAt = Number(pairs?.[1]?.[1]);
+  if (!savedAt || Date.now() - savedAt > PENDING_LINK_TTL_MS) {
+    await AsyncStorage.multiRemove([KEY_PENDING_LINK, KEY_PENDING_LINK_AT]).catch(() => {});
+    return null;
+  }
+  return link;
+}
+
+/** Forgets the saved product link without opening it. */
+export async function discardPendingDeferredLink() {
+  await AsyncStorage.multiRemove([KEY_PENDING_LINK, KEY_PENDING_LINK_AT]).catch(() => {});
+  referrerRead = Promise.resolve(null);
+}
 
 /**
  * Accepts `/store/<slug>/<id>` and `/store/<slug>/product/<id>`.
@@ -28,24 +58,36 @@ export function productFromLink(link) {
   return { slug: segments[1], productId };
 }
 
+/** @returns {Promise<string | null>} */
+async function readAndroidInstallReferrer() {
+  if (!NativeModules.InstallReferrer) return null;
+  const raw = await NativeModules.InstallReferrer.getReferrer();
+  if (!raw) return null;
+  return new URLSearchParams(raw).get('deeplink');
+}
+
 /**
  * Reads the Play install referrer once per launch and keeps a product link in
- * storage until the user is signed in. The native module only returns the
- * referrer on the first read after install.
+ * storage until the user is signed in. iOS has no install referrer, so there
+ * is no deferred link there; installed iOS apps get product links through
+ * Universal Links instead (see `queueProductLink`).
  * @returns {Promise<string | null>}
  */
 export function loadPendingDeferredLink() {
   if (!referrerRead) {
     referrerRead = (async () => {
-      const stored = await AsyncStorage.getItem(KEY_PENDING_LINK).catch(() => null);
+      const stored = await readStoredLink();
       if (stored) return stored;
-      if (Platform.OS !== 'android' || !NativeModules.InstallReferrer) return null;
+      const initialUrl = await Linking.getInitialURL().catch(() => null);
+      if (initialUrl && productFromLink(initialUrl)) {
+        await savePendingLink(initialUrl);
+        return initialUrl;
+      }
+      if (Platform.OS !== 'android') return null;
       try {
-        const raw = await NativeModules.InstallReferrer.getReferrer();
-        if (!raw) return null;
-        const link = new URLSearchParams(raw).get('deeplink');
-        if (!productFromLink(link)) return null;
-        await AsyncStorage.setItem(KEY_PENDING_LINK, link);
+        const link = await readAndroidInstallReferrer();
+        if (!link || !productFromLink(link)) return null;
+        await savePendingLink(link);
         return link;
       } catch {
         return null;
@@ -56,14 +98,26 @@ export function loadPendingDeferredLink() {
 }
 
 /**
+ * Saves a product link that opened the app (Universal Link / App Link) so it
+ * goes through the same sign-in-then-open flow as a deferred link.
+ * @param {string | null | undefined} url
+ * @returns {Promise<boolean>} true when the URL is a product link
+ */
+export async function queueProductLink(url) {
+  if (!url || !productFromLink(url)) return false;
+  await savePendingLink(url);
+  referrerRead = Promise.resolve(url);
+  return true;
+}
+
+/**
  * Returns the saved product link and forgets it so it only opens once.
  * @returns {Promise<string | null>}
  */
 export async function takePendingDeferredLink() {
   const link = await loadPendingDeferredLink();
   if (!link) return null;
-  await AsyncStorage.removeItem(KEY_PENDING_LINK).catch(() => {});
-  referrerRead = Promise.resolve(null);
+  await discardPendingDeferredLink();
   return link;
 }
 

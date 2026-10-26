@@ -1,6 +1,6 @@
 
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import RootNavigator from './authentication';
 import {
   Alert,
@@ -27,7 +27,12 @@ import { DEFAULT_API_BASE_URL } from '../api/config';
 import { getMessaging } from '@react-native-firebase/messaging';
 import { getStoredUser } from '../auth/session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { openPendingDeferredProduct } from '../auth/deferredLink';
+import {
+  discardPendingDeferredLink,
+  loadPendingDeferredLink,
+  openPendingDeferredProduct,
+  queueProductLink,
+} from '../auth/deferredLink';
 
 
 export { navigationRef, navigate } from './root';
@@ -35,15 +40,50 @@ export { navigationRef, navigate } from './root';
 /** Renders inside `<Provider>` so `useDispatch` and navigation share one Redux context. */
 function NavigationTree() {
   const dispatch = useDispatch();
-  const { signIn, status, activeRole, initialAppRoute, isGuest } = useAuth();
+  const { signIn, status, activeRole, initialAppRoute, isGuest, setActiveRole, setPreAuthChoice } = useAuth();
 
-  useEffect(() => {
-    if (status !== 'signedIn' || activeRole === 'vendor') return;
+  const authRef = useRef({ status, activeRole, initialAppRoute, isGuest });
+  authRef.current = { status, activeRole, initialAppRoute, isGuest };
+  const switchingRole = useRef(false);
+
+  const handlePendingProduct = useCallback(async () => {
+    const auth = authRef.current;
+    if (auth.status === 'signedOut') {
+      // Splash and Login already take a pending link to customer sign-in.
+      const route = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : 'Splash';
+      if (route === 'Splash' || route === 'Login') return;
+      if (!(await loadPendingDeferredLink())) return;
+      await setPreAuthChoice('customer').catch(() => {});
+      navigationRef.navigate('Login', { allowSkip: true, intentRole: 'customer' });
+      return;
+    }
+    if (auth.status !== 'signedIn') return;
+    if (auth.activeRole === 'vendor') {
+      if (switchingRole.current || !(await loadPendingDeferredLink())) return;
+      switchingRole.current = true;
+      // The role change re-runs the effect below, which opens the product
+      // once the customer tabs are mounted.
+      try {
+        await setActiveRole('customer');
+      } catch {
+        void discardPendingDeferredLink();
+      } finally {
+        switchingRole.current = false;
+      }
+      return;
+    }
     // New accounts land on "Almost there" first; that screen opens the
     // product itself once the profile is saved.
-    if (!isGuest && initialAppRoute !== 'home') return;
-    void openPendingDeferredProduct();
-  }, [status, activeRole, initialAppRoute, isGuest]);
+    if (auth.isGuest || auth.initialAppRoute === 'home') void openPendingDeferredProduct();
+  }, [setActiveRole, setPreAuthChoice]);
+
+  useEffect(() => {
+    void handlePendingProduct();
+  }, [status, activeRole, initialAppRoute, isGuest, handlePendingProduct]);
+
+  const handleProductUrl = useCallback(async (url) => {
+    if (await queueProductLink(url)) void handlePendingProduct();
+  }, [handlePendingProduct]);
 
   const handleOAuthUrl = useCallback(
     async (url) => {
@@ -73,12 +113,16 @@ function NavigationTree() {
   useEffect(() => {
     const sub = Linking.addEventListener('url', ({ url }) => {
       void handleOAuthUrl(url);
+      void handleProductUrl(url);
     });
     Linking.getInitialURL().then((url) => {
-      if (url) void handleOAuthUrl(url);
+      if (url) {
+        void handleOAuthUrl(url);
+        void handleProductUrl(url);
+      }
     });
     return () => sub.remove();
-  }, [handleOAuthUrl]);
+  }, [handleOAuthUrl, handleProductUrl]);
 
   useEffect(() => {
     if (status !== 'signedIn') return undefined;
