@@ -20,6 +20,7 @@ import {
   updateUserProfileFields,
 } from '../../api/user';
 import { getStoredAccessToken, getStoredPreAuthChoice, getStoredUser, saveSession } from '../../auth/session';
+import { openPendingDeferredProduct } from '../../auth/deferredLink';
 import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
 import { useLocationLookup } from '../../hooks/useLocationLookup';
 import { AUTH } from './theme';
@@ -187,6 +188,7 @@ export default function OnboardingProfileScreen({ navigation }) {
             routes: [{ name: 'home' }],
           }),
         );
+        void openPendingDeferredProduct();
       } else {
         navigation.dispatch(
           CommonActions.reset({
