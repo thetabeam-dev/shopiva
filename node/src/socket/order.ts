@@ -6,7 +6,9 @@ import { ordersTransformer as customerOrdersTransformer } from "../transformers/
 import { notifyUser } from "../services/socketBroadcast.js";
 import { createAndEmitNotification, appRoleToNotificationRole } from "../services/notifications.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
-import { creditUserWallet } from "../models/wallet.js";
+import { creditOrderPayoutToWallet, creditUserWallet } from "../models/wallet.js";
+import { GetShopOwnerByShopIdService } from "../services/business/shop.js";
+import { sendNotificationEmail } from "../services/email.js";
 import { recordEscrowRelease, reduceEscrowHeld, syncOrderEscrowStatus } from "../models/escrow.js";
 import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 import { calculateEscrowFee, policy } from "../utils/escrow.js";
@@ -233,9 +235,9 @@ function emitOrderUpdateToUser(
         { type: "order", order_id: orderId, role } /** meta */,
       );
     }
-    }).catch((err) => {
-      console.error(`[order] ${event} buyer notification failed`, err);
-    });
+  }).catch((err) => {
+    console.error(`[order] ${event} buyer notification failed`, err);
+  });
 }
 
 /**
@@ -959,6 +961,233 @@ export const handleOrderConfirmation = async (
         result: null,
       });
     }
+  }
+};
+
+/** Platform commission on the goods amount only; shipping is passed to the vendor in full. */
+const ORDER_COMMISSION_RATE = 0.03;
+
+/** How long after the buyer confirms before funds go to the vendor automatically. */
+export const ORDER_PAYOUT_HOLD_HOURS = 48;
+
+async function notifyShopOfPayout(payout: { shop_id: unknown; order_id: unknown; net_naira: number }): Promise<void> {
+  try {
+    const owner = await GetShopOwnerByShopIdService(Number(payout.shop_id));
+    const vendorId = Number(owner?.id);
+    const orderId = Number(payout.order_id);
+    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(orderId) || orderId <= 0) return;
+
+    const title = "Payout Sent";
+    const message = `A payout of ${nairaLabel(payout.net_naira)} for order #${orderId} has been added to your wallet.`;
+
+    await createAndEmitNotification({
+      recipientId: vendorId,
+      title,
+      message,
+      sourceType: "order",
+      sourceId: orderId,
+      role: "vendor",
+    });
+
+    const pool = await db();
+    const { rows } = await pool.query<{ devicetoken: string | null; email: string | null; fname: string | null }>(
+      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
+      [vendorId],
+    );
+    const token = String(rows[0]?.devicetoken ?? "").trim();
+    if (token) {
+      await sendFcmForActivities(token, title, message, null, {
+        type: "order",
+        order_id: orderId,
+        role: "vendor",
+      });
+    }
+
+    const email = String(rows[0]?.email ?? owner.email ?? "").trim();
+    if (email) {
+      await sendNotificationEmail(email, {
+        fname: String(rows[0]?.fname ?? owner.fname ?? "there"),
+        title,
+        message,
+      });
+    }
+  } catch (err) {
+    console.error("notifyShopOfPayout failed", err);
+  }
+}
+
+/**
+ * Pays a confirmed order out of escrow to the vendor's wallet and marks it
+ * `order_completed`. Used by the buyer's "Release Funds" button and by the
+ * auto-release job; the order row lock makes the two safe to race.
+ */
+export async function releaseOrderFunds(
+  orderId: number,
+  actor: { type: "customer" | "system"; id: number | null },
+): Promise<{ released: boolean; message: string }> {
+  const pool = await db();
+  const client = await pool.connect();
+  let shopId = "";
+  let customerId = 0;
+  let netNaira = 0;
+  let grossKobo = 0;
+  let credit: Awaited<ReturnType<typeof creditOrderPayoutToWallet>>;
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{
+      shop_id: string;
+      customer_id: string;
+      amount_paid: string | number | null;
+      total_paid: string | number | null;
+      fulfillment_status: string | null;
+    }>(
+      `SELECT shop_id, customer_id, amount_paid, total_paid, fulfillment_status FROM orders WHERE id = $1 FOR UPDATE`,
+      [orderId],
+    );
+    const order = rows[0];
+    if (!order) {
+      await client.query("ROLLBACK");
+      return { released: false, message: "Order not found." };
+    }
+    if (actor.type === "customer" && String(order.customer_id) !== String(actor.id)) {
+      await client.query("ROLLBACK");
+      return { released: false, message: "Only the buyer can release funds for this order." };
+    }
+    if (order.fulfillment_status !== "order_confirmed") {
+      await client.query("ROLLBACK");
+      return {
+        released: false,
+        message: order.fulfillment_status === "order_completed"
+          ? "Funds for this order have already been released."
+          : "Funds can only be released after you confirm the order.",
+      };
+    }
+
+    shopId = String(order.shop_id);
+    customerId = Number(order.customer_id);
+    const gross = Number(order.total_paid ?? 0);
+    const goods = Math.max(0, Number(order.amount_paid ?? 0) || 0);
+    const commission = Number((goods * ORDER_COMMISSION_RATE).toFixed(2));
+    netNaira = Number((gross - commission).toFixed(2));
+    credit = await creditOrderPayoutToWallet({
+      shopId,
+      orderId,
+      grossNaira: gross,
+      commissionNaira: commission,
+      netNaira,
+    });
+    if (!credit.credited && !credit.duplicate) {
+      await client.query("ROLLBACK");
+      return { released: false, message: "The vendor's wallet could not be credited. Please try again later." };
+    }
+
+    grossKobo = Math.round(gross * 100);
+    await client.query(
+      `UPDATE orders SET fulfillment_status = 'order_completed', updated_at = NOW() WHERE id = $1`,
+      [orderId],
+    );
+    await client.query(
+      `INSERT INTO order_events
+         (order_id, event_type, stage, actor_type, actor_id, outcome, notes, meta, created_at)
+       VALUES ($1, 'completion', 'order_completed', $2, $3, 'success', '', $4::jsonb, NOW())`,
+      [
+        orderId,
+        actor.type,
+        actor.id != null ? String(actor.id) : null,
+        JSON.stringify({ gross_naira: gross, commission_naira: commission, net_naira: netNaira }),
+      ],
+    );
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // Runs after COMMIT: it updates the order row on another connection.
+  await recordEscrowRelease(orderId, grossKobo).catch((err) =>
+    console.error(`[order] escrow release record failed for #${orderId}`, err),
+  );
+
+  if (credit.credited && credit.userId) {
+    notifyUser(credit.userId, "wallet_credited", {
+      balance_kobo: credit.balance_kobo,
+      transactions: credit.transactions ?? [],
+    });
+    await notifyShopOfPayout({ shop_id: shopId, order_id: orderId, net_naira: netNaira });
+  }
+
+  const { result, vendorList, customerList } = await buildOrderLists(orderId);
+  if (credit.userId) notifyUser(credit.userId, "order_completed", { result, list: vendorList });
+  if (customerId > 0) {
+    notifyUser(customerId, "order_completed", { result, list: customerList });
+    await createAndEmitNotification({
+      recipientId: customerId,
+      title: "Order completed",
+      message: `Funds for order #${orderId} were released to the vendor. Thanks for shopping on DeeDyte.`,
+      sourceType: "order",
+      sourceId: orderId,
+      role: "buyer",
+    }).catch(() => {});
+  }
+  return { released: true, message: "Funds released. Your order is complete." };
+}
+
+/** Confirmed orders whose hold period has passed, by the buyer's confirmation time. */
+export async function autoReleaseConfirmedOrders(): Promise<void> {
+  const pool = await db();
+  const { rows } = await pool.query<{ id: number }>(
+    `SELECT o.id
+     FROM orders o
+     WHERE o.fulfillment_status = 'order_confirmed'
+       AND COALESCE(
+             (SELECT MAX(e.created_at) FROM order_events e
+              WHERE e.order_id::text = o.id::text AND e.stage = 'order_confirmed'),
+             o.updated_at
+           ) <= NOW() - ($1 || ' hours')::interval`,
+    [String(ORDER_PAYOUT_HOLD_HOURS)],
+  );
+  for (const row of rows) {
+    try {
+      await releaseOrderFunds(Number(row.id), { type: "system", id: null });
+    } catch (err) {
+      console.error(`[order] auto release failed for #${row.id}`, err);
+    }
+  }
+}
+
+/** Buyer taps "Release Funds To Complete Order". */
+export const handleOrderReleaseFunds = async (
+  userId: number,
+  _nsp: Namespace,
+  payload: Record<string, unknown>,
+  ack: unknown,
+) => {
+  const reply = (body: Record<string, unknown>) => {
+    if (typeof ack === "function") ack(body);
+  };
+  try {
+    const orderId = Number(payload.order_id);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      reply({ success: false, message: "Invalid order.", error: "invalid_order", result: null });
+      return;
+    }
+    const out = await releaseOrderFunds(orderId, { type: "customer", id: userId });
+    if (!out.released) {
+      reply({ success: false, message: out.message, error: out.message, result: null });
+      return;
+    }
+    const { result, customerList } = await buildOrderLists(orderId);
+    reply({ success: true, message: out.message, error: null, result, list: customerList });
+  } catch (error) {
+    console.error("Error releasing order funds:", error);
+    reply({
+      success: false,
+      message: "Could not release funds. Please try again.",
+      error: error instanceof Error ? error.message : "Unknown error",
+      result: null,
+    });
   }
 };
 

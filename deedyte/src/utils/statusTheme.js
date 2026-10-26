@@ -85,6 +85,12 @@ export const STATUS_THEME = {
     text: '#155E75',
     label: 'Confirmed',
   },
+  order_completed: {
+    bg: '#ECFDF5',
+    dot: '#059669',
+    text: '#065F46',
+    label: 'Completed',
+  },
 
   order_disputed: {
     bg: '#FEF2F2',

@@ -36,7 +36,7 @@ import {
 } from '../api';
 import { useDispatch, useSelector } from 'react-redux';
 import { getStoredUser } from '../auth/session';
-import { connectChatSocket } from '../socket/chatSocket';
+import { connectChatSocket, emitSocketAck } from '../socket/chatSocket';
 import { set_orderInfo } from '../../redux/order';
 import {
   ESCROW_STATUS_THEME,
@@ -242,6 +242,8 @@ function MoneyRow({ label, value, bold, muted }) {
 }
 
 const PAYOUT_HOLD_MS = 48 * 60 * 60 * 1000;
+/** Must match ORDER_COMMISSION_RATE in node/src/socket/order.ts. */
+const APP_COMMISSION_RATE = 0.03;
 
 const ORDER_PROGRESS_STEPS = [
   { label: 'Pending', icon: 'time-outline', statuses: ['unpaid', 'payment_received'] },
@@ -367,7 +369,13 @@ function orderTurnHint(role, statusKey, awaitingBuyerPayment, eventCount) {
   if (vendor && (status === 'order_delivered' || status === 'order_confirmed')) {
     return 'Waiting on the buyer. You will be notified when it is your turn.';
   }
-  if (status === 'order_confirmed' || status === 'order_completed') {
+  if (!vendor && status === 'order_confirmed') {
+    return 'Happy with your order? Release the funds to the vendor below, or they will be released automatically when the countdown ends.';
+  }
+  if (status === 'order_completed') {
+    return 'This order is complete. Funds have been released to the vendor.';
+  }
+  if (status === 'order_confirmed') {
     return 'No action is needed. This order is wrapping up.';
   }
   return vendor
@@ -375,19 +383,33 @@ function orderTurnHint(role, statusKey, awaitingBuyerPayment, eventCount) {
     : 'Waiting on the shop. You will be notified when it is your turn.';
 }
 
-function paymentReleaseLabel(updatedAt, nowMs, fulfillmentStatus) {
-  if (String(fulfillmentStatus ?? '').toLowerCase() === 'order_completed') return 'Completed';
-  const updated = new Date(updatedAt).getTime();
-  if (!Number.isFinite(updated)) return 'Payment releasing';
-  const remaining = updated + PAYOUT_HOLD_MS - nowMs;
-  if (remaining <= 0) return 'Payment releasing';
+/** When confirmed funds auto-release: buyer's confirmation time plus the hold period. */
+function releaseDeadlineMs(orderInfo) {
+  const events = Array.isArray(orderInfo?.order_events) ? orderInfo.order_events : [];
+  const confirmedAt = events
+    .filter((e) => String(e?.stage ?? '') === 'order_confirmed')
+    .map((e) => new Date(e.created_at).getTime())
+    .filter(Number.isFinite)
+    .reduce((max, t) => Math.max(max, t), NaN);
+  const start = Number.isFinite(confirmedAt)
+    ? confirmedAt
+    : new Date(orderInfo?.order?.updated_at).getTime();
+  return Number.isFinite(start) ? start + PAYOUT_HOLD_MS : NaN;
+}
 
+function releaseCountdownLabel(deadlineMs, nowMs) {
+  if (!Number.isFinite(deadlineMs)) return '';
+  const remaining = deadlineMs - nowMs;
+  if (remaining <= 0) return 'Releasing funds to the vendor…';
   const hours = Math.floor(remaining / (60 * 60 * 1000));
   const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
   const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
-  if (hours > 0) return `Payment releasing in ${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `Payment releasing in ${minutes}m ${seconds}s`;
-  return `Payment releasing in ${seconds}s`;
+  const parts = hours > 0
+    ? `${hours}h ${minutes}m ${seconds}s`
+    : minutes > 0
+      ? `${minutes}m ${seconds}s`
+      : `${seconds}s`;
+  return `Funds auto-release to the vendor in ${parts}`;
 }
 
 export default function OrderDetailScreen() {
@@ -422,6 +444,8 @@ export default function OrderDetailScreen() {
   const onMakePaymentRef = useRef(() => { });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const escrowCharge = Number(orderInfo?.order?.escrow_fee ?? 0);
+  const [releasingFunds, setReleasingFunds] = useState(false);
+  const releaseAtMs = useMemo(() => releaseDeadlineMs(orderInfo), [orderInfo]);
 
   useEffect(() => {
     if (statusKey !== 'order_confirmed') return undefined;
@@ -1208,6 +1232,9 @@ export default function OrderDetailScreen() {
         case 'order_confirmed':
           message = 'Payment pending';
           break;
+        case 'order_completed':
+          message = 'Completed';
+          break;
         case 'order_cancelled':
           message = 'Order cancelled';
           break;
@@ -1238,11 +1265,7 @@ export default function OrderDetailScreen() {
           message = 'Out for delivery';
           break;
         case 'order_confirmed':
-          message = paymentReleaseLabel(
-            orderInfo?.order?.updated_at,
-            nowMs,
-            orderInfo?.order?.fulfillment_status,
-          );
+          message = releasingFunds ? 'Releasing funds…' : 'Release Funds To Complete Order';
           break;
         case 'order_completed':
           message = 'Completed';
@@ -1259,6 +1282,37 @@ export default function OrderDetailScreen() {
     }
 
     return message;
+  };
+
+  const onReleaseFunds = () => {
+    if (releasingFunds) return;
+    const orderId = orderInfo?.order?.id;
+    if (orderId == null) return;
+    Alert.alert(
+      'Release funds?',
+      'The vendor will receive payment for this order and it will be marked as completed. Only do this if you are happy with your order.',
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: 'Release funds',
+          onPress: () => {
+            setReleasingFunds(true);
+            emitSocketAck('order_release_funds', { order_id: orderId })
+              .then((res) => {
+                if (!res?.success) {
+                  Alert.alert('Could not release funds', res?.message || 'Please try again.');
+                  return;
+                }
+                Alert.alert('Order completed', 'Funds were released to the vendor.');
+              })
+              .catch((err) => {
+                Alert.alert('Could not release funds', err instanceof Error ? err.message : String(err));
+              })
+              .finally(() => setReleasingFunds(false));
+          },
+        },
+      ],
+    );
   };
 
   const onMakePayment = () => {
@@ -1575,6 +1629,8 @@ export default function OrderDetailScreen() {
             const escrowFee = showEscrowFee ? (escrowCharge || 0) : 0;
             const shipping = shippingPending ? 0 : Number(orderInfo?.order?.shipping_fee || 0);
             const total = subtotal + escrowFee + shipping;
+            const goods = Number(orderInfo?.order?.amount_paid ?? subtotal) || 0;
+            const appCharge = isVendor ? Math.round(goods * APP_COMMISSION_RATE * 100) / 100 : 0;
             return (
               <>
                 <MoneyRow label="Subtotal" value={fmt(subtotal)} muted />
@@ -1590,6 +1646,20 @@ export default function OrderDetailScreen() {
                 <MoneyRow label="Tax" value={fmt(0)} muted />
                 <View style={styles.moneyDivider} />
                 <MoneyRow label="Total" value={fmt(total)} bold />
+                {isVendor ? (
+                  <>
+                    <MoneyRow
+                      label={`App Charge (${APP_COMMISSION_RATE * 100}% of order amount)`}
+                      value={`-${fmt(appCharge)}`}
+                      muted
+                    />
+                    <MoneyRow
+                      label="You Receive"
+                      value={shippingPending ? `${fmt(total - appCharge)} + shipping` : fmt(total - appCharge)}
+                      bold
+                    />
+                  </>
+                ) : null}
               </>
             );
           })()}
@@ -1735,6 +1805,7 @@ export default function OrderDetailScreen() {
                   auth.activeRole === 'vendor' &&
                   (statusKey === 'order_delivered' ||
                     statusKey === 'order_confirmed' ||
+                    statusKey === 'order_completed' ||
                     statusKey === 'order_cancelled' ||
                     statusKey === 'order_rejected')
                 ) {
@@ -1786,6 +1857,10 @@ export default function OrderDetailScreen() {
                 onMakePayment();
                 return;
               }
+              if (statusKey === 'order_confirmed') {
+                onReleaseFunds();
+                return;
+              }
               setStatusInfoOpen(true);
             }}
             style={({ pressed }) => [
@@ -1794,7 +1869,10 @@ export default function OrderDetailScreen() {
               {
                 backgroundColor: STATUS_THEME[statusKey]?.dot,
               },
+              statusKey === 'order_confirmed' && styles.btnReleaseFunds,
+              releasingFunds && styles.btnPrimaryDisabled,
             ]}
+            disabled={releasingFunds}
           >
             <Text
               style={styles.btnPrimaryText}
@@ -1804,6 +1882,11 @@ export default function OrderDetailScreen() {
                 ? 'Awaiting approval'
                 : actionBtn()}
             </Text>
+            {statusKey === 'order_confirmed' && !releasingFunds ? (
+              <Text style={styles.releaseCountdown} numberOfLines={1}>
+                {releaseCountdownLabel(releaseAtMs, nowMs)}
+              </Text>
+            ) : null}
           </Pressable>
         ) : (
           ''
@@ -2863,6 +2946,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     // backgroundColor: "#000",
     // backgroundColor: COLOR.BRAND_COLOR,
+  },
+  btnReleaseFunds: {
+    height: undefined,
+    minHeight: 52,
+    paddingVertical: 6,
+  },
+  releaseCountdown: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    opacity: 0.9,
+    marginTop: 2,
   },
   btnPrimaryPressed: {
     backgroundColor: COLOR.BRAND_COLOR_LITE,

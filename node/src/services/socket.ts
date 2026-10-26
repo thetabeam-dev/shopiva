@@ -9,7 +9,7 @@ import {
   handleTyping,
 } from "../socket/chat.js";
 import { handleDisputeEscalation, handleDisputeResponse, handleNewDispute } from "../socket/dispute.js";
-import { handleOrderAcceptance, handleOrderCancellation, handleOrderConfirmation, handleOrderDelivered, handleOrderOutForDelivery, handleOrderProcessing, handleOrderShipping } from "../socket/order.js";
+import { handleOrderAcceptance, handleOrderCancellation, handleOrderConfirmation, handleOrderDelivered, handleOrderOutForDelivery, handleOrderProcessing, handleOrderReleaseFunds, handleOrderShipping } from "../socket/order.js";
 import { handleReturnAcceptance, handleReturnCancellation, handleReturnConfirmation, handleReturnDelivered, handleReturnOutForDelivery, handleReturnProcessing, handleReturnShipping } from "../socket/return.js";
 
 type SocketWithAuth = Socket & {
@@ -76,6 +76,9 @@ export default function handleSocketConnection(client: SocketWithAuth) {
   ));
   client.on("order_confirmed", wrapSocketHandler((p, a) =>
     handleOrderConfirmation(userId, nsp, asPayload(p), a)
+  ));
+  client.on("order_release_funds", wrapSocketHandler((p, a) =>
+    handleOrderReleaseFunds(userId, nsp, asPayload(p), a)
   ));
 
   // return updates

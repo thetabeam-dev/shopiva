@@ -28,13 +28,10 @@ import { paystack } from "./services/paystack.js";
 import { error } from "console";
 import { sendFcmForActivities } from "./services/firebaseConfig.js";
 import { createAndEmitNotification } from "./services/notifications.js";
-import { GetShopOwnerByShopIdService } from "./services/business/shop.js";
-import { sendNotificationEmail } from "./services/email.js";
 import paystackTools from "./utils/paystack.js";
-import { creditOrderPayoutToWallet, storePaystackVirtualAccount } from "./models/wallet.js";
-import { expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
+import { storePaystackVirtualAccount } from "./models/wallet.js";
+import { autoReleaseConfirmedOrders, expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
-import { recordEscrowRelease } from "./models/escrow.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -343,63 +340,8 @@ app.use(BusinessRouter);
 app.use(BuyerRouter);
 app.use(StorefrontRouter);
 
-function formatNaira(amount: number): string {
-  const value = Number.isFinite(amount) ? amount : 0;
-  return `₦${value.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 
-
-async function notifyShopOfPayout(payout: {
-  shop_id: unknown;
-  order_id: unknown;
-  net_amount: unknown;
-}): Promise<void> {
-  try {
-    const owner = await GetShopOwnerByShopIdService(Number(payout.shop_id));
-    const vendorId = Number(owner?.id);
-    const orderId = Number(payout.order_id);
-    if (!Number.isFinite(vendorId) || vendorId <= 0 || !Number.isFinite(orderId) || orderId <= 0) return;
-
-    const amount = formatNaira(Number(payout.net_amount));
-    const title = "Payout Sent";
-    const message = `A payout of ${amount} for order #${orderId} has been added to your wallet.`;
-
-    await createAndEmitNotification({
-      recipientId: vendorId,
-      title,
-      message,
-      sourceType: "order",
-      sourceId: orderId,
-      role: "vendor",
-    });
-
-    const pool = await db();
-    const { rows } = await pool.query<{ devicetoken: string | null; email: string | null; fname: string | null }>(
-      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
-      [vendorId],
-    );
-    const token = String(rows[0]?.devicetoken ?? "").trim();
-    if (token) {
-      await sendFcmForActivities(token, title, message, null, {
-        type: "order",
-        order_id: orderId,
-        role: "vendor",
-      });
-    }
-
-    const email = String(rows[0]?.email ?? owner.email ?? "").trim();
-    if (email) {
-      await sendNotificationEmail(email, {
-        fname: String(rows[0]?.fname ?? owner.fname ?? "there"),
-        title,
-        message,
-      });
-    }
-  } catch (err) {
-    console.error("notifyShopOfPayout failed", err);
-  }
-}
 
 const server = app.listen(process.env.PORT, async () => {
   console.log(`listening to port ${process.env.PORT}`);
@@ -410,53 +352,10 @@ const server = app.listen(process.env.PORT, async () => {
   console.log(`JWT_SECRET loaded: ${secretLen > 0 ? "yes" : "NO - fix .env"}`);
 
   nodeCron.schedule("0 */5 * * * *", async () => {
-    const pool = await db();
-    const { rows: orders } = await pool.query<{
-      id: string;
-      shop_id: string;
-      total_paid: string;
-    }>(
-      `SELECT o.id, o.shop_id, o.total_paid
-       FROM orders o
-       WHERE o.updated_at <= NOW() - INTERVAL '48 hours'
-         AND o.fulfillment_status IN ('order_confirmed', 'order_completed')
-         AND NOT EXISTS (
-           SELECT 1 FROM wallet_transactions t
-           WHERE t.reference = 'order:' || o.id::text || ':payout'
-         )`,
-    );
-
-    for (const order of orders) {
-      try {
-        const gross = Number(order.total_paid);
-        const commission = Number((gross * 0.03).toFixed(2)) + 200;
-        const net = Number((gross - commission).toFixed(2));
-        const credited = await creditOrderPayoutToWallet({
-          shopId: order.shop_id,
-          orderId: order.id,
-          grossNaira: gross,
-          commissionNaira: commission,
-          netNaira: net,
-        });
-        if (credited.credited) {
-          await recordEscrowRelease(Number(order.id), Math.round(gross * 100)).catch((err) =>
-            console.error("escrow release record failed", err),
-          );
-        }
-        if (credited.credited && credited.userId) {
-          getIo().to(`user:${credited.userId}`).emit("wallet_credited", {
-            balance_kobo: credited.balance_kobo,
-            transactions: credited.transactions,
-          });
-          await notifyShopOfPayout({
-            shop_id: order.shop_id,
-            order_id: order.id,
-            net_amount: net,
-          });
-        }
-      } catch (error) {
-        console.log(error);
-      }
+    try {
+      await autoReleaseConfirmedOrders();
+    } catch (error) {
+      console.log(error);
     }
   });
 
