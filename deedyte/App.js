@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Appearance, Linking, Platform, StatusBar, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Appearance, Linking, Text, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WIPE_STORAGE_ON_LAUNCH } from './src/auth/devAuth';
@@ -7,21 +7,10 @@ import { clearAllDeedyteStorage } from './src/auth/session';
 import { getPaystackPublicKey, isPaystackConfigured, warnIfPaystackLiveInDev } from './src/config/paystack';
 import { getPaystackProvider } from './src/paystack/paystackNativeGate';
 import NavigationHandler from './src/navigation/index';
-import {
-  getFcmToken,
-  requestPermission,
-  requestAndroidPermission,
-  setupFcmListeners,
-} from './src/utils/firebaseTokenReqConfig';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { DEFAULT_API_BASE_URL } from './src/api/config';
+import { setupFcmListeners } from './src/utils/firebaseTokenReqConfig';
 import { checkForUpdate } from './src/api';
-import { requestLocationPermission } from './src/utils/deviceLocation';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
   useEffect(() => {
     Appearance.setColorScheme('unspecified');
   }, []);
@@ -86,32 +75,11 @@ function App() {
       void clearAllDeedyteStorage();
     }
     warnIfPaystackLiveInDev();
-    void requestLocationPermission({ interactive: true });
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        if (Platform.OS === 'android') {
-          const granted = await requestAndroidPermission();
-          if (!granted && Platform.Version >= 33) {
-            return;
-          }
-        }
-
-        if (!cancelled) {
-          await requestPermission();
-        }
-      } catch (error) {
-        console.warn('[fcm] initial setup failed:', error instanceof Error ? error.message : String(error));
-      }
-    })();
-
     const unsubscribe = setupFcmListeners();
     return () => {
-      cancelled = true;
       unsubscribe();
     };
   }, []);
@@ -127,37 +95,19 @@ function App() {
       try {
         const data = await checkForUpdate();
         if (data && typeof data === 'object') {
+          const isUpdating = String(data.isUpdating ?? '').trim().toLowerCase() === 'true';
+          const storeUrl = typeof data.storeUrl === 'string' ? data.storeUrl : '';
+          const isLatest = Boolean(data.isLatest);
           setVersionCheck({
-            isLatest: Boolean(data.isLatest),
-            storeUrl: typeof (data.storeUrl) === 'string' ? data.storeUrl : '',
-            isUpdating: String(data.isUpdating).trim().toLowerCase() === 'true'
+            isLatest: isLatest || (!storeUrl && !isUpdating),
+            storeUrl,
+            isUpdating,
           });
         }
       } catch (error) {
         console.warn('[app] version check failed:', error instanceof Error ? error.message : String(error));
       }
     })();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const token = await getFcmToken();
-        if (!token || cancelled) {
-          return;
-        }
-        console.log('Device FCM Token:', token);
-        await AsyncStorage.setItem('fcm', token);
-      } catch (error) {
-        console.warn('Device FCM Token Error:', error instanceof Error ? error.message : String(error));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const openStore = () => {
@@ -173,12 +123,7 @@ function App() {
   const paystackReady = isPaystackConfigured();
   const PaystackProvider = paystackReady ? getPaystackProvider() : null;
 
-  const appBody = (
-    <>
-      {/* <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} /> */}
-      <NavigationHandler />
-    </>
-  );
+  const appBody = <NavigationHandler />;
 
   return (
     <>

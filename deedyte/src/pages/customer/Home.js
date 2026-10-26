@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSelector } from 'react-redux';
 import { getStorefrontProduct, getStorefrontProducts, getVendorsOnMapByCategory } from '../../api';
-import { addBuyerCartLine, fetchBuyerCart } from '../../api/buyer';
+import { addBuyerCartLine, deleteBuyerCartLine, fetchBuyerCart } from '../../api/buyer';
 import { fetchWallet } from '../../api/user';
 import { connectChatSocket } from '../../socket/chatSocket';
 import { useProfile } from '../../context/ProfileContext';
@@ -111,7 +111,7 @@ export default function HomeScreen() {
   const [wallet, setWallet] = useState(null);
   const [walletRefreshing, setWalletRefreshing] = useState(false);
   const [cartBusyId, setCartBusyId] = useState('');
-  const [cartProductIds, setCartProductIds] = useState(() => new Set());
+  const [cartLinesByProduct, setCartLinesByProduct] = useState(() => new Map());
   const [variantSheet, setVariantSheet] = useState(
     /** @type {null | { item: Record<string, unknown>; variants: Record<string, unknown>[]; selected: number | null }} */ (null),
   );
@@ -233,15 +233,19 @@ export default function HomeScreen() {
     try {
       const res = await fetchBuyerCart();
       const lines = Array.isArray(res?.lines) ? res.lines : [];
-      const ids = new Set();
+      const byProduct = new Map();
       lines.forEach(line => {
         if (!line || typeof line !== 'object') return;
         const id = String(line.productId ?? line.product_id ?? '').trim();
-        if (id) ids.add(id);
+        if (!id) return;
+        const cartItemId = Number(line.cartItemId ?? line.cart_item_id ?? line.id);
+        const list = byProduct.get(id) ?? [];
+        if (Number.isFinite(cartItemId)) list.push(cartItemId);
+        byProduct.set(id, list);
       });
-      setCartProductIds(ids);
+      setCartLinesByProduct(byProduct);
     } catch {
-      setCartProductIds(new Set());
+      setCartLinesByProduct(new Map());
     }
   }, []);
 
@@ -280,6 +284,12 @@ export default function HomeScreen() {
     if (cartBusyId) return;
     setCartBusyId(key);
     try {
+      const existing = cartLinesByProduct.get(String(item.id));
+      if (existing) {
+        await Promise.all(existing.map(cartItemId => deleteBuyerCartLine(cartItemId)));
+        await loadCartProducts();
+        return;
+      }
       const data = await getStorefrontProduct(item.id);
       const detail = data?.product && typeof data.product === 'object' ? data.product : null;
       const rawVariants = Array.isArray(detail?.variants) ? detail.variants : [];
@@ -298,7 +308,7 @@ export default function HomeScreen() {
     } finally {
       setCartBusyId('');
     }
-  }, [addLine, cartBusyId]);
+  }, [addLine, cartBusyId, cartLinesByProduct, loadCartProducts]);
 
   const confirmVariant = useCallback(async () => {
     if (!variantSheet || variantSheet.selected == null) return;
@@ -493,7 +503,7 @@ export default function HomeScreen() {
           {visibleArrivals.map(item => {
             const showCompare = item.comparePrice > item.price && item.price > 0;
             const { rating, count } = shopRating(item.shop);
-            const inCart = cartProductIds.has(String(item.id));
+            const inCart = cartLinesByProduct.has(String(item.id));
             return (
               <TouchableOpacity
                 key={`${item.shop?.id}-${item.id}`}
@@ -530,7 +540,7 @@ export default function HomeScreen() {
                     onPress={() => { void onCartPress(item); }}
                     disabled={Boolean(cartBusyId)}
                     hitSlop={6}
-                    accessibilityLabel={inCart ? 'In cart' : 'Add to cart'}
+                    accessibilityLabel={inCart ? 'Remove from cart' : 'Add to cart'}
                   >
                     {cartBusyId === `${item.shop?.id}-${item.id}` ? (
                       <ActivityIndicator size="small" color={inCart ? '#FFFFFF' : '#00926E'} />
