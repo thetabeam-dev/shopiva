@@ -37,7 +37,7 @@ export async function GET(request) {
               d.customer_id AS "customerId",
               u.email AS "customerEmail",
               u.phone AS "customerPhone",
-              d.id AS "orderId",
+              d.order_id AS "orderId",
               d.status,
               d.source,
               d.created_at AS "createdAt",
@@ -46,7 +46,7 @@ export async function GET(request) {
               s.contactPhone AS "vendorPhone"
        FROM disputes d
        LEFT JOIN users u ON u.id = d.customer_id
-       LEFT JOIN orders o ON o.id = d.id
+       LEFT JOIN orders o ON o.id = d.order_id
        LEFT JOIN shops s ON s.id::text = o.shop_id
        ${whereClause}
        ORDER BY d.created_at DESC
