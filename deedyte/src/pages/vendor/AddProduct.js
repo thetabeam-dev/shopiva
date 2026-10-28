@@ -2113,6 +2113,17 @@ export default function VendorCreateProductScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
+        {/* Must be nested: a sibling Modal cannot present over this one on iOS. */}
+        <OptionPickerModal
+          visible={editingVariantId != null && picker !== null}
+          title={optionPickerProps.title}
+          options={optionPickerProps.options}
+          formatLabel={optionPickerProps.formatLabel}
+          swatchByValue={optionPickerProps.swatchByValue}
+          onSelect={handlePickerSelect}
+          onClose={() => setPicker(null)}
+          insetBottom={insets.bottom}
+        />
       </Modal>
       <Modal transparent visible={showValidationModal} animationType="fade">
         <View style={styles.modalRoot}>
@@ -2138,7 +2149,7 @@ export default function VendorCreateProductScreen() {
       </Modal>
 
       <OptionPickerModal
-        visible={picker !== null}
+        visible={editingVariantId == null && picker !== null}
         title={optionPickerProps.title}
         options={optionPickerProps.options}
         formatLabel={optionPickerProps.formatLabel}
