@@ -32,6 +32,7 @@ import paystackTools from "./utils/paystack.js";
 import { storePaystackVirtualAccount } from "./models/wallet.js";
 import { autoReleaseConfirmedOrders, expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
+import { sendShopSetupReminders } from "./services/shopSetupReminders.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -365,6 +366,15 @@ const server = app.listen(process.env.PORT, async () => {
       await expireUnacceptedOrders();
     } catch (error) {
       console.log(error);
+    }
+  });
+
+  nodeCron.schedule("0 0 */12 * * *", async () => {
+    try {
+      const result = await sendShopSetupReminders();
+      console.log("[shop-setup] 12-hour reminder job complete", result);
+    } catch (error) {
+      console.error("[shop-setup] 12-hour reminder job failed", error);
     }
   });
 });
