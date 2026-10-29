@@ -40,6 +40,12 @@ import logo_img from "../../images/Deedyte.png";
 import Solution from "../../components/floaters.js/Solution";
 import Resources from "../../components/floaters.js/Resources";
 import MenuComp from "../../components/floaters.js/Menu";
+import {
+  APP_STORE_URL,
+  LEGAL_AND_DOC_LINKS,
+  PLAY_STORE_URL,
+  categoryLinks,
+} from "../../lib/siteNavigation";
 
 // ============================================================================
 // CONSTANTS
@@ -380,40 +386,49 @@ function CustomerFreeLayout({ children }) {
             </div>
           </div>
 
-          {/* Support & Legal Links */}
           <div className="footer-column">
-            <h6 className="footer-heading">Support</h6>
+            <h6 className="footer-heading">Shop categories</h6>
             <ul className="footer-links">
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/contact")}
-              >
-                Contact
+              {categoryLinks().map((category) => (
+                <li
+                  className="footer-link"
+                  key={category.path}
+                  onClick={() => (window.location.href = category.path)}
+                >
+                  {category.title}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="footer-column">
+            <h6 className="footer-heading">Get the app</h6>
+            <ul className="footer-links">
+              <li className="footer-link">
+                <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+                  App Store
+                </a>
               </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/about")}
-              >
-                About
+              <li className="footer-link">
+                <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
+                  Google Play
+                </a>
               </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/terms-of-use")}
-              >
-                Terms Of Service
-              </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/privacy-policy")}
-              >
-                Privacy Policy
-              </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/legal")}
-              >
-                Legal
-              </li>
+            </ul>
+          </div>
+
+          <div className="footer-column">
+            <h6 className="footer-heading">Legal & docs</h6>
+            <ul className="footer-links">
+              {LEGAL_AND_DOC_LINKS.map((link) => (
+                <li
+                  className="footer-link"
+                  key={link.path}
+                  onClick={() => (window.location.href = link.path)}
+                >
+                  {link.title}
+                </li>
+              ))}
             </ul>
           </div>
         </section>

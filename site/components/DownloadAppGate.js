@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const APP_STORE_URL = "https://apps.apple.com/app/id6792328397";
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.thetabeam.shopiva";
+import { APP_STORE_URL, PLAY_STORE_URL } from "../lib/siteNavigation";
 
 /**
  * Play Store link that carries the current page as `deeplink` in the install

@@ -30,6 +30,7 @@ import Screenshot from "../images/screenshot.png";
 import BasketSvg from "../svgs/basket.svg";
 import PhoneSvg from "../svgs/phone.svg";
 import BikeSvg from "../svgs/bike.svg";
+import { APP_STORE_URL, PLAY_STORE_URL } from "../lib/siteNavigation";
 
 // ============================================================================
 // CONSTANTS
@@ -263,46 +264,52 @@ export default function Dashboard() {
 
               {/* Download Buttons */}
               <div className="download_btn">
-                <button style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#fff',
-                  borderRadius: '10px',
-                  height: '100%',
-                  color: '#00926E'
-                }} onClick={e => window.location.href = 'itms-apps://apps.apple.com/app/id6792328397'}>
+                <a
+                  href={APP_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#fff",
+                    borderRadius: "10px",
+                    height: "100%",
+                    color: "#00926E",
+                    textDecoration: "none",
+                  }}
+                >
                   <img
                     src={APP_STORE_LINKS.ios}
-                    alt="App Store"
+                    alt="Download DeeDyte on the App Store"
                     style={{ height: "45px", width: "45px" }}
                   />
-                  &nbsp;
-                  &nbsp;
-
+                  &nbsp;&nbsp;
                   <b>App Store</b>
-                </button>
-                <button style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#fff',
-                  height: '100%',
-                  borderRadius: '10px',
-                  color: '#00926E'
-
-                }} onClick={e => {
-                  window.location.href = 'market://details?id=com.thetabeam.shopiva';
-                }}>
+                </a>
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#fff",
+                    height: "100%",
+                    borderRadius: "10px",
+                    color: "#00926E",
+                    textDecoration: "none",
+                  }}
+                >
                   <img
                     src={APP_STORE_LINKS.android}
-                    alt="Google Play"
+                    alt="Download DeeDyte on Google Play"
                     style={{ height: "45px", width: "45px" }}
                   />
-                  &nbsp;
-                  &nbsp;
+                  &nbsp;&nbsp;
                   <b>Play Store</b>
-                </button>
+                </a>
               </div>
             </div>
           </div>

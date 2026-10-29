@@ -1,27 +1,28 @@
 import { query } from "./api/lib/database";
+import {
+  LEGAL_AND_DOC_LINKS,
+  SITE_ORIGIN,
+  categoryLinks,
+} from "../lib/siteNavigation";
 
-const SITE = "https://www.deedyte.com";
-
-/** Public pages. Account, cart, checkout, and vendor dashboard routes stay out. */
 const STATIC_PATHS = [
   "/",
-  "/about",
   "/vendors",
   "/pricing",
-  "/legal",
-  "/privacy-policy",
-  "/terms-of-use",
-  "/contact",
+  ...LEGAL_AND_DOC_LINKS.map((link) => link.path),
+  ...categoryLinks().map((link) => link.path),
 ];
 
-function entry(path, lastModified = new Date()) {
+function entry(path, lastModified = new Date(), priority = 0.6) {
   return {
-    url: path === "/" ? SITE : `${SITE}${path}`,
+    url: path === "/" ? `${SITE_ORIGIN}/` : `${SITE_ORIGIN}${path}`,
     lastModified,
+    changeFrequency: path === "/" ? "daily" : "weekly",
+    priority,
   };
 }
 
-async function storefrontEntries() {
+async function shopEntries() {
   const shops = await query(`
     SELECT slug, updatedat
     FROM shops
@@ -35,41 +36,23 @@ async function storefrontEntries() {
       )
     ORDER BY name ASC
   `);
- 
-  const products = await query(`
-    SELECT s.slug, p.id, p.updated_at
-    FROM products p
-    INNER JOIN shops s ON s.id = p.shop_id
-    WHERE p.is_published = true
-      AND s.isactive = true
-      AND s.slug IS NOT NULL
-      AND btrim(s.slug) <> ''
-    ORDER BY p.updated_at DESC NULLS LAST
-  `);
 
-  const shopEntries = shops.rows.map((shop) =>
+  return shops.rows.map((shop) =>
     entry(
       `/store/${encodeURIComponent(shop.slug)}`,
       shop.updatedat ? new Date(shop.updatedat) : new Date(),
+      0.5,
     ),
   );
-
-  const productEntries = products.rows.map((product) =>
-    entry(
-      `/store/${encodeURIComponent(product.slug)}/${product.id}`,
-      product.updated_at ? new Date(product.updated_at) : new Date(),
-    ),
-  );
-
-  return [...shopEntries, ...productEntries];
 }
 
 export default async function sitemap() {
-  const pages = STATIC_PATHS.map((path) => entry(path));
+  const pages = STATIC_PATHS.map((path) =>
+    entry(path, new Date(), path === "/" ? 1 : 0.8),
+  );
 
   try {
-    const storefronts = await storefrontEntries();
-    return [...pages, ...storefronts];
+    return [...pages, ...(await shopEntries())];
   } catch (error) {
     console.error("Sitemap storefront lookup failed:", error);
     return pages;

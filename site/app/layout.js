@@ -16,111 +16,60 @@
 import App from "./App";
 import "./globals.css";
 import StructuredData from "./StructuredData";
+import { ORGANIZATION_LOGO } from "../lib/siteNavigation";
+import { buildSearchAppearanceSchema } from "../lib/organizationSchema";
 
 export async function generateMetadata() {
-  const imageUrl = "https://www.deedyte.com/api/logo";
+  const imageUrl = ORGANIZATION_LOGO;
+  const title =
+    "DeeDyte Nigeria | Online Shopping for Fashion, Electronics & Local Delivery";
+  const description =
+    "DeeDyte Nigeria is an on-demand marketplace for fashion, electronics, home, and more. Shop nearby vendors with secure checkout and delivery to your location.";
 
   return {
     metadataBase: new URL("https://www.deedyte.com"),
-    title: "DeeDyte Nigeria | Trusted Online Marketplace For Anyone",
-    description: "Enjoy Free Commerce From The Comfort Of Your Home.",
+    applicationName: "DeeDyte Nigeria",
+    title,
+    description,
     robots: { index: true, follow: true },
+    icons: {
+      icon: [
+        { url: "/favicon.ico" },
+        { url: imageUrl, type: "image/jpeg", sizes: "512x512" },
+      ],
+      apple: [{ url: imageUrl, type: "image/jpeg" }],
+    },
     openGraph: {
-      title: "DeeDyte Nigeria | Trusted Online Marketplace Anyone",
-      description: "Enjoy Free Commerce From The Comfort Of Your Home.",
+      title,
+      description,
       url: "https://www.deedyte.com",
+      siteName: "DeeDyte Nigeria",
+      locale: "en_NG",
       type: "website",
       images: [{ url: imageUrl, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "DeeDyte Nigeria | Trusted Online Marketplace Anyone",
-      description: "Enjoy Free Commerce From The Comfort Of Your Home.",
+      title,
+      description,
       images: [imageUrl],
     },
   };
 }
 
-const productSchema = await fetch("https://www.deedyte.com/api/json-ld", {
-  next: { revalidate: 3600 },
-})
-  .then(res => res.ok ? res.json() : null)
-  .then(data => data?.success ? data.data : null)
-  .catch(() => null);
-
-
-const CATEGORY_NAMES = [
-  "apparel & accessories",
-  "beauty",
-  "jewelry & watches & eyewear",
-  "shoes & accessories",
-  "home appliances",
-  "lights & lighting",
-  "kitchenware & cookware",
-  "storage & organizations",
-  "electronics",
-  "toiletries",
-];
-
-function categoryPath(name) {
-  return `/store/${encodeURIComponent(name.replaceAll(" ", ""))}`;
-}
-
 export default async function RootLayout({ children }) {
-  const categories = CATEGORY_NAMES.map((title) => ({
-    title,
-    uri: categoryPath(title),
-  }));
-
-  const websiteSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "DeeDyte",
-    url: "https://www.deedyte.com/",
-    logo: "https://res.cloudinary.com/jh7nqlrd/image/upload/v1791187434/WhatsApp_Image_2026-09-22_at_22.45.49.jpg",
-    // sameAs: [
-    //   "",
-    //   "",
-    //   "",
-    //   ""
-    // ],
-    description: "Sign up, sign in, and rely on us to handle your purchase.",
-    hasPart: [
-      {
-        "@type": "SiteNavigationElement",
-        name: "Sign Up",
-        url: "https://www.deedyte.com/auth/signup",
-      },
-      {
-        "@type": "SiteNavigationElement",
-        name: "Sign In",
-        url: "https://www.deedyte.com/auth/login",
-      },
-      {
-        "@type": "SiteNavigationElement",
-        name: "Sell Your Products",
-        url: "https://www.deedyte.com/entrepreneur/ng",
-      },
-      {
-        "@type": "SiteNavigationElement",
-        name: "Place Your Order",
-        url: "https://www.deedyte.com/vendors",
-      },
-      ...categories.map((cat) => ({
-        "@type": "SiteNavigationElement",
-        name: cat.title,
-        url: `https://www.deedyte.com${cat.uri}`,
-      })),
-    ],
-  };
+  const searchAppearanceSchema = await buildSearchAppearanceSchema();
 
   return (
     <html lang="en">
       <head>
-        <title>DeeDyte — The Trusted Marketplace for Buyers & Vendors</title>
+        <title>
+          DeeDyte Nigeria | Online Shopping for Fashion, Electronics & Local
+          Delivery
+        </title>
         <meta
           name="description"
-          content="DeeDyte is an e-commerce marketplace connecting buyers with trusted vendors."
+          content="DeeDyte Nigeria is an on-demand marketplace for fashion, electronics, home, and more. Shop nearby vendors with secure checkout and delivery to your location."
         />
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -146,8 +95,7 @@ export default async function RootLayout({ children }) {
         />
 
         <script async src="https://js.pusher.com/7.2/pusher.min.js" />
-        <StructuredData data={websiteSchema} />
-        {productSchema && <StructuredData data={productSchema} />}
+        <StructuredData data={searchAppearanceSchema} />
       </head>
 
       <body style={{ overflow: "auto", background: "#fff" }}>
