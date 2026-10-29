@@ -176,8 +176,7 @@ app.get("/categories", async (req, res) => {
   const pool = await db();
 
   const { rows } = await pool.query(
-    // `SELECT * FROM categories WHERE existing_product_count > 0 ORDER BY category ASC`
-    `SELECT * FROM categories`,
+    `SELECT * FROM categories WHERE COALESCE(existing_product_count, 0) > 0 ORDER BY category ASC`,
   );
   res.json(rows);
 });

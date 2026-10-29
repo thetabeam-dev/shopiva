@@ -34,9 +34,12 @@
         font-weight: 1000;
     }
 
-    #header-logo-cnt img {
-        height: 50px;
-        width: 50px;
+    #header-logo-cnt img,
+    .header .inscription {
+        height: 40px;
+        width: 40px;
+        max-width: 40px;
+        object-fit: contain;
     }
 
     ul li div:hover {
@@ -254,13 +257,16 @@
 
     .download_btn {
         width: 100%;
-        height: 100px;
+        min-height: 110px;
         display: flex;
         flex-direction: row;
         justify-content: space-between;
+        align-items: stretch;
+        gap: 12px;
         cursor: pointer;
-        padding: 20px;
+        padding: 16px;
         margin-top: 20px;
+        box-sizing: border-box;
     }
 
     .download_btn {
@@ -294,11 +300,33 @@
         border-radius: 8px;
     }
 
-    .download_btn button {
+    .download_btn button,
+    .download_btn a {
         width: 48%;
-        padding: 0;
+        min-height: 64px;
+        padding: 10px 16px;
         border: none;
-        background-color: transparent;
+        background-color: #fff;
+        border-radius: 12px;
+        color: #00926E;
+        text-decoration: none;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        box-sizing: border-box;
+    }
+
+    .download_btn a img {
+        height: 32px;
+        width: 32px;
+        flex-shrink: 0;
+    }
+
+    .download_btn a b {
+        font-size: 0.95rem;
+        white-space: nowrap;
     }
 
     #about {

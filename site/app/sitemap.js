@@ -2,15 +2,14 @@ import { query } from "./api/lib/database";
 import {
   LEGAL_AND_DOC_LINKS,
   SITE_ORIGIN,
-  categoryLinks,
 } from "../lib/siteNavigation";
+import { listCategoriesWithProducts } from "../lib/storefrontCategories";
 
 const STATIC_PATHS = [
   "/",
   "/vendors",
   "/pricing",
   ...LEGAL_AND_DOC_LINKS.map((link) => link.path),
-  ...categoryLinks().map((link) => link.path),
 ];
 
 function entry(path, lastModified = new Date(), priority = 0.6) {
@@ -52,7 +51,12 @@ export default async function sitemap() {
   );
 
   try {
-    return [...pages, ...(await shopEntries())];
+    const categories = await listCategoriesWithProducts();
+    return [
+      ...pages,
+      ...categories.map((category) => entry(category.path, new Date(), 0.8)),
+      ...(await shopEntries()),
+    ];
   } catch (error) {
     console.error("Sitemap storefront lookup failed:", error);
     return pages;

@@ -44,8 +44,8 @@ import {
   APP_STORE_URL,
   LEGAL_AND_DOC_LINKS,
   PLAY_STORE_URL,
-  categoryLinks,
 } from "../../lib/siteNavigation";
+import { formatCategoryLabel } from "../../lib/categoryLabel";
 
 // ============================================================================
 // CONSTANTS
@@ -115,6 +115,7 @@ function CustomerFreeLayout({ children }) {
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [screenWidth, setScreenWidth] = useState(0);
   const [headerScrolled, setHeaderScrolled] = useState(false);
+  const [shopCategories, setShopCategories] = useState([]);
 
   const layoutRef = useRef(null);
   const headerRef = useRef(null);
@@ -122,6 +123,23 @@ function CustomerFreeLayout({ children }) {
   // ============================================================================
   // EFFECTS
   // ============================================================================
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/storefront/categories")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (active && Array.isArray(payload?.categories)) {
+          setShopCategories(payload.categories);
+        }
+      })
+      .catch(() => {
+        if (active) setShopCategories([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Update logged in state based on entrepreneur ID
   useEffect(() => {
@@ -301,10 +319,22 @@ function CustomerFreeLayout({ children }) {
         className={`header${headerScrolled ? " header--scrolled" : ""}`}
       >
         {/* Logo Section */}
-        <section id="header-logo-cnt">
-          &nbsp;
-          <img className="inscription" src={logo_img.src} alt="" />
-          {/* <h3>DeeDyte</h3> */}
+        <section id="header-logo-cnt" style={{ width: "fit-content", flex: "0 0 auto" }}>
+          <img
+            className="inscription"
+            src={logo_img.src}
+            alt="DeeDyte"
+            width={40}
+            height={40}
+            style={{
+              height: 40,
+              width: 40,
+              maxHeight: 40,
+              maxWidth: 40,
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
         </section>
 
         {/* Desktop Navigation */}
@@ -378,6 +408,9 @@ function CustomerFreeLayout({ children }) {
                 className="footer-logo"
                 src={logo_img.src}
                 alt="Deedyte logo"
+                width={48}
+                height={48}
+                style={{ width: 48, height: 48, objectFit: "contain" }}
               />
             </div>
             <span className="footer-contact-spacer" aria-hidden="true" />
@@ -389,13 +422,11 @@ function CustomerFreeLayout({ children }) {
           <div className="footer-column">
             <h6 className="footer-heading">Shop categories</h6>
             <ul className="footer-links">
-              {categoryLinks().map((category) => (
-                <li
-                  className="footer-link"
-                  key={category.path}
-                  onClick={() => (window.location.href = category.path)}
-                >
-                  {category.title}
+              {shopCategories.map((category) => (
+                <li className="footer-link" key={category.path}>
+                  <a href={category.path} style={{ color: "#fff" }}>
+                    {formatCategoryLabel(category.title)}
+                  </a>
                 </li>
               ))}
             </ul>
@@ -405,12 +436,22 @@ function CustomerFreeLayout({ children }) {
             <h6 className="footer-heading">Get the app</h6>
             <ul className="footer-links">
               <li className="footer-link">
-                <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={APP_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#fff" }}
+                >
                   App Store
                 </a>
               </li>
               <li className="footer-link">
-                <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#fff" }}
+                >
                   Google Play
                 </a>
               </li>

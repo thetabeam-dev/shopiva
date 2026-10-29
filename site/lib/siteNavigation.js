@@ -1,18 +1,5 @@
 export const SITE_ORIGIN = "https://www.deedyte.com";
 
-export const CATEGORY_NAMES = [
-  "apparel & accessories",
-  "beauty",
-  "jewelry & watches & eyewear",
-  "shoes & accessories",
-  "home appliances",
-  "lights & lighting",
-  "kitchenware & cookware",
-  "storage & organizations",
-  "electronics",
-  "toiletries",
-];
-
 /** Legal and informational pages Google should treat as site sections, not products. */
 export const LEGAL_AND_DOC_LINKS = [
   { title: "Legal", path: "/legal" },
@@ -23,9 +10,9 @@ export const LEGAL_AND_DOC_LINKS = [
 ];
 
 /** Pages we want as Google sitelinks: categories plus a compact legal group. */
-export function sitelinkSections() {
+export function sitelinkSections(categories = []) {
   return [
-    ...categoryLinks(),
+    ...categories,
     { title: "Legal", path: "/legal" },
     { title: "Contact Us", path: "/contact" },
     { title: "About", path: "/about" },
@@ -47,17 +34,6 @@ export const SOCIAL_PROFILE_URLS = [
 
 export const ORGANIZATION_LOGO =
   "https://www.deedyte.com/api/logo";
-
-export function categoryPath(name) {
-  return `/store/${encodeURIComponent(name.replaceAll(" ", ""))}`;
-}
-
-export function categoryLinks() {
-  return CATEGORY_NAMES.map((title) => ({
-    title,
-    path: categoryPath(title),
-  }));
-}
 
 export function absoluteUrl(path) {
   if (!path || path === "/") return `${SITE_ORIGIN}/`;

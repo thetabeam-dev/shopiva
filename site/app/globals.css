@@ -16,6 +16,27 @@
 
 @import "./styles/site-footer.css";
 
+#header-logo-cnt {
+  width: fit-content;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+#header-logo-cnt img,
+#header-logo-cnt img.inscription,
+.header .inscription {
+  height: 40px !important;
+  width: 40px !important;
+  max-height: 40px !important;
+  max-width: 40px !important;
+  object-fit: contain !important;
+  display: block;
+}
+
+.header {
+  overflow: hidden;
+}
+
 /* ============================================================================
    1. CSS VARIABLES
    ============================================================================ */

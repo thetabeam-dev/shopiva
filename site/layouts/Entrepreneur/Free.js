@@ -183,6 +183,10 @@ export default function EntrepreneurFreeLayout({ children }) {
     );
   };
 
+  const isPublicInfoPage = ["/privacy-policy", "/terms-of-use", "/about", "/legal", "/contact"].some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+
   /**
    * Renders the desktop navigation menu
    */
@@ -409,11 +413,12 @@ export default function EntrepreneurFreeLayout({ children }) {
         {screenWidth < MOBILE_MENU_BREAKPOINT && renderMobileMenuButton()}
       </div>
 
-      {/* Hero Section */}
-      <header>
-        {isLandingPage() && renderHeroSection()}
-        {renderFeatureHighlights()}
-      </header>
+      {!isPublicInfoPage ? (
+        <header>
+          {isLandingPage() && renderHeroSection()}
+          {renderFeatureHighlights()}
+        </header>
+      ) : null}
 
       {/* Dropdown Menus */}
       {solutionMenu && <Solution />}

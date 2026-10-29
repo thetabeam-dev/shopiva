@@ -8,6 +8,7 @@ import {
   absoluteUrl,
   sitelinkSections,
 } from "./siteNavigation";
+import { listCategoriesWithProducts } from "./storefrontCategories";
 
 async function marketplaceRating() {
   try {
@@ -34,7 +35,10 @@ async function marketplaceRating() {
 }
 
 export async function buildSearchAppearanceSchema() {
-  const rating = await marketplaceRating();
+  const [rating, categories] = await Promise.all([
+    marketplaceRating(),
+    listCategoriesWithProducts().catch(() => []),
+  ]);
   const organizationId = `${SITE_ORIGIN}/#organization`;
   const websiteId = `${SITE_ORIGIN}/#website`;
 
@@ -128,7 +132,7 @@ export async function buildSearchAppearanceSchema() {
       {
         "@type": "ItemList",
         name: "DeeDyte sitelinks",
-        itemListElement: sitelinkSections().map((section, index) => ({
+        itemListElement: sitelinkSections(categories).map((section, index) => ({
           "@type": "SiteNavigationElement",
           position: index + 1,
           name: section.title,

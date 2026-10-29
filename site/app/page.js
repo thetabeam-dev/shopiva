@@ -268,46 +268,22 @@ export default function Dashboard() {
                   href={APP_STORE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "#fff",
-                    borderRadius: "10px",
-                    height: "100%",
-                    color: "#00926E",
-                    textDecoration: "none",
-                  }}
                 >
                   <img
                     src={APP_STORE_LINKS.ios}
                     alt="Download DeeDyte on the App Store"
-                    style={{ height: "45px", width: "45px" }}
                   />
-                  &nbsp;&nbsp;
                   <b>App Store</b>
                 </a>
                 <a
                   href={PLAY_STORE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "#fff",
-                    height: "100%",
-                    borderRadius: "10px",
-                    color: "#00926E",
-                    textDecoration: "none",
-                  }}
                 >
                   <img
                     src={APP_STORE_LINKS.android}
                     alt="Download DeeDyte on Google Play"
-                    style={{ height: "45px", width: "45px" }}
                   />
-                  &nbsp;&nbsp;
                   <b>Play Store</b>
                 </a>
               </div>

@@ -150,6 +150,16 @@ ul li{
   list-style: none;
 }
 
+.site-footer .footer-link a,
+.site-footer .footer-link a:link,
+.site-footer .footer-link a:visited,
+.site-footer .footer-link a:hover,
+.site-footer .footer-link a:active,
+.site-footer .footer-link a:focus {
+  color: #fff !important;
+  text-decoration: none;
+}
+
 .site-footer .footer-divider {
   width: 100%;
   border: 0;
@@ -268,8 +278,8 @@ ul li{
 
 
   .site-footer .footer-logo {
-    height: 88px;
-    width: 88px;
+    height: 48px;
+    width: 48px;
   }
 
   .site-footer .footer-heading {
@@ -331,8 +341,8 @@ ul li{
   }
 
   .site-footer .footer-logo {
-    height: 90px;
-    width: 90px;
+    height: 56px;
+    width: 56px;
   }
 
   .site-footer .footer-heading {

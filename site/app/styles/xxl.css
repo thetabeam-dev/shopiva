@@ -235,12 +235,15 @@
 
     .download_btn{
         width: 100%;
-        height: 100px;
+        min-height: 120px;
         display: flex;
         flex-direction: row;
         justify-content: space-between;
+        align-items: stretch;
+        gap: 16px;
         cursor: pointer;
         padding: 20px;
+        box-sizing: border-box;
     }
 
     .order_btn{
@@ -270,11 +273,33 @@
         border-radius: 15px;
     }
 
-    .download_btn button{
+    .download_btn button,
+    .download_btn a{
         width: 48%;
-        padding: 0;
+        min-height: 72px;
+        padding: 12px 24px;
         border: none;
-        background-color: transparent;
+        background-color: #fff;
+        border-radius: 14px;
+        color: #00926E;
+        text-decoration: none;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        box-sizing: border-box;
+    }
+
+    .download_btn a img{
+        height: 36px;
+        width: 36px;
+        flex-shrink: 0;
+    }
+
+    .download_btn a b{
+        font-size: 1.15rem;
+        white-space: nowrap;
     }
     
     #about{
