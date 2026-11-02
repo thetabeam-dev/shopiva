@@ -8,22 +8,22 @@ export const MODERATION_CONFIG = Object.freeze({
   HISTORY_MAX_MESSAGES: 10,
 
   /** Ignore prior fragments older than this (time decay). */
-  CONTEXT_WINDOW_MS: 120_000,
+  CONTEXT_WINDOW_MS: 180_000,
 
   /** Merged digit-only string length threshold (requires ≥2 contributing messages). */
-  MIN_SPLIT_DIGIT_LEN: 7,
+  MIN_SPLIT_DIGIT_LEN: 6,
 
   /** Treat long merged digit blobs as higher confidence. */
   STRONG_DIGIT_MERGE_LEN: 10,
 
   /** Short numeric bursts inside this window contribute “rapid fragment” risk. */
-  RAPID_FRAGMENT_WINDOW_MS: 50_000,
+  RAPID_FRAGMENT_WINDOW_MS: 180_000,
 
   /** Messages longer than this are not counted as “numeric fragments”. */
-  RAPID_FRAGMENT_MAX_LEN: 6,
+  RAPID_FRAGMENT_MAX_LEN: 8,
 
   /** How many rapid numeric touches trigger a violation. */
-  RAPID_FRAGMENT_MIN_COUNT: 3,
+  RAPID_FRAGMENT_MIN_COUNT: 2,
 
   /** Context / combined risk must meet this to hard-block when only contextual signals fire. */
   CONTEXT_BLOCK_RISK_SCORE: 75,

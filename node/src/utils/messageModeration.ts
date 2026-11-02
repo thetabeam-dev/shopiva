@@ -102,7 +102,7 @@ const RE_PHONE_GROUPED =
   /\b(?:\(\d{3}\)|\d{3})[\s.\-]?\d{3}[\s.\-]?\d{4}\b/;
 const RE_DIGIT_RUN_SPACED = /\b\d(?:[\s.\-_/]+\d){5,}\b/;
 const RE_SOCIAL_WORD =
-  /\b(?:whatsapp|wa\b|telegram|instagram|insta\b|facebook|fb\b|messenger|twitter|x\.com|tiktok|snapchat|discord|signal|viber|linkedin|youtube\.com|youtu\.be)\b/i;
+  /\b(?:whatsapp|whats?\s*app|what[\s.\-_]*sapp|wa\b|telegram|instagram|insta\b|facebook|fb\b|messenger|twitter|x\.com|tiktok|snapchat|discord|signal|viber|linkedin|youtube\.com|youtu\.be)\b/i;
 const RE_AT_HANDLE = /@[a-z0-9_]{2,30}\b/i;
 const RE_OFF_PLATFORM_INTENT = new RegExp(
   [
@@ -128,6 +128,36 @@ function collapseDigitSeparators(s: string): string {
   return s.replace(/(\d)(?:[\s.\-_/]+(?=\d))+/g, "$1");
 }
 
+/** Treat emoji, punctuation, and invisible chars between digits as separators. */
+function collapseObfuscation(s: string): string {
+  return String(s ?? "")
+    .replace(/[\u200B-\u200D\uFEFF\u2060\uFE0F]/g, "")
+    .replace(/(\d)(?:[^0-9A-Za-z]+)(?=\d)/g, "$1");
+}
+
+function digitBlob(value: string): string {
+  return collapseObfuscation(value).replace(/\D/g, "");
+}
+
+function looksLikePhone(value: string): boolean {
+  const digits = digitBlob(value);
+  return (
+    RE_PHONE_NG.test(value) ||
+    RE_PHONE_INTL_PLUS.test(value) ||
+    RE_PHONE_GROUPED.test(value) ||
+    (digits.length >= 10 &&
+      digits.length <= 15 &&
+      /(?:234|0)(?:7[0-9]|8[01]|9[01])\d{8}/.test(digits))
+  );
+}
+
+/** Start of an NG mobile number sent in pieces, e.g. "070 😍😍 613". */
+function looksLikePhoneFragment(value: string): boolean {
+  const digits = digitBlob(value);
+  if (digits.length < 6 || digits.length > 15) return false;
+  return RE_NG_DIGIT_PREFIX.test(digits);
+}
+
 function normalizeSpokenDigits(s: string): string {
   let out = s.toLowerCase();
   for (const [word, digit] of SPOKEN_DIGIT_MAP) {
@@ -137,8 +167,10 @@ function normalizeSpokenDigits(s: string): string {
 }
 
 export function normalizeContextCorpus(s: string): string {
-  return collapseDigitSeparators(
-    normalizeSpokenDigits(String(s ?? "").toLowerCase()),
+  return collapseObfuscation(
+    collapseDigitSeparators(
+      normalizeSpokenDigits(String(s ?? "").toLowerCase()),
+    ),
   );
 }
 
@@ -224,18 +256,23 @@ export function scanMessage(message: string | null | undefined): ScanResult {
   }
 
   const collapsed = collapseDigitSeparators(trimmed);
+  const deobfuscated = collapseObfuscation(trimmed);
   const hasStructuredPhone =
-    RE_PHONE_NG.test(trimmed) ||
-    RE_PHONE_INTL_PLUS.test(trimmed) ||
-    RE_PHONE_GROUPED.test(trimmed) ||
-    RE_PHONE_NG.test(collapsed) ||
-    RE_PHONE_INTL_PLUS.test(collapsed) ||
-    RE_PHONE_GROUPED.test(collapsed);
+    looksLikePhone(trimmed) ||
+    looksLikePhone(collapsed) ||
+    looksLikePhone(deobfuscated);
 
   if (hasStructuredPhone) {
     addViolation(VIOLATION_TYPES.PHONE_NUMBER, seen, details);
   }
-  if (RE_DIGIT_RUN_SPACED.test(trimmed) && !hasStructuredPhone) {
+  if (
+    !hasStructuredPhone &&
+    (looksLikePhoneFragment(trimmed) ||
+      looksLikePhoneFragment(collapsed) ||
+      looksLikePhoneFragment(deobfuscated) ||
+      RE_DIGIT_RUN_SPACED.test(trimmed) ||
+      RE_DIGIT_RUN_SPACED.test(deobfuscated))
+  ) {
     addViolation(VIOLATION_TYPES.OBFUSCATED_PHONE, seen, details);
   }
 
@@ -248,7 +285,10 @@ export function scanMessage(message: string | null | undefined): ScanResult {
       RE_PHONE_GROUPED.test(spokenCollapsed);
     if (spokenLooksPhone) {
       addViolation(VIOLATION_TYPES.PHONE_NUMBER, seen, details);
-    } else if (/\b\d{10,15}\b/.test(spokenCollapsed)) {
+    } else if (
+      looksLikePhoneFragment(spokenCollapsed) ||
+      /\b\d{10,15}\b/.test(spokenCollapsed)
+    ) {
       addViolation(VIOLATION_TYPES.OBFUSCATED_PHONE, seen, details);
     }
   }
@@ -274,9 +314,33 @@ export function scanAndValidateMessage(message: string | null | undefined): Scan
 
 function isNumericFragment(text: string): boolean {
   const t = String(text ?? "").trim();
-  if (!t || t.length > MODERATION_CONFIG.RAPID_FRAGMENT_MAX_LEN) return false;
-  const digits = (t.match(/\d/g) ?? []).length;
-  return digits >= 1 && digits / Math.max(1, t.length) >= 0.34;
+  if (!t) return false;
+  const compact = collapseObfuscation(t).replace(/\s+/g, "");
+  if (!compact || compact.length > MODERATION_CONFIG.RAPID_FRAGMENT_MAX_LEN) {
+    return false;
+  }
+  const digits = (compact.match(/\d/g) ?? []).length;
+  return digits >= 1 && digits / Math.max(1, compact.length) >= 0.34;
+}
+
+/** 080😍😍 / 326😍😍 — short digit-only chunks used to drip a phone number. */
+function isShortDigitFragment(text: string): boolean {
+  const t = String(text ?? "").trim();
+  if (!t || /[a-zA-Z]/.test(t)) return false;
+  const digits = digitBlob(t);
+  return digits.length >= 2 && digits.length <= 4;
+}
+
+function assembledDigits(parts: string[]): string {
+  return parts.map((part) => digitBlob(part)).join("");
+}
+
+function looksLikeAssembledNgNumber(digits: string): boolean {
+  if (digits.length < 6 || digits.length > 15) return false;
+  return (
+    RE_NG_DIGIT_PREFIX.test(digits) ||
+    /(?:234|0)(?:7[0-9]|8[01]|9[01])/.test(digits)
+  );
 }
 
 function countRapidNumericFragments(
@@ -331,7 +395,7 @@ export function scanConversationContext(
 
   const merged = parts.join(" ");
   const mergedNorm = normalizeContextCorpus(merged);
-  const digitsOnly = mergedNorm.replace(/\D/g, "");
+  const digitsOnly = assembledDigits(parts);
 
   const scanMerged = scanMessage(merged);
   const scanCurrent = scanMessage(current);
@@ -357,13 +421,15 @@ export function scanConversationContext(
 
   const minLen = MODERATION_CONFIG.MIN_SPLIT_DIGIT_LEN;
   const strongLen = MODERATION_CONFIG.STRONG_DIGIT_MERGE_LEN;
+  const shortFragments = parts.filter(isShortDigitFragment).length;
   if (digitContributors >= 2 && digitsOnly.length >= minLen) {
     const ngShape =
+      looksLikeAssembledNgNumber(digitsOnly) ||
       RE_PHONE_NG.test(mergedNorm) ||
       RE_PHONE_INTL_PLUS.test(mergedNorm) ||
       RE_PHONE_GROUPED.test(mergedNorm) ||
-      RE_NG_DIGIT_PREFIX.test(digitsOnly) ||
-      digitsOnly.length >= strongLen;
+      digitsOnly.length >= strongLen ||
+      (shortFragments >= 2 && looksLikeAssembledNgNumber(digitsOnly));
     if (ngShape) {
       addViolation(VIOLATION_TYPES.SPLIT_DIGIT_SEQUENCE, seen, details);
     }

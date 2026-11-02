@@ -275,7 +275,7 @@ export async function SigninService(payload: AuthData) {
     const users = await model.findUserByEmail(payload.email);
 
     if (users.length === 0) {
-        throw new Error("Invalid email or password");
+        throw new Error("email does not exist");
     }
 
     const user = users[0];
@@ -284,9 +284,8 @@ export async function SigninService(payload: AuthData) {
     const passwordMatch = await bcrypt.compare(payload.password, user.password);
 
     if (!passwordMatch) {
-        // Record failed login attempt
         await model.recordFailedLoginAttempt(user.id);
-        throw new Error("Invalid email or password");
+        throw new Error("incorrect password");
     }
 
     // Reset login attempts on successful login

@@ -1831,6 +1831,7 @@ export default function OrderDetailScreen() {
                 {
                   backgroundColor: STATUS_THEME[statusKey]?.dot,
                 },
+                statusKey === 'order_completed' && styles.btnStatusTall,
               ]}
             >
               <Text style={styles.btnPrimaryText} numberOfLines={1}>
@@ -1870,7 +1871,9 @@ export default function OrderDetailScreen() {
               {
                 backgroundColor: STATUS_THEME[statusKey]?.dot,
               },
-              statusKey === 'order_confirmed' && styles.btnReleaseFunds,
+              (statusKey === 'order_confirmed' ||
+                statusKey === 'order_completed') &&
+                styles.btnStatusTall,
               releasingFunds && styles.btnPrimaryDisabled,
             ]}
             disabled={releasingFunds}
@@ -2941,17 +2944,23 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     flex: 1.2,
-    height: 44,
+    minHeight: 52,
+    height: 52,
     borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
-    // backgroundColor: "#000",
-    // backgroundColor: COLOR.BRAND_COLOR,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  btnStatusTall: {
+    height: undefined,
+    minHeight: 52,
+    paddingVertical: 12,
   },
   btnReleaseFunds: {
     height: undefined,
     minHeight: 52,
-    paddingVertical: 6,
+    paddingVertical: 12,
   },
   releaseCountdown: {
     color: '#FFFFFF',

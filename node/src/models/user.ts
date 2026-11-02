@@ -330,19 +330,18 @@ export class model{
     static recordFailedLoginAttempt = withErrorHandling(async (id: number) => {
         const { rows } = await (await db()).query(
             `
-                UPDATE users 
+                UPDATE users
                 SET loginAttempts = jsonb_set(
-                    loginAttempts,
-                    '{count}',
-                    to_jsonb((loginAttempts->>'count')::int + 1)
-                ),
-                loginAttempts = jsonb_set(
-                    loginAttempts,
+                    jsonb_set(
+                        COALESCE(loginAttempts, '{"count": 0, "lastAttempt": null, "history": []}'::jsonb),
+                        '{count}',
+                        to_jsonb(COALESCE((loginAttempts->>'count')::int, 0) + 1)
+                    ),
                     '{lastAttempt}',
-                    to_jsonb(NOW())
+                    to_jsonb(to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
                 ),
                 updatedAt = NOW()
-                WHERE id = $1 
+                WHERE id = $1
                 RETURNING *
             `,
             [id]

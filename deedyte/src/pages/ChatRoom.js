@@ -158,6 +158,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         text: String(row.content ?? '').trim(),
         outgoing,
         timeLabel,
+        sentAt: Number.isNaN(d.getTime()) ? Date.now() : d.getTime(),
       };
     },
     [user?.id],
@@ -186,6 +187,10 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         .map((x) => mapMessage(/** @type {Record<string, unknown>} */(x)))
         .filter((x) => x.text);
       setMessages(mapped);
+      outgoingSendHistoryRef.current = mapped
+        .filter((row) => row.outgoing && row.text)
+        .slice(-MODERATION_CONFIG.HISTORY_MAX_MESSAGES)
+        .map((row) => ({ text: row.text, sentAt: row.sentAt ?? Date.now() }));
       refreshUnreadChats(appRolePayload).catch(() => {});
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
     } finally {
