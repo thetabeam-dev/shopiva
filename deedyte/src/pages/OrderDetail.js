@@ -872,6 +872,13 @@ export default function OrderDetailScreen() {
 
   const onCancelDelivery = useCallback(async () => {
     if (!statusKey) return;
+    if (statusKey === 'order_completed') {
+      Alert.alert(
+        'Cannot cancel a completed order',
+        'Funds have already been released. This order can no longer be cancelled.',
+      );
+      return;
+    }
     if (statusKey === 'order_delivered') {
       Alert.alert(
         'Cannot cancel order after delivery',
@@ -1163,7 +1170,8 @@ export default function OrderDetailScreen() {
     // },
     ...(auth.activeRole === 'vendor' &&
       orderInfo?.order_events?.length > 1 &&
-      !isOrderCancelled
+      !isOrderCancelled &&
+      statusKey !== 'order_completed'
       ? [
         {
           key: 'cancel-order',
@@ -1531,6 +1539,7 @@ export default function OrderDetailScreen() {
             ) : null}
             {!isOrderCancelled &&
               statusKey !== 'order_confirmed' &&
+              statusKey !== 'order_completed' &&
               statusKey !== 'order_rejected' ? (
               <View style={styles.escrowActions}>
                 {statusKey !== 'order_disputed' && (

@@ -5,6 +5,7 @@
  */
 
 import type { Request, Response } from "express";
+import { scanMessage } from "../../utils/messageModeration.js";
 import {
   CreateProductService,
   UpdateProductService,
@@ -19,6 +20,18 @@ import {
   UpdateOrderStatusForShopService,
   GetOrderDetailByIdService,
 } from "../../services/business/product.js";
+
+function rejectContactInDescription(description: unknown, res: Response): boolean {
+  const descriptionStr = typeof description === "string" ? description.trim() : "";
+  if (descriptionStr && !scanMessage(descriptionStr).isAllowed) {
+    res.status(400).json({
+      success: false,
+      error: "Product descriptions cannot include contact details or links.",
+    });
+    return true;
+  }
+  return false;
+}
 
 /**
  * Create a new product.
@@ -60,6 +73,8 @@ export async function CreateProductController(req: Request, res: Response) {
     } = req.body;
 
     console.log(req.body);
+
+    if (rejectContactInDescription(description, res)) return;
 
     const result = await CreateProductService({
       shop_id: shopId,
@@ -130,6 +145,8 @@ export async function UpdateProductController(req: Request, res: Response) {
       published_at,
       is_featured,
     } = req.body;
+
+    if (rejectContactInDescription(description, res)) return;
 
     const result = await UpdateProductService({
       id: productId,

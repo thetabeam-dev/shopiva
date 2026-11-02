@@ -35,6 +35,7 @@ import {
   updateProduct,
 } from '../../api/product';
 import { useProfile } from '../../context/ProfileContext';
+import { scanMessage } from '../../moderation/messageModeration';
 import {
   selectCategoryTree,
   selectCategoriesState,
@@ -1310,11 +1311,20 @@ export default function VendorCreateProductScreen() {
     //   return;
     // }
 
+    const descriptionTrim = String(description ?? '').trim();
+    if (descriptionTrim && !scanMessage(descriptionTrim).isAllowed) {
+      Alert.alert(
+        'Description not allowed',
+        'Product descriptions cannot include phone numbers, email addresses, or links to chat off DeeDyte. Keep buyer contact on the app.',
+      );
+      return;
+    }
+
     setSaveSubmitting(true);
     try {
       const { productPayload, inventoryPayload } = buildProductCreatePayloads({
         title,
-        description,
+        description: descriptionTrim,
         category: categoryKey,
         subCategory,
         type: productType,
