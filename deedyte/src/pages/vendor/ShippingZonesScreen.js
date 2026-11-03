@@ -171,7 +171,7 @@ export default function ShippingZonesScreen({ navigation, route }) {
           <Text style={sharedStyles.sectionSubtitle}>Loading zones…</Text>
         ) : zones.length === 0 ? (
           <Text style={sharedStyles.sectionSubtitle}>
-            No shipping zones yet. Tap "Add Zone" to create one.
+            No shipping zones yet. Tap “Add Zone”, pick a geo-political zone, then the states you ship to and the fee.
           </Text>
         ) : null}
 

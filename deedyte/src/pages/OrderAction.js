@@ -23,13 +23,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoredUser } from '../auth/session';
 import { connectChatSocket, emitSocketAck } from '../socket/chatSocket';
 import { set_orderInfo } from '../../redux/order';
-import { useDispatch } from 'react-redux';
-import { fetchShopOwner, uploadDeliveryEvidence } from '../api';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchShopDetails, fetchShopOwner, uploadDeliveryEvidence } from '../api';
 import { getStorefrontShopDelivery } from '../api/storefront';
 import { formatNaira } from '../utils/formatNaira';
 import { computeMultiItemShippingFee, normalizeShopDelivery } from '../utils/vendorDelivery';
 import { formatShippingAddress, shippingAddressState } from '../utils/shippingAddress';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const VendorRejectReason = [
   { label: 'out of stock', value: 'out_of_stock' },
@@ -50,6 +51,9 @@ const FULFILLMENT_TIMEFRAME_OPTIONS = [
   { label: 'Within 48 hours (tomorrow)', value: '48_hrs' },
   { label: 'Within 72 hours (3 days)', value: '72_hrs' },
   { label: 'Within 96 hours (4 days)', value: '96_hrs' },
+  { label: 'Within 120 hours (5 days)', value: '120_hrs' },
+  { label: 'Within 144 hours (6 days)', value: '144_hrs' },
+  { label: 'Within 168 hours (7 days)', value: '168_hrs' },
 ];
 
 const SHIPPING_METHOD_OPTIONS = [
@@ -66,17 +70,41 @@ function shippingUsesTrackingId(method) {
   return method != null && method !== 'self_delivery';
 }
 
+function phoneDigits(raw) {
+  return String(raw ?? '').replace(/\D/g, '');
+}
+
+function isValidTrackingPhone(raw) {
+  const digits = phoneDigits(raw);
+  return digits.length === 11 && digits.startsWith('0');
+}
+
+function phonesMatch(a, b) {
+  const da = phoneDigits(a);
+  const db = phoneDigits(b);
+  if (da.length < 10 || db.length < 10) return false;
+  return da.slice(-10) === db.slice(-10);
+}
+
 /** Who handles the final mile when marking out for delivery. */
 const FINAL_DELIVERY_HANDLER_OPTIONS = [
   { label: 'Third-party logistics', value: 'third_party_logistics' },
   { label: 'Dispatch rider', value: 'dispatch_rider' },
   { label: 'Courier service', value: 'courier_service' },
+  { label: 'Bus transport / waybill', value: 'bus_waybill' },
   { label: 'My team / Me', value: 'vendor_team' },
   { label: 'Customer pickup (at hub)', value: 'customer_pickup_hub' },
 ];
 
+function mapShippingMethodToFinalHandler(method) {
+  const key = String(method ?? '').trim();
+  if (!key) return null;
+  if (key === 'self_delivery') return 'vendor_team';
+  if (FINAL_DELIVERY_HANDLER_OPTIONS.some(o => o.value === key)) return key;
+  return null;
+}
+
 const MAX_DELIVERY_EVIDENCE = 8;
-const MIN_DELIVERY_EVIDENCE = 2;
 
 const CANCEL_ORDER_REASONS = [
   { label: 'Changed my mind / Ordered by mistake', value: 'changed_mind' },
@@ -489,7 +517,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                   }
                   setLoading(!loading);
                   const u = await getStoredUser();
-                  
+
 
                   async function AcceptSubmit() {
                     const response = await emitSocketAck('order_acceptance', {
@@ -522,7 +550,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                       {
                         text: 'Confirm',
                         style: 'default',
-                        onPress:  AcceptSubmit,
+                        onPress: AcceptSubmit,
                       },
                     ],
                   );
@@ -592,9 +620,9 @@ function Processing({ data }) {
     <>
       {(
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-        {loading && <Spinner />}
+          {loading && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -689,10 +717,35 @@ function Shipping({ data }) {
   const [estimatedDelivery, setEstimatedDelivery] = useState(null);
   const [logisticProvider, setLogisticProvider] = useState('');
   const [trackingId, setTrackingId] = useState('');
+  const [vendorPhone, setVendorPhone] = useState('');
+  const [shopContactPhone, setShopContactPhone] = useState('');
 
   useEffect(() => {
     connectChatSocket();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const u = await getStoredUser();
+      if (!cancelled) setVendorPhone(String(u?.phone ?? u?.phone_number ?? '').trim());
+      const shopId = data?.shop_id;
+      const userId = u?.id;
+      if (!shopId || !userId) return;
+      try {
+        const shop = await fetchShopDetails(shopId, userId);
+        if (cancelled) return;
+        setShopContactPhone(
+          String(shop.contactphone ?? shop.contactPhone ?? '').trim(),
+        );
+      } catch {
+        /* vendor/shop phones still used from the signed-in profile when shop fetch fails */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.shop_id]);
 
   const optionLabel = (options, value) =>
     options.find(o => o.value === value)?.label ?? null;
@@ -740,10 +793,17 @@ function Shipping({ data }) {
         return false;
       }
       const tid = trackingId.trim();
-      if (!tid) {
+      if (!isValidTrackingPhone(tid)) {
         Alert.alert(
-          'Tracking or reference ID required',
-          'Enter a waybill, tracking number, or reference for this shipment. Self delivery is the only option that skips this.',
+          'Logistics phone required',
+          'Enter an 11-digit phone number starting with 0.',
+        );
+        return false;
+      }
+      if (phonesMatch(tid, vendorPhone) || phonesMatch(tid, shopContactPhone)) {
+        Alert.alert(
+          'Use a logistics number',
+          'This cannot be your own phone number or your shop contact number. Enter the logistics provider’s number.',
         );
         return false;
       }
@@ -771,18 +831,23 @@ function Shipping({ data }) {
     if (response.success) {
       dispatch(set_orderInfo(response.result));
       navigation.goBack();
+    } else {
+      Alert.alert(
+        'Could not mark as shipping',
+        response?.message || response?.error || 'Try again.',
+      );
     }
   };
 
   return (
     <>
-     
+
 
       {(
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-         {loading && <Spinner />}
+          {loading && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -801,16 +866,17 @@ function Shipping({ data }) {
                 <ConfirmCheckbox
                   checked={handedOffForShipping}
                   onToggle={setHandedOffForShipping}
-                  label="I've shipped this order or released it for delivery / pickup"
+                  label="I've shipped this order or released it for shipping"
                   rowStyle={styles.processingCheckboxRow}
                 />
                 <View style={styles.processingChecklistDivider} />
                 <ConfirmCheckbox
                   checked={withinCommittedTimeframe}
                   onToggle={setWithinCommittedTimeframe}
-                  label="Delivery or pickup stays within the timeframe I committed to"
+                  label="Shipping stays within the timeframe I committed to"
                   rowStyle={styles.processingCheckboxRow}
                 />
+
               </View>
             </View>
 
@@ -869,18 +935,20 @@ function Shipping({ data }) {
                       styles.shippingTrackingLabel,
                     ]}
                   >
-                    Tracking or reference ID
+                    {`Tracking Number (${optionLabel(SHIPPING_METHOD_OPTIONS, shippingMethod) || 'shipping method'} phone number)`}
                   </Text>
                   <Text style={styles.processingFieldHint}>
-                    Waybill, AWB, rider/courier reference, bus waybill, or
-                    pickup code — anything the customer can use to trace the
-                    handoff. Not required for self delivery.
+                    11-digit phone number starting with 0. Do not use your personal number or your shop contact number.
                   </Text>
                   <TextInput
                     style={[styles.textInput, styles.acceptanceFormInput]}
-                    placeholder="Enter tracking or reference number"
+                    placeholder="08012345678"
                     value={trackingId}
-                    onChangeText={setTrackingId}
+                    onChangeText={(text) =>
+                      setTrackingId(phoneDigits(text).slice(0, 11))
+                    }
+                    keyboardType="phone-pad"
+                    maxLength={11}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
@@ -905,7 +973,7 @@ function Shipping({ data }) {
                 itemTextStyle={styles.processingDropdownItem}
                 iconStyle={styles.iconStyle}
                 data={FULFILLMENT_TIMEFRAME_OPTIONS}
-                maxHeight={280}
+                maxHeight={360}
                 labelField="label"
                 valueField="value"
                 placeholder="Select timeframe"
@@ -920,6 +988,17 @@ function Shipping({ data }) {
                 By confirming, you state that shipment or pickup details above
                 are accurate. Keep the customer updated if anything changes.
               </Text>
+              {shippingUsesTrackingId(shippingMethod) ? (
+                <View style={styles.shippingNotice}>
+                  <Icon name="information-circle" size={20} color="#B45309" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.shippingNoticeTitle}>Notice</Text>
+                    <Text style={styles.shippingNoticeText}>
+                      Please provide your phone number to the logistics provider. You’ll receive a call when your item arrives at the pickup location, so you can update your order status to Ready for Pickup.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
           </ScrollView>
           <View
@@ -971,14 +1050,37 @@ function OutForDelivery({ data }) {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const navigation = useNavigation();
+  const { orderInfo } = useSelector(s => s.orderInfo);
+  const shippingMethod = String(
+    data?.shipping_method ?? orderInfo?.order?.shipping_method ?? '',
+  );
+  const shippingTrackingPhone = phoneDigits(
+    data?.tracking_number ?? orderInfo?.order?.tracking_number ?? '',
+  ).slice(0, 11);
   const [loading, setLoading] = useState(false);
   const [confirmOutForDelivery, setConfirmOutForDelivery] = useState(false);
-  const [finalDeliveryHandler, setFinalDeliveryHandler] = useState(null);
+  const [finalDeliveryHandler, setFinalDeliveryHandler] = useState(() =>
+    mapShippingMethodToFinalHandler(shippingMethod),
+  );
   const [riderContact, setRiderContact] = useState('');
+  const [pickupStationAddress, setPickupStationAddress] = useState('');
+  const requiresPickupStation = shippingUsesTrackingId(shippingMethod);
 
   useEffect(() => {
     connectChatSocket();
   }, []);
+
+  useEffect(() => {
+    const mapped = mapShippingMethodToFinalHandler(shippingMethod);
+    if (mapped) setFinalDeliveryHandler(prev => prev ?? mapped);
+  }, [shippingMethod]);
+
+  useEffect(() => {
+    if (!shippingUsesTrackingId(shippingMethod) || !isValidTrackingPhone(shippingTrackingPhone)) {
+      return;
+    }
+    setRiderContact(prev => (prev.trim() ? prev : shippingTrackingPhone));
+  }, [shippingMethod, shippingTrackingPhone]);
 
   const optionLabel = (options, value) =>
     options.find(o => o.value === value)?.label ?? null;
@@ -992,6 +1094,9 @@ function OutForDelivery({ data }) {
       finalDeliveryHandler,
     ),
     rider_contact: riderContact.trim() || null,
+    pickup_station_address: requiresPickupStation
+      ? pickupStationAddress.trim() || null
+      : null,
   });
 
   const validate = () => {
@@ -1006,6 +1111,20 @@ function OutForDelivery({ data }) {
       Alert.alert(
         'Final delivery',
         'Select who is handling the final delivery.',
+      );
+      return false;
+    }
+    if (requiresPickupStation && pickupStationAddress.trim().length < 8) {
+      Alert.alert(
+        'Pickup station required',
+        'Enter the pickup station address. This is required when shipping is not self delivery.',
+      );
+      return false;
+    }
+    if (requiresPickupStation && !isValidTrackingPhone(riderContact)) {
+      Alert.alert(
+        'Rider contact required',
+        'Enter an 11-digit rider phone number starting with 0. This is required when shipping is not self delivery.',
       );
       return false;
     }
@@ -1025,18 +1144,23 @@ function OutForDelivery({ data }) {
     if (response.success) {
       dispatch(set_orderInfo(response.result));
       navigation.goBack();
+    } else {
+      Alert.alert(
+        'Could not update order',
+        response?.message || response?.error || 'Try again.',
+      );
     }
   };
 
   return (
     <>
-      
+
       {(
 
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-        {loading && <Spinner />}
+          {loading && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -1085,20 +1209,43 @@ function OutForDelivery({ data }) {
               />
             </View>
 
+            {requiresPickupStation ? (
+              <View style={styles.processingCard}>
+                <Text style={styles.processingFieldLabel}>
+                  Pickup station address
+                </Text>
+                <Text style={styles.processingFieldHint}>
+                  Where the customer or rider should collect this order. Required for logistics shipping.
+                </Text>
+                <TextInput
+                  style={[styles.textInput, styles.acceptanceFormInput, { minHeight: 88, textAlignVertical: 'top' }]}
+                  placeholder="Street, landmark, city"
+                  value={pickupStationAddress}
+                  onChangeText={setPickupStationAddress}
+                  multiline
+                  autoCapitalize="words"
+                />
+              </View>
+            ) : null}
+
             <View style={styles.processingCard}>
               <Text style={styles.processingFieldLabel}>
-                Rider contact number (optional)
+                {requiresPickupStation
+                  ? 'Rider contact number'
+                  : 'Rider contact number (optional)'}
               </Text>
               <Text style={styles.processingFieldHint}>
-                If a rider or driver is involved, share their phone number for
-                coordination.
+                {requiresPickupStation
+                  ? '11-digit phone number starting with 0. Required when shipping is not self delivery.'
+                  : 'If a rider or driver is involved, share their phone number for coordination.'}
               </Text>
               <TextInput
                 style={[styles.textInput, styles.acceptanceFormInput]}
-                placeholder="e.g. +234 801 234 5678"
+                placeholder="08012345678"
                 value={riderContact}
-                onChangeText={setRiderContact}
+                onChangeText={(text) => setRiderContact(phoneDigits(text).slice(0, 11))}
                 keyboardType="phone-pad"
+                maxLength={11}
               />
             </View>
 
@@ -1185,8 +1332,8 @@ function MarkAsDelivered({ data }) {
           fileName: f.name || 'photo.jpg',
           ...(f.isVirtual && f.convertibleToMimeTypes?.[0]?.mimeType
             ? {
-                convertVirtualFileToType: f.convertibleToMimeTypes[0].mimeType,
-              }
+              convertVirtualFileToType: f.convertibleToMimeTypes[0].mimeType,
+            }
             : {}),
         })),
         destination: 'cachesDirectory',
@@ -1273,13 +1420,6 @@ function MarkAsDelivered({ data }) {
       );
       return;
     }
-    if (evidence.length < MIN_DELIVERY_EVIDENCE) {
-      Alert.alert(
-        'Photos required',
-        `Add at least ${MIN_DELIVERY_EVIDENCE} photos: the buyer's signature and proof the order was delivered.`,
-      );
-      return;
-    }
     setLoading(!loading);
     const u = await getStoredUser();
     const response = await emitSocketAck('order_delivered', {
@@ -1305,13 +1445,13 @@ function MarkAsDelivered({ data }) {
 
   return (
     <>
-      
+
 
       {(
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-        {loading && <Spinner />}
+          {loading && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -1330,7 +1470,7 @@ function MarkAsDelivered({ data }) {
                 <ConfirmCheckbox
                   checked={confirmed}
                   onToggle={setConfirmed}
-                  label="I confirm this order was delivered to the customer."
+                  label="I confirm that this order has been shipped to the designated pickup location and is ready for customer collection."
                   rowStyle={styles.processingCheckboxRow}
                 />
               </View>
@@ -1338,15 +1478,13 @@ function MarkAsDelivered({ data }) {
 
             <View style={styles.processingCard}>
               <Text style={styles.processingFieldLabel}>
-                Delivery evidence (photos)
+                Delivery evidence (Optional)
               </Text>
               <Text style={styles.processingFieldHint}>
-                Add clear photos: buyer signature, then proof of delivery
-                (package / handoff). At least {MIN_DELIVERY_EVIDENCE} images, up
-                to {MAX_DELIVERY_EVIDENCE}. Scroll sideways to review.
+                Photos are optional. You can add proof of delivery (package / handoff), up to {MAX_DELIVERY_EVIDENCE} images.
               </Text>
               <ScrollView
-              keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="handled"
                 horizontal
                 nestedScrollEnabled
                 showsHorizontalScrollIndicator={false}
@@ -1378,8 +1516,8 @@ function MarkAsDelivered({ data }) {
                     style={({ pressed }) => [
                       styles.evidenceAddTile,
                       pressed &&
-                        !evidenceUploading &&
-                        styles.evidenceAddTilePressed,
+                      !evidenceUploading &&
+                      styles.evidenceAddTilePressed,
                       evidenceUploading && styles.evidenceAddTileDisabled,
                     ]}
                   >
@@ -1482,13 +1620,13 @@ function ConfirmDelivery({ data }) {
     const u = await getStoredUser();
     const response = await emitSocketAck('order_confirmed', {
       ...data,
-      meta: JSON.stringify({handedOffForShipping, withinCommittedTimeframe}),
+      meta: JSON.stringify({ handedOffForShipping, withinCommittedTimeframe }),
       outcome: 'success',
       actor_id: u.id,
     });
     if (response.success) {
       dispatch(set_orderInfo(response.result));
-      console.log("response - result",response.result);
+      console.log("response - result", response.result);
       const orderItems = Array.isArray(response?.result?.order?.order_items)
         ? response.result.order.order_items
         : Array.isArray(response?.result?.order_items)
@@ -1517,13 +1655,13 @@ function ConfirmDelivery({ data }) {
 
   return (
     <>
-      
+
       {(
-        
+
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-        {loading && <Spinner />}
+          {loading && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -1603,7 +1741,7 @@ function ConfirmDelivery({ data }) {
                 pressed && styles.btnAcceptPressed,
               ]}
             >
-              <Text style={styles.btnAcceptText}>Confirm & Pay Vendor</Text>
+              <Text style={styles.btnAcceptText}>Confirm Delivery</Text>
             </Pressable>
           </View>
         </FormKeyboardAvoiding>
@@ -1681,8 +1819,8 @@ function VendorCancelOrder({ data }) {
         Alert.alert(
           'Cancellation failed',
           response?.message ||
-            response?.error ||
-            'Could not cancel this order. Try again.',
+          response?.error ||
+          'Could not cancel this order. Try again.',
         );
       }
     } catch (e) {
@@ -1713,13 +1851,13 @@ function VendorCancelOrder({ data }) {
 
   return (
     <>
-      
+
       {(
-        
+
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-        {submitting && <Spinner />}
+          {submitting && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -1916,8 +2054,8 @@ function CancelOrder({ data }) {
         Alert.alert(
           'Cancellation failed',
           response?.message ||
-            response?.error ||
-            'Could not cancel this order. Try again.',
+          response?.error ||
+          'Could not cancel this order. Try again.',
         );
       }
     } catch (e) {
@@ -1985,13 +2123,13 @@ function CancelOrder({ data }) {
 
   return (
     <>
-      
+
       {(
-        
+
         <FormKeyboardAvoiding style={[styles.cnt, styles.processingRoot]}>
-        {submitting && <Spinner />}
+          {submitting && <Spinner />}
           <ScrollView
-              keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.processingScrollContent,
@@ -2439,6 +2577,29 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#333333',
     lineHeight: 22,
+  },
+  shippingNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 5,
+    backgroundColor: '#FFFBEB',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#F59E0B',
+  },
+  shippingNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  shippingNoticeText: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#78350F',
+    lineHeight: 20,
   },
   textInput: {
     borderColor: '#E0E0E0',

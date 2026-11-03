@@ -1128,7 +1128,7 @@ export default function ProfileShopInfoScreen() {
 
           <View style={styles.sectionDivider} />
 
-          <Text style={styles.sectionTitlePlain}>Verification</Text>
+          {/* <Text style={styles.sectionTitlePlain}>Verification</Text>
           <VerificationRow
             label="ID Card"
             status={idSt}
@@ -1175,7 +1175,7 @@ export default function ProfileShopInfoScreen() {
             }
           />
 
-          <View style={styles.sectionDivider} />
+          <View style={styles.sectionDivider} /> */}
 
           <View>
             <View

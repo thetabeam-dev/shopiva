@@ -16,6 +16,7 @@ import {
   type ShippingZone,
   type ShippingMultiItemDiscount,
 } from "../../models/business/shipping.js";
+import { assertValidShippingZone } from "../../utils/nigeriaGeoZones.js";
 
 /**
  * Save or update shipping fee model for a shop
@@ -100,9 +101,7 @@ export async function SaveShippingZoneService(
     throw new Error("Zone name is required");
   }
 
-  if (!Array.isArray(locations) || locations.length === 0) {
-    throw new Error("At least one location is required");
-  }
+  assertValidShippingZone(name, locations);
 
   if (baseFee <= 0) {
     throw new Error("Base fee must be greater than 0");

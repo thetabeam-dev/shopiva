@@ -410,7 +410,7 @@ export async function handleGetRooms(
 
 export async function handleGetRoomMessages(
   userId: number,
-  _nsp: Namespace,
+  nsp: Namespace,
   payload: Record<string, unknown>,
   ack?: unknown
 ): Promise<void> {
@@ -442,11 +442,15 @@ export async function handleGetRoomMessages(
     result: { messages },
     message: "ok",
   });
+  const others = await chatModel.otherParticipantIds(room_id, userId);
+  for (const uid of others) {
+    nsp.to(`user:${uid}`).emit("messages_read", { room_id, reader_id: userId });
+  }
 }
 
 export async function handleMarkMessageRead(
   userId: number,
-  _nsp: Namespace,
+  nsp: Namespace,
   payload: Record<string, unknown>,
   ack?: unknown
 ): Promise<void> {
@@ -491,4 +495,12 @@ export async function handleMarkMessageRead(
     result: { read },
     message: "ok",
   });
+  const others = await chatModel.otherParticipantIds(rid, userId);
+  for (const uid of others) {
+    nsp.to(`user:${uid}`).emit("message_read", {
+      room_id: rid,
+      message_id,
+      reader_id: userId,
+    });
+  }
 }

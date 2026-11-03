@@ -18,6 +18,8 @@ import {
   buildPreviewLines,
   DISCOUNT_OPTIONS,
   formatAmountInput,
+  GEO_ZONE_OPTIONS,
+  inferGeoZone,
   NIGERIA_GEO_ZONES,
   parseAmountInput,
   sharedStyles,
@@ -48,7 +50,11 @@ export default function ShippingZoneEditScreen({ route }) {
   const defaultDiscount = route.params?.defaultDiscount ?? 50;
   const navigation = useNavigation();
 
-  const [zoneName, setZoneName] = useState(existingZone?.name ?? '');
+  const inferredExisting = inferGeoZone(
+    existingZone?.name,
+    Array.isArray(existingZone?.locations) ? existingZone.locations : [],
+  );
+  const [zoneName, setZoneName] = useState(inferredExisting?.name ?? '');
   const [locations, setLocations] = useState(
     /** @type {string[]} */ (existingZone?.locations?.length ? [...existingZone.locations] : []),
   );
@@ -63,6 +69,7 @@ export default function ShippingZoneEditScreen({ route }) {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [takenByZone, setTakenByZone] = useState(/** @type {Record<string, string>} */ ({}));
+  const [takenGeoZones, setTakenGeoZones] = useState(/** @type {Record<string, string>} */ ({}));
   const shopId = route.params?.shopId;
   const userId = route.params?.userId;
   const previewLines = useMemo(
@@ -95,6 +102,8 @@ export default function ShippingZoneEditScreen({ route }) {
         const currentId = existingZone?.id != null ? String(existingZone.id) : '';
         /** @type {Record<string, string>} */
         const taken = {};
+        /** @type {Record<string, string>} */
+        const takenGeos = {};
         for (const row of Array.isArray(rows) ? rows : []) {
           const zoneId = String(row.zone_id ?? row.id ?? '');
           if (currentId && zoneId === currentId) continue;
@@ -104,8 +113,11 @@ export default function ShippingZoneEditScreen({ route }) {
             const key = String(loc).trim();
             if (key) taken[key] = name;
           }
+          const geo = inferGeoZone(name, locs);
+          if (geo) takenGeos[geo.name] = name;
         }
         setTakenByZone(taken);
+        setTakenGeoZones(takenGeos);
       })
       .catch(() => {});
     return () => {
@@ -116,6 +128,26 @@ export default function ShippingZoneEditScreen({ route }) {
   const onBaseFeeChange = (text) => {
     setBaseFeeText(text);
     setBaseFee(parseAmountInput(text));
+  };
+
+  const selectedGeo = useMemo(
+    () => NIGERIA_GEO_ZONES.find((zone) => zone.name === zoneName) ?? null,
+    [zoneName],
+  );
+  const zoneStates = selectedGeo?.states ?? [];
+
+  const onSelectGeoZone = (name) => {
+    const owner = takenGeoZones[name];
+    if (owner) {
+      Alert.alert(
+        'Zone already added',
+        `${name} is already set up as “${owner}”. Edit that zone instead of creating another.`,
+      );
+      return;
+    }
+    setZoneName(name);
+    const nextStates = NIGERIA_GEO_ZONES.find((zone) => zone.name === name)?.states ?? [];
+    setLocations((prev) => prev.filter((loc) => nextStates.includes(loc)));
   };
 
   const toggleLocation = (loc) => {
@@ -138,12 +170,15 @@ export default function ShippingZoneEditScreen({ route }) {
 
   const onSave = async () => {
     const name = zoneName.trim();
-    if (!name) {
-      Alert.alert('Zone name required', 'Enter a name for this shipping zone.');
+    if (!selectedGeo) {
+      Alert.alert(
+        'Select a geo-political zone',
+        'Choose one of Nigeria’s six geo-political zones. Do not type a custom name.',
+      );
       return;
     }
     if (locations.length === 0) {
-      Alert.alert('Locations required', 'Select at least one state or city for this zone.');
+      Alert.alert('States required', `Select at least one state in ${selectedGeo.name}.`);
       return;
     }
     if (baseFee <= 0) {
@@ -155,10 +190,8 @@ export default function ShippingZoneEditScreen({ route }) {
       return;
     }
 
-    const zoneId = existingZone?.id ?? slugFromName(name);
-    const pinColors = [BRAND, '#16A34A', '#EA580C', '#2563EB', '#9333EA'];
-    const colorIndex = Math.abs(zoneId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % pinColors.length;
-    const pinColor = existingZone?.pinColor ?? pinColors[colorIndex];
+    const zoneId = existingZone?.id ?? slugFromName(selectedGeo.name);
+    const pinColor = existingZone?.pinColor ?? selectedGeo.color;
 
     setSaving(true);
     try {
@@ -234,26 +267,52 @@ export default function ShippingZoneEditScreen({ route }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ marginBottom: 20 }}>
-          <Text style={sharedStyles.fieldLabel}>Zone Name (Geo-Political Zones).</Text>
-          <View style={sharedStyles.inputWrap}>
-            <TextInput
-              style={sharedStyles.textInput}
-              value={zoneName}
-              onChangeText={setZoneName}
-              placeholder="Lagos"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
+          <Text style={sharedStyles.fieldLabel}>Geo-political zone</Text>
+          <Dropdown
+            data={GEO_ZONE_OPTIONS.map((option) => ({
+              ...option,
+              label: takenGeoZones[option.value]
+                ? `${option.label} (already added)`
+                : option.label,
+            }))}
+            labelField="label"
+            valueField="value"
+            value={zoneName || null}
+            onChange={(item) => onSelectGeoZone(item.value)}
+            style={sharedStyles.dropdown}
+            placeholder="Select North Central, South West, …"
+            placeholderStyle={sharedStyles.dropdownPlaceholder}
+            selectedTextStyle={sharedStyles.dropdownSelected}
+            itemTextStyle={{ fontSize: 15, color: '#111111' }}
+            disable={Boolean(isEdit && inferredExisting)}
+            renderRightIcon={() => (
+              <Icon name="chevron-down" size={18} color="#6B7280" />
+            )}
+          />
+          <Text style={sharedStyles.fieldHint}>
+            Pick one of Nigeria’s six geo-political zones. You cannot type a custom zone name.
+          </Text>
         </View>
 
         <View style={{ marginBottom: 20 }}>
-          <Text style={sharedStyles.fieldLabel}>Locations</Text>
+          <Text style={sharedStyles.fieldLabel}>States you ship to</Text>
           <Pressable
             style={[sharedStyles.inputWrap, { minHeight: 52, flexWrap: 'wrap', paddingVertical: 10 }]}
-            onPress={() => setLocationPickerOpen(true)}
+            onPress={() => {
+              if (!selectedGeo) {
+                Alert.alert(
+                  'Select a zone first',
+                  'Choose a geo-political zone, then pick the states in that zone.',
+                );
+                return;
+              }
+              setLocationPickerOpen(true);
+            }}
           >
             {locations.length === 0 ? (
-              <Text style={{ color: '#9CA3AF', fontSize: 15 }}>Select states or cities</Text>
+              <Text style={{ color: '#9CA3AF', fontSize: 15 }}>
+                {selectedGeo ? `Select states in ${selectedGeo.name}` : 'Select a geo-political zone first'}
+              </Text>
             ) : (
               <View style={sharedStyles.tagRow}>
                 {locations.map((loc) => (
@@ -270,7 +329,9 @@ export default function ShippingZoneEditScreen({ route }) {
               <Icon name="chevron-down" size={18} color="#6B7280" />
             </View>
           </Pressable>
-          <Text style={sharedStyles.fieldHint}>Select states or cities in this zone.</Text>
+          <Text style={sharedStyles.fieldHint}>
+            Only states in the selected geo-political zone are listed. Then set the shipping fee below.
+          </Text>
         </View>
 
         <View style={{ marginBottom: 20 }}>
@@ -363,73 +424,87 @@ export default function ShippingZoneEditScreen({ route }) {
             }}
           >
             <Text style={{ fontSize: 18, fontWeight: '700', color: '#111111' }}>
-              Select locations
+              {selectedGeo ? `States in ${selectedGeo.name}` : 'Select states'}
             </Text>
             <TouchableOpacity onPress={() => setLocationPickerOpen(false)}>
               <Text style={{ color: BRAND, fontSize: 16, fontWeight: '700' }}>Done</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-            {NIGERIA_GEO_ZONES.map((zone) => (
-              <View key={zone.name}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    paddingHorizontal: 20,
-                    paddingTop: 18,
-                    paddingBottom: 8,
-                    backgroundColor: '#F7F7F8',
-                  }}
-                >
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: zone.color }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
-                    {zone.name}
-                  </Text>
-                </View>
-                {zone.states.map((loc) => {
-                  const selected = locations.includes(loc);
-                  const takenName = takenByZone[loc];
-                  const taken = Boolean(takenName) && !selected;
-                  return (
-                    <TouchableOpacity
-                      key={loc}
-                      style={{
-                        paddingVertical: 14,
-                        paddingHorizontal: 20,
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#F3F4F6',
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        backgroundColor: '#FFFFFF',
-                        opacity: taken ? 0.4 : 1,
-                      }}
-                      onPress={() => toggleLocation(loc)}
-                    >
-                      <View style={{ flex: 1, paddingRight: 12 }}>
-                        <Text
-                          style={{
-                            fontSize: 15,
-                            color: selected ? BRAND : '#111111',
-                            fontWeight: selected ? '600' : '400',
-                          }}
-                        >
-                          {loc}
-                        </Text>
-                        {taken ? (
-                          <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
-                            Already in {takenName}
-                          </Text>
-                        ) : null}
-                      </View>
-                      {selected ? <Icon name="checkmark-circle" size={20} color={BRAND} /> : null}
-                    </TouchableOpacity>
+            {selectedGeo ? (
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 14,
+                  paddingHorizontal: 20,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#E5E7EB',
+                  backgroundColor: '#F7F7F8',
+                }}
+                onPress={() => {
+                  const available = zoneStates.filter(
+                    (loc) => !takenByZone[loc] || locations.includes(loc),
                   );
-                })}
-              </View>
-            ))}
+                  const allSelected =
+                    available.length > 0 && available.every((loc) => locations.includes(loc));
+                  if (allSelected) {
+                    setLocations((prev) => prev.filter((loc) => !zoneStates.includes(loc)));
+                    return;
+                  }
+                  setLocations((prev) => {
+                    const next = new Set(prev);
+                    available.forEach((loc) => next.add(loc));
+                    return Array.from(next);
+                  });
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND }}>
+                  {zoneStates.filter((loc) => locations.includes(loc)).length ===
+                  zoneStates.filter((loc) => !takenByZone[loc] || locations.includes(loc)).length
+                    ? 'Clear all states'
+                    : 'Select all states in this zone'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {zoneStates.map((loc) => {
+              const selected = locations.includes(loc);
+              const takenName = takenByZone[loc];
+              const taken = Boolean(takenName) && !selected;
+              return (
+                <TouchableOpacity
+                  key={loc}
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 20,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F3F4F6',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#FFFFFF',
+                    opacity: taken ? 0.4 : 1,
+                  }}
+                  onPress={() => toggleLocation(loc)}
+                >
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        color: selected ? BRAND : '#111111',
+                        fontWeight: selected ? '600' : '400',
+                      }}
+                    >
+                      {loc}
+                    </Text>
+                    {taken ? (
+                      <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                        Already in {takenName}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {selected ? <Icon name="checkmark-circle" size={20} color={BRAND} /> : null}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </Modal>

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -17,8 +18,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import { Dropdown } from 'react-native-element-dropdown';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +34,7 @@ import { ProductCardMedia } from '../components/ProductCardMedia';
 import {
   fetchBuyerOrder,
   fetchOwnerShops,
+  fetchShopDetails,
   fetchShopOrderDetail,
   fetchShopOwner,
 } from '../api';
@@ -46,6 +50,54 @@ import {
 } from '../utils/statusTheme';
 import { set_disputeInfo } from '../../redux/dispute';
 import { MessageIconBadge, useUnreadMessageCount } from '../components/UnreadMessageBadge';
+
+const SHIPPING_METHOD_OPTIONS = [
+  { label: 'Third-party logistics partner', value: 'third_party_logistics' },
+  { label: 'Dispatch rider', value: 'dispatch_rider' },
+  { label: 'Courier service', value: 'courier_service' },
+  { label: 'Bus transport / waybill', value: 'bus_waybill' },
+  { label: 'Self delivery', value: 'self_delivery' },
+];
+
+const FULFILLMENT_TIMEFRAME_OPTIONS = [
+  { label: 'Within 24 hours (today)', value: '24_hrs' },
+  { label: 'Within 48 hours (tomorrow)', value: '48_hrs' },
+  { label: 'Within 72 hours (3 days)', value: '72_hrs' },
+  { label: 'Within 96 hours (4 days)', value: '96_hrs' },
+  { label: 'Within 120 hours (5 days)', value: '120_hrs' },
+  { label: 'Within 144 hours (6 days)', value: '144_hrs' },
+  { label: 'Within 168 hours (7 days)', value: '168_hrs' },
+];
+
+const VENDOR_EDITABLE_SHIPPING_STATUSES = new Set([
+  'order_shipping',
+  'order_out_for_delivery',
+  'order_delivered',
+]);
+
+function shippingUsesTrackingId(method) {
+  return method != null && method !== 'self_delivery';
+}
+
+function phoneDigits(raw) {
+  return String(raw ?? '').replace(/\D/g, '');
+}
+
+function isValidTrackingPhone(raw) {
+  const digits = phoneDigits(raw);
+  return digits.length === 11 && digits.startsWith('0');
+}
+
+function phonesMatch(a, b) {
+  const da = phoneDigits(a);
+  const db = phoneDigits(b);
+  if (da.length < 10 || db.length < 10) return false;
+  return da.slice(-10) === db.slice(-10);
+}
+
+function optionLabel(options, value) {
+  return options.find(o => o.value === value)?.label ?? null;
+}
 
 function parseEventMeta(meta) {
   if (meta == null) return {};
@@ -241,7 +293,7 @@ function MoneyRow({ label, value, bold, muted }) {
   );
 }
 
-const PAYOUT_HOLD_MS = 48 * 60 * 60 * 1000;
+const PAYOUT_HOLD_MS = 24 * 60 * 60 * 1000;
 /** Must match ORDER_COMMISSION_RATE in node/src/socket/order.ts. */
 const APP_COMMISSION_RATE = 0.03;
 
@@ -428,6 +480,14 @@ export default function OrderDetailScreen() {
     null;
   const [statusKey, setStatusKey] = useState(null);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [editShippingOpen, setEditShippingOpen] = useState(false);
+  const [editShippingSaving, setEditShippingSaving] = useState(false);
+  const [editShippingMethod, setEditShippingMethod] = useState(null);
+  const [editEstimatedDelivery, setEditEstimatedDelivery] = useState(null);
+  const [editLogisticProvider, setEditLogisticProvider] = useState('');
+  const [editTrackingPhone, setEditTrackingPhone] = useState('');
+  const [vendorPhone, setVendorPhone] = useState('');
+  const [shopContactPhone, setShopContactPhone] = useState('');
   const [cancelledModalOpen, setCancelledModalOpen] = useState(false);
   const [statusInfoOpen, setStatusInfoOpen] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
@@ -539,6 +599,16 @@ export default function OrderDetailScreen() {
     const n = order?.orderId ?? order?.order_id ?? '';
     return String(n).replace(/^ORD-/i, '');
   }, [order]);
+
+  const pickupStationAddress = useMemo(() => {
+    const events = Array.isArray(orderInfo?.order_events) ? orderInfo.order_events : [];
+    for (let i = events.length - 1; i >= 0; i -= 1) {
+      const meta = parseEventMeta(events[i]?.meta);
+      const addr = String(meta.pickup_station_address ?? '').trim();
+      if (addr) return addr;
+    }
+    return '';
+  }, [orderInfo?.order_events]);
 
   useEffect(() => {
     if (!orderInfo) return;
@@ -990,13 +1060,15 @@ export default function OrderDetailScreen() {
     }
     if (blockIfCancelled()) return;
     if (auth.activeRole === 'customer') {
-      if (statusKey !== 'order_delivered') {
+      const canRaise =
+        statusKey === 'order_delivered' || statusKey === 'order_confirmed';
+      if (!canRaise) {
         Alert.alert(
           'Cannot open dispute at this stage',
-          'To dispute this order, you must confirm you received the order from the vendor first',
+          'You can raise a dispute after the vendor marks the order delivered, and until you release funds.',
           [{ text: 'OK' }],
         );
-      } else if (statusKey === 'order_delivered') {
+      } else {
         const oid =
           orderInfo?.order?.id ??
           orderInfo?.order?.order_id ??
@@ -1097,6 +1169,8 @@ export default function OrderDetailScreen() {
             ...base,
             event_type: 'delivery',
             stage: 'order_out_for_delivery',
+            shipping_method: orderInfo?.order?.shipping_method,
+            tracking_number: orderInfo?.order?.tracking_number,
           },
         });
         return;
@@ -1129,6 +1203,101 @@ export default function OrderDetailScreen() {
     }
   };
 
+  const canEditShipping =
+    auth.activeRole === 'vendor' &&
+    VENDOR_EDITABLE_SHIPPING_STATUSES.has(String(statusKey ?? '').toLowerCase()) &&
+    !isOrderCancelled;
+
+  const openEditShipping = useCallback(() => {
+    const o = orderInfo?.order;
+    setEditShippingMethod(o?.shipping_method ?? null);
+    setEditEstimatedDelivery(o?.estimated_delivery_date ?? null);
+    setEditLogisticProvider(String(o?.logistic_provider ?? '').trim());
+    setEditTrackingPhone(phoneDigits(o?.tracking_number).slice(0, 11));
+    setEditShippingOpen(true);
+    (async () => {
+      const u = await getStoredUser();
+      setVendorPhone(String(u?.phone ?? u?.phone_number ?? '').trim());
+      const shopId = o?.shop_id ?? orderInfo?.shop?.id;
+      if (!shopId || !u?.id) return;
+      try {
+        const shop = await fetchShopDetails(shopId, u.id);
+        setShopContactPhone(String(shop.contactphone ?? shop.contactPhone ?? '').trim());
+      } catch {
+        /* still validate against the vendor profile phone */
+      }
+    })();
+  }, [orderInfo]);
+
+  const saveEditShipping = useCallback(async () => {
+    if (editShippingMethod == null || editShippingMethod === '') {
+      Alert.alert('Shipping method', 'Select how this order is being sent.');
+      return;
+    }
+    if (shippingUsesTrackingId(editShippingMethod)) {
+      if (!editLogisticProvider.trim()) {
+        Alert.alert('Logistics provider required', 'Enter the company or service handling this shipment.');
+        return;
+      }
+      if (!isValidTrackingPhone(editTrackingPhone)) {
+        Alert.alert('Logistics phone required', 'Enter an 11-digit phone number starting with 0.');
+        return;
+      }
+      if (phonesMatch(editTrackingPhone, vendorPhone) || phonesMatch(editTrackingPhone, shopContactPhone)) {
+        Alert.alert(
+          'Use a logistics number',
+          'This cannot be your own phone number or your shop contact number.',
+        );
+        return;
+      }
+    }
+    if (editEstimatedDelivery == null || editEstimatedDelivery === '') {
+      Alert.alert('Delivery window', 'Select when the customer should expect delivery.');
+      return;
+    }
+    setEditShippingSaving(true);
+    try {
+      const u = await getStoredUser();
+      const response = await emitSocketAck('order_shipping_updated', {
+        order_id: orderInfo?.order?.id,
+        actor_type: 'vendor',
+        actor_id: u.id,
+        meta: {
+          shipping_method: editShippingMethod,
+          shipping_method_label: optionLabel(SHIPPING_METHOD_OPTIONS, editShippingMethod),
+          estimated_delivery: editEstimatedDelivery,
+          estimated_delivery_label: optionLabel(FULFILLMENT_TIMEFRAME_OPTIONS, editEstimatedDelivery),
+          logistic_provider: shippingUsesTrackingId(editShippingMethod)
+            ? editLogisticProvider.trim() || null
+            : null,
+          tracking_id: shippingUsesTrackingId(editShippingMethod)
+            ? editTrackingPhone.trim() || null
+            : null,
+        },
+      });
+      if (!response.success) {
+        Alert.alert(
+          'Could not update shipping',
+          response?.message || response?.error || 'Try again.',
+        );
+        return;
+      }
+      if (response.result) dispatch(set_orderInfo(response.result));
+      setEditShippingOpen(false);
+    } finally {
+      setEditShippingSaving(false);
+    }
+  }, [
+    editShippingMethod,
+    editLogisticProvider,
+    editTrackingPhone,
+    editEstimatedDelivery,
+    vendorPhone,
+    shopContactPhone,
+    orderInfo?.order?.id,
+    dispatch,
+  ]);
+
   const ORDER_ACTIONS = [
     {
       key: 'Message',
@@ -1140,6 +1309,19 @@ export default function OrderDetailScreen() {
         onMail();
       },
     },
+    ...(canEditShipping
+      ? [
+          {
+            key: 'edit-shipping',
+            label: 'Edit shipping',
+            icon: 'create-outline',
+            onPress: () => {
+              closeActions();
+              openEditShipping();
+            },
+          },
+        ]
+      : []),
     // {
     //   key: 'status',
     //   label: 'Update status',
@@ -1503,8 +1685,16 @@ export default function OrderDetailScreen() {
               icon="pricetag-outline"
               label="Tracking Number"
               value={String(orderInfo?.order?.tracking_number || 'Awaiting shipment')}
-              last
+              last={!pickupStationAddress}
             />
+            {pickupStationAddress ? (
+              <SummaryRow
+                icon="business-outline"
+                label="Pickup station"
+                value={pickupStationAddress}
+                last
+              />
+            ) : null}
           </View>
         </View>
 
@@ -1538,11 +1728,11 @@ export default function OrderDetailScreen() {
               </View>
             ) : null}
             {!isOrderCancelled &&
-              statusKey !== 'order_confirmed' &&
               statusKey !== 'order_completed' &&
               statusKey !== 'order_rejected' ? (
               <View style={styles.escrowActions}>
-                {statusKey !== 'order_disputed' && (
+                {statusKey !== 'order_disputed' &&
+                statusKey !== 'order_confirmed' ? (
                   <Pressable
                     onPress={onCancelDelivery}
                     style={({ pressed }) => [
@@ -1555,19 +1745,25 @@ export default function OrderDetailScreen() {
                   >
                     <Text style={styles.escrowBtnCancelText}>Cancel order</Text>
                   </Pressable>
-                )}
+                ) : null}
                 <Pressable
                   onPress={onOpenDispute}
                   style={({ pressed }) => [
                     styles.escrowBtn,
-                    styles.escrowBtnSecondary,
+                    orderInfo?.dispute ? styles.escrowBtnSecondary : styles.escrowBtnRaise,
                     pressed && styles.pressed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel="Open dispute"
+                  accessibilityLabel={orderInfo?.dispute ? 'View dispute' : 'Raise dispute'}
                 >
-                  <Text style={styles.escrowBtnSecondaryText}>
-                    {orderInfo?.dispute ? 'View dispute' : 'Open dispute'}
+                  <Text
+                    style={
+                      orderInfo?.dispute
+                        ? styles.escrowBtnSecondaryText
+                        : styles.escrowBtnRaiseText
+                    }
+                  >
+                    {orderInfo?.dispute ? 'View dispute' : 'Raise dispute'}
                   </Text>
                 </Pressable>
               </View>
@@ -1961,6 +2157,115 @@ export default function OrderDetailScreen() {
             </Pressable>
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={editShippingOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !editShippingSaving && setEditShippingOpen(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.sheetRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable
+            style={styles.sheetDismiss}
+            onPress={() => !editShippingSaving && setEditShippingOpen(false)}
+          />
+          <View
+            style={[
+              styles.sheet,
+              styles.editShippingSheet,
+              { paddingBottom: Math.max(insets.bottom, 16) + 8 },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Edit shipping</Text>
+            <Text style={styles.editShippingHint}>
+              Update how this order is moving. Shipping fee cannot be changed here.
+            </Text>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.editShippingLabel}>Shipping method</Text>
+              <Dropdown
+                style={styles.editShippingDropdown}
+                data={SHIPPING_METHOD_OPTIONS}
+                labelField="label"
+                valueField="value"
+                placeholder="Select shipping method"
+                value={editShippingMethod}
+                maxHeight={280}
+                onChange={(item) => {
+                  setEditShippingMethod(item.value);
+                  if (!shippingUsesTrackingId(item.value)) {
+                    setEditLogisticProvider('');
+                    setEditTrackingPhone('');
+                  }
+                }}
+              />
+              {shippingUsesTrackingId(editShippingMethod) ? (
+                <>
+                  <Text style={styles.editShippingLabel}>Logistics provider</Text>
+                  <TextInput
+                    style={styles.editShippingInput}
+                    placeholder="Enter logistics provider"
+                    value={editLogisticProvider}
+                    onChangeText={setEditLogisticProvider}
+                    autoCapitalize="words"
+                  />
+                  <Text style={styles.editShippingLabel}>
+                    {`Tracking Number (${optionLabel(SHIPPING_METHOD_OPTIONS, editShippingMethod) || 'shipping method'} phone number)`}
+                  </Text>
+                  <TextInput
+                    style={styles.editShippingInput}
+                    placeholder="08012345678"
+                    value={editTrackingPhone}
+                    onChangeText={(text) => setEditTrackingPhone(phoneDigits(text).slice(0, 11))}
+                    keyboardType="phone-pad"
+                    maxLength={11}
+                  />
+                </>
+              ) : null}
+              <Text style={styles.editShippingLabel}>Expected delivery window</Text>
+              <Dropdown
+                style={styles.editShippingDropdown}
+                data={FULFILLMENT_TIMEFRAME_OPTIONS}
+                labelField="label"
+                valueField="value"
+                placeholder="Select timeframe"
+                value={editEstimatedDelivery}
+                maxHeight={280}
+                onChange={(item) => setEditEstimatedDelivery(item.value)}
+              />
+            </ScrollView>
+            <View style={styles.editShippingActions}>
+              <Pressable
+                onPress={() => !editShippingSaving && setEditShippingOpen(false)}
+                style={({ pressed }) => [styles.btnReject, pressed && styles.btnRejectPressed]}
+              >
+                <Text style={styles.btnRejectText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={saveEditShipping}
+                disabled={editShippingSaving}
+                style={({ pressed }) => [
+                  styles.btnAccept,
+                  pressed && styles.btnAcceptPressed,
+                  editShippingSaving && styles.btnPrimaryDisabled,
+                ]}
+              >
+                {editShippingSaving ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.btnAcceptText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -2480,6 +2785,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLOR.TEXT,
+  },
+  escrowBtnRaise: {
+    borderColor: '#C62828',
+    backgroundColor: '#C62828',
+  },
+  escrowBtnRaiseText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   cancelledBanner: {
     flexDirection: 'row',
@@ -3020,6 +3334,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLOR.NEUTRAL,
+  },
+  editShippingSheet: {
+    maxHeight: '88%',
+  },
+  editShippingHint: {
+    fontSize: 13,
+    color: '#667781',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  editShippingLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLOR.TEXT,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  editShippingDropdown: {
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  editShippingInput: {
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: COLOR.TEXT,
+    backgroundColor: '#FFFFFF',
+  },
+  editShippingActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
   },
   sheetRoot: {
     flex: 1,

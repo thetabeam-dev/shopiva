@@ -36,7 +36,7 @@ export default function ShippingZoneTutorial({ visible, onClose }) {
             How to set up a shipping zone
           </Text>
           <Text style={{ marginTop: 8, fontSize: 14, lineHeight: 20, color: '#6B7280', textAlign: 'center' }}>
-            Add a zone, choose the states it covers, then set the fee for the first item and the discount for extra items.
+            Pick a geo-political zone (for example South East), choose the states you ship to in that zone, then set the fee.
           </Text>
           <View style={{ flex: 1, borderRadius: 7, overflow: 'hidden', marginTop: 14, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' }}>
             {loading ? (

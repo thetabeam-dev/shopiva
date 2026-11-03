@@ -57,6 +57,9 @@ function fcmMssg(
     case "order_shipping":
       return "Your order has been shipped and is on its way to you.";
 
+    case "order_shipping_updated":
+      return "The seller updated the shipping details for your order. Open DeeDyte to see the latest method, tracking number, and delivery window.";
+
     case "order_out_for_delivery":
       return "Your order is out for delivery and should arrive soon. Please be available to receive it.";
 
@@ -67,7 +70,7 @@ function fcmMssg(
       if (role === "vendor") {
         return "The buyer has confirmed receipt of your order. Please wait for the buyer to confirm their satisfaction before your payment is released.";
       }
-      return "Your order has been confirmed as delivered! Please check your order and report any issues within 48 hours. If no issue is reported within this period, payment will be automatically released to the vendor.";
+      return "Your order has been confirmed as delivered! Please check your order and report any issues within 24 hours. If no issue is reported within this period, payment will be automatically released to the vendor.";
 
     case "order_disputed":
       return "A dispute has been raised for this order. We’ll review the matter and keep you informed.";
@@ -199,11 +202,39 @@ function emitOrderUpdateToUser(
         goods: Number.isFinite(goods) ? goods : 0,
       };
     }
-    const msg = fcmMssg(event, amounts, role, stage != null ? String(stage) : null, cancelledBySelf);
+    let msg = fcmMssg(event, amounts, role, stage != null ? String(stage) : null, cancelledBySelf);
+    let pushTitle = "Order Update";
+    if (event === "order_shipping_updated") {
+      pushTitle = "Shipping details updated";
+      const { rows: shipRows } = await pool.query<{
+        shipping_method: string | null;
+        tracking_number: string | null;
+        logistic_provider: string | null;
+        estimated_delivery_date: string | null;
+      }>(
+        `SELECT shipping_method, tracking_number, logistic_provider, estimated_delivery_date
+         FROM orders WHERE id = $1 LIMIT 1`,
+        [orderId],
+      );
+      const ship = shipRows[0];
+      const method = String(ship?.shipping_method ?? "")
+        .replace(/_/g, " ")
+        .trim() || "updated";
+      const window = String(ship?.estimated_delivery_date ?? "")
+        .replace(/_/g, " ")
+        .trim();
+      const provider = String(ship?.logistic_provider ?? "").trim();
+      const tracking = String(ship?.tracking_number ?? "").trim();
+      const parts = [`The seller updated shipping for order #${sourceId}. Method: ${method}.`];
+      if (provider) parts.push(`Provider: ${provider}.`);
+      if (tracking) parts.push(`Tracking number: ${tracking}.`);
+      if (window) parts.push(`Expected delivery: ${window}.`);
+      msg = parts.join(" ");
+    }
     if (role && Number.isFinite(sourceId) && sourceId > 0) {
       await createAndEmitNotification({
         recipientId: id,
-        title: "Order update",
+        title: pushTitle,
         message: msg,
         sourceType: "order",
         sourceId,
@@ -211,19 +242,33 @@ function emitOrderUpdateToUser(
       });
     }
 
-    const { rows: tokenRows } = await pool.query<{ devicetoken: string | null }>(
-      `SELECT devicetoken FROM users WHERE id = $1`,
+    const { rows: tokenRows } = await pool.query<{
+      devicetoken: string | null;
+      email: string | null;
+      fname: string | null;
+    }>(
+      `SELECT devicetoken, email, fname FROM users WHERE id = $1`,
       [id],
     );
     const deviceToken = String(tokenRows[0]?.devicetoken ?? "").trim();
     if (deviceToken) {
       await sendFcmForActivities(
         deviceToken,
-        "Order Update",
+        pushTitle,
         msg,
         null,
         { type: "order", order_id: orderId, role },
       );
+    }
+    if (event === "order_shipping_updated") {
+      const email = String(tokenRows[0]?.email ?? "").trim();
+      if (email) {
+        await sendNotificationEmail(email, {
+          fname: String(tokenRows[0]?.fname ?? "").trim() || "there",
+          title: pushTitle,
+          message: msg,
+        });
+      }
     }
     const { rows: [{ devicetoken: vendorDevicetoken }] } = await pool.query(`SELECT devicetoken FROM users WHERE id = $1`, [id]);
     if (event === "order_disputed") {
@@ -612,6 +657,18 @@ export const handleOrderShipping = async (
       reason,
     } = payload;
 
+    const shippingMeta =
+      meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+    const shippingMethod = shippingMeta?.shipping_method ?? null;
+    if (shippingMethod != null && shippingMethod !== "self_delivery") {
+      await assertTrackingPhoneNotVendorContact(
+        p,
+        order_id,
+        shippingMeta?.tracking_id,
+        shippingMethod,
+      );
+    }
+
     const { rows } = await p.query(
       `
                 INSERT INTO order_events
@@ -696,6 +753,147 @@ export const handleOrderShipping = async (
   }
 };
 
+const EDITABLE_SHIPPING_STATUSES = new Set([
+  "order_shipping",
+  "order_out_for_delivery",
+  "order_delivered",
+]);
+
+export const handleUpdateOrderShippingDetails = async (
+  userId: number,
+  _nsp: Namespace,
+  payload: Record<string, unknown>,
+  ack: unknown,
+) => {
+  try {
+    const p = await db();
+    const order_id = payload.order_id;
+    const meta =
+      payload.meta && typeof payload.meta === "object"
+        ? (payload.meta as Record<string, unknown>)
+        : payload;
+
+    const { rows: orderRows } = await p.query<{
+      fulfillment_status: string | null;
+      ownerid: string | number | null;
+      customer_id: string | number | null;
+    }>(
+      `SELECT o.fulfillment_status, s.ownerid, o.customer_id
+       FROM orders o
+       INNER JOIN shops s ON s.id::text = trim(o.shop_id::text)
+       WHERE o.id = $1
+       LIMIT 1`,
+      [order_id],
+    );
+    const row = orderRows[0];
+    if (!row) {
+      if (typeof ack === "function") {
+        ack({
+          success: false,
+          message: "Order not found",
+          error: "not_found",
+          result: null,
+        });
+      }
+      return;
+    }
+    if (Number(row.ownerid) !== Number(userId)) {
+      if (typeof ack === "function") {
+        ack({
+          success: false,
+          message: "Only the vendor can edit shipping details",
+          error: "forbidden",
+          result: null,
+        });
+      }
+      return;
+    }
+    const status = String(row.fulfillment_status ?? "");
+    if (!EDITABLE_SHIPPING_STATUSES.has(status)) {
+      if (typeof ack === "function") {
+        ack({
+          success: false,
+          message: "Shipping details can be edited after the order is in shipping",
+          error: "invalid_status",
+          result: null,
+        });
+      }
+      return;
+    }
+
+    const shipping_method = meta.shipping_method ?? null;
+    const estimated_delivery = meta.estimated_delivery ?? null;
+    const tracking_id =
+      shipping_method != null && shipping_method !== "self_delivery"
+        ? (meta.tracking_id ?? null)
+        : null;
+    const logistic_provider =
+      shipping_method != null && shipping_method !== "self_delivery"
+        ? (meta.logistic_provider ?? null)
+        : null;
+
+    if (!shipping_method) {
+      throw new Error("Select a shipping method.");
+    }
+    if (!estimated_delivery) {
+      throw new Error("Select an expected delivery window.");
+    }
+    if (shipping_method !== "self_delivery") {
+      if (!String(logistic_provider ?? "").trim()) {
+        throw new Error("Enter the logistics provider.");
+      }
+      await assertTrackingPhoneNotVendorContact(
+        p,
+        order_id,
+        tracking_id,
+        shipping_method,
+      );
+    }
+
+    await p.query(
+      `UPDATE orders
+       SET shipping_method = $1,
+           tracking_number = $2,
+           logistic_provider = $3,
+           estimated_delivery_date = $4
+       WHERE id = $5`,
+      [
+        shipping_method,
+        tracking_id,
+        logistic_provider,
+        estimated_delivery,
+        order_id,
+      ],
+    );
+
+    const orderPayload = await broadcastOrderUpdate(
+      "order_shipping_updated",
+      order_id,
+      "vendor",
+      userId,
+      row.customer_id,
+    );
+    if (typeof ack === "function") {
+      ack({
+        success: true,
+        message: "Shipping details updated",
+        error: null,
+        result: orderPayload.result,
+        list: orderPayload.list,
+      });
+    }
+  } catch (error) {
+    if (typeof ack === "function") {
+      ack({
+        success: false,
+        message: error instanceof Error ? error.message : "Could not update shipping details",
+        error: error instanceof Error ? error.message : "Unknown error",
+        result: null,
+      });
+    }
+  }
+};
+
 export const handleOrderOutForDelivery = async (
   userId: number,
   nsp: Namespace,
@@ -717,6 +915,41 @@ export const handleOrderOutForDelivery = async (
       recipient,
       reason,
     } = payload;
+
+    const { rows: shipRows } = await p.query<{
+      shipping_method: string | null;
+    }>(`SELECT shipping_method FROM orders WHERE id = $1 LIMIT 1`, [order_id]);
+    const shippingMethod = String(shipRows[0]?.shipping_method ?? "");
+    const metaObjIn =
+      meta && typeof meta === "object" ? (meta as Record<string, unknown>) : {};
+    if (shippingMethod && shippingMethod !== "self_delivery") {
+      const pickup = String(metaObjIn.pickup_station_address ?? "").trim();
+      if (pickup.length < 8) {
+        if (typeof ack === "function") {
+          ack({
+            success: false,
+            message:
+              "Enter the pickup station address. This is required when shipping is not self delivery.",
+            error: "pickup_station_required",
+            result: null,
+          });
+        }
+        return;
+      }
+      const riderDigits = String(metaObjIn.rider_contact ?? "").replace(/\D/g, "");
+      if (riderDigits.length !== 11 || !riderDigits.startsWith("0")) {
+        if (typeof ack === "function") {
+          ack({
+            success: false,
+            message:
+              "Enter an 11-digit rider phone number starting with 0. This is required when shipping is not self delivery.",
+            error: "rider_contact_required",
+            result: null,
+          });
+        }
+        return;
+      }
+    }
 
     const { rows } = await p.query(
       `
@@ -968,7 +1201,7 @@ export const handleOrderConfirmation = async (
 const ORDER_COMMISSION_RATE = 0.03;
 
 /** How long after the buyer confirms before funds go to the vendor automatically. */
-export const ORDER_PAYOUT_HOLD_HOURS = 48;
+export const ORDER_PAYOUT_HOLD_HOURS = 24;
 
 async function notifyShopOfPayout(payout: { shop_id: unknown; order_id: unknown; net_naira: number }): Promise<void> {
   try {
@@ -1698,6 +1931,49 @@ async function updateShipping(delivery_duration: unknown, order_id: unknown) {
     `UPDATE orders SET estimated_delivery_date = $1 WHERE id = $2`,
     [delivery_duration, order_id],
   );
+}
+
+function phoneDigits(raw: unknown): string {
+  return String(raw ?? "").replace(/\D/g, "");
+}
+
+function phonesMatch(a: unknown, b: unknown): boolean {
+  const da = phoneDigits(a);
+  const db = phoneDigits(b);
+  if (da.length < 10 || db.length < 10) return false;
+  return da.slice(-10) === db.slice(-10);
+}
+
+async function assertTrackingPhoneNotVendorContact(
+  pool: Awaited<ReturnType<typeof db>>,
+  orderId: unknown,
+  trackingId: unknown,
+  shippingMethod: unknown,
+) {
+  if (shippingMethod == null || shippingMethod === "self_delivery") return;
+  const digits = phoneDigits(trackingId);
+  if (digits.length !== 11 || !digits.startsWith("0")) {
+    throw new Error("Enter an 11-digit phone number starting with 0.");
+  }
+  const { rows } = await pool.query<{
+    vendor_phone: string | null;
+    shop_phone: string | null;
+  }>(
+    `SELECT u.phone AS vendor_phone, s.contactphone AS shop_phone
+     FROM orders o
+     INNER JOIN shops s ON s.id::text = trim(o.shop_id::text)
+     INNER JOIN users u ON u.id::text = trim(s.ownerid::text)
+     WHERE o.id = $1
+     LIMIT 1`,
+    [orderId],
+  );
+  const vendorPhone = rows[0]?.vendor_phone;
+  const shopPhone = rows[0]?.shop_phone;
+  if (phonesMatch(trackingId, vendorPhone) || phonesMatch(trackingId, shopPhone)) {
+    throw new Error(
+      "Use the logistics provider’s phone number, not your own or your shop contact number.",
+    );
+  }
 }
 
 async function updateShippingMethod(

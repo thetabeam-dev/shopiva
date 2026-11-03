@@ -49,7 +49,7 @@ function TodayChip() {
 }
 
 /**
- * @param {{ item: { id: string; text: string; outgoing: boolean; timeLabel: string } }} p
+ * @param {{ item: { id: string; text: string; outgoing: boolean; timeLabel: string; isRead?: boolean } }} p
  */
 function Bubble({ item }) {
   const out = item.outgoing;
@@ -60,7 +60,12 @@ function Bubble({ item }) {
         <View style={[styles.bubbleMetaRow, out ? styles.bubbleMetaRowOut : styles.bubbleMetaRowIn]}>
           <Text style={[styles.bubbleMeta, out && styles.bubbleMetaOut]}>{item.timeLabel}</Text>
           {out ? (
-            <Icon name="checkmark-done" size={14} color="#53BDEB" style={styles.tickIcon} />
+            <Icon
+              name="checkmark-done"
+              size={14}
+              color={item.isRead ? '#53BDEB' : '#FFFFFF'}
+              style={styles.tickIcon}
+            />
           ) : null}
         </View>
       </View>
@@ -159,6 +164,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         outgoing,
         timeLabel,
         sentAt: Number.isNaN(d.getTime()) ? Date.now() : d.getTime(),
+        isRead: Boolean(row.is_read ?? row.isRead ?? row.read),
       };
     },
     [user?.id],
@@ -217,13 +223,37 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
           if (prev.some((p) => p.id === mapped.id)) return prev;
           return [...prev, mapped];
         });
+        if (!mapped.outgoing && mapped.id) {
+          emitChatSocketAck('mark_message_as_read', {
+            message_id: mapped.id,
+            app_role: appRolePayload,
+          }).catch(() => {});
+        }
         requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
       };
+      const onMessagesRead = (payload) => {
+        if (!payload || String(payload.room_id ?? '') !== roomId) return;
+        setMessages((prev) =>
+          prev.map((row) => (row.outgoing ? { ...row, isRead: true } : row)),
+        );
+      };
+      const onMessageRead = (payload) => {
+        if (!payload || String(payload.room_id ?? '') !== roomId) return;
+        const mid = String(payload.message_id ?? '');
+        if (!mid) return;
+        setMessages((prev) =>
+          prev.map((row) => (row.id === mid ? { ...row, isRead: true } : row)),
+        );
+      };
       socket?.on('message_created', onIncoming);
+      socket?.on('messages_read', onMessagesRead);
+      socket?.on('message_read', onMessageRead);
       return () => {
         socket?.off('message_created', onIncoming);
+        socket?.off('messages_read', onMessagesRead);
+        socket?.off('message_read', onMessageRead);
       };
-    }, [roomId, loadMessages, mapMessage, storageScope]),
+    }, [roomId, loadMessages, mapMessage, storageScope, appRolePayload]),
   );
 
   const bumpModerationLockIfNeeded = useCallback(() => {
