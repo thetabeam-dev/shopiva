@@ -32,6 +32,7 @@ import paystackTools from "./utils/paystack.js";
 import { storePaystackVirtualAccount } from "./models/wallet.js";
 import { autoReleaseConfirmedOrders, expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
+import { sendShopSetupReminders } from "./services/shopSetupReminders.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -175,8 +176,7 @@ app.get("/categories", async (req, res) => {
   const pool = await db();
 
   const { rows } = await pool.query(
-    // `SELECT * FROM categories WHERE existing_product_count > 0 ORDER BY category ASC`
-    `SELECT * FROM categories`,
+    `SELECT * FROM categories WHERE COALESCE(existing_product_count, 0) > 0 ORDER BY category ASC`,
   );
   res.json(rows);
 });
@@ -249,88 +249,88 @@ app.post("/update-fcm", async (req, res) => {
   }
 });
 
-app.post("/pay", async (_req, res) => {
-  const {
-    fname,
-    lname,
-    email,
-    phone,
-    userId
-  } = _req.body;
-  console.log(
-    fname,
-    lname,
-    email,
-    phone,
-    userId
-  )
-  try {
-    const pool = await db();
-    const account = await paystackTools.createDVAOnce({
-      firstName: fname,
-      lastName: lname?.trim() ? lname : fname[0],
-      email: email,
-      phone: `+234${phone}`,
-    });
-    await storePaystackVirtualAccount({
-      userId: (userId),
-      phone: phone,
-      customerCode: account.customerCode,
-      accountNumber: account.accountNumber,
-      accountName: account.accountName,
-      bankName: account.bankName,
-    });
+// app.post("/pay", async (_req, res) => {
+//   const {
+//     fname,
+//     lname,
+//     email,
+//     phone,
+//     userId
+//   } = _req.body;
+//   console.log(
+//     fname,
+//     lname,
+//     email,
+//     phone,
+//     userId
+//   )
+//   try {
+//     const pool = await db();
+//     const account = await paystackTools.createDVAOnce({
+//       firstName: fname,
+//       lastName: lname?.trim() ? lname : fname[0],
+//       email: email,
+//       phone: `+234${phone}`,
+//     });
+//     await storePaystackVirtualAccount({
+//       userId: (userId),
+//       phone: phone,
+//       customerCode: account.customerCode,
+//       accountNumber: account.accountNumber,
+//       accountName: account.accountName,
+//       bankName: account.bankName,
+//     });
 
-    // const missing = await pool.query<{
-    //   id: number;
-    //   fname: string;
-    //   lname: string | any;
-    //   email: string;
-    //   phone: string;
-    // }>(
-    //   `SELECT u.id, u.fname, u.lname, u.email, u.phone
-    //    FROM users u
-    //    WHERE u.phone IS NOT NULL
-    //      AND btrim(u.phone) <> ''
-    //      AND NOT EXISTS (
-    //        SELECT 1 FROM wallets w WHERE w.user_id = u.id
-    //      )`
-    // );
+//     // const missing = await pool.query<{
+//     //   id: number;
+//     //   fname: string;
+//     //   lname: string | any;
+//     //   email: string;
+//     //   phone: string;
+//     // }>(
+//     //   `SELECT u.id, u.fname, u.lname, u.email, u.phone
+//     //    FROM users u
+//     //    WHERE u.phone IS NOT NULL
+//     //      AND btrim(u.phone) <> ''
+//     //      AND NOT EXISTS (
+//     //        SELECT 1 FROM wallets w WHERE w.user_id = u.id
+//     //      )`
+//     // );
 
-    // const created: number[] = [];
-    // const failed: { userId: number; error: string }[] = [];
+//     // const created: number[] = [];
+//     // const failed: { userId: number; error: string }[] = [];
 
-    // for (const user of missing.rows) {
-    //   try {
-    //     const account = await paystackTools.createDVAOnce({
-    //       firstName: user.fname,
-    //       lastName: user.lname?.trim() ? user.lname : user.fname[0],
-    //       email: user.email,
-    //       phone: `+234${user.phone}`,
-    //     });
-    //     await storePaystackVirtualAccount({
-    //       userId: user.id,
-    //       phone: user.phone,
-    //       customerCode: account.customerCode,
-    //       accountNumber: account.accountNumber,
-    //       accountName: account.accountName,
-    //       bankName: account.bankName,
-    //     });
-    //     created.push(user.id);
-    //   } catch (error: any) {
-    //     const message = error?.response?.data?.message
-    //       ?? (error instanceof Error ? error.message : String(error));
-    //     console.log(error?.response?.data ?? error);
-    //     failed.push({ userId: user.id, error: message });
-    //   }
-    // }
+//     // for (const user of missing.rows) {
+//     //   try {
+//     //     const account = await paystackTools.createDVAOnce({
+//     //       firstName: user.fname,
+//     //       lastName: user.lname?.trim() ? user.lname : user.fname[0],
+//     //       email: user.email,
+//     //       phone: `+234${user.phone}`,
+//     //     });
+//     //     await storePaystackVirtualAccount({
+//     //       userId: user.id,
+//     //       phone: user.phone,
+//     //       customerCode: account.customerCode,
+//     //       accountNumber: account.accountNumber,
+//     //       accountName: account.accountName,
+//     //       bankName: account.bankName,
+//     //     });
+//     //     created.push(user.id);
+//     //   } catch (error: any) {
+//     //     const message = error?.response?.data?.message
+//     //       ?? (error instanceof Error ? error.message : String(error));
+//     //     console.log(error?.response?.data ?? error);
+//     //     failed.push({ userId: user.id, error: message });
+//     //   }
+//     // }
 
-    // res.json({ created: created.length, userIds: created, failed });
-  } catch (error: any) {
-    console.log(error?.response?.data ?? error);
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
-  }
-});
+//     // res.json({ created: created.length, userIds: created, failed });
+//   } catch (error: any) {
+//     console.log(error?.response?.data ?? error);
+//     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+//   }
+// });
 
 // Routes
 app.use("/api/oauth", OAuthRouter);
@@ -365,6 +365,15 @@ const server = app.listen(process.env.PORT, async () => {
       await expireUnacceptedOrders();
     } catch (error) {
       console.log(error);
+    }
+  });
+
+  nodeCron.schedule("0 0 */12 * * *", async () => {
+    try {
+      const result = await sendShopSetupReminders();
+      console.log("[shop-setup] 12-hour reminder job complete", result);
+    } catch (error) {
+      console.error("[shop-setup] 12-hour reminder job failed", error);
     }
   });
 });

@@ -2,6 +2,10 @@ import type { Response } from "express";
 import { db } from "../../config/database.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 
+/** Statuses that unlock product/shop reviews. Must include `order_completed`
+ *  (set when the buyer or auto-release pays out escrow). */
+const REVIEWABLE_FULFILLMENT_SQL = `'order_completed', 'completed', 'order_delivered', 'delivered', 'order_confirmed', 'confirmed'`;
+
 function normalizeNumber(value: unknown): number | null {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string" && value.trim() !== "") {
@@ -42,7 +46,7 @@ export async function PostBuyerShopReviewController(req: AuthRequest, res: Respo
              FROM orders
              WHERE id = $1 AND customer_id = $2
                AND LOWER(COALESCE(fulfillment_status, '')) IN
-                   ('order_delivered', 'delivered', 'completed', 'order_confirmed', 'confirmed')
+                   (${REVIEWABLE_FULFILLMENT_SQL})
              LIMIT 1`,
             [orderId, String(userId)]
         );
@@ -108,7 +112,7 @@ export async function GetBuyerProductPendingReviewsController(req: AuthRequest, 
              LEFT JOIN shops s ON s.id = CAST(o.shop_id AS INTEGER)
              LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
              WHERE o.customer_id = $1
-               AND LOWER(COALESCE(o.fulfillment_status, '')) IN ('order_delivered', 'delivered', 'completed', 'order_confirmed', 'confirmed')
+               AND LOWER(COALESCE(o.fulfillment_status, '')) IN (${REVIEWABLE_FULFILLMENT_SQL})
                AND pr.id IS NULL
              ORDER BY o.updated_at DESC, oi.id DESC`,
             [String(userId)]
@@ -176,7 +180,7 @@ export async function PostBuyerProductReviewController(req: AuthRequest, res: Re
              LEFT JOIN products p ON p.id = CAST(oi.item_id AS INTEGER)
                          WHERE oi.id = $1
                              AND LOWER(COALESCE(o.fulfillment_status, '')) IN
-                                     ('order_delivered', 'delivered', 'completed', 'order_confirmed', 'confirmed')
+                                     (${REVIEWABLE_FULFILLMENT_SQL})
              LIMIT 1`,
             [orderItemId]
         );

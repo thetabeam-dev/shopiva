@@ -96,6 +96,7 @@ const pages = {
     title: "Orders",
     description: "Monitor recent orders, payment status, and fulfillment flow.",
     endpoint: "orders",
+    rowHref: (row) => `/orders/${row.id}`,
     columns: [
       { accessor: "id", header: "ID" },
       { accessor: "orderId", header: "Order Ref" },
@@ -111,6 +112,7 @@ const pages = {
     title: "Returns",
     description: "Review return requests and shipment status.",
     endpoint: "returns",
+    rowHref: (row) => `/returns/${row.id}`,
     columns: [
       { accessor: "id", header: "ID" },
       { accessor: "orderId", header: "Order Ref" },
@@ -125,6 +127,7 @@ const pages = {
     title: "Disputes",
     description: "Track dispute cases, filter by status, and contact the customer or vendor.",
     endpoint: "disputes",
+    rowHref: (row) => `/disputes/${row.id}`,
     filters: [
       {
         name: "status",
@@ -248,7 +251,7 @@ export default function Dashboard() {
   );
 }
 
-function ResourcePage({ title, description, endpoint, columns, filters, rowActions }) {
+function ResourcePage({ title, description, endpoint, columns, filters, rowActions, rowHref }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -377,7 +380,11 @@ function ResourcePage({ title, description, endpoint, columns, filters, rowActio
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id ?? JSON.stringify(row)}>
+              <tr
+                key={row.id ?? JSON.stringify(row)}
+                className={rowHref ? 'clickable-row' : undefined}
+                onClick={rowHref ? () => { window.location.href = rowHref(row); } : undefined}
+              >
                 {columns.map((column) => (
                   <td key={column.accessor}>
                     {column.render ? column.render(row) : renderCellValue(row[column.accessor], column.accessor)}

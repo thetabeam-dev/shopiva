@@ -1202,3 +1202,94 @@ header{
         animation-duration: 0.01ms !important;
     }
 }
+
+.resource-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.order-progress-card {
+  margin-bottom: 24px;
+}
+
+.order-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.order-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.order-progress-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.order-progress-step.done {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.order-progress-step.done .order-progress-dot {
+  background: #16a34a;
+}
+
+.order-progress-step.active {
+  background: #dbeafe;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.order-progress-step.active .order-progress-dot {
+  background: #2563eb;
+}
+
+.order-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.order-detail-value {
+  text-align: right;
+  word-break: break-word;
+}
+
+.order-detail-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 8px 0;
+}
+
+.order-product-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.order-product-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+}

@@ -29,14 +29,6 @@ export default function LegalPageShell({ title, subtitle, toc = [], children }) 
       main.classList.add("legal-route-main");
     }
 
-    const header = document.querySelector("header");
-    if (header) {
-      header.style.position = "sticky";
-      header.style.top = "0px";
-      header.style.height = "70px";
-      header.style.background = "#ffffff";
-    }
-
     return () => {
       document.body.style.background = previousBodyBg;
       document.body.classList.remove("legal-route");

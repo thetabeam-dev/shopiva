@@ -15,6 +15,7 @@ import { shop } from "../../models/business/shop.js";
 import type { NewPayoutAccount, NewShopDocument, ShopDocument, ShopPolicies, TransferRecipientResponse } from "../../types/business.js";
 import { paystack } from "../paystack.js";
 import { formatPhoneNumber } from "../../utils/phone.js";
+import { parseShopLocationCoords } from "../../utils/shopSetup.js";
 
 /**
  * Create a new shop
@@ -304,44 +305,6 @@ function parseAddressAndCityFromLocation(location: unknown): { address: string |
         address: address.length ? address : null,
         city: city.length ? city : null,
     };
-}
-
-function parseShopLocationCoords(location: unknown): { lat: number; lng: number } | null {
-    if (location == null || typeof location !== "object") return null;
-    const loc = location as Record<string, unknown>;
-    const coords = loc.coordinates;
-
-    const toValidPair = (latRaw: unknown, lngRaw: unknown): { lat: number; lng: number } | null => {
-        const lat = Number(latRaw);
-        const lng = Number(lngRaw);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-        return { lat, lng };
-    };
-
-    // Most common shape: { coordinates: { lat, lng } }.
-    if (coords != null && typeof coords === "object" && !Array.isArray(coords)) {
-        const c = coords as Record<string, unknown>;
-        const direct = toValidPair(c.lat, c.lng) ?? toValidPair(c.latitude, c.longitude);
-        if (direct) return direct;
-        // GeoJSON Point: { type: "Point", coordinates: [lng, lat] }
-        if (c.type === "Point" && Array.isArray(c.coordinates) && c.coordinates.length >= 2) {
-            const geojson = toValidPair(c.coordinates[1], c.coordinates[0]);
-            if (geojson) return geojson;
-        }
-    }
-
-    // Legacy array shape: [lat, lng]
-    if (Array.isArray(coords) && coords.length >= 2) {
-        const arrPair = toValidPair(coords[0], coords[1]);
-        if (arrPair) return arrPair;
-    }
-
-    // Legacy top-level shape: { latitude, longitude } or { lat, lng }
-    const topLevel = toValidPair(loc.latitude, loc.longitude) ?? toValidPair(loc.lat, loc.lng);
-    if (topLevel) return topLevel;
-
-    return null;
 }
 
 /**

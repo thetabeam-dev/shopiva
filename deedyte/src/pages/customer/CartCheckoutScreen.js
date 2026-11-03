@@ -321,6 +321,10 @@ export default function CartCheckoutScreen({ navigation }) {
     () => checkoutLines.reduce((s, l) => s + l.unitPrice * l.qty, 0),
     [checkoutLines],
   );
+  const totalUnits = useMemo(
+    () => checkoutLines.reduce((s, l) => s + Math.max(1, Number(l.qty) || 1), 0),
+    [checkoutLines],
+  );
 
   const deliveryLocations = useMemo(() => {
     /** @type {Map<number, number>} */
@@ -683,7 +687,7 @@ export default function CartCheckoutScreen({ navigation }) {
           subtotal,
           shipping: chargedShipping,
           total: total,
-          itemCount: checkoutLines.length,
+          itemCount: totalUnits,
         });
       },
       onCancel: () => {
@@ -818,7 +822,7 @@ export default function CartCheckoutScreen({ navigation }) {
         transferAmount: Math.ceil(shortfall / 10) * 10,
         subtotal,
         shipping: chargedShipping,
-        itemCount: checkoutLines.length,
+        itemCount: totalUnits,
         checkout: buildCheckoutPayload(`wallet_${uid}_${Date.now()}`),
       });
       return;
@@ -845,7 +849,7 @@ export default function CartCheckoutScreen({ navigation }) {
                   subtotal,
                   shipping: chargedShipping,
                   total,
-                  itemCount: checkoutLines.length,
+                  itemCount: totalUnits,
                   rooms: Array.isArray(data?.rooms) ? data.rooms : [],
                 });
               })
@@ -859,7 +863,7 @@ export default function CartCheckoutScreen({ navigation }) {
       ],
     );
 
-  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, chargedShipping, checkoutLines.length, buildCheckoutPayload]);
+  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, chargedShipping, totalUnits, buildCheckoutPayload]);
 
   const inputStyle = (key) => [
     styles.input,

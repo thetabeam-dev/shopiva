@@ -6,13 +6,56 @@ main.legal-route-main {
   color: #111111 !important;
 }
 
+body.legal-route header {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body.legal-route .header {
+  height: 56px !important;
+  min-height: 56px !important;
+  overflow: hidden !important;
+}
+
+body.legal-route #header-logo-cnt {
+  width: fit-content !important;
+  height: 40px !important;
+  overflow: hidden !important;
+}
+
+body.legal-route #header-logo-cnt img,
+body.legal-route .header .inscription {
+  height: 36px !important;
+  width: 36px !important;
+  max-height: 36px !important;
+  max-width: 36px !important;
+  object-fit: contain !important;
+}
+
+@media screen and (max-width: 480px) {
+  body.legal-route .site-footer .footer-logo {
+    height: 48px !important;
+    width: 48px !important;
+    max-width: 48px !important;
+  }
+}
+
+body.legal-route .dashboard-summary {
+  display: none !important;
+}
+
 main.legal-route-main {
   display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
   height: auto !important;
   min-height: calc(100vh - 70px) !important;
   align-items: stretch !important;
   justify-content: flex-start !important;
   overflow: visible !important;
+  background: #ffffff !important;
 }
 
 .legal-page {

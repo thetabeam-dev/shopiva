@@ -64,6 +64,32 @@ export const NIGERIA_GEO_ZONES = [
 
 export const NIGERIA_LOCATIONS = NIGERIA_GEO_ZONES.flatMap((zone) => zone.states);
 
+export const GEO_ZONE_OPTIONS = NIGERIA_GEO_ZONES.map((zone) => ({
+  label: zone.name,
+  value: zone.name,
+}));
+
+/** @param {string} name */
+export function findGeoZoneByName(name) {
+  const key = String(name ?? '').trim().toLowerCase();
+  if (!key) return null;
+  return NIGERIA_GEO_ZONES.find((zone) => zone.name.toLowerCase() === key) ?? null;
+}
+
+/**
+ * @param {string} [name]
+ * @param {string[]} [locations]
+ */
+export function inferGeoZone(name, locations = []) {
+  const byName = findGeoZoneByName(name);
+  if (byName) return byName;
+  for (const loc of locations) {
+    const match = NIGERIA_GEO_ZONES.find((zone) => zone.states.includes(loc));
+    if (match) return match;
+  }
+  return null;
+}
+
 /** @param {string | number} raw */
 export function parseAmountInput(raw) {
   const digits = String(raw ?? '').replace(/[^\d]/g, '');

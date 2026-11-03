@@ -35,6 +35,7 @@ import {
   updateProduct,
 } from '../../api/product';
 import { useProfile } from '../../context/ProfileContext';
+import { scanMessage } from '../../moderation/messageModeration';
 import {
   selectCategoryTree,
   selectCategoriesState,
@@ -1310,11 +1311,20 @@ export default function VendorCreateProductScreen() {
     //   return;
     // }
 
+    const descriptionTrim = String(description ?? '').trim();
+    if (descriptionTrim && !scanMessage(descriptionTrim).isAllowed) {
+      Alert.alert(
+        'Description not allowed',
+        'Product descriptions cannot include phone numbers, email addresses, or links to chat off DeeDyte. Keep buyer contact on the app.',
+      );
+      return;
+    }
+
     setSaveSubmitting(true);
     try {
       const { productPayload, inventoryPayload } = buildProductCreatePayloads({
         title,
-        description,
+        description: descriptionTrim,
         category: categoryKey,
         subCategory,
         type: productType,
@@ -2113,6 +2123,17 @@ export default function VendorCreateProductScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
+        {/* Must be nested: a sibling Modal cannot present over this one on iOS. */}
+        <OptionPickerModal
+          visible={editingVariantId != null && picker !== null}
+          title={optionPickerProps.title}
+          options={optionPickerProps.options}
+          formatLabel={optionPickerProps.formatLabel}
+          swatchByValue={optionPickerProps.swatchByValue}
+          onSelect={handlePickerSelect}
+          onClose={() => setPicker(null)}
+          insetBottom={insets.bottom}
+        />
       </Modal>
       <Modal transparent visible={showValidationModal} animationType="fade">
         <View style={styles.modalRoot}>
@@ -2138,7 +2159,7 @@ export default function VendorCreateProductScreen() {
       </Modal>
 
       <OptionPickerModal
-        visible={picker !== null}
+        visible={editingVariantId == null && picker !== null}
         title={optionPickerProps.title}
         options={optionPickerProps.options}
         formatLabel={optionPickerProps.formatLabel}

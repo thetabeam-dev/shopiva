@@ -2,7 +2,12 @@ import { db } from "../config/database.js";
 import { notifyUser } from "./socketBroadcast.js";
 
 export type NotificationRole = "buyer" | "vendor";
-export type NotificationSource = "order" | "dispute" | "return" | "chat";
+export type NotificationSource =
+  | "order"
+  | "dispute"
+  | "return"
+  | "chat"
+  | "shop";
 
 export type NotificationRow = {
   id: number;

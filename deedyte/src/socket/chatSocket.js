@@ -23,6 +23,7 @@ const ORDER_SOCKET_EVENTS = [
   'order_acceptance',
   'order_processing',
   'order_shipping',
+  'order_shipping_updated',
   'order_out_for_delivery',
   'order_delivered',
   'order_confirmed',
@@ -225,15 +226,19 @@ function ensureDomainListeners(socket) {
 
   if (!socket.__orderListenersBound) {
     socket.__orderListenersBound = true;
-    const onOrderUpdate = async (res) => {
-      try {
-        await Tools.playSound();
-      } catch {
-        /* sound must not block Redux */
-      }
-      applyOrderSocketPayload(res);
-    };
-    ORDER_SOCKET_EVENTS.forEach((event) => socket.on(event, onOrderUpdate));
+    const silentOrderEvents = new Set(['order_shipping_updated']);
+    ORDER_SOCKET_EVENTS.forEach((event) => {
+      socket.on(event, async (res) => {
+        if (!silentOrderEvents.has(event)) {
+          try {
+            await Tools.playSound();
+          } catch {
+            /* sound must not block Redux */
+          }
+        }
+        applyOrderSocketPayload(res);
+      });
+    });
   }
 
   if (!socket.__returnListenersBound) {
@@ -266,9 +271,13 @@ function ensureDomainListeners(socket) {
     socket.__messageSoundBound = true;
     socket.on('message_created', async (payload) => {
       const message = payload?.message;
-      const senderId = Number(message?.sender_id ?? message?.senderId ?? message?.user_id);
-      const selfId = Number(store.getState()?.auth?.user?.id ?? store.getState()?.profile?.user?.id);
-      if (Number.isFinite(senderId) && Number.isFinite(selfId) && senderId === selfId) return;
+      const senderId = Number(
+        message?.sender ?? message?.sender_id ?? message?.senderId ?? message?.user_id,
+      );
+      const authUser = store.getState()?.auth?.user;
+      const selfId = Number(authUser?.id ?? authUser?.user_id ?? store.getState()?.profile?.user?.id);
+      // Only the recipient should hear the beep — skip own sends and unknown ids.
+      if (!Number.isFinite(senderId) || !Number.isFinite(selfId) || senderId === selfId) return;
       try {
         await Tools.playSound();
       } catch {

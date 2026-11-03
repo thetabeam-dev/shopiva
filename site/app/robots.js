@@ -18,7 +18,7 @@ export default function robots() {
         "/store/disputes",
       ],
     },
-    sitemap: `${SITE}/sitemap.xml`,
+    sitemap: [`${SITE}/sitemap.xml`, `${SITE}/product-sitemap.xml`],
     host: SITE,
   };
 }

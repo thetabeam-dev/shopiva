@@ -45,10 +45,10 @@ export async function GET() {
       "@type": "ListItem",
       position: index + 1,
       item: {
-        "@type": "Products",
+        "@type": "Product",
         name: item.name,
         image: productImageUrl(item.thumbnail_url),
-        url: `https://www.deedyte.com/store/${encodeURIComponent(String(item.shop_slug))}/product/${item.id}`,
+        url: `https://www.deedyte.com/store/${encodeURIComponent(String(item.shop_slug))}/${item.id}`,
         offers: {
           "@type": "Offer",
           price: productPrice(item.price),

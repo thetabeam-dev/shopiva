@@ -18,6 +18,7 @@ export type ChatMessageRecord = {
   content: string | null;
   created_at: Date;
   updated_at: Date;
+  is_read?: boolean;
 };
 
 export type ParticipantRole = "buyer" | "seller" | "admin";
@@ -199,10 +200,14 @@ export class chatModel {
       }
       const lim = Math.min(Math.max(1, limit), 100);
       const { rows } = await (await db()).query<ChatMessageRecord>(
-        `SELECT id, sender, room_id, type, content, created_at, updated_at
-         FROM chat_messages
-         WHERE room_id = $1
-         ORDER BY created_at DESC
+        `SELECT m.id, m.sender, m.room_id, m.type, m.content, m.created_at, m.updated_at,
+            EXISTS (
+              SELECT 1 FROM chat_message_reads r
+              WHERE r.message_id = m.id AND r.user_id <> m.sender
+            ) AS is_read
+         FROM chat_messages m
+         WHERE m.room_id = $1
+         ORDER BY m.created_at DESC
          LIMIT $2`,
         [room_id, lim]
       );

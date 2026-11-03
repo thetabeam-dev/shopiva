@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import nextDynamic from "next/dynamic";
+import StructuredData from "../../../StructuredData";
+import { productJsonLd } from "@/lib/productStructuredData";
 
 const ProductDetail = nextDynamic(() => import("./product"), {
   ssr: false,
@@ -60,7 +62,6 @@ export async function generateMetadata({ params }) {
   try {
     const product = await loadStorefrontProduct(slug, id);
 
-    console.log('product: ', product)
     if (!product || Object.keys(product).length === 0) {
       return { title: "Product Not Found" };
     }
@@ -148,7 +149,12 @@ export default async function ProductPage({ params }) {
     if (!product) {
       return <div>Error loading product. Please try again later.</div>;
     }
-    return <ProductDetail slug={slug} product={product} />;
+    return (
+      <>
+        <StructuredData data={productJsonLd(product, slug)} />
+        <ProductDetail slug={slug} product={product} />
+      </>
+    );
   } catch (error) {
     console.error("Error fetching product:", error);
     return <div>Error loading product. Please try again later.</div>;
