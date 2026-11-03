@@ -127,7 +127,7 @@ function App() {
 
   return (
     <>
-      {versionCheck.isUpdating && !versionCheck.isLatest ? (
+      {!versionCheck.isUpdating && !versionCheck.isLatest ? (
         <SafeAreaView
           style={{
             flex: 1,
@@ -152,7 +152,7 @@ function App() {
         </SafeAreaView>
       ) : null}
 
-      {!versionCheck.isLatest || versionCheck.isUpdating ? (
+      {versionCheck.isLatest || versionCheck.isUpdating ? (
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider style={{ flex: 1 }}>
             {PaystackProvider ? (
