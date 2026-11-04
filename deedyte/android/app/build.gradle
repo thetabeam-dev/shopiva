@@ -104,6 +104,29 @@ android {
         versionCode 23
         versionName "1.6.7"
         manifestPlaceholders = [MAPS_API_KEY: localProperties.getProperty("MAPS_API_KEY", "")]
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+    // Per-ABI APKs for assembleRelease. Play App Bundle already splits by ABI —
+    // upload the .aab, not a universal APK (that fat APK is ~3× a single-ABI build).
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a"
+            universalApk false
+        }
+    }
+    bundle {
+        abi { enableSplit = true }
+        density { enableSplit = true }
+        language { enableSplit = true }
+    }
+    packaging {
+        jniLibs {
+            excludes += ["**/x86/**", "**/x86_64/**"]
+        }
     }
     // signingConfigs {
     //     debug {
