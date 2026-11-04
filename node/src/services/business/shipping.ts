@@ -103,6 +103,17 @@ export async function SaveShippingZoneService(
 
   assertValidShippingZone(name, locations);
 
+  const existingZones = await shipping.getShippingZonesByShop(shopId);
+  const geoName = name.trim().toLowerCase();
+  const clash = existingZones.find(
+    (zone) =>
+      String(zone.zone_id) !== String(zoneId) &&
+      String(zone.name ?? "").trim().toLowerCase() === geoName,
+  );
+  if (clash) {
+    throw new Error(`${name.trim()} is already a shipping zone. Edit that zone instead.`);
+  }
+
   if (baseFee <= 0) {
     throw new Error("Base fee must be greater than 0");
   }

@@ -136,12 +136,25 @@ export default function ShippingZoneEditScreen({ route }) {
   );
   const zoneStates = selectedGeo?.states ?? [];
 
-  const onSelectGeoZone = (name) => {
-    const owner = takenGeoZones[name];
-    if (owner) {
+  const geoZoneDropdownData = useMemo(
+    () =>
+      GEO_ZONE_OPTIONS.map((option) => {
+        const taken = Boolean(takenGeoZones[option.value]) && option.value !== zoneName;
+        return {
+          ...option,
+          disable: taken,
+          label: taken ? `${option.label} (already added)` : option.label,
+        };
+      }),
+    [takenGeoZones, zoneName],
+  );
+
+  const onSelectGeoZone = (item) => {
+    const name = String(item?.value ?? '');
+    if (!name || item?.disable || (takenGeoZones[name] && name !== zoneName)) {
       Alert.alert(
         'Zone already added',
-        `${name} is already set up as “${owner}”. Edit that zone instead of creating another.`,
+        `${name || 'That zone'} is already in your shipping zones. Edit that zone instead.`,
       );
       return;
     }
@@ -174,6 +187,13 @@ export default function ShippingZoneEditScreen({ route }) {
       Alert.alert(
         'Select a geo-political zone',
         'Choose one of Nigeria’s six geo-political zones. Do not type a custom name.',
+      );
+      return;
+    }
+    if (takenGeoZones[selectedGeo.name]) {
+      Alert.alert(
+        'Zone already added',
+        `${selectedGeo.name} is already in your shipping zones. Edit that zone instead.`,
       );
       return;
     }
@@ -269,22 +289,40 @@ export default function ShippingZoneEditScreen({ route }) {
         <View style={{ marginBottom: 20 }}>
           <Text style={sharedStyles.fieldLabel}>Geo-political zone</Text>
           <Dropdown
-            data={GEO_ZONE_OPTIONS.map((option) => ({
-              ...option,
-              label: takenGeoZones[option.value]
-                ? `${option.label} (already added)`
-                : option.label,
-            }))}
+            data={geoZoneDropdownData}
             labelField="label"
             valueField="value"
+            disable={Boolean(isEdit && inferredExisting)}
             value={zoneName || null}
-            onChange={(item) => onSelectGeoZone(item.value)}
+            onChange={onSelectGeoZone}
             style={sharedStyles.dropdown}
             placeholder="Select North Central, South West, …"
             placeholderStyle={sharedStyles.dropdownPlaceholder}
             selectedTextStyle={sharedStyles.dropdownSelected}
             itemTextStyle={{ fontSize: 15, color: '#111111' }}
-            disable={Boolean(isEdit && inferredExisting)}
+            renderItem={(item) => {
+              const taken = Boolean(item.disable);
+              return (
+                <View
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    opacity: taken ? 0.4 : 1,
+                    backgroundColor: taken ? '#F3F4F6' : '#FFFFFF',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: taken ? '#6B7280' : '#111111',
+                      fontWeight: taken ? '400' : '500',
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </View>
+              );
+            }}
             renderRightIcon={() => (
               <Icon name="chevron-down" size={18} color="#6B7280" />
             )}
