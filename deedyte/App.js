@@ -127,49 +127,49 @@ function App() {
 
   return (
     <>
-        {!versionCheck.isUpdating && !versionCheck.isLatest ? (
-          <SafeAreaView
-            style={{
-              flex: 1,
-              backgroundColor: '#FFFFFF',
-              justifyContent: 'center',
-              paddingHorizontal: 28,
-            }}
-          >
-            <TouchableOpacity style={{ alignItems: 'center' }} onPress={openStore}>
-              <Text style={{ fontSize: 22, fontWeight: '800', color: '#111111', textAlign: 'center', marginBottom: 10 }}>
-                Update required
+      {!versionCheck.isUpdating && !versionCheck.isLatest ? (
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: '#FFFFFF',
+            justifyContent: 'center',
+            paddingHorizontal: 28,
+          }}
+        >
+          <TouchableOpacity style={{ alignItems: 'center' }} onPress={openStore}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#111111', textAlign: 'center', marginBottom: 10 }}>
+              Update required
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555555', textAlign: 'center', marginBottom: 20 }}>
+              Your app is outdated. Install the latest version to keep using Deedyte.
+            </Text>
+            <TouchableOpacity onPress={openStore} activeOpacity={0.85}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#00926e', textAlign: 'center' }}>
+                Click Here To Download The Latest Version
               </Text>
-              <Text style={{ fontSize: 15, lineHeight: 22, color: '#555555', textAlign: 'center', marginBottom: 20 }}>
-                Your app is outdated. Install the latest version to keep using Deedyte.
-              </Text>
-              <TouchableOpacity onPress={openStore} activeOpacity={0.85}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#00926e', textAlign: 'center' }}>
-                  Click Here To Download The Latest Version
-                </Text>
-              </TouchableOpacity>
             </TouchableOpacity>
-          </SafeAreaView>
-        ) : null}
+          </TouchableOpacity>
+        </SafeAreaView>
+      ) : null}
 
-        {versionCheck.isLatest || versionCheck.isUpdating ? (
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider style={{ flex: 1 }}>
-              {PaystackProvider ? (
-                <PaystackProvider
-                  publicKey={paystackPublicKey}
-                  currency="NGN"
-                  defaultChannels={['card', 'ussd', 'bank']}
-                  debug={__DEV__}
-                >
-                  {appBody}
-                </PaystackProvider>
-              ) : (
-                appBody
-              )}
-            </SafeAreaProvider>
-          </GestureHandlerRootView>
-        ) : null}
+      {versionCheck.isLatest || versionCheck.isUpdating ? (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider style={{ flex: 1 }}>
+            {PaystackProvider ? (
+              <PaystackProvider
+                publicKey={paystackPublicKey}
+                currency="NGN"
+                defaultChannels={['card', 'ussd', 'bank']}
+                debug={__DEV__}
+              >
+                {appBody}
+              </PaystackProvider>
+            ) : (
+              appBody
+            )}
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      ) : null}
     </>
   );
 }

@@ -1358,7 +1358,7 @@ export default function ProfileShopInfoScreen() {
 
       <FormModal
         visible={modalDesc}
-        title="Description"
+        title="Description"   
         saving={saving}
         onClose={() => {
           if (saving || descriptionPolicyOpen) return;
