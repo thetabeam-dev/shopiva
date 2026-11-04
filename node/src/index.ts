@@ -368,14 +368,14 @@ const server = app.listen(process.env.PORT, async () => {
     }
   });
 
-  nodeCron.schedule("0 0 */12 * * *", async () => {
-    try {
-      const result = await sendShopSetupReminders();
-      console.log("[shop-setup] 12-hour reminder job complete", result);
-    } catch (error) {
-      console.error("[shop-setup] 12-hour reminder job failed", error);
-    }
-  });
+  // nodeCron.schedule("0 0 */12 * * *", async () => {
+  //   try {
+  //     const result = await sendShopSetupReminders();
+  //     console.log("[shop-setup] 12-hour reminder job complete", result);
+  //   } catch (error) {
+  //     console.error("[shop-setup] 12-hour reminder job failed", error);
+  //   }
+  // });
 });
 
 app.post("/notify", async (req, res) => {
