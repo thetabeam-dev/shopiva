@@ -5,7 +5,7 @@
   "scripts": {
     "android": "react-native run-android",
     "android:win": "set \"JAVA_HOME=C:\\Users\\pisti\\.gradle\\jdks\\eclipse_adoptium-21-amd64-windows.2\" && react-native run-android",
-    "android:win-fixed": "scripts\\run-gradle-with-jdk.bat app:installDebug -PreactNativeDevServerPort=8081",
+    "android:win-fixed": "scripts\\run-gradle-with-jdk.bat clean app:installDebug -PreactNativeDevServerPort=8081",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
