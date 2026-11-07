@@ -155,7 +155,32 @@ function verifyOAuthReauthTokenForUser(token: string | undefined, userId: number
     }
 }
 
-export async function SignupService(payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string }) {
+/** Full name must include at least a first and last name (split on whitespace). */
+export function requireTwoNameParts(input: {
+    fname?: unknown;
+    lname?: unknown;
+    name?: unknown;
+}): { fname: string; lname: string } {
+    const combined = [input.name, input.fname, input.lname]
+        .map((part) => String(part ?? "").trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    const parts = combined.split(/\s+/).filter(Boolean);
+    const first = parts[0];
+    if (!first || parts.length < 2) {
+        throw new Error("Enter your full name (first and last name).");
+    }
+    return {
+        fname: first,
+        lname: parts.slice(1).join(" "),
+    };
+}
+
+export async function SignupService(payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string; name?: string }) {
+    const { fname, lname } = requireTwoNameParts(payload);
+    payload = { ...payload, fname, lname };
+
     const userDoc = await model.findUserByEmail(payload.email);
 
     // Check if user exists and has deleted account

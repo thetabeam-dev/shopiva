@@ -25,9 +25,9 @@ import { paystack } from "../services/paystack.js";
 
 export async function SignupController(req: Request, res: Response) {
     try {
-        const { fname, lname, email, phone, provider, password, gender, role, src, deviceId, deviceToken, whatsappMarketingConsent } = req.body;
+        const { fname, lname, name, email, phone, provider, password, gender, role, src, deviceId, deviceToken, whatsappMarketingConsent } = req.body;
         
-        const result = await SignupService({ fname, lname, email, phone, provider, password, gender, role, src, deviceId, deviceToken, whatsappMarketingConsent: whatsappMarketingConsent === true });
+        const result = await SignupService({ fname, lname, name, email, phone, provider, password, gender, role, src, deviceId, deviceToken, whatsappMarketingConsent: whatsappMarketingConsent === true });
         
         res.status(201).json({
             message: "User created successfully",
