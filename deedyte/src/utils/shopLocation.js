@@ -1,5 +1,12 @@
 export function shopRecordHasLocation(shop) {
-  const loc = shop?.location ?? shop?.Location;
+  let loc = shop?.location ?? shop?.Location;
+  if (typeof loc === 'string') {
+    try {
+      loc = JSON.parse(loc);
+    } catch {
+      return false;
+    }
+  }
   if (!loc || typeof loc !== 'object') return false;
   return Boolean(String(loc.city ?? '').trim() && String(loc.state ?? '').trim());
 }

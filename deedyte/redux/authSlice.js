@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { fetchCurrentUserOrStatus } from '../src/api/user';
 import { resolveInitialAppRoute } from '../src/auth/onboarding';
-import { hasVendorShop } from '../src/api/shop';
+import { fetchMyVendorShop, hasVendorShop, withVendorShop } from '../src/api/shop';
 import {
   clearSession,
   getStoredActiveRole,
@@ -50,6 +50,8 @@ function normalizeAppRole(value) {
 function userHasVendorRole(user) {
   if (!user || typeof user !== 'object') return false;
   const u = /** @type {Record<string, unknown>} */ (user);
+  const shopId = Number(u.shopId ?? (u.shop && typeof u.shop === 'object' ? /** @type {Record<string, unknown>} */ (u.shop).id : 0));
+  if (Number.isFinite(shopId) && shopId > 0) return true;
   const roleCandidates = [
     u.role,
     u.userRole,
@@ -74,6 +76,18 @@ function userHasVendorRole(user) {
  */
 function defaultRoleFromUser(user) {
   return userHasVendorRole(user) ? 'vendor' : 'customer';
+}
+
+/**
+ * Persist the signed-in profile with the vendor shop loaded from the API.
+ * @param {string} token
+ * @param {object | null | undefined} user
+ */
+async function persistUserWithShop(token, user) {
+  const shop = await fetchMyVendorShop(user);
+  const merged = withVendorShop(user, shop);
+  await saveSession(token, merged);
+  return merged;
 }
 
 const initialState = {
@@ -196,81 +210,22 @@ export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async (_, { disp
       return;
     }
 
-    if (r.user && typeof r.user === 'object') {
-      await saveSession(token, r.user);
-      const preAuthChoice = await getStoredPreAuthChoice();
-      const initialAppRoute = await resolveInitialAppRoute(r.user, {
-        fromSignup: false,
-        preferredRole,
-        preAuthChoice,
-      });
-      dispatch(
-        applySignedIn({
-          mergedUser: r.user,
-          preferredRole,
-          authenticated: true,
-          forceHome: false,
-          fromSignup: false,
-          initialAppRoute,
-        }),
-      );
-      await saveActiveRole(getState().auth.activeRole);
-      return;
-    }
-
-    if (cached && typeof cached === 'object') {
-      const preAuthChoice = await getStoredPreAuthChoice();
-      const initialAppRoute = await resolveInitialAppRoute(cached, {
-        fromSignup: false,
-        preferredRole,
-        preAuthChoice,
-      });
-      dispatch(
-        applySignedIn({
-          mergedUser: cached,
-          preferredRole,
-          authenticated: true,
-          forceHome: false,
-          fromSignup: false,
-          initialAppRoute,
-        }),
-      );
-      await saveActiveRole(getState().auth.activeRole);
-      return;
-    }
-
-    if (r.ok) {
-      await saveSession(token, {});
-      const preAuthChoice = await getStoredPreAuthChoice();
-      const initialAppRoute = await resolveInitialAppRoute({}, {
-        fromSignup: false,
-        preferredRole,
-        preAuthChoice,
-      });
-      dispatch(
-        applySignedIn({
-          mergedUser: {},
-          preferredRole,
-          authenticated: true,
-          forceHome: false,
-          fromSignup: false,
-          initialAppRoute,
-        }),
-      );
-      await saveActiveRole(getState().auth.activeRole);
-      return;
-    }
-
-    await saveSession(token, {});
+    const sessionUser =
+      r.user && typeof r.user === 'object'
+        ? r.user
+        : cached && typeof cached === 'object'
+          ? cached
+          : {};
+    const merged = await persistUserWithShop(token, sessionUser);
     const preAuthChoice = await getStoredPreAuthChoice();
-    const initialAppRoute = await resolveInitialAppRoute({}, {
+    const initialAppRoute = await resolveInitialAppRoute(merged, {
       fromSignup: false,
       preferredRole,
       preAuthChoice,
     });
     dispatch(
       applySignedIn({
-        mergedUser: {},
+        mergedUser: merged,
         preferredRole,
         authenticated: true,
         forceHome: false,
@@ -290,14 +245,15 @@ export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async (_, { disp
       if (token && cached && typeof cached === 'object') {
         const preferredRole = await getStoredActiveRole();
         const preAuthChoice = await getStoredPreAuthChoice();
-        const initialAppRoute = await resolveInitialAppRoute(cached, {
+        const merged = await persistUserWithShop(token, cached);
+        const initialAppRoute = await resolveInitialAppRoute(merged, {
           fromSignup: false,
           preferredRole,
           preAuthChoice,
         });
         dispatch(
           applySignedIn({
-            mergedUser: cached,
+            mergedUser: merged,
             preferredRole,
             authenticated: true,
             forceHome: false,
@@ -350,10 +306,8 @@ export const signInThunk = createAsyncThunk(
 
       if (!merged || typeof merged !== 'object') {
         merged = {};
-        await saveSession(token, merged);
-      } else {
-        await saveSession(token, merged);
       }
+      merged = await persistUserWithShop(token, merged);
 
       dispatch(
         applySignedIn({

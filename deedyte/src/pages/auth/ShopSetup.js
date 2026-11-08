@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import { useAuth } from '../../hooks/useAuth';
 import { createVendorShop, fetchOwnerShops, hasVendorShop, updateVendorShop } from '../../api/shop';
+import { isVendorAccountRole } from '../../profile/normalizeUser';
 import { fetchCurrentUserOrStatus, updateUserRole } from '../../api/user';
 import {
   getCurrentCoordinates,
@@ -30,7 +31,6 @@ import PlaceLocationField from '../../components/PlaceLocationField';
 import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
 import { getStoredAccessToken, getStoredUser, saveSession } from '../../auth/session';
 import { formatMvpCategoryLabel } from '../../utils/mvpCategory';
-import { shopRecordHasLocation } from '../../utils/shopLocation';
 import {
   selectCategoriesError,
   selectCategoriesLoading,
@@ -97,52 +97,37 @@ export default function ShopSetupScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const hasShop = await hasVendorShop();
+        const stored = await getStoredUser();
+        const uid = Number(stored?.id ?? stored?.user_id ?? stored?.raw?.id);
+        const [hasShop, shops] = await Promise.all([
+          hasVendorShop().catch(() => false),
+          Number.isFinite(uid) ? fetchOwnerShops(uid).catch(() => []) : Promise.resolve([]),
+        ]);
         if (cancelled) return;
-        if (hasShop) {
-          const stored = await getStoredUser();
-          const uid = Number(stored?.id);
-          const shops = Number.isFinite(uid) ? await fetchOwnerShops(uid).catch(() => []) : [];
-          const shop = Array.isArray(shops) ? shops[0] : null;
-          if (shop && shopRecordHasLocation(shop)) {
-            await setActiveRole('vendor');
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'home' }],
-              }),
-            );
-            return;
-          }
-          const shopId = Number(shop?.id ?? shop?.shop_id);
-          if (Number.isFinite(shopId) && shopId > 0) setExistingShopId(shopId);
-          if (shop?.name) setShopName(String(shop.name));
-          void requestLocationPermission().then(async granted => {
-            if (!granted || cancelled) {
-              Alert.alert(
-                'Shop location',
-                'Allow location to set your shop, or enter the city and state below.',
-              );
-              return;
-            }
-            try {
-              const c = await getCurrentCoordinates();
-              if (!cancelled) setCoords(c);
-            } catch {
-              /* manual entry remains available */
-            }
-          });
-        } else {
-          void requestLocationPermission().then(async granted => {
-            if (!granted || cancelled) return;
-            try {
-              const c = await getCurrentCoordinates();
-              if (!cancelled) setCoords(c);
-            } catch {
-              /* manual entry remains available */
-            }
-          });
+        const shop = Array.isArray(shops) ? shops[0] : null;
+        const shopId = Number(shop?.id ?? shop?.shop_id);
+        const alreadyVendor = isVendorAccountRole(
+          stored?.role ?? stored?.roleRaw ?? stored?.raw?.role,
+        );
+        if (hasShop || alreadyVendor || (Number.isFinite(shopId) && shopId > 0)) {
+          await setActiveRole('vendor');
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'home' }],
+            }),
+          );
+          return;
         }
+        void requestLocationPermission().then(async granted => {
+          if (!granted || cancelled) return;
+          try {
+            const c = await getCurrentCoordinates();
+            if (!cancelled) setCoords(c);
+          } catch {
+            /* manual entry remains available */
+          }
+        });
       } catch {
         /* show form */
       } finally {

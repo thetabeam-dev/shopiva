@@ -253,6 +253,7 @@ export type ShopMapVendorRow = {
     name: string;
     slug: string;
     logo: string | null;
+    banner: string | null;
     lat: number;
     lng: number;
     /** Shop `location.state` when present (for same-state vs buyer highlighting). */
@@ -321,6 +322,7 @@ export async function GetShopsForDiscoverByCategoryService(category: string): Pr
         const name = typeof r.name === "string" ? r.name : "";
         const slug = typeof r.slug === "string" ? r.slug : "";
         const logo = typeof r.logo === "string" ? r.logo.trim() : "";
+        const banner = typeof r.banner === "string" ? r.banner.trim() : "";
         if (!Number.isFinite(id)) continue;
         const coords = parseShopLocationCoords(r.location);
         const { address, city } = parseAddressAndCityFromLocation(r.location);
@@ -340,6 +342,7 @@ export async function GetShopsForDiscoverByCategoryService(category: string): Pr
             name,
             slug,
             logo: logo || null,
+            banner: banner || null,
             lat: coords?.lat ?? null,
             lng: coords?.lng ?? null,
             state: parseStateFromLocation(r.location),

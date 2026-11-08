@@ -1,5 +1,4 @@
 import { fetchOwnerShops, hasVendorShop } from '../api/shop';
-import { shopRecordHasLocation } from '../utils/shopLocation';
 
 /**
  * Post-signup onboarding: “Almost there” profile (phone, gender, location).
@@ -73,17 +72,31 @@ export async function resolveInitialAppRoute(user, opts = {}) {
     return 'OnboardingProfile';
   }
 
-  // Vendor signup and login both stop here until the shop has a city and state.
-  if (wantsVendor) {
-    try {
-      const hasShop = await hasVendorShop();
-      if (!hasShop) return 'Shop-Onboarding';
-      const uid = Number(/** @type {{ id?: unknown }} */ (user)?.id);
+  // Shop creation is a signup step. Returning vendor logins always go home —
+  // a missing/false has-shop response must not reopen setup for an existing shop.
+  if (wantsVendor && fromSignup) {
+    const attachedId = Number(
+      /** @type {{ shopId?: unknown; shop?: { id?: unknown } }} */ (user)?.shopId ??
+        /** @type {{ shop?: { id?: unknown } }} */ (user)?.shop?.id,
+    );
+    if (Number.isFinite(attachedId) && attachedId > 0) {
+      // Shop already loaded onto the session at login.
+    } else {
+      const uid = Number(
+        /** @type {{ id?: unknown; user_id?: unknown }} */ (user)?.id ??
+          /** @type {{ user_id?: unknown }} */ (user)?.user_id,
+      );
       const shops = Number.isFinite(uid) ? await fetchOwnerShops(uid).catch(() => []) : [];
-      const shop = Array.isArray(shops) ? shops[0] : null;
-      if (!shop || !shopRecordHasLocation(shop)) return 'Shop-Onboarding';
-    } catch {
-      return 'Shop-Onboarding';
+      const ownedShop = Array.isArray(shops) && shops.length > 0;
+      let hasShop = ownedShop;
+      if (!hasShop) {
+        try {
+          hasShop = await hasVendorShop();
+        } catch {
+          hasShop = false;
+        }
+      }
+      if (!hasShop) return 'Shop-Onboarding';
     }
   }
 

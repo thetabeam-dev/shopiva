@@ -7,6 +7,7 @@ export type RecentlyViewedShop = {
   name: string;
   slug: string;
   logo: string;
+  banner: string;
   category: string;
   ratingAverage: number;
   reviewCount: number;
@@ -54,6 +55,7 @@ export async function listRecentlyViewedShops(
     name: string;
     slug: string | null;
     logo: string | null;
+    banner: string | null;
     category: string | null;
     rating_average: string | number | null;
     review_count: string | number | null;
@@ -66,6 +68,7 @@ export async function listRecentlyViewedShops(
        s.name,
        s.slug,
        s.logo,
+       s.banner,
        s.category,
        COALESCE(m.average_rating, 0) AS rating_average,
        COALESCE(m.review_count, 0) AS review_count,
@@ -86,6 +89,7 @@ export async function listRecentlyViewedShops(
     name: String(row.name ?? "Shop"),
     slug: String(row.slug ?? ""),
     logo: String(row.logo ?? "").trim(),
+    banner: String(row.banner ?? "").trim(),
     category: String(row.category ?? "").trim(),
     ratingAverage: Number(row.rating_average) || 0,
     reviewCount: Number(row.review_count) || 0,
