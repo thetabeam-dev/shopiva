@@ -1,7 +1,7 @@
 import messaging from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import notifee, { AndroidImportance, EventType } from 'react-native-notify-kit';
-import { navigateToActivitiesScreen, navigationRef } from '../navigation/root';
+import { navigateToActivitiesScreen, navigateToCartTab, navigationRef } from '../navigation/root';
 import store from '../../redux/store';
 import { setActiveRoleThunk } from '../../redux/authSlice';
 
@@ -64,6 +64,10 @@ function resolveNotificationTarget(meta, data) {
     return roomId
       ? { screen: 'Inbox', params: { chat: { roomId, name: roomName || 'Chat' } } }
       : null;
+  }
+
+  if (type === 'cart' || type === 'checkout' || type === 'abandoned_cart') {
+    return { screen: 'Cart', role: 'customer' };
   }
 
   if (type === 'order' || type === 'orders') {
@@ -217,7 +221,11 @@ function navigateWhenReady(target) {
       console.warn('[fcm] role switch failed:', err instanceof Error ? err.message : String(err));
     }
     if (navigationRef.isReady()) {
-      const ok = navigateToActivitiesScreen(target.screen, target.params);
+      const screenName = String(target.screen ?? '');
+      const ok =
+        screenName.toLowerCase() === 'cart'
+          ? navigateToCartTab()
+          : navigateToActivitiesScreen(screenName, target.params);
       if (!ok && attempt < 20) {
         setTimeout(() => tryNavigate(attempt + 1), 250);
       }
