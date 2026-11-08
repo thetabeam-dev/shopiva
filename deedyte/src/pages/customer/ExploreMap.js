@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   Keyboard,
   Modal,
   Platform,
@@ -26,9 +25,8 @@ import { placeDetails, suggestPlaces, tomtomTileUrl } from '../../utils/tomtom';
 import { getCurrentCoordinates, requestLocationPermission, reverseGeocodeToPlace } from '../../utils/deviceLocation';
 import { updateUserProfileFields } from '../../api/user';
 import PlaceLocationField from '../../components/PlaceLocationField';
+import ShopBrowseCard from '../../components/ShopBrowseCard';
 import {
-  shopCover,
-  shopPlace,
   storedUserCoordinate,
   vendorCoordinate,
 } from '../../utils/exploreMap';
@@ -611,29 +609,13 @@ export default function ExploreMap({ navigation, route }) {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.mapCardRow}
                 onScrollToIndexFailed={() => { }}
-                renderItem={({ item }) => {
-                  const cover = shopCover(item.shop);
-                  const place = shopPlace(item.shop);
-                  return (
-                    <TouchableOpacity
-                      style={styles.mapCard}
-                      activeOpacity={0.9}
-                      onPress={() => openShop(item.shop)}
-                    >
-                      {cover ? (
-                        <Image source={{ uri: cover }} style={styles.mapCardImage} />
-                      ) : (
-                        <View style={[styles.mapCardImage, styles.coverFallback]}>
-                          <Text style={styles.coverLetter}>
-                            {String(item.shop.name || 'S').trim().charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <Text style={styles.mapCardTitle} numberOfLines={1}>{item.shop.name || 'Shop'}</Text>
-                      {place ? <Text style={styles.mapCardSub} numberOfLines={1}>{place}</Text> : null}
-                    </TouchableOpacity>
-                  );
-                }}
+                renderItem={({ item }) => (
+                  <ShopBrowseCard
+                    item={item.shop}
+                    width={MAP_CARD_W}
+                    onPress={() => openShop(item.shop)}
+                  />
+                )}
               />
             )}
           </View>
@@ -862,20 +844,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     transform: [{ rotate: '45deg' }],
   },
-  mapCard: {
-    width: MAP_CARD_W,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 7,
-    padding: 10,
-  },
-  mapCardImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 7,
-    backgroundColor: '#F3F4F6',
-  },
-  coverFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F6F1' },
-  coverLetter: { fontSize: 36, fontWeight: '700', color: '#00926E' },
-  mapCardTitle: { marginTop: 8, fontSize: 15, fontWeight: '700', color: '#111111' },
-  mapCardSub: { marginTop: 2, fontSize: 13, color: '#6B7280' },
 });
