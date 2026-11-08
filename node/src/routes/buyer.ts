@@ -26,6 +26,14 @@ import {
   disputeEvidenceUploadMiddleware,
   UploadDisputeEvidenceController,
 } from "../controllers/buyer/disputeEvidenceUpload.js";
+import {
+  GetBuyerRecentlyViewedController,
+  PostBuyerProductViewController,
+} from "../controllers/buyer/productHistory.js";
+import {
+  GetBuyerRecentlyViewedShopsController,
+  PostBuyerShopViewController,
+} from "../controllers/buyer/shopHistory.js";
 
 const BuyerRouter = express.Router();
 // /buyer/cart/${productId}/shopId
@@ -55,6 +63,10 @@ BuyerRouter.post(
   disputeEvidenceUploadMiddleware,
   UploadDisputeEvidenceController
 );
+BuyerRouter.get("/buyer/recently-viewed", verifyToken, GetBuyerRecentlyViewedController);
+BuyerRouter.post("/buyer/recently-viewed", verifyToken, PostBuyerProductViewController);
+BuyerRouter.get("/buyer/recently-viewed-shops", verifyToken, GetBuyerRecentlyViewedShopsController);
+BuyerRouter.post("/buyer/recently-viewed-shops", verifyToken, PostBuyerShopViewController);
 BuyerRouter.get("/buyer/product-pending-reviews", verifyToken, GetBuyerProductPendingReviewsController);
 BuyerRouter.post("/buyer/shop-review", verifyToken, PostBuyerShopReviewController);
 BuyerRouter.post("/buyer/product-review", verifyToken, PostBuyerProductReviewController);

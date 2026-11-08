@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Dimensions,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getVendorsOnMapByCategory } from '../../api';
+import { fetchRecentlyViewedShops } from '../../api/buyer';
 import { normalizeVendorState, vendorStateRaw } from './Vendors';
 import { shopCover, shopPlace } from '../../utils/exploreMap';
 
@@ -26,6 +28,7 @@ export default function ExploreBrowse({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [recentShops, setRecentShops] = useState([]);
 
   const load = useCallback(async (isRefresh) => {
     if (isRefresh) setRefreshing(true);
@@ -46,6 +49,21 @@ export default function ExploreBrowse({ navigation }) {
   useEffect(() => {
     load(false).catch(() => {});
   }, [load]);
+
+  const loadRecentShops = useCallback(async () => {
+    try {
+      const rows = await fetchRecentlyViewedShops();
+      setRecentShops(Array.isArray(rows) ? rows : []);
+    } catch {
+      setRecentShops([]);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadRecentShops();
+    }, [loadRecentShops]),
+  );
 
   const sections = useMemo(() => {
     /** @type {Map<string, object[]>} */
@@ -94,6 +112,50 @@ export default function ExploreBrowse({ navigation }) {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#00926E" />
           }
         >
+          {recentShops.length ? (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.sectionHead}
+                onPress={() => navigation.navigate('State-shops', { recentlyViewed: true })}
+                accessibilityRole="button"
+                accessibilityLabel="See all recently viewed shops"
+              >
+                <Text style={styles.sectionTitle} numberOfLines={1}>Recently viewed shops</Text>
+                <Icon name="arrow-forward" size={20} color="#111111" />
+              </TouchableOpacity>
+              <FlatList
+                horizontal
+                data={recentShops}
+                keyExtractor={(item) => `recent-shop-${item.id}`}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.row}
+                renderItem={({ item }) => {
+                  const cover = shopCover(item);
+                  const place = shopPlace(item);
+                  return (
+                    <TouchableOpacity
+                      style={styles.card}
+                      activeOpacity={0.9}
+                      onPress={() => openShop(item)}
+                    >
+                      {cover ? (
+                        <Image source={{ uri: cover }} style={styles.cover} />
+                      ) : (
+                        <View style={[styles.cover, styles.coverFallback]}>
+                          <Text style={styles.coverLetter}>
+                            {String(item.name || 'S').trim().charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <Text style={styles.cardTitle} numberOfLines={1}>{item.name || 'Shop'}</Text>
+                      {place ? <Text style={styles.cardSub} numberOfLines={1}>{place}</Text> : null}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
+          ) : null}
+
           {sections.length === 0 ? (
             <Text style={styles.muted}>No shops available.</Text>
           ) : sections.map((section) => (

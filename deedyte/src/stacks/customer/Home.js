@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import HomeScreen from "../../pages/customer/Home";
+import RecentlyViewedProductsScreen from '../../pages/customer/RecentlyViewedProducts';
 import ProductSearchScreen from "../../pages/customer/ProductSearch";
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
@@ -96,6 +97,16 @@ export function HomeStackScreen() {
         component={ProductSearchScreen}
         options={{
           title: 'Search',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTitleStyle: { fontWeight: '700' },
+        }}
+      />
+      <HomeStack.Screen
+        name="RecentlyViewedProducts"
+        component={RecentlyViewedProductsScreen}
+        options={{
+          title: 'Recently viewed',
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#FFFFFF' },
           headerTitleStyle: { fontWeight: '700' },

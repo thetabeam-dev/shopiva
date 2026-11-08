@@ -1,12 +1,15 @@
 import type { Request, Response } from "express";
+import type { AuthRequest } from "../middleware/auth.js";
 import {
   GetStorefrontShopBySlugService,
   GetStorefrontProductsByShopIdService,
   GetStorefrontProductService,
   GetStorefrontShopDeliveryService,
 } from "../services/business/storefront.js";
+import { recordProductView } from "../services/buyer/productHistory.js";
+import { recordShopView } from "../services/buyer/shopHistory.js";
 
-export async function GetStorefrontShopController(req: Request, res: Response): Promise<void> {
+export async function GetStorefrontShopController(req: AuthRequest, res: Response): Promise<void> {
   try {
     const slug = typeof req.params.slug === "string" ? req.params.slug.trim() : "";
     if (!slug) {
@@ -19,6 +22,15 @@ export async function GetStorefrontShopController(req: Request, res: Response): 
       return;
     }
     const row = result.shop as Record<string, unknown>;
+    const viewerId = Number(req.user?.id);
+    const shopId = Number(row.id);
+    if (Number.isFinite(viewerId) && viewerId > 0 && Number.isFinite(shopId) && shopId > 0) {
+      try {
+        await recordShopView(viewerId, shopId);
+      } catch (error) {
+        console.error("[shop-history] failed to record view", error);
+      }
+    }
     res.status(200).json({
       shop: {
         id: row.id,
@@ -60,7 +72,7 @@ export async function GetStorefrontProductsController(req: Request, res: Respons
   }
 }
 
-export async function GetStorefrontProductController(req: Request, res: Response): Promise<void> {
+export async function GetStorefrontProductController(req: AuthRequest, res: Response): Promise<void> {
   try {
     const productId = parseInt(req.params.productId ?? "", 10);
     if (isNaN(productId)) {
@@ -72,6 +84,14 @@ export async function GetStorefrontProductController(req: Request, res: Response
     if (!p?.is_published) {
       res.status(404).json({ error: "Product not found" });
       return;
+    }
+    const viewerId = Number(req.user?.id);
+    if (Number.isFinite(viewerId) && viewerId > 0) {
+      try {
+        await recordProductView(viewerId, productId);
+      } catch (error) {
+        console.error("[product-history] failed to record view", error);
+      }
     }
     res.status(200).json(data);
   } catch (err) {

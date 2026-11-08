@@ -24,6 +24,7 @@ import {
   getStorefrontShop,
   getStorefrontShopDelivery,
 } from '../../api';
+import { fetchRecentlyViewedShops } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
@@ -598,6 +599,8 @@ export default function VendorScreen({ route, navigation }) {
     /** @type {{ title?: string; description?: string } | undefined} */ (undefined),
   );
 
+  const recentlyViewedOnly = Boolean(route.params?.recentlyViewed);
+
   const loadVendors = useCallback(async (isRefresh) => {
     const requestId = vendorRequestId.current + 1;
     vendorRequestId.current = requestId;
@@ -611,6 +614,22 @@ export default function VendorScreen({ route, navigation }) {
     else setLoading(true);
     setError('');
     try {
+      if (recentlyViewedOnly) {
+        const rows = await fetchRecentlyViewedShops();
+        const mapped = (Array.isArray(rows) ? rows : []).map(row => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          logo: row.logo,
+          city: row.city,
+          state: row.state,
+          average_rating: row.ratingAverage,
+          review_count: row.reviewCount,
+        }));
+        if (vendorRequestId.current !== requestId) return;
+        setVendors(mapped);
+        return;
+      }
       const rows = await getVendorsOnMapByCategory(
         category === ALL_CATEGORY ? '' : category,
       );
@@ -640,7 +659,7 @@ export default function VendorScreen({ route, navigation }) {
         setRefreshing(false);
       }
     }
-  }, [category]);
+  }, [category, recentlyViewedOnly]);
 
   useEffect(() => {
     loadVendors(false).catch(() => {});
@@ -934,6 +953,15 @@ export default function VendorScreen({ route, navigation }) {
   }, [route.params?.shopIds]);
 
   const displayedVendors = useMemo(() => {
+    if (recentlyViewedOnly) {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return vendors;
+      return vendors.filter(v => {
+        const name = String(v?.name ?? '').toLowerCase();
+        const city = String(v?.city ?? '').toLowerCase();
+        return name.includes(query) || city.includes(query);
+      });
+    }
     if (shopIdOrder) {
       const byId = new Map(vendors.map(v => [String(v.id), v]));
       return shopIdOrder.map(id => byId.get(id)).filter(Boolean);
@@ -951,7 +979,7 @@ export default function VendorScreen({ route, navigation }) {
       const city = String(v?.city ?? v?.location?.city ?? '').toLowerCase();
       return name.includes(query) || city.includes(query);
     });
-  }, [vendors, locationFilter, searchQuery, shopIdOrder]);
+  }, [vendors, locationFilter, searchQuery, shopIdOrder, recentlyViewedOnly]);
 
   const handleSelectLocation = useCallback(stateName => {
     setLocationFilter(stateName);
