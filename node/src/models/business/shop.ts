@@ -234,11 +234,13 @@ export class shop{
     });
 
     static getShopsByOwnerId = withErrorHandling(async (ownerId: string | number) => {
-        const {
-            rows
-        } = await (await db()).query(
-            `SELECT * FROM shops WHERE ownerid = $1 ORDER BY id`,
-            [String(ownerId)]
+        const id = Number(ownerId);
+        if (!Number.isFinite(id) || id < 1) {
+            return [];
+        }
+        const { rows } = await (await db()).query(
+            `SELECT * FROM shops WHERE ownerid = $1::int ORDER BY id`,
+            [id]
         );
         return rows;
     });
@@ -748,6 +750,7 @@ export class shop{
               s.name,
               s.slug,
               s.logo,
+              s.banner,
               s.location,
               m.average_rating,
               m.review_count,

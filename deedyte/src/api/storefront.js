@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch, apiFetchAuth } from './client';
 
 /**
  * @param {Response} res
@@ -24,7 +24,7 @@ async function readJson(res) {
 export async function getStorefrontShop(slug) {
   const s = String(slug ?? '').trim();
   if (!s) throw new Error('Shop slug is required');
-  const res = await apiFetch(`/storefront/shop/${encodeURIComponent(s)}`);
+  const res = await apiFetchAuth(`/storefront/shop/${encodeURIComponent(s)}`);
   return readJson(res);
 }
 
@@ -46,7 +46,7 @@ export async function getStorefrontProducts(slug) {
 export async function getStorefrontProduct(productId) {
   const id = String(productId ?? '').trim();
   if (!id) throw new Error('Product id is required');
-  const res = await apiFetch(`/storefront/product/${encodeURIComponent(id)}`);
+  const res = await apiFetchAuth(`/storefront/product/${encodeURIComponent(id)}`);
   return readJson(res);
 }
 

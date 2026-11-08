@@ -230,6 +230,44 @@ export async function deleteBuyerCartLine(cartItemId) {
 }
 
 
+/** @returns {Promise<Array<Record<string, unknown>>>} */
+export async function fetchRecentlyViewedProducts() {
+  const res = await apiFetchAuth('/buyer/recently-viewed');
+  const data = await readJson(res);
+  return Array.isArray(data?.products) ? data.products : [];
+}
+
+/** @returns {Promise<Array<Record<string, unknown>>>} */
+export async function fetchRecentlyViewedShops() {
+  const res = await apiFetchAuth('/buyer/recently-viewed-shops');
+  const data = await readJson(res);
+  return Array.isArray(data?.shops) ? data.shops : [];
+}
+
+export async function recordShopView(shopId) {
+  const id = Number(shopId);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const res = await apiFetchAuth('/buyer/recently-viewed-shops', {
+    method: 'POST',
+    body: JSON.stringify({ shopId: id }),
+  });
+  if (res.status === 204) return {};
+  if (!res.ok) return {};
+  return readJson(res);
+}
+
+export async function recordProductView(productId) {
+  const id = Number(productId);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const res = await apiFetchAuth('/buyer/recently-viewed', {
+    method: 'POST',
+    body: JSON.stringify({ productId: id }),
+  });
+  if (res.status === 204) return {};
+  if (!res.ok) return {};
+  return readJson(res);
+}
+
 export async function createProductReview(body) {
   const res = await apiFetchAuth('/buyer/product-review', {
     method: 'POST',

@@ -18,11 +18,68 @@ async function readJson(res) {
   return data;
 }
 
+/**
+ * @param {unknown} shops
+ * @returns {Record<string, unknown> | null}
+ */
+function pickPrimaryShop(shops) {
+  if (!Array.isArray(shops) || shops.length === 0) return null;
+  const shop = shops[0];
+  if (!shop || typeof shop !== 'object') return null;
+  return /** @type {Record<string, unknown>} */ (shop);
+}
+
+/**
+ * Load the signed-in vendor's shop using the JWT (not a possibly stale user id).
+ * @param {object | null | undefined} [user]
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
+export async function fetchMyVendorShop(user) {
+  try {
+    const res = await apiFetchAuth('/shop/has-shop', { method: 'GET' });
+    const data = await readJson(res);
+    const fromHasShop = pickPrimaryShop(data.shops);
+    if (fromHasShop) return fromHasShop;
+    if (data.hasShop === true) {
+      /* owner list below */
+    }
+  } catch {
+    /* try owner list */
+  }
+  const uid = Number(
+    user?.id ?? user?.user_id ?? user?.raw?.id ?? 0,
+  );
+  if (!Number.isFinite(uid) || uid <= 0) return null;
+  try {
+    return pickPrimaryShop(await fetchOwnerShops(uid));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {object | null | undefined} user
+ * @param {Record<string, unknown> | null} shop
+ */
+export function withVendorShop(user, shop) {
+  const base = user && typeof user === 'object' ? { ...user } : {};
+  if (!shop) {
+    return { ...base, shop: null, shopId: null };
+  }
+  const id = Number(shop.id ?? shop.shop_id ?? shop.shopId);
+  return {
+    ...base,
+    shop,
+    shopId: Number.isFinite(id) && id > 0 ? id : null,
+  };
+}
+
 /** @returns {Promise<boolean>} */
 export async function hasVendorShop() {
-  const res = await apiFetchAuth('/shop/has-shop', { method: 'GET' });
-  const data = await readJson(res);
-  return Boolean(data.hasShop);
+  const { getStoredUser } = await import('../auth/session');
+  const stored = await getStoredUser().catch(() => null);
+  const shop = await fetchMyVendorShop(stored);
+  return Boolean(shop && (shop.id ?? shop.shop_id));
 }
 
 /**
@@ -77,7 +134,10 @@ export async function fetchOwnerShops(userId) {
   }
   const res = await apiFetchAuth(`/shop/owner/${uid}`, { method: 'GET' });
   const data = await readJson(res);
-  return Array.isArray(data.shops) ? data.shops : [];
+  if (Array.isArray(data.shops)) return data.shops;
+  if (Array.isArray(data.result)) return data.result;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
 }
 
 /**

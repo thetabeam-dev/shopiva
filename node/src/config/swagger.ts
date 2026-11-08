@@ -115,8 +115,9 @@ const options: swaggerJsdoc.Options = {
           type: 'object',
           required: ['fname', 'lname', 'email', 'phone', 'password'],
           properties: {
-            fname: { type: 'string', example: 'John' },
+            fname: { type: 'string', example: 'John', description: 'First name. Together with lname (or name), at least two words are required.' },
             lname: { type: 'string', example: 'Doe' },
+            name: { type: 'string', example: 'John Doe', description: 'Optional full name. Must split into 2 or more parts.' },
             email: { type: 'string', format: 'email', example: 'john.doe@example.com' },
             phone: { type: 'string', example: '+2348012345678' },
             password: { type: 'string', format: 'password', example: 'securePassword123' },

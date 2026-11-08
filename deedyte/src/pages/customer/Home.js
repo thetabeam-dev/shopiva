@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSelector } from 'react-redux';
 import { getStorefrontProduct, getStorefrontProducts, getVendorsOnMapByCategory } from '../../api';
-import { addBuyerCartLine, deleteBuyerCartLine, fetchBuyerCart } from '../../api/buyer';
+import { addBuyerCartLine, deleteBuyerCartLine, fetchBuyerCart, fetchRecentlyViewedProducts } from '../../api/buyer';
 import { fetchWallet } from '../../api/user';
 import { connectChatSocket } from '../../socket/chatSocket';
 import { useProfile } from '../../context/ProfileContext';
@@ -115,6 +115,7 @@ export default function HomeScreen() {
   const [variantSheet, setVariantSheet] = useState(
     /** @type {null | { item: Record<string, unknown>; variants: Record<string, unknown>[]; selected: number | null }} */ (null),
   );
+  const [recentlyViewed, setRecentlyViewed] = useState([]);
   const categories = useMemo(() => {
     const seen = new Set();
     const names = [];
@@ -249,10 +250,45 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadRecentlyViewed = useCallback(async () => {
+    if (!user?.id) {
+      setRecentlyViewed([]);
+      return;
+    }
+    try {
+      const productRows = await fetchRecentlyViewedProducts();
+      setRecentlyViewed(
+        productRows.map(product => {
+          const shop = product?.shop && typeof product.shop === 'object' ? product.shop : {};
+          return {
+            id: String(product.id),
+            title: String(product.name ?? 'Product'),
+            uri: getProductImageUri(product) || String(product.thumbnail ?? ''),
+            price: Number(product.minPrice ?? product.price) || 0,
+            comparePrice: Number(product.maxPrice) || 0,
+            category: String(product?.category ?? '').trim().toLowerCase(),
+            hasVariants: Boolean(product?.hasVariants),
+            shop: {
+              id: shop.id,
+              name: shop.name,
+              slug: shop.slug,
+              ratingAverage: shop.ratingAverage,
+              reviewCount: shop.reviewCount,
+            },
+            product,
+          };
+        }),
+      );
+    } catch {
+      setRecentlyViewed([]);
+    }
+  }, [user?.id]);
+
   useFocusEffect(
     useCallback(() => {
       void loadCartProducts();
-    }, [loadCartProducts]),
+      void loadRecentlyViewed();
+    }, [loadCartProducts, loadRecentlyViewed]),
   );
 
   const addLine = useCallback(async (inventoryId, unitPrice) => {
@@ -484,6 +520,41 @@ export default function HomeScreen() {
           ))}
         </View>
       </View>
+
+      {recentlyViewed.length ? (
+        <View style={styles.recentBlock}>
+          <View style={styles.recentHead}>
+            <Text style={styles.recentTitle}>Recently viewed</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('RecentlyViewedProducts')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="See all recently viewed products"
+            >
+              <Icon name="chevron-forward" size={22} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recentRow}
+          >
+            {recentlyViewed.map(item => (
+              <TouchableOpacity
+                key={`recent-${item.shop?.id}-${item.id}`}
+                style={styles.recentCard}
+                activeOpacity={0.9}
+                onPress={() => openProduct(item)}
+              >
+                <ProductCardMedia uri={item.uri} style={styles.recentImage} />
+                <Text style={styles.recentName} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.recentPrice}>{formatNaira(item.price)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.grid}>
@@ -926,6 +997,48 @@ const styles = StyleSheet.create({
   },
   bannerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D5D5D5' },
   bannerDotOn: { width: 16, backgroundColor: '#00926E' },
+  recentBlock: {
+    paddingTop: 4,
+    marginBottom: 4,
+  },
+  recentHead: {
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  recentTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111111',
+  },
+  recentRow: {
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  recentCard: {
+    width: 132,
+  },
+  recentImage: {
+    width: 132,
+    height: 132,
+    borderRadius: 12,
+    backgroundColor: '#F3F3F3',
+  },
+  recentName: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 17,
+    color: '#222222',
+    minHeight: 34,
+  },
+  recentPrice: {
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#111111',
+  },
   grid: {
     paddingHorizontal: 12,
     paddingTop: 12,

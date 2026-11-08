@@ -21,6 +21,7 @@ import ShopPolicyViewerModal from '../../components/ShopPolicyViewerModal';
 import { buildMvpCategoryFilters, formatMvpCategoryLabel } from '../../utils/mvpCategory';
 import { selectCategoryTree } from '../../../redux/categoriesSlice';
 import { getStorefrontProducts, getStorefrontShop, getStorefrontShopDelivery } from '../../api/storefront';
+import { recordShopView } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
@@ -320,6 +321,11 @@ export default function VendorShopScreen({ route, navigation }) {
         const list = Array.isArray(prodRes.products) ? prodRes.products : [];
         setApiProducts(list.map(mapStorefrontProductToTile));
         setShopReviews(Array.isArray(shopRes.reviews) ? shopRes.reviews : []);
+        const viewedShopId =
+          parseShopId(shop.id) ||
+          parseShopId(incomingVendor.id) ||
+          parseShopId(incomingVendor.shop_id);
+        if (viewedShopId) void recordShopView(viewedShopId).catch(() => {});
       } catch (e) {
         if (!cancelled) {
           setProductsError(e instanceof Error ? e.message : String(e));

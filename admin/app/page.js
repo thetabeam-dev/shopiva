@@ -38,14 +38,26 @@ const pages = {
   },
   Shops: {
     title: "Shops",
-    description: "Manage storefronts, approval status, and shop performance.",
+    description: "Manage storefronts, approval status, and shop performance. Shown to buyers means the shop has more than zero products and shipping zones with prices.",
     endpoint: "shops",
+    filters: [
+      {
+        name: "shownToBuyers",
+        label: "Shown to buyers",
+        type: "select",
+        options: ["All", "true", "false"],
+      },
+    ],
     columns: [
       { accessor: "id", header: "ID" },
       { accessor: "name", header: "Name" },
       { accessor: "ownerId", header: "Owner" },
+      { accessor: "phone", header: "Phone" },
       { accessor: "status", header: "Status" },
       { accessor: "isActive", header: "Active" },
+      { accessor: "hasProducts", header: "Has products" },
+      { accessor: "hasShippingZones", header: "Shipping zones & prices" },
+      { accessor: "shownToBuyers", header: "Shown to buyers" },
       { accessor: "category", header: "Category" },
       { accessor: "createdAt", header: "Created" },
     ],

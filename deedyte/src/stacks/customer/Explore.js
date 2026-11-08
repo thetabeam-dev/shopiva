@@ -94,10 +94,19 @@ export function ExploreStackScreen() {
       <ExploreStack.Screen
         name="State-shops"
         component={VendorsScreen}
-        options={({ navigation, route }) => ({
-          ...exploreOpt(navigation),
-          title: route.params?.state ? `Shops in ${route.params.state}` : 'Shops',
-        })}
+        options={({ navigation, route }) => (
+          route.params?.recentlyViewed
+            ? {
+                title: 'Recently viewed shops',
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: '#FFFFFF' },
+                headerTitleStyle: { fontWeight: '700' },
+              }
+            : {
+                ...exploreOpt(navigation),
+                title: route.params?.state ? `Shops in ${route.params.state}` : 'Shops',
+              }
+        )}
       />
       <ExploreStack.Screen
         name="Area-shops"

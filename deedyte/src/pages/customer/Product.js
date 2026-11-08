@@ -44,6 +44,7 @@ import {
   fetchBuyerCart,
   fetchAwaitingShippingQuote,
   patchBuyerCartLine,
+  recordProductView,
 } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
@@ -191,6 +192,7 @@ export default function ProductScreen({ route, navigation }) {
         } else {
           setDetailProduct(normalized);
           setDetailError('');
+          void recordProductView(parseInt(pid, 10)).catch(() => {});
           const sp = data.shopPolicies;
           setShopPolicies(
             sp && typeof sp === 'object'
@@ -222,7 +224,7 @@ export default function ProductScreen({ route, navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [productIdParam, detailRetryToken]);
+  }, [productIdParam, detailRetryToken, loggedIn]);
 
   const d = detailProduct;
   const bulkTiers = useMemo(() => {

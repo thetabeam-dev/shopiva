@@ -185,8 +185,17 @@ export default function OnboardingProfileScreen({ navigation }) {
 
       const preAuthChoice = await getStoredPreAuthChoice();
       const isVendorIntent = preAuthChoice === 'vendor';
+      let needsShop = isVendorIntent;
+      if (isVendorIntent) {
+        try {
+          const { hasVendorShop } = await import('../../api/shop');
+          needsShop = !(await hasVendorShop());
+        } catch {
+          needsShop = true;
+        }
+      }
 
-      if (!isVendorIntent) {
+      if (!needsShop) {
         navigation.dispatch(
           CommonActions.reset({
             index: 0,

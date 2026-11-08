@@ -153,7 +153,8 @@ const optionalVerifyToken = async (
   _res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const raw = String(req.headers.authorization ?? "").trim();
+  const token = raw.replace(/^Bearer\s+/i, "").trim();
   if (!token) {
     next();
     return;

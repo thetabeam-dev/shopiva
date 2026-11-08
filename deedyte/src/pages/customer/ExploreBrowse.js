@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Dimensions,
@@ -13,10 +14,42 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getVendorsOnMapByCategory } from '../../api';
+import { fetchRecentlyViewedShops } from '../../api/buyer';
 import { normalizeVendorState, vendorStateRaw } from './Vendors';
-import { shopCover, shopPlace } from '../../utils/exploreMap';
+import { shopCover, shopLogo, shopPlace } from '../../utils/exploreMap';
 
 const CARD_W = Math.round(Dimensions.get('window').width * 0.62);
+
+function ShopBrowseCard({ item, onPress }) {
+  const cover = shopCover(item);
+  const logo = shopLogo(item);
+  const place = shopPlace(item);
+  const letter = String(item.name || 'S').trim().charAt(0).toUpperCase();
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
+      <View style={styles.coverWrap}>
+        {cover ? (
+          <Image source={{ uri: cover }} style={styles.cover} />
+        ) : (
+          <View style={[styles.cover, styles.coverFallback]}>
+            <Text style={styles.coverLetter}>{letter}</Text>
+          </View>
+        )}
+        <View style={styles.logoRing}>
+          {logo ? (
+            <Image source={{ uri: logo }} style={styles.logoImage} />
+          ) : (
+            <View style={[styles.logoImage, styles.logoFallback]}>
+              <Text style={styles.logoLetter}>{letter}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      <Text style={styles.cardTitle} numberOfLines={1}>{item.name || 'Shop'}</Text>
+      {place ? <Text style={styles.cardSub} numberOfLines={1}>{place}</Text> : null}
+    </TouchableOpacity>
+  );
+}
 
 /**
  * @param {{ navigation: import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> }} props
@@ -26,6 +59,7 @@ export default function ExploreBrowse({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [recentShops, setRecentShops] = useState([]);
 
   const load = useCallback(async (isRefresh) => {
     if (isRefresh) setRefreshing(true);
@@ -46,6 +80,21 @@ export default function ExploreBrowse({ navigation }) {
   useEffect(() => {
     load(false).catch(() => {});
   }, [load]);
+
+  const loadRecentShops = useCallback(async () => {
+    try {
+      const rows = await fetchRecentlyViewedShops();
+      setRecentShops(Array.isArray(rows) ? rows : []);
+    } catch {
+      setRecentShops([]);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadRecentShops();
+    }, [loadRecentShops]),
+  );
 
   const sections = useMemo(() => {
     /** @type {Map<string, object[]>} */
@@ -94,6 +143,30 @@ export default function ExploreBrowse({ navigation }) {
             <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#00926E" />
           }
         >
+          {recentShops.length ? (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.sectionHead}
+                onPress={() => navigation.navigate('State-shops', { recentlyViewed: true })}
+                accessibilityRole="button"
+                accessibilityLabel="See all recently viewed shops"
+              >
+                <Text style={styles.sectionTitle} numberOfLines={1}>Recently viewed shops</Text>
+                <Icon name="arrow-forward" size={20} color="#111111" />
+              </TouchableOpacity>
+              <FlatList
+                horizontal
+                data={recentShops}
+                keyExtractor={(item) => `recent-shop-${item.id}`}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.row}
+                renderItem={({ item }) => (
+                  <ShopBrowseCard item={item} onPress={() => openShop(item)} />
+                )}
+              />
+            </View>
+          ) : null}
+
           {sections.length === 0 ? (
             <Text style={styles.muted}>No shops available.</Text>
           ) : sections.map((section) => (
@@ -113,29 +186,9 @@ export default function ExploreBrowse({ navigation }) {
                 keyExtractor={(item) => String(item.id)}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.row}
-                renderItem={({ item }) => {
-                  const cover = shopCover(item);
-                  const place = shopPlace(item);
-                  return (
-                    <TouchableOpacity
-                      style={styles.card}
-                      activeOpacity={0.9}
-                      onPress={() => openShop(item)}
-                    >
-                      {cover ? (
-                        <Image source={{ uri: cover }} style={styles.cover} />
-                      ) : (
-                        <View style={[styles.cover, styles.coverFallback]}>
-                          <Text style={styles.coverLetter}>
-                            {String(item.name || 'S').trim().charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <Text style={styles.cardTitle} numberOfLines={1}>{item.name || 'Shop'}</Text>
-                      {place ? <Text style={styles.cardSub} numberOfLines={1}>{place}</Text> : null}
-                    </TouchableOpacity>
-                  );
-                }}
+                renderItem={({ item }) => (
+                  <ShopBrowseCard item={item} onPress={() => openShop(item)} />
+                )}
               />
             </View>
           ))}
@@ -174,6 +227,10 @@ const styles = StyleSheet.create({
   sectionTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: '#111111', marginRight: 12 },
   row: { paddingHorizontal: 16, gap: 12 },
   card: { width: CARD_W },
+  coverWrap: {
+    width: CARD_W,
+    marginBottom: 20,
+  },
   cover: {
     width: CARD_W,
     height: 168,
@@ -182,6 +239,28 @@ const styles = StyleSheet.create({
   },
   coverFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F6F1' },
   coverLetter: { fontSize: 36, fontWeight: '700', color: '#00926E' },
+  logoRing: {
+    position: 'absolute',
+    left: 10,
+    bottom: -18,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  logoFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E7F6EF',
+  },
+  logoLetter: { fontSize: 18, fontWeight: '700', color: '#00926E' },
   cardTitle: { marginTop: 8, fontSize: 15, fontWeight: '600', color: '#111111' },
   cardSub: { marginTop: 2, fontSize: 13, color: '#6B7280' },
 });

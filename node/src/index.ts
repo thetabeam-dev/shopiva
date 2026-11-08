@@ -33,6 +33,7 @@ import { storePaystackVirtualAccount } from "./models/wallet.js";
 import { autoReleaseConfirmedOrders, expireUnacceptedOrders, remindVendorsOfUnacceptedOrders } from "./socket/order.js";
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
 import { sendShopSetupReminders } from "./services/shopSetupReminders.js";
+import { sendAbandonedCartReminders } from "./services/cartAbandonedReminders.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -176,7 +177,7 @@ app.get("/categories", async (req, res) => {
   const pool = await db();
 
   const { rows } = await pool.query(
-    `SELECT * FROM categories WHERE COALESCE(existing_product_count, 0) > 0 ORDER BY category ASC`,
+    `SELECT * FROM categories ORDER BY category ASC`,
   );
   res.json(rows);
 });
@@ -368,12 +369,21 @@ const server = app.listen(process.env.PORT, async () => {
     }
   });
 
+  // nodeCron.schedule("0 0 */12 * * *", async () => {
+  //   try {
+  //     const result = await sendShopSetupReminders();
+  //     console.log("[shop-setup] 12-hour reminder job complete", result);
+  //   } catch (error) {
+  //     console.error("[shop-setup] 12-hour reminder job failed", error);
+  //   }
+  // });
+
   nodeCron.schedule("0 0 */12 * * *", async () => {
     try {
-      const result = await sendShopSetupReminders();
-      console.log("[shop-setup] 12-hour reminder job complete", result);
+      const result = await sendAbandonedCartReminders();
+      console.log("[cart-reminder] pending-cart job complete", result);
     } catch (error) {
-      console.error("[shop-setup] 12-hour reminder job failed", error);
+      console.error("[cart-reminder] pending-cart job failed", error);
     }
   });
 });

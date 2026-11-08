@@ -27,8 +27,17 @@ async function proxy(request, method) {
       headers: { 'content-type': response.headers.get('content-type') || 'application/json' },
     });
   } catch (error) {
+    const refused = error?.cause?.code === 'ECONNREFUSED' || error?.code === 'ECONNREFUSED';
     console.error('Vendor activation backend request failed:', error);
-    return NextResponse.json({ success: false, error: 'Unable to contact the admin API.' }, { status: 502 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: refused
+          ? `Node API is not running at ${BACKEND_URL}. Start it with npm run local in node/, or restart admin with npm run dev.`
+          : 'Unable to contact the admin API.',
+      },
+      { status: 502 }
+    );
   }
 }
 

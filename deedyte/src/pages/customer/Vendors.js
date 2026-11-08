@@ -24,6 +24,7 @@ import {
   getStorefrontShop,
   getStorefrontShopDelivery,
 } from '../../api';
+import { fetchRecentlyViewedShops } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
@@ -258,6 +259,7 @@ function VendorCard({
   const t = isDark ? DARK : LIGHT;
   const slug = String(item.slug ?? '').trim();
   const logo = String(item.logo ?? '').trim();
+  const banner = String(item.banner ?? '').trim();
   const loc = vendorLocationLine(item);
   const pv = preview ?? { loading: Boolean(slug), items: [] };
   const carouselItems = Array.isArray(pv.items) ? pv.items : [];
@@ -266,24 +268,56 @@ function VendorCard({
     <View
       style={[styles.card, { backgroundColor: t.cardBg, borderRadius: 7 }]}
     >
-      <View style={styles.cardInner}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity
+      <TouchableOpacity
+        style={styles.cover}
+        onPress={() => onOpenShop?.(item)}
+        activeOpacity={0.9}
+      >
+        {banner ? (
+          <Image source={{ uri: banner }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View
             style={[
-              styles.avatar,
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E8E8E8' },
+              StyleSheet.absoluteFill,
+              { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#E7F6EF' },
             ]}
-            onPress={() => onOpenShop?.(item)}
-          >
-            {logo ? (
-              <Image source={{ uri: logo }} style={styles.avatarImage} resizeMode="cover" />
-            ) : (
+          />
+        )}
+      </TouchableOpacity>
+      <View style={styles.profileTop}>
+        <TouchableOpacity
+          style={styles.avatarRing}
+          onPress={() => onOpenShop?.(item)}
+          activeOpacity={0.9}
+        >
+          {logo ? (
+            <Image source={{ uri: logo }} style={styles.avatarImage} resizeMode="cover" />
+          ) : (
+            <View
+              style={[
+                styles.avatarImage,
+                styles.avatarFallback,
+                { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#E8E8E8' },
+              ]}
+            >
               <Text style={[styles.avatarLetter, { color: t.primaryText }]}>
                 {(item.name || 'S').trim().charAt(0).toUpperCase()}
               </Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerText} onPress={() => onOpenShop?.(item)}>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconHit}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => onPressMenu?.(item)}
+          accessibilityRole="button"
+          accessibilityLabel="Shop options"
+        >
+          <Icon name="ellipsis-vertical" size={22} color={isDark ? '#FFFFFF' : '#000000'} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.cardInner}>
+        <TouchableOpacity style={styles.headerText} onPress={() => onOpenShop?.(item)}>
             <View style={styles.nameRow}>
               <Text
                 style={[styles.vendorName, { color: t.primaryText }]}
@@ -333,17 +367,6 @@ function VendorCard({
               </View>
             ) : null}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconHit}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            onPress={() => onPressMenu?.(item)}
-            accessibilityRole="button"
-            accessibilityLabel="Shop options"
-          >
-            <Icon name="ellipsis-vertical" size={22} color="#000000" />
-          </TouchableOpacity>
-        </View>
 
         {pv.loading ? (
           <View style={styles.carouselSkeleton}>
@@ -598,6 +621,8 @@ export default function VendorScreen({ route, navigation }) {
     /** @type {{ title?: string; description?: string } | undefined} */ (undefined),
   );
 
+  const recentlyViewedOnly = Boolean(route.params?.recentlyViewed);
+
   const loadVendors = useCallback(async (isRefresh) => {
     const requestId = vendorRequestId.current + 1;
     vendorRequestId.current = requestId;
@@ -611,18 +636,42 @@ export default function VendorScreen({ route, navigation }) {
     else setLoading(true);
     setError('');
     try {
+      if (recentlyViewedOnly) {
+        const rows = await fetchRecentlyViewedShops();
+        const mapped = (Array.isArray(rows) ? rows : []).map(row => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          logo: row.logo,
+          banner: row.banner,
+          city: row.city,
+          state: row.state,
+          average_rating: row.ratingAverage,
+          review_count: row.reviewCount,
+        }));
+        if (vendorRequestId.current !== requestId) return;
+        setVendors(mapped);
+        return;
+      }
       const rows = await getVendorsOnMapByCategory(
         category === ALL_CATEGORY ? '' : category,
       );
       const withLogos = await Promise.all(
         rows.map(async row => {
-          if (String(row?.logo ?? '').trim()) return row;
+          const hasLogo = Boolean(String(row?.logo ?? '').trim());
+          const hasBanner = Boolean(String(row?.banner ?? '').trim());
+          if (hasLogo && hasBanner) return row;
           const slug = String(row?.slug ?? '').trim();
           if (!slug) return row;
           try {
             const shopRes = await getStorefrontShop(slug);
             const logo = String(shopRes?.shop?.logo ?? '').trim();
-            return logo ? { ...row, logo } : row;
+            const banner = String(shopRes?.shop?.banner ?? '').trim();
+            return {
+              ...row,
+              ...(logo ? { logo } : {}),
+              ...(banner ? { banner } : {}),
+            };
           } catch {
             return row;
           }
@@ -640,7 +689,7 @@ export default function VendorScreen({ route, navigation }) {
         setRefreshing(false);
       }
     }
-  }, [category]);
+  }, [category, recentlyViewedOnly]);
 
   useEffect(() => {
     loadVendors(false).catch(() => {});
@@ -934,6 +983,15 @@ export default function VendorScreen({ route, navigation }) {
   }, [route.params?.shopIds]);
 
   const displayedVendors = useMemo(() => {
+    if (recentlyViewedOnly) {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return vendors;
+      return vendors.filter(v => {
+        const name = String(v?.name ?? '').toLowerCase();
+        const city = String(v?.city ?? '').toLowerCase();
+        return name.includes(query) || city.includes(query);
+      });
+    }
     if (shopIdOrder) {
       const byId = new Map(vendors.map(v => [String(v.id), v]));
       return shopIdOrder.map(id => byId.get(id)).filter(Boolean);
@@ -951,7 +1009,7 @@ export default function VendorScreen({ route, navigation }) {
       const city = String(v?.city ?? v?.location?.city ?? '').toLowerCase();
       return name.includes(query) || city.includes(query);
     });
-  }, [vendors, locationFilter, searchQuery, shopIdOrder]);
+  }, [vendors, locationFilter, searchQuery, shopIdOrder, recentlyViewedOnly]);
 
   const handleSelectLocation = useCallback(stateName => {
     setLocationFilter(stateName);
@@ -1137,34 +1195,53 @@ const styles = StyleSheet.create({
   card: {
     overflow: 'hidden',
   },
+  cover: {
+    height: 168,
+    backgroundColor: '#E7F6EF',
+  },
+  profileTop: {
+    marginTop: -36,
+    paddingHorizontal: CARD_PAD,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  avatarRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cardInner: {
-    padding: CARD_PAD,
+    paddingHorizontal: CARD_PAD,
+    paddingBottom: CARD_PAD,
+    paddingTop: 10,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  avatarFallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 48,
-    height: 48,
   },
   avatarLetter: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
   },
   headerText: {
     flex: 1,
-    marginLeft: 12,
     minWidth: 0,
+    marginBottom: 16,
   },
   nameRow: {
     flexDirection: 'row',

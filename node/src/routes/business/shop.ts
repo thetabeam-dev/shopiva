@@ -144,7 +144,7 @@ BusinessRouter.delete("/shop/payment/:shopId/:id", authenticate, DeleteShopPayme
 // Shop Data Retrieval
 BusinessRouter.get("/shop/tags", authenticate, GetTagsByCategoryController);
 BusinessRouter.get("/shop/has-shop", verifyToken, HasShopController);
-BusinessRouter.get("/shop/owner/:id", authenticate, GetShopsByOwnerController);
+BusinessRouter.get("/shop/owner/:id", verifyToken, GetShopsByOwnerController);
 BusinessRouter.get("/shop/:shopId/products/:id", authenticate, GetProductsController);
 BusinessRouter.get("/shop/:shopId/transactions/:id", authenticate, GetShopTransactionsController);
 BusinessRouter.get("/shop/:shopId/inventory/:id", authenticate, GetInventoryByShopController);

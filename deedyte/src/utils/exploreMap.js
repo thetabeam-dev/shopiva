@@ -1,7 +1,15 @@
 import { normalizeVendorState, vendorStateRaw } from '../pages/customer/Vendors';
 
-export function shopCover(vendor) {
+export function shopLogo(vendor) {
   return String(vendor?.logo ?? '').trim();
+}
+
+export function shopCover(vendor) {
+  const banner = String(vendor?.banner ?? '').trim();
+  if (banner) return banner;
+  const productThumb = String(vendor?.products?.[0]?.thumbnail_url ?? '').trim();
+  if (productThumb) return productThumb;
+  return shopLogo(vendor);
 }
 
 export function vendorCoordinate(vendor) {

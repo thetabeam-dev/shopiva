@@ -13,6 +13,7 @@
 import type { Request, Response } from "express";
 import { scanMessage } from "../../utils/messageModeration.js";
 import type { AuthRequest } from "../../middleware/auth.js";
+import { shopRowToUpdatePayload } from "../../utils/shopRowToUpdatePayload.js";
 import {
     CreateShopService,
     UpdateShopService,
@@ -194,6 +195,29 @@ export async function CreateShopByTokenController(req: Request, res: Response) {
             });
             return;
         }
+
+        const existingOwned = await GetShopsByOwnerIdService(user.id);
+        const existingRow = Array.isArray(existingOwned) ? existingOwned[0] : null;
+        if (existingRow) {
+            const payload = shopRowToUpdatePayload(existingRow as Record<string, unknown>);
+            payload.location = {
+                ...payload.location,
+                ...locationJson,
+            } as typeof payload.location;
+            await UpdateShopService(payload);
+            res.status(200).json({
+                success: true,
+                shop: {
+                    id: payload.shopId,
+                    name: payload.name,
+                    slug: payload.slug,
+                    status: payload.status,
+                    createdAt: payload.createdAt,
+                },
+            });
+            return;
+        }
+
         const created = await CreateShopService({
             ownerId: user.id,
             name: nameStr,
@@ -815,12 +839,12 @@ export async function GetShopOwnerByShopIdController(req: Request, res: Response
  */
 export async function GetShopsByOwnerController(req: Request, res: Response) {
     try {
-        if (!req.params?.id) {
+        const tokenUserId = Number((req as AuthRequest).user?.id);
+        if (!Number.isFinite(tokenUserId) || tokenUserId < 1) {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const ownerId = req.params.id;
-        const shops = await GetShopsByOwnerIdService(ownerId);
+        const shops = await GetShopsByOwnerIdService(tokenUserId);
         res.status(200).json({ shops });
     } catch (err) {
         res.status(400).json({
@@ -841,8 +865,17 @@ export async function HasShopController(req: Request, res: Response) {
             res.status(401).json({ error: "Unauthorized" });
             return;
         }
-        const hasShop = await HasShopService(user.id);
-        res.status(200).json({ hasShop });
+        const ownerId = Number(user.id);
+        if (!Number.isFinite(ownerId) || ownerId < 1) {
+            res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        const shops = await GetShopsByOwnerIdService(ownerId);
+        const list = Array.isArray(shops) ? shops : [];
+        res.status(200).json({
+            hasShop: list.length > 0,
+            shops: list,
+        });
     } catch (err) {
         res.status(500).json({
             error: err instanceof Error ? err.message : String(err),
