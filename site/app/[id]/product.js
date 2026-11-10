@@ -5,8 +5,11 @@ import "./styles/xxl.css";
 import "./styles/s.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ProductReviews from "@/components/customers/Review";
+import ShopDetails from "@/components/customers/ShopDetails";
+import ProductVariantCardPicker, {
+    formatAttributeLabel,
+} from "@/components/customers/ProductVariantCardPicker";
 import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 
 const PaystackBinder = dynamic(() => import("./paystackBinder"), { ssr: false });
@@ -22,14 +25,26 @@ function isValidEmail(s) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
 }
 
-const COLORS = [
-    { id: "black", label: "Black", hex: "#1a1a1a" },
-    { id: "white", label: "White", hex: "#f5f5f5" },
-    { id: "purple", label: "Purple", hex: "#6b4c9a" },
-    { id: "gray", label: "Dark gray", hex: "#4a4a4a" },
-];
+function unitPriceForBulk(base, tiers, quantity) {
+    const qty = Math.max(1, Math.trunc(Number(quantity) || 1));
+    let chosen = null;
+    for (const tier of tiers) {
+        if (tier.minQuantity <= qty) chosen = tier;
+    }
+    if (!chosen) return base;
+    const unit = chosen.totalPrice / chosen.minQuantity;
+    return Number.isFinite(unit) && unit > 0 ? unit : base;
+}
 
-const SIZES = ["L", "M", "XL", "XXL", "3XL", "4XL"];
+function variantAttributeKeys(variants) {
+    const keys = new Set();
+    for (const variant of variants) {
+        const attrs =
+            variant?.attributes && typeof variant.attributes === "object" ? variant.attributes : {};
+        Object.keys(attrs).forEach((key) => keys.add(key));
+    }
+    return Array.from(keys);
+}
 
 function ProfileIcon() {
     return (
@@ -114,10 +129,13 @@ function inventoryFromProduct(product) {
     if (Array.isArray(product.variants) && product.variants.length > 0) {
         return product.variants.map((variant, index) => ({
             id: variant.id ?? index,
+            optionKey: variant.optionKey ?? `${variant.id ?? index}-${index}`,
             price: variant.price ?? product.price ?? product.minPrice ?? 0,
             compare_at_price: variant.compare_at_price ?? null,
             sku: variant.sku ?? null,
             stock: variant.stock ?? product.stock ?? null,
+            allowBackorder: Boolean(variant.allowBackorder),
+            attributes: variant.attributes && typeof variant.attributes === "object" ? variant.attributes : {},
         }));
     }
     const price = product.price ?? product.minPrice ?? product.maxPrice;
@@ -146,8 +164,8 @@ function shownPrice(inv, product) {
     return formatNgn(raw);
 }
 
-export default function ProductDetail({ product, slug }) {
-    const shopSlug = typeof slug === "string" ? slug : String(slug ?? "");
+export default function ProductDetail({ product }) {
+    const shopSlug = String(product?.slug ?? "");
     const productId = product?.id != null ? String(product.id) : "";
 
     const [productReviews, setProductReviews] = useState(() =>
@@ -155,17 +173,16 @@ export default function ProductDetail({ product, slug }) {
     );
     const [reviewMetrics, setReviewMetrics] = useState(product?.reviewMetrics ?? null);
     const inventory = useMemo(() => inventoryFromProduct(product), [product]);
-    const [shopLabel, setShopLabel] = useState(product?.shopName || "Shop name");
     const [loadError, setLoadError] = useState(product ? "" : "Product not found");
 
     const [activeImageIndex, setActiveImageIndex] = useState(0);
-    const [selectedColorId, setSelectedColorId] = useState(COLORS[0].id);
     const [selectedInvId, setSelectedInvId] = useState(
         () => inventoryFromProduct(product)[0]?.id ?? null
     );
-    const [selectedSize, setSelectedSize] = useState("M");
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const menuTriggerRef = useRef(null);
+    const [selectedOptionKey, setSelectedOptionKey] = useState(
+        () => inventoryFromProduct(product)[0]?.optionKey ?? null
+    );
+    const [localQty, setLocalQty] = useState(1);
     /** null | "adding" | "removing" — drives disabled state and button label while a request runs. */
     const [cartAction, setCartAction] = useState(null);
     const [cartMessage, setCartMessage] = useState("");
@@ -196,9 +213,30 @@ export default function ProductDetail({ product, slug }) {
     const activeImage = gallery[activeImageIndex] ?? gallery[0];
 
     const selectedInv = useMemo(
-        () => inventory.find((i) => i.id === selectedInvId) ?? inventory[0] ?? null,
-        [inventory, selectedInvId]
+        () =>
+            inventory.find((i) => i.optionKey === selectedOptionKey) ??
+            inventory.find((i) => i.id === selectedInvId) ??
+            inventory[0] ??
+            null,
+        [inventory, selectedInvId, selectedOptionKey]
     );
+
+    const bulkTiers = useMemo(() => {
+        const raw = product?.bulkDiscount;
+        if (!Array.isArray(raw)) return [];
+        return raw
+            .map((tier) => {
+                if (!tier || typeof tier !== "object") return null;
+                const minQuantity = Number(String(tier.minQuantity ?? "").replace(/[^\d]/g, ""));
+                const totalPrice = Number(String(tier.totalPrice ?? "").replace(/[^\d.]/g, "").replace(/\.(?=.*\.)/g, ""));
+                if (!Number.isFinite(minQuantity) || minQuantity < 2) return null;
+                if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
+                return { minQuantity, totalPrice };
+            })
+            .filter(Boolean);
+    }, [product?.bulkDiscount]);
+
+    const attrKeys = useMemo(() => variantAttributeKeys(inventory), [inventory]);
 
     const selectedCartLine = useMemo(() => {
         if (selectedInv?.id == null) return null;
@@ -212,6 +250,7 @@ export default function ProductDetail({ product, slug }) {
 
     const selectedInvInCart = selectedCartLine != null;
     const selectedQty = selectedCartLine?.quantity ?? 0;
+    const qty = selectedInvInCart ? selectedQty : localQty;
     const maxUnits = useMemo(() => {
         const stock = Number(selectedInv?.stock);
         if (Number.isFinite(stock) && stock > 0) return Math.min(99, Math.floor(stock));
@@ -219,8 +258,9 @@ export default function ProductDetail({ product, slug }) {
     }, [selectedInv?.stock]);
 
     const selectedPriceNaira = Number(selectedInv?.price) || 0;
+    const unitPrice = unitPriceForBulk(selectedPriceNaira, bulkTiers, qty);
     /** Paystack NGN amount in kobo (smallest unit). */
-    const buyNowAmountKobo = Math.max(100, Math.round(selectedPriceNaira * 100));
+    const buyNowAmountKobo = Math.max(100, Math.round(unitPrice * qty * 100));
 
     const paystackBase = useMemo(
         () => ({
@@ -326,7 +366,10 @@ export default function ProductDetail({ product, slug }) {
                     method: "POST",
                     headers: buyerAuthHeaders(),
                     credentials: "include",
-                    body: JSON.stringify({ inventoryId: invNum, quantity: 1 }),
+                    body: JSON.stringify({
+                        inventoryId: invNum,
+                        quantity: Math.max(1, Math.min(maxUnits, Math.abs(delta))),
+                    }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (res.status === 401) {
@@ -413,6 +456,20 @@ export default function ProductDetail({ product, slug }) {
         }
     }, [selectedInv, cartLinesByInvId, refreshCartLinesForProduct, maxUnits]);
 
+    const bumpQty = (delta) => {
+        if (selectedInvInCart) {
+            void changeUnits(delta);
+            return;
+        }
+        setLocalQty((current) => Math.min(maxUnits, Math.max(1, current + delta)));
+    };
+
+    const applyVariantPick = (variant) => {
+        if (!variant) return;
+        setSelectedInvId(variant.id ?? null);
+        setSelectedOptionKey(variant.optionKey ?? `${variant.id}-0`);
+    };
+
     useEffect(() => {
         void refreshCartLinesForProduct();
     }, [refreshCartLinesForProduct]);
@@ -439,9 +496,11 @@ export default function ProductDetail({ product, slug }) {
     useEffect(() => {
         setProductReviews(Array.isArray(product?.productReviews) ? product.productReviews : []);
         setReviewMetrics(product?.reviewMetrics ?? null);
-        setShopLabel(product?.shopName || "Shop name");
         setLoadError(product ? "" : "Product not found");
-        setSelectedInvId(inventoryFromProduct(product)[0]?.id ?? null);
+        const first = inventoryFromProduct(product)[0];
+        setSelectedInvId(first?.id ?? null);
+        setSelectedOptionKey(first?.optionKey ?? null);
+        setLocalQty(1);
         setActiveImageIndex(0);
     }, [product]);
 
@@ -449,35 +508,12 @@ export default function ProductDetail({ product, slug }) {
         const el = document.querySelector(".customer-main");
         if (!el) return;
         el.style.height = "100vh";
+        el.style.display = "flex";
+        el.style.flexDirection = "column";
+        el.style.overflow = "hidden";
         el.style.borderRadius = "unset";
         el.style.backgroundColor = "#fff";
     }, []);
-
-    const closeMobileMenu = useCallback(() => {
-        setMobileMenuOpen(false);
-    }, []);
-
-    useEffect(() => {
-        if (!mobileMenuOpen) return;
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        const onKey = (e) => {
-            if (e.key === "Escape") closeMobileMenu();
-        };
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.body.style.overflow = prevOverflow;
-            document.removeEventListener("keydown", onKey);
-        };
-    }, [mobileMenuOpen, closeMobileMenu]);
-
-    const prevMenuOpen = useRef(mobileMenuOpen);
-    useEffect(() => {
-        if (prevMenuOpen.current && !mobileMenuOpen) {
-            menuTriggerRef.current?.focus();
-        }
-        prevMenuOpen.current = mobileMenuOpen;
-    }, [mobileMenuOpen]);
 
     const onPaystackSuccess = (reference) => {
         console.log(reference);
@@ -539,195 +575,12 @@ export default function ProductDetail({ product, slug }) {
         });
     };
 
-    useEffect(() => {
-        document.querySelector(".header").style.display = "none";
-        document.querySelector(".customer-free-main").style.height = "100vh";
-    }, [])
     return (
         <div className="shop-page pdp-page">
             <PaystackBinder config={paystackBase} paymentRef={paymentRef} />
-            <header className="pdp-header" style={{
-                position: "fixed",
-                top: "0",
-                left: "0"
-            }}>
-                <div className="pdp-header__brand">
-                    <span className="pdp-header__logo">{shopLabel}</span>
-                </div>
-                <nav className="pdp-header__nav" aria-label="Primary">
-                    <span className="pdp-header__link">About</span>
-                    <span className="pdp-header__link">Brands</span>
-                </nav>
-                <div className="pdp-header__end">
-                    <button
-                        ref={menuTriggerRef}
-                        type="button"
-                        className={`pdp-menu-trigger${mobileMenuOpen ? " pdp-menu-trigger--open" : ""}`}
-                        aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-                        aria-expanded={mobileMenuOpen}
-                        aria-controls="pdp-mobile-menu"
-                        onClick={() => setMobileMenuOpen((o) => !o)}
-                    >
-                        <span className="pdp-menu-trigger__bar" aria-hidden />
-                        <span className="pdp-menu-trigger__bar" aria-hidden />
-                        <span className="pdp-menu-trigger__bar" aria-hidden />
-                    </button>
-                </div>
-
-                <span style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", display: "flex" }}>
-                    <Link href="/store/cart" className="customer-shell-header__icon" aria-label="Cart">
-                        <CartIcon />
-                    </Link>
-                    &nbsp;
-                    &nbsp;
-                    <Link
-                        href="/user-profile"
-                        className="customer-shell-header__icon"
-                        aria-label="Account">
-                        <ProfileIcon />
-                    </Link>
-                </span>
-            </header>
-            <br />
-            <br />
-            <br />
-            <br />
-
-            <div
-                className={`pdp-menu-backdrop${mobileMenuOpen ? " pdp-menu-backdrop--open" : ""}`}
-                aria-hidden={!mobileMenuOpen}
-                onClick={closeMobileMenu}
-
-            />
-            <div
-                id="pdp-mobile-menu"
-                className={`pdp-menu-drawer${mobileMenuOpen ? " pdp-menu-drawer--open" : ""}`}
-                role="dialog"
-                aria-modal="true"
-                aria-label="Shop menu"
-
-            >
-                <div className="pdp-menu-drawer__top">
-                    <span className="pdp-menu-drawer__title">Menu</span>
-                    <button
-                        type="button"
-                        className="pdp-menu-drawer__close"
-                        aria-label="Close menu"
-                        onClick={closeMobileMenu}
-                    >
-                        ×
-                    </button>
-                </div>
-                <nav className="pdp-menu-drawer__nav" aria-label="Primary">
-                    <span className="pdp-menu-drawer__link" role="button" tabIndex={0}>
-                        About
-                    </span>
-                    <span className="pdp-menu-drawer__link" role="button" tabIndex={0}>
-                        Brands
-                    </span>
-                </nav>
-                <div className="pdp-menu-drawer__tools">
-                    {/* Search bar not used in this version
-          <label className="pdp-menu-drawer__search">
-            <img src={searchSvg.src} alt="" className="pdp-menu-drawer__search-icon" />
-            <input
-              type="search"
-              className="pdp-menu-drawer__search-input"
-              placeholder="Search products…"
-              autoComplete="off"
-            />
-          </label>
-          */}
-                    <div className="pdp-menu-drawer__icons">
-                        <button type="button" className="pdp-menu-drawer__icon-btn" aria-label="Account">
-                            {/* <img src={userSvg.src} alt="" /> */}
-                        </button>
-                        {/* Wishlist not used in this version
-            <button
-              type="button"
-              className="pdp-menu-drawer__icon-btn pdp-menu-drawer__icon-btn--dot"
-              aria-label="Wishlist"
-            >
-              <span className="pdp-menu-drawer__heart" aria-hidden>
-                ♡
-              </span>
-            </button>
-            */}
-                        {/* Cart lives in the header only, not in the drawer */}
-                    </div>
-                </div>
-            </div>
-
-            {/* <nav className="pdp-breadcrumbs" aria-label="Breadcrumb">
-        <a href={`/store/${shopSlug}`}>Home</a>
-        <span className="pdp-breadcrumbs__sep">›</span>
-        <span>{product?.category}</span>
-        <span className="pdp-breadcrumbs__sep">›</span>
-        <span className="pdp-breadcrumbs__current">{product?.name}</span>
-      </nav> */}
-
             <div className="pdp-layout">
+                <div className="pdp-col-main">
                 <div className="pdp-gallery">
-                    <div className="pdp-gallery__stage">
-                        <button
-                            type="button"
-                            className="pdp-gallery__arrow pdp-gallery__arrow--prev"
-                            aria-label="Previous image"
-                            onClick={goPrev}
-                        >
-                            ‹
-                        </button>
-                        <div className="pdp-gallery__main-wrap">
-                            {!activeImage ? (
-                                <div
-                                    className="pdp-gallery__main"
-                                    style={{ background: "#eee", minHeight: 280 }}
-                                    aria-hidden
-                                />
-                            ) : isVideoFile(activeImage.url) ? (
-                                <video
-                                    key={activeImage.url}
-                                    src={activeImage.url}
-                                    className="pdp-gallery__main"
-                                    controls
-                                    playsInline
-                                />
-                            ) : (
-                                <img
-                                    src={activeImage.url}
-                                    alt={activeImage.alt ?? "Product"}
-                                    className="pdp-gallery__main"
-                                />
-                            )}
-                            <div className="pdp-gallery__side-actions">
-                                <button
-                                    type="button"
-                                    className="pdp-round-action"
-                                    aria-label="Share"
-                                >
-                                    ↗
-                                </button>
-                                {/* Wishlist not used in this version
-                <button
-                  type="button"
-                  className="pdp-round-action"
-                  aria-label="Add to wishlist"
-                >
-                  ♡
-                </button>
-                */}
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            className="pdp-gallery__arrow pdp-gallery__arrow--next"
-                            aria-label="Next image"
-                            onClick={goNext}
-                        >
-                            ›
-                        </button>
-                    </div>
-
                     <div
                         className="thumbnail-list"
                         role="tablist"
@@ -761,6 +614,48 @@ export default function ProductDetail({ product, slug }) {
                         ))}
                     </div>
 
+                    <div className="pdp-gallery__stage">
+                        <button
+                            type="button"
+                            className="pdp-gallery__arrow pdp-gallery__arrow--prev"
+                            aria-label="Previous image"
+                            onClick={goPrev}
+                        >
+                            ‹
+                        </button>
+                        <div className="pdp-gallery__main-wrap">
+                            {!activeImage ? (
+                                <div
+                                    className="pdp-gallery__main"
+                                    style={{ background: "#f5f5f5", minHeight: 280 }}
+                                    aria-hidden
+                                />
+                            ) : isVideoFile(activeImage.url) ? (
+                                <video
+                                    key={activeImage.url}
+                                    src={activeImage.url}
+                                    className="pdp-gallery__main"
+                                    controls
+                                    playsInline
+                                />
+                            ) : (
+                                <img
+                                    src={activeImage.url}
+                                    alt={activeImage.alt ?? "Product"}
+                                    className="pdp-gallery__main"
+                                />
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            className="pdp-gallery__arrow pdp-gallery__arrow--next"
+                            aria-label="Next image"
+                            onClick={goNext}
+                        >
+                            ›
+                        </button>
+                    </div>
+
                     {/* <div className="pdp-social-bar" aria-label="Share">
             <span className="pdp-social-bar__label">Share</span>
             <div className="pdp-social-bar__icons">
@@ -778,6 +673,56 @@ export default function ProductDetail({ product, slug }) {
               </button>
             </div>
           </div> */}
+                </div>
+
+                <div className="pdp-details">
+                    <div className="pdp-social-bar" aria-label="Share">
+                        <span className="pdp-social-bar__label">Share</span>
+                        <div className="pdp-social-bar__icons">
+                            <button type="button" className="pdp-social-icon" aria-label="Facebook" onClick={() => {
+                                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, "_blank", "noopener,noreferrer");
+                            }}>
+                                <i className="fa-brands fa-facebook" aria-hidden="true" />
+                            </button>
+                            <button type="button" className="pdp-social-icon" aria-label="X" onClick={() => {
+                                const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent("Check out this product on DeeDyte " + window.location.href)}`;
+                                window.open(twitterUrl, "_blank", "noopener,noreferrer");
+                            }}>
+                                <i className="fa-brands fa-twitter" aria-hidden="true" />
+                            </button>
+                            <button type="button" className="pdp-social-icon" aria-label="WhatsApp" onClick={() => {
+                                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent("Check out this product on DeeDyte " + window.location.href)}`;
+                                window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+                            }}>
+                                <i className="fa-brands fa-whatsapp" aria-hidden="true" />
+                            </button>
+                            <button type="button" className="pdp-social-icon" aria-label="Instagram" onClick={async () => {
+                                const text = `Check out this product on DeeDyte ${window.location.href}`;
+                                try {
+                                    await navigator.clipboard.writeText(text);
+                                } catch { }
+                                window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
+                            }}>
+                                <i className="fa-brands fa-instagram" aria-hidden="true" />
+                            </button>
+                            <button type="button" className="pdp-social-icon" aria-label="Copy link" onClick={async () => {
+                                try {
+                                    await navigator.clipboard.writeText(window.location.href);
+                                    alert("Link copied to clipboard");
+                                } catch {
+                                    alert("Could not copy the link");
+                                }
+                            }}>
+                                <i className="fa-solid fa-link" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="pdp-reviews-wrap">
+                        <ProductReviews reviews={productReviews} metrics={reviewMetrics} />
+                        <ShopDetails shop={product?.shop} />
+                    </div>
+                </div>
                 </div>
 
                 <aside className="pdp-buybox">
@@ -802,7 +747,7 @@ export default function ProductDetail({ product, slug }) {
                                     : ""}
                             </span>
                             <span className="pdp-buybox__price">
-                                {shownPrice(selectedInv, product)}
+                                {selectedInv ? formatNgn(unitPrice) : shownPrice(selectedInv, product)}
                             </span>
                         </div>
                         <div className="pdp-buybox__rating">
@@ -826,62 +771,72 @@ export default function ProductDetail({ product, slug }) {
                         </div>
                     </div>
 
-                    <div style={{
-                        minHeight: "100px"
-                    }}>
-                        <label htmlFor=""><b>Description:</b></label>
-                        {product?.description ? (
-                            <div
-                                className="pdp-buybox__desc pdp-buybox__desc--html"
-                                dangerouslySetInnerHTML={{ __html: product.description }}
+                    {bulkTiers.length > 0 ? (
+                        <div className="pdp-bulk">
+                            <h2 className="pdp-section-heading">Bulk discount</h2>
+                            <p className="pdp-bulk__hint">Buy more and pay less per item.</p>
+                            {bulkTiers.map((tier) => (
+                                <div key={`${tier.minQuantity}-${tier.totalPrice}`} className="pdp-bulk__row">
+                                    <span className="pdp-bulk__qty">Buy {tier.minQuantity}</span>
+                                    <span className="pdp-bulk__prices">
+                                        <strong>{formatNgn(tier.totalPrice)}</strong>
+                                        <small>{formatNgn(tier.totalPrice / tier.minQuantity)} each</small>
+                                    </span>
+                                </div>
+                            ))}
+                            {qty >= (bulkTiers[0]?.minQuantity ?? Infinity) ? (
+                                <p className="pdp-bulk__applied">Bulk price applied at {formatNgn(unitPrice)} each</p>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {inventory.length > 0 && attrKeys.length ? (
+                        <div className="pdp-variant-pickers">
+                            <h2 className="pdp-section-heading">
+                                {inventory.length === 1 ? "Features" : "Options (variant)"}
+                            </h2>
+                            <ProductVariantCardPicker
+                                attrKeys={attrKeys}
+                                variants={inventory}
+                                selectedVariant={selectedInv}
+                                onSelect={applyVariantPick}
                             />
-                        ) : (
-                            <p className="pdp-buybox__desc" style={{
-                                padding: "10px 20px"
-                            }}>No Description For This Product</p>
-                        )}
+                        </div>
+                    ) : null}
+
+                    <p className="pdp-qty-label">Quantity</p>
+                    <div className="pdp-qty-pill" role="group" aria-label="Quantity">
+                        <button
+                            type="button"
+                            className="pdp-qty-pill__btn"
+                            aria-label="Decrease quantity"
+                            disabled={!product || !selectedInv || !!loadError || cartAction != null || qty <= 1}
+                            onClick={() => bumpQty(-1)}
+                        >
+                            −
+                        </button>
+                        <span className="pdp-qty-pill__value" aria-live="polite">
+                            {cartAction != null ? "…" : qty}
+                        </span>
+                        <button
+                            type="button"
+                            className="pdp-qty-pill__btn"
+                            aria-label="Increase quantity"
+                            disabled={!product || !selectedInv || !!loadError || cartAction != null || qty >= maxUnits}
+                            onClick={() => bumpQty(1)}
+                        >
+                            +
+                        </button>
                     </div>
 
-
                     <div className="pdp-ctas">
-                        {selectedInvInCart ? (
-                            <div className="pdp-units" role="group" aria-label="Units in cart">
-                                <button
-                                    type="button"
-                                    className="pdp-units__btn"
-                                    aria-label={selectedQty <= 1 ? "Remove from cart" : "Remove unit"}
-                                    disabled={!product || !selectedInv || !!loadError || cartAction != null}
-                                    onClick={() => void changeUnits(-1)}
-                                >
-                                    −
-                                </button>
-                                <span className="pdp-units__count" aria-live="polite">
-                                    {cartAction != null ? "…" : selectedQty}
-                                </span>
-                                <button
-                                    type="button"
-                                    className="pdp-units__btn"
-                                    aria-label="Add unit"
-                                    disabled={
-                                        !product ||
-                                        !selectedInv ||
-                                        !!loadError ||
-                                        cartAction != null ||
-                                        selectedQty >= maxUnits
-                                    }
-                                    onClick={() => void changeUnits(1)}
-                                >
-                                    +
-                                </button>
-                            </div>
-                        ) : null}
                         <div className="pdp-ctas__actions">
                             <button
                                 type="button"
                                 className="pdp-btn pdp-btn--primary"
                                 disabled={!product || !selectedInv || !!loadError || cartAction != null}
                                 aria-pressed={selectedInvInCart}
-                                onClick={() => void changeUnits(selectedInvInCart ? -selectedQty : 1)}
+                                onClick={() => void changeUnits(selectedInvInCart ? -selectedQty : localQty)}
                             >
                                 {cartAction === "adding"
                                     ? "Adding…"
@@ -912,6 +867,47 @@ export default function ProductDetail({ product, slug }) {
                         ) : null}
                     </div>
 
+                    {selectedInv ? (
+                        <div className="pdp-selected-variant">
+                            <h2 className="pdp-selected-variant__title">Selected variant</h2>
+                            <div className="pdp-selected-variant__grid">
+                                {Object.entries(
+                                    selectedInv.attributes && typeof selectedInv.attributes === "object"
+                                        ? selectedInv.attributes
+                                        : {}
+                                )
+                                    .filter(([, value]) => {
+                                        const text = String(value ?? "").trim();
+                                        return text && text !== "—" && text !== "-";
+                                    })
+                                    .map(([key, value]) => (
+                                        <div key={key} className="pdp-variant-tile">
+                                            <span className="pdp-variant-tile__label">
+                                                {formatAttributeLabel(key).toUpperCase()}
+                                            </span>
+                                            <span className="pdp-variant-tile__value">{String(value)}</span>
+                                        </div>
+                                    ))}
+                                <div className="pdp-variant-tile">
+                                    <span className="pdp-variant-tile__label">PRICE</span>
+                                    <span className="pdp-variant-tile__value">{formatNgn(unitPrice)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    <div className="pdp-description">
+                        <h2 className="pdp-section-heading">Description</h2>
+                        {product?.description ? (
+                            <div
+                                className="pdp-buybox__desc pdp-buybox__desc--html"
+                                dangerouslySetInnerHTML={{ __html: product.description }}
+                            />
+                        ) : (
+                            <p className="pdp-buybox__desc">No description provided for this product.</p>
+                        )}
+                    </div>
+
                     {/* <p className="pdp-muted-link">
             <button type="button" className="pdp-link pdp-link--muted">
               Delivery terms &amp; conditions
@@ -937,63 +933,7 @@ export default function ProductDetail({ product, slug }) {
               <li>Free returns via drop-off service</li>
             </ul>
           </div> */}
-
-                    <div className="pdp-social-bar" aria-label="Share">
-                        <span className="pdp-social-bar__label">Share</span>
-                        <div className="pdp-social-bar__icons">
-                            <button type="button" className="pdp-social-icon" aria-label="Facebook" onClick={() => {
-                                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, "_blank", "noopener,noreferrer");
-                            }}>
-                                <i className="fa-brands fa-facebook" aria-hidden="true" />
-                            </button>
-                            <button type="button" className="pdp-social-icon" aria-label="X" onClick={() => {
-                                const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent("Check out this product on DeeDyte " + window.location.href)}`;
-                                window.open(twitterUrl, "_blank", "noopener,noreferrer");
-                            }}>
-                                <i className="fa-brands fa-twitter" aria-hidden="true" />
-                            </button>
-                            <button type="button" className="pdp-social-icon" aria-label="WhatsApp" onClick={() => {
-                                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent("Check out this product on DeeDyte " + window.location.href)}`;
-                                window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-                            }}>
-                                <i className="fa-brands fa-whatsapp" aria-hidden="true" />
-                            </button>
-                            <button type="button" className="pdp-social-icon" aria-label="Instagram" onClick={async () => {
-                                const text = `Check out this product on DeeDyte ${window.location.href}`;
-                                try {
-                                    await navigator.clipboard.writeText(text);
-                                } catch { }
-                                window.open("https://www.instagram.com/", "_blank", "noopener,noreferrer");
-                            }}>
-                                <i className="fa-brands fa-instagram" aria-hidden="true" />
-                            </button>
-                            {/* <button type="button" className="pdp-social-icon" aria-label="TikTok" onClick={async () => {
-                                const text = `Check out this product on DeeDyte ${window.location.href}`;
-                                try {
-                                    await navigator.clipboard.writeText(text);
-                                } catch { }
-                                window.open("https://www.tiktok.com/", "_blank", "noopener,noreferrer");
-                            }}>
-                                <i className="fa-brands fa-tiktok" aria-hidden="true" />
-                            </button> */}
-                            <button type="button" className="pdp-social-icon" aria-label="Copy link" onClick={async () => {
-                                try {
-                                    await navigator.clipboard.writeText(window.location.href);
-                                    alert("Link copied to clipboard");
-                                } catch {
-                                    alert("Could not copy the link");
-                                }
-                            }}>
-                                <i className="fa-solid fa-link" aria-hidden="true" />
-                            </button>
-                        </div>
-                    </div>
                 </aside>
-            </div>
-
-
-            <div className="pdp-reviews-wrap">
-                <ProductReviews reviews={productReviews} metrics={reviewMetrics} />
             </div>
         </div>
     );

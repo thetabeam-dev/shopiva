@@ -168,9 +168,9 @@ export async function loginWithPassword(emailOrUsername, password) {
 }
 
 /**
- * @param {{ name: string; email: string; password: string }} fields
+ * @param {{ name: string; email: string; password: string; phone: string }} fields
  */
-export async function registerAccount({ name, email, password }) {
+export async function registerAccount({ name, email, password, phone }) {
   const em = String(email).trim().toLowerCase();
   const { fname, lname } = splitFullName(name);
 
@@ -180,6 +180,7 @@ export async function registerAccount({ name, email, password }) {
       fname,
       lname,
       email: em,
+      phone: String(phone ?? '').trim(),
       password: String(password),
       provider: 'local',
       role: 'customer',

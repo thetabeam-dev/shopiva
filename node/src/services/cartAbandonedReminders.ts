@@ -103,19 +103,19 @@ export async function sendAbandonedCartReminders(): Promise<CartReminderResult> 
         }
       }
 
-      if (email) {
-        try {
-          await sendNotificationEmail(email, {
-            fname: String(row.fname ?? "").trim() || "there",
-            title,
-            message,
-          });
-          result.emailsSent += 1;
-        } catch (error) {
-          result.failures += 1;
-          console.error(`[cart-reminder] email failed for user ${userId}`, error);
-        }
-      }
+      // if (email) {
+      //   try {
+      //     await sendNotificationEmail(email, {
+      //       fname: String(row.fname ?? "").trim() || "there",
+      //       title,
+      //       message,
+      //     });
+      //     result.emailsSent += 1;
+      //   } catch (error) {
+      //     result.failures += 1;
+      //     console.error(`[cart-reminder] email failed for user ${userId}`, error);
+      //   }
+      // }
     }
 
     return result;

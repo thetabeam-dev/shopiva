@@ -5,7 +5,6 @@ const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "").replace(/\/$/, "
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id") || "";
-  const slug = searchParams.get("slug") || "";
   const productId = parseInt(id, 10);
 
   if (!BACKEND_URL || !Number.isFinite(productId)) {
@@ -16,12 +15,7 @@ export async function GET(request) {
   }
 
   try {
-    const [prodRes, shopRes] = await Promise.all([
-      fetch(`${BACKEND_URL}/storefront/product/${productId}`, { cache: "no-store" }),
-      slug
-        ? fetch(`${BACKEND_URL}/storefront/shop/${encodeURIComponent(slug)}`, { cache: "no-store" })
-        : Promise.resolve(null),
-    ]);
+    const prodRes = await fetch(`${BACKEND_URL}/storefront/product/${productId}`, { cache: "no-store" });
 
     if (!prodRes.ok) {
       return NextResponse.json(
@@ -31,7 +25,6 @@ export async function GET(request) {
     }
 
     const prod = await prodRes.json().catch(() => ({}));
-    const shop = shopRes && shopRes.ok ? await shopRes.json().catch(() => ({})) : {};
     if (!prod?.product) {
       return NextResponse.json(
         { success: false, error: "Product not found" },
@@ -46,7 +39,7 @@ export async function GET(request) {
           ...prod.product,
           productReviews: Array.isArray(prod.productReviews) ? prod.productReviews : [],
           reviewMetrics: prod.reviewMetrics ?? null,
-          shopName: shop?.shop?.name ? String(shop.shop.name) : "",
+          shopName: String(prod.product.shopName ?? "").trim(),
         },
       },
       { status: 200 }

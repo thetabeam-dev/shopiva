@@ -142,7 +142,7 @@ export default function App({ session, children }) {
   return (
     <>
       <AppShell session={session} pathname={pathname}>{children}</AppShell>
-      {isWebAllowedPath(pathname) ? null : <DownloadAppGate />}
+      {/* {isWebAllowedPath(pathname) ? null : <DownloadAppGate />} */}
     </>
   );
 }

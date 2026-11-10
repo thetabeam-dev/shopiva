@@ -175,8 +175,8 @@ function bulkDiscountIssue(enabled, tiers) {
     minQty: Number(String(tier.minQty).replace(/[^\d]/g, '')),
     totalPrice: Number(String(tier.totalPrice).replace(/[^\d.]/g, '')),
   }));
-  if (parsed.some(tier => !Number.isFinite(tier.minQty) || tier.minQty < 1)) {
-    return 'Each bulk tier needs a minimum quantity of at least 1.';
+  if (parsed.some(tier => !Number.isFinite(tier.minQty) || tier.minQty < 2)) {
+    return 'Each bulk tier needs a minimum quantity of at least 2.';
   }
   if (parsed.some(tier => !Number.isFinite(tier.totalPrice) || tier.totalPrice <= 0)) {
     return 'Each bulk tier needs a total price greater than 0.';
@@ -1894,7 +1894,7 @@ export default function VendorCreateProductScreen() {
             <View style={styles.bulkHeaderCopy}>
               <Text style={styles.sectionTitle}>Bulk discounts</Text>
               <Text style={styles.bulkHint}>
-                Encourage customers to buy more by offering a lower total price.
+                Encourage customers to buy more by offering a lower total price. Minimum quantity starts at 2.
               </Text>
             </View>
             <CheckRow
@@ -1941,7 +1941,7 @@ export default function VendorCreateProductScreen() {
                               ),
                             )
                           }
-                          placeholder="1"
+                          placeholder="2"
                           placeholderTextColor="#9CA3AF"
                         />
                       </View>

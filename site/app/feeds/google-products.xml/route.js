@@ -54,7 +54,7 @@ export async function GET() {
       .map((row) => {
         const image = productImageUrl(row.thumbnail_url);
         if (!image) return "";
-        const link = `${SITE_ORIGIN}/store/${encodeURIComponent(row.shop_slug)}/${row.id}`;
+        const link = `${SITE_ORIGIN}/${row.id}`;
         const title = String(row.name ?? "Product").slice(0, 150);
         const description = String(row.description ?? title)
           .replace(/<[^>]+>/g, " ")

@@ -207,8 +207,8 @@ export default function CartPage() {
                 const maxQty =
                   Number.isFinite(stock) && stock > 0 ? Math.min(99, stock) : 99;
                 const productHref =
-                  row.shopSlug && row.productId
-                    ? `/store/${encodeURIComponent(row.shopSlug)}/${row.productId}`
+                  row.productId
+                    ? `/${row.productId}`
                     : continueHref;
                 return (
                   <article key={String(row.id)} className="crt-line">

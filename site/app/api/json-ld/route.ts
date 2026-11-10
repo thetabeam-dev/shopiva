@@ -48,7 +48,7 @@ export async function GET() {
         "@type": "Product",
         name: item.name,
         image: productImageUrl(item.thumbnail_url),
-        url: `https://www.deedyte.com/store/${encodeURIComponent(String(item.shop_slug))}/${item.id}`,
+        url: `https://www.deedyte.com/${item.id}`,
         offers: {
           "@type": "Offer",
           price: productPrice(item.price),

@@ -378,7 +378,7 @@ const server = app.listen(process.env.PORT, async () => {
   //   }
   // });
 
-  nodeCron.schedule("0 0 */12 * * *", async () => {
+  nodeCron.schedule("*/10 * * * * *", async () => {
     try {
       const result = await sendAbandonedCartReminders();
       console.log("[cart-reminder] pending-cart job complete", result);

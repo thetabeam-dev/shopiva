@@ -58,8 +58,7 @@ function shouldShowCustomerCheckoutAside(pathname) {
 
 /**
  * Buyer shell header on index customer routes, except vendor storefront
- * `/store/:shopSlug` and PDP `/store/:shopSlug/product/:id`
- * (e.g. no header on `/store/lexicon`).
+ * `/store/:shopSlug` and PDP `/:id`.
  *
  * @param {string} pathname
  * @returns {boolean}

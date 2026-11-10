@@ -24,11 +24,11 @@ import {
 
 // Styles
 import "../../app/entrepreneur/[id]/global.css";
-import "../../app/styles/s.css";
-import "../../app/styles/m.css";
-import "../../app/styles/l.css";
-import "../../app/styles/xl.css";
-import "../../app/styles/xxl.css";
+import "../../app/store/styles/s.css";
+import "../../app/store/styles/m.css";
+import "../../app/store/styles/l.css";
+import "../../app/store/styles/xl.css";
+import "../../app/store/styles/xxl.css";
 
 
 // Assets
@@ -313,13 +313,13 @@ function CustomerFreeLayout({ children }) {
   return (
     <div ref={layoutRef} className="customer-free-layout">
       {/* Header */}
-      <div
+      {/* <div
         ref={headerRef}
         style={pathname !== "/" ? { background: "#fff" } : undefined}
         className={`header${headerScrolled ? " header--scrolled" : ""}`}
-      >
+      > */}
         {/* Logo Section */}
-        <section id="header-logo-cnt" style={{ width: "fit-content", flex: "0 0 auto" }}>
+        {/* <section id="header-logo-cnt" style={{ width: "fit-content", flex: "0 0 auto" }}>
           <img
             className="inscription"
             src={logo_img.src}
@@ -335,27 +335,27 @@ function CustomerFreeLayout({ children }) {
               display: "block",
             }}
           />
-        </section>
+        </section> */}
 
         {/* Desktop Navigation */}
-        {screenWidth > DESKTOP_NAV_BREAKPOINT && pathname === "/" && renderDesktopNav()}
+        {/* {screenWidth > DESKTOP_NAV_BREAKPOINT && pathname === "/" && renderDesktopNav()} */}
 
         {/* Auth Buttons */}
         {
-          pathname === "/" &&
-          <section className="header-auth">
-            <ul>
-              <li onClick={() => window.open("/entrepreneur/ng")}>
-                Become A Vendor
-              </li>
-            </ul>
-          </section>
+          // pathname === "/" &&
+          // <section className="header-auth">
+          //   <ul>
+          //     <li onClick={() => window.open("/entrepreneur/ng")}>
+          //       Become A Vendor
+          //     </li>
+          //   </ul>
+          // </section>
         }
 
         {/* Mobile Menu Button */}
-        {screenWidth < MOBILE_MENU_BREAKPOINT && pathname === "/" && renderMobileMenuButton()}
+        {/* {screenWidth < MOBILE_MENU_BREAKPOINT && pathname === "/" && renderMobileMenuButton()} */}
 
-        {pathname.startsWith("/vendors") && locationFilter ? (
+        {/* {pathname.startsWith("/vendors") && locationFilter ? (
           <div className="customer-vendor-page-locale-filter" style={{
             marginRight: screenWidth > DESKTOP_NAV_BREAKPOINT ? "25px" : "10px"
           }}>
@@ -388,8 +388,8 @@ function CustomerFreeLayout({ children }) {
               />
             </div>
           </div>
-        ) : null}
-      </div>
+        ) : null} */}
+      {/* </div> */}
 
       {/* Main Content */}
       <main className="customer-free-main">

@@ -235,7 +235,7 @@ export default function ProductScreen({ route, navigation }) {
         if (!tier || typeof tier !== 'object') return null;
         const minQuantity = Number(String(tier.minQuantity ?? tier.minQty ?? '').replace(/[^\d]/g, ''));
         const totalPrice = Number(String(tier.totalPrice ?? '').replace(/[^\d.]/g, '').replace(/\.(?=.*\.)/g, ''));
-        if (!Number.isFinite(minQuantity) || minQuantity < 1) return null;
+        if (!Number.isFinite(minQuantity) || minQuantity < 2) return null;
         if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
         return { minQuantity, totalPrice };
       })
@@ -1133,7 +1133,7 @@ export default function ProductScreen({ route, navigation }) {
                   try {
                     setLoading(false)
                     await Share.share({
-                      message: `Check out this product on DeeDyte! https://www.deedyte.com/store/${product.slug}/${product?.id}`,
+                      message: `Check out this product on DeeDyte! https://www.deedyte.com/${product?.id}`,
                       title: product?.name,
                     });
                   } catch (error) {
