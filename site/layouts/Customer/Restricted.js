@@ -21,6 +21,7 @@ import { usePathname } from "next/navigation";
 // import Header from "../../components/customer/header/Header";
 import Aside from "../../components/customers/Aside";
 import CustomerShellHeader from "../../components/customers/CustomerShellHeader";
+import CustomerAuthModal from "../../components/customers/CustomerAuthModal";
 import ProfileFloater from "../../components/floaters.js/Profile";
 import NotificationFloater from "../../components/floaters.js/Notification";
 import SearchFloater from "../../components/floaters.js/Search";
@@ -28,6 +29,7 @@ import SearchFloater from "../../components/floaters.js/Search";
 // Utilities
 import { handleFloater, closeSidebar, closeAllFloaters } from "../../reusables/anitmation";
 import { useVerifyAuth, requiresAuth } from "../../reusables/verifyAuth";
+import SiteFooter from "../../components/SiteFooter";
 
 const ASIDE_MIN_WIDTH = 1200;
 const RESIZE_DEBOUNCE_DELAY = 150;
@@ -120,7 +122,10 @@ export default function CustomerRestrictedLayout({ children }) {
   const [activeFloater, setActiveFloater] = useState(null);
   const [screenWidth, setScreenWidth] = useState(0);
 
-  const { isLoading, isAuthenticated } = useVerifyAuth("customer");
+  const { isLoading, isAuthenticated, recheck } = useVerifyAuth("customer", {
+    redirectOnFail: false,
+  });
+  const [authModalOpen, setAuthModalOpen] = useState(true);
   const { floater_src } = useSelector((state) => state.floater_src);
   const showAside = shouldShowCustomerCheckoutAside(pathname);
   const showDesktopAside = showAside && screenWidth >= ASIDE_MIN_WIDTH;
@@ -145,6 +150,7 @@ export default function CustomerRestrictedLayout({ children }) {
   useEffect(() => {
     closeAllFloaters();
     closeSidebar();
+    setAuthModalOpen(true);
   }, [pathname]);
 
   /**
@@ -201,49 +207,16 @@ export default function CustomerRestrictedLayout({ children }) {
   const isUserProfilePage = pathParts[0] === "customer" && pathParts[1] === "user-profile";
 
   if (isUserProfilePage) {
-    return <>{children}</>;
-  }
-
-  if (isLoading) {
     return (
-      <div
-        className="customer-layout"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "100vh",
-          backgroundColor: "#f7f7f7",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              border: "3px solid #ededed",
-              borderTopColor: "#00926e",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 16px",
-            }}
-          />
-          <p style={{ color: "#666" }}>Loading...</p>
-        </div>
-        <style jsx>{`
-          @keyframes spin {
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
-      </div>
+      <>
+        {children}
+        <SiteFooter />
+      </>
     );
   }
 
-  if (!isAuthenticated && requiresAuth(pathname)) {
-    return null;
-  }
+  const needsAuthModal =
+    !isLoading && !isAuthenticated && requiresAuth(pathname) && authModalOpen;
 
   return (
     <div
@@ -272,6 +245,16 @@ export default function CustomerRestrictedLayout({ children }) {
           <div style={{background: "transparent"}} className="customer-content__body">{children}</div>
         </div>
       </div>
+      <SiteFooter />
+      {needsAuthModal ? (
+        <CustomerAuthModal
+          onAuthenticated={() => {
+            setAuthModalOpen(false);
+            recheck();
+          }}
+          onClose={() => setAuthModalOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -16,6 +16,7 @@
 import { usePathname } from "next/navigation";
 import React from "react";
 import { useVerifyAuth } from "../reusables/verifyAuth";
+import SiteFooter from "../components/SiteFooter";
 
 // ============================================================================
 // AUTH LAYOUT COMPONENT
@@ -38,7 +39,12 @@ function EntrepreneurShopVerify({ children }) {
           backgroundColor: "#f7f7f7",
         }}
       >
-        <p style={{ color: "#666" }}>Loading…</p>
+        <div className="site-process-loader" role="status" aria-label="Loading">
+          <span
+            className="site-process-loader__spinner"
+            style={{ borderColor: "#ededed", borderTopColor: "#00926e" }}
+          />
+        </div>
       </div>
     );
   }
@@ -61,5 +67,14 @@ export default function AuthLayout({ children }) {
     return <EntrepreneurShopVerify>{children}</EntrepreneurShopVerify>;
   }
 
-  return <>{children}</>;
+  if (pathname.startsWith("/entrepreneur")) {
+    return <>{children}</>;
+  }
+
+  return (
+    <>
+      {children}
+      <SiteFooter />
+    </>
+  );
 }

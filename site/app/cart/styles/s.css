@@ -1,26 +1,56 @@
-@media screen and (max-width: 860px) {
-  .crt-page {
-    padding: 20px 16px 48px;
+@media screen and (max-width: 900px) {
+  .crt-shell {
+    height: auto;
+    overflow: visible;
   }
 
-  .crt-head {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
+  .crt-page {
+    padding: 12px 16px 48px;
+    height: auto;
+    overflow: visible;
   }
 
   .crt-layout {
-    grid-template-columns: 1fr;
-    gap: 24px;
+    flex-direction: column;
+    gap: 28px;
+    height: auto;
   }
 
-  .crt-line__top,
+  .crt-main {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .crt-scroll {
+    overflow: visible;
+    height: auto;
+  }
+
+  .crt-summary {
+    position: static;
+    width: 100%;
+    flex: none;
+  }
+
+  .crt-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .crt-line {
+    flex-wrap: wrap;
+  }
+
+  .crt-line__thumb {
+    width: 72px;
+    height: 72px;
+  }
+
   .crt-line__bottom {
     flex-direction: column;
-    align-items: flex-start;
   }
 
-  .crt-line__totals {
-    align-items: flex-start;
+  .crt-explore .deedyte-home-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

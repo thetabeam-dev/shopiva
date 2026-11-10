@@ -1,0 +1,490 @@
+@media screen and (max-width: 480px) {
+    #headline {
+        font-size: 9vh;
+    }
+
+    #interval-text {
+        font-size: 5vh;
+    }
+
+    #section {
+        padding: 20px 55px;
+    }
+
+    #conclude-cnt {
+        padding: 50px;
+    }
+
+    #globe-section {
+        padding: 20px;
+    }
+
+    #header-logo-cnt {
+        /* margin-left: 20px; */
+        display: flex;
+        flex-direction: row;
+        width: fit-content;
+        align-items: flex-end;
+    }
+
+    #header-logo-cnt h3 {
+        padding-left: 20px;
+        margin: 0;
+        color: rgba(0, 146, 110, 1);
+        font-weight: 1000;
+    }
+
+    #header-logo-cnt img,
+    .header .inscription {
+        height: 40px;
+        width: 40px;
+        max-width: 40px;
+        object-fit: contain;
+    }
+
+    ul li div:hover {
+        background-color: transparent;
+    }
+
+    header {
+        height: 100vh;
+        background-color: transparent;
+        /* background-color: ; */
+        /* opacity: .5; */
+        display: flex;
+        position: relative;
+        margin: 0;
+        /* flex-direction: column; */
+        z-index: 1000;
+        padding: 0;
+        top: 0;
+        align-items: flex-start;
+
+        justify-content: space-between;
+    }
+
+
+
+    .header section ul {
+        list-style-type: none;
+        display: flex;
+        align-items: center;
+        /* height: 100%; */
+        margin: 0;
+        justify-content: center;
+    }
+
+    .header section ul li {
+        border: 1px solid #00926E;
+        padding: 12px 12px;
+        border-radius: 25px;
+        margin: 0px 5px;
+        font-weight: 500;
+        color: #00926E;
+
+    }
+
+    .header section ul li:last-child {
+        background-color: #00926E;
+        color: #fff;
+    }
+
+    .header section ul li:hover {
+        background-color: #00926E;
+        color: #fff;
+    }
+
+    .header {
+        height: 60px;
+        background-color: transparent;
+        /* background-color: ; */
+        /* opacity: .5; */
+        width: 100%;
+        display: flex;
+        position: fixed;
+        left: 0;
+        margin: 0;
+        z-index: 10000;
+        top: 0;
+        align-items: center;
+        justify-content: space-between;
+        transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .header.header--scrolled {
+        background-color: #fff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .header-auth {
+        margin: 0 25px 0 0;
+    }
+
+    .customer-free-layout {
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        background-color: #003c2d;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .customer-free-main {
+        flex: 1 0 auto;
+        width: 100%;
+        height: fit-content;
+        /* min-height: 0; */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        position: relative;
+        overflow: visible;
+        background-color: transparent;
+    }
+
+    .header-auth ul {
+        position: relative;
+        background-color: transparent;
+        width: fit-content;
+    }
+
+    .header-auth ul li {
+        width: fit-content;
+    }
+
+
+    main {
+        height: calc(100vh - 60px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: #f8f8f8;
+    }
+
+    .hero-section {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        overflow: hidden;
+        position: relative;
+        flex-direction: row-reverse;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0px 0px;
+    }
+
+    .video-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        overflow: hidden;
+        background-color: #99d3c5;
+        pointer-events: none;
+    }
+
+    .video-bg video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .hero-right {
+        width: 45%;
+        height: 100%;
+        background-color: transparent;
+        position: relative;
+        display: none;
+        padding: 70px 0px 0px 0px;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background-color: rgba(0, 146, 110, 1);
+        background-color: rgba(0, 146, 110, .2);
+    }
+
+    .hero-left {
+        width: 100%;
+        height: 100%;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 10px 0px 10px;
+        background-color: rgba(0, 146, 110, 1);
+        background-color: rgba(0, 146, 110, .2);
+    }
+
+    .hero-info {
+        width: 470px;
+    }
+
+    .hero-left h2 {
+        padding: 20px 20px 20px 20px;
+        color: rgb(255, 255, 255);
+        font-size: 4.5vh;
+        font-weight: 800;
+    }
+
+    .hero-left ul {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 0px;
+    }
+
+    .theme {
+        padding: 20px 20px;
+        font-weight: 600;
+        font-size: large;
+        color: rgb(255, 255, 255);
+        text-align: justify;
+    }
+
+    .download_btn {
+        width: 100%;
+        min-height: 110px;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: stretch;
+        gap: 12px;
+        cursor: pointer;
+        padding: 16px;
+        margin-top: 20px;
+        box-sizing: border-box;
+    }
+
+    .download_btn {
+        border-radius: 10px;
+    }
+
+    .order_btn {
+        width: 100%;
+        height: 100px;
+        margin: 5px 0px;
+        padding: 20px 20px;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        cursor: pointer;
+    }
+
+    .order_btn button {
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        background-color: #00926E;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        color: #fff;
+        font-weight: 500;
+        font-size: 2.5vh;
+        border: none;
+        border-radius: 8px;
+    }
+
+    .download_btn button,
+    .download_btn a {
+        width: 48%;
+        min-height: 64px;
+        padding: 10px 16px;
+        border: none;
+        background-color: #fff;
+        border-radius: 12px;
+        color: #00926E;
+        text-decoration: none;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        box-sizing: border-box;
+    }
+
+    .download_btn a img {
+        height: 32px;
+        width: 32px;
+        flex-shrink: 0;
+    }
+
+    .download_btn a b {
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+
+    #about {
+        /* height: 70vh; */
+        width: 100%;
+        background-color: #ffffff;
+        border-radius: 0px;
+        display: flex;
+        flex-direction: column;
+        z-index: 200;
+        margin: 0px 0px;
+        justify-content: space-between;
+    }
+
+    #about h1 {
+        color: #00926E;
+        font-size: 3.5vh;
+        font-weight: 700;
+        border: none;
+        margin: 0;
+        text-align: center;
+        margin: 20px 0px;
+    }
+
+    .about-card-cnt {
+        display: flex;
+        flex-direction: column;
+
+        /* margin: 5px; */
+        color: #000;
+        width: 100%;
+    }
+
+    .about-card {
+        padding: 10px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #about-card {
+        width: 100%;
+    }
+
+    .about-card img {
+        height: 150px;
+        width: 150px;
+    }
+
+    .content {
+        padding: 10px;
+        text-align: center;
+    }
+
+    .title {
+        font-size: large;
+        font-weight: 600;
+        font-size: 2.5vh;
+        height: fit-content;
+        margin: 10px 0px;
+    }
+
+    .summary {
+        font-size: large;
+        line-height: 30px;
+    }
+
+    #why-section {
+        background-color: #00926E;
+        color: #fff;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 200;
+        justify-content: center;
+    }
+
+    #why-card {
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        height: fit-content;
+        /* flex-direction: space-between; */
+        margin: 20px 0px;
+        padding: 25px;
+        /* flex-direction: row; */
+        border-radius: 5px;
+        color: #000;
+    }
+
+    #why-card:nth-child(odd) {
+        flex-direction: column;
+    }
+
+    #why-card:nth-child(even) {
+        flex-direction: column;
+    }
+
+    #why-card:nth-child(even) .content {
+        width: 100%;
+        /* padding: 25px 35px; */
+
+        text-align: justify;
+    }
+
+    #why-card:nth-child(odd) .content {
+        width: 100%;
+        /* padding: 25px 35px; */
+        text-align: justify;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    #why-card:nth-child(even) img {
+        width: 100%;
+        height: 100%;
+        border-radius: 5px;
+        /* padding: 10px; */
+        text-align: right;
+    }
+
+    #why-card:nth-child(odd) img {
+        width: 100%;
+        /* padding: 10px; */
+        border-radius: 5px;
+        height: 100%;
+        text-align: left;
+    }
+
+
+    .input-cnt {
+        height: auto;
+        width: auto;
+        display: flex;
+        justify-content: flex-start;
+        flex-direction: row;
+    }
+
+    .input-cnt input {
+        height: 40px;
+        width: 200px;
+
+    }
+
+    .footer-button {
+        height: 40px;
+        width: 70px;
+        border-radius: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+
+
+
+
+}

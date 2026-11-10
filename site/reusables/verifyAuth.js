@@ -16,7 +16,21 @@ import { set_entrepreneur_data_to } from "../redux/entrepreneur/entrepreneur_dat
 export const ENTREPRENEUR_SHOP_CREATE_PATH = "/entrepreneur/shop";
 
 /** Pages that do not require authentication (last path segment) */
-export const PUBLIC_PAGES = ["login", "signup", "password-recovery"];
+export const PUBLIC_PAGES = ["login", "signup", "password-recovery", "wait-list"];
+
+/** Buyer account / commerce routes that require a customer session */
+const CUSTOMER_AUTH_PREFIXES = [
+  "/cart",
+  "/checkouts",
+  "/orders",
+  "/user-profile",
+  "/account",
+  "/disputes",
+  "/inbox",
+];
+
+/** `/store/{segment}/...` app routes (not public `/store/{shopSlug}`) */
+const STORE_APP_SEGMENTS = new Set(["cart", "checkouts", "orders", "disputes", "inbox"]);
 
 /**
  * Same-origin auth API so cookies are always sent with credentials.
@@ -44,13 +58,42 @@ export function getCookie(name) {
 export function requiresAuth(pathname) {
   if (!pathname || typeof pathname !== "string") return false;
   const path = pathname.split("?")[0].replace(/\/+$/, "") || "/";
-  // Require auth only for entrepreneur routes
-  if (!path.startsWith("/entrepreneur")) return false;
-
   const pathParts = path.split("/").filter(Boolean);
   const lastPart = pathParts[pathParts.length - 1];
-  // Still allow public pages under entrepreneur (e.g. /entrepreneur/auth/login)
-  return !PUBLIC_PAGES.includes(lastPart);
+
+  if (path.startsWith("/auth")) return false;
+
+  if (path.startsWith("/entrepreneur")) {
+    if (pathParts[1] === "auth") return false;
+    return !PUBLIC_PAGES.includes(lastPart);
+  }
+
+  if (pathParts[0] === "store" && pathParts.length >= 2 && STORE_APP_SEGMENTS.has(pathParts[1])) {
+    return true;
+  }
+
+  return CUSTOMER_AUTH_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
+/**
+ * Login role for a protected path.
+ * @param {string} pathname
+ * @returns {"entrepreneur"|"customer"}
+ */
+export function authRoleForPath(pathname) {
+  const path = String(pathname || "").split("?")[0];
+  return path.startsWith("/entrepreneur") ? "entrepreneur" : "customer";
+}
+
+function loginPathFor(role, pathname) {
+  const params = new URLSearchParams({ role });
+  const next = String(pathname || "").split("?")[0];
+  if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/auth")) {
+    params.set("next", next);
+  }
+  return `/auth/login?${params.toString()}`;
 }
 
 /**
@@ -63,17 +106,21 @@ function cookieNameForRole(role) {
 
 /**
  * Unified auth verification hook.
- * Verifies token with /api/user/authorization; redirects to /auth/login?role=... if invalid.
+ * Verifies token with /api/user/authorization; redirects to /auth/login?role=... if invalid
+ * unless `redirectOnFail` is false (customer in-page sign-in modal).
  *
  * @param {"entrepreneur"|"customer"} role
- * @returns {{ isLoading: boolean, isAuthenticated: boolean }}
+ * @param {{ redirectOnFail?: boolean }} [options]
+ * @returns {{ isLoading: boolean, isAuthenticated: boolean, recheck: () => void }}
  */
-export function useVerifyAuth(role) {
+export function useVerifyAuth(role, options = {}) {
+  const redirectOnFail = options.redirectOnFail !== false;
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [recheckKey, setRecheckKey] = useState(0);
   const authInProgress = useRef(false);
 
   useEffect(() => {
@@ -89,6 +136,7 @@ export function useVerifyAuth(role) {
     // HttpOnly cookies are invisible to JS — still verify via API with credentials
 
     authInProgress.current = true;
+    setIsLoading(true);
 
     const headers = { "Content-Type": "application/json" };
     if (tokenFromDocument) {
@@ -112,18 +160,29 @@ export function useVerifyAuth(role) {
             dispatch(set_entrepreneur_data_to(response.data));
           }
           setIsAuthenticated(true);
+        } else if (redirectOnFail) {
+          router.replace(loginPathFor(role, pathname));
         } else {
-          router.push(`/auth/login?role=${role}`);
+          setIsAuthenticated(false);
         }
       })
       .catch(() => {
-        router.push(`/auth/login?role=${role}`);
+        if (redirectOnFail) {
+          router.replace(loginPathFor(role, pathname));
+        } else {
+          setIsAuthenticated(false);
+        }
       })
       .finally(() => {
         setIsLoading(false);
         authInProgress.current = false;
       });
-  }, [pathname, router, dispatch, role]);
+  }, [pathname, router, dispatch, role, redirectOnFail, recheckKey]);
 
-  return { isLoading, isAuthenticated };
+  function recheck() {
+    authInProgress.current = false;
+    setRecheckKey((n) => n + 1);
+  }
+
+  return { isLoading, isAuthenticated, recheck };
 }

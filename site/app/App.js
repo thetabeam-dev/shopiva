@@ -29,6 +29,8 @@ import EntrepreneurFreeLayout from "../layouts/Entrepreneur/Free";
 
 // Customer Layout Imports
 import CustomerFreeLayout from "../layouts/Customer/Free";
+import CustomerRestrictedLayout from "../layouts/Customer/Restricted";
+import { requiresAuth } from "../reusables/verifyAuth";
 
 // ============================================================================
 // CONSTANTS
@@ -229,6 +231,10 @@ function Customer({ children }) {
   // Auth pages use AuthLayout
   if (isAuthPage(pathname)) {
     return <AuthLayout>{children}</AuthLayout>;
+  }
+
+  if (requiresAuth(pathname)) {
+    return <CustomerRestrictedLayout>{children}</CustomerRestrictedLayout>;
   }
 
   return <CustomerFreeLayout>{children}</CustomerFreeLayout>;

@@ -1,0 +1,187 @@
+.customer-auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.customer-auth-modal__dialog {
+  position: relative;
+  width: min(420px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 28px 32px 22px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  text-align: center;
+}
+
+.customer-auth-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #222;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.customer-auth-modal__title {
+  margin: 4px 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111;
+}
+
+.customer-auth-modal__safe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 22px;
+  color: #00926e;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.customer-auth-modal__avatar {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: #c5c5c5;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.customer-auth-modal__name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
+.customer-auth-modal__email {
+  margin: 4px 0 22px;
+  font-size: 13px;
+  color: #888;
+}
+
+.customer-auth-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.customer-auth-modal__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid #d8d8d8;
+  background: #fff;
+  color: #222;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.customer-auth-modal__btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.customer-auth-modal__btn img {
+  width: 18px;
+  height: 18px;
+}
+
+.customer-auth-modal__alt {
+  margin: 18px 0 10px;
+}
+
+.customer-auth-modal__text-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #555;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.customer-auth-modal__meta {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 6px 0 18px;
+}
+
+.customer-auth-modal__legal {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #888;
+}
+
+.customer-auth-modal__legal a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.customer-auth-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  margin-top: 8px;
+}
+
+.customer-auth-modal__form label {
+  font-size: 12px;
+  color: #555;
+}
+
+.customer-auth-modal__form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #111;
+}
+
+.customer-auth-modal__error {
+  margin: 0;
+  color: #c0392b;
+  font-size: 13px;
+  text-align: left;
+}
+
+.customer-auth-modal__primary {
+  background: #00926e;
+  border-color: #00926e;
+  color: #fff;
+  border-radius: 8px;
+}
+
+.customer-auth-modal__row {
+  display: flex;
+  gap: 10px;
+}

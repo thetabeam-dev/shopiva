@@ -1,16 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { IoCheckmarkCircle, IoLockClosed } from "react-icons/io5";
 import "./styles/xxl.css";
 import "./styles/s.css";
+import "../styles/xxl.css";
+import CustomerHeader from "@/components/customers/Header";
 import { API_BACKEND, buyerAuthHeaders } from "@/reusables/shopBackendAuth";
+import {
+  estimateLocationShipping,
+  evaluateDeliveryState,
+  listAllDeliveryStates,
+  normalizeShopDelivery,
+  parseShopId,
+} from "@/lib/vendorDelivery";
 
 const AUTH_URL = "/api/user/authorization";
 
 const PAYSTACK_PUBLIC_KEY =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY) ||
   "pk_test_9d54d1840154258f2371f52ac12b73e19b25dad";
-
 
 function isValidEmail(s) {
   const t = String(s || "").trim();
@@ -19,6 +29,10 @@ function isValidEmail(s) {
 
 function digitCount(s) {
   return (String(s || "").match(/\d/g) || []).length;
+}
+
+function isVideoUrl(url) {
+  return /\.(mp4|webm|mov|m4v|ogv|ogg|avi|mkv)(\?|#|$)/i.test(String(url || ""));
 }
 
 function validateCheckoutFields(values) {
@@ -65,66 +79,6 @@ function validateCheckoutFields(values) {
   return errors;
 }
 
-function computeMultiItemShippingFee(itemCount, baseFee, discountPercent) {
-  const count = Math.max(0, Math.floor(Number(itemCount) || 0));
-  const base = Math.max(0, Number(baseFee) || 0);
-  const discount = Math.min(100, Math.max(0, Number(discountPercent) || 0)) / 100;
-  if (count <= 0 || base <= 0) return 0;
-  const extra = Math.max(0, count - 1);
-  return Math.round(base + extra * base * (1 - discount));
-}
-
-function normalizeShopDelivery(data) {
-  if (!data || typeof data !== "object") return null;
-  const shopId = Number(data.shopId ?? data.shop_id);
-  if (!Number.isFinite(shopId) || shopId <= 0) return null;
-  const locations = Array.isArray(data.locations)
-    ? data.locations
-        .map((loc) => {
-          const name = String(loc?.name ?? "").trim();
-          const key = String(loc?.key ?? name).trim().toLowerCase();
-          return {
-            key,
-            name: name || key,
-            fee: Math.max(0, Math.round(Number(loc?.fee) || 0)),
-            discountPercent: Number.isFinite(Number(loc?.discountPercent))
-              ? Number(loc.discountPercent)
-              : Number(data.discountPercent) || 50,
-          };
-        })
-        .filter((loc) => loc.name)
-    : [];
-  return { shopId, locations };
-}
-
-function mergeCheckoutDeliveryLocations(shops) {
-  const usable = shops.filter((shop) => shop.delivery && shop.delivery.locations.length);
-  if (!usable.length) return [];
-  const byKey = new Map();
-  for (const shop of usable) {
-    for (const loc of shop.delivery.locations) {
-      const prev = byKey.get(loc.key) || { name: loc.name, perShop: [] };
-      prev.perShop.push({
-        fee: loc.fee,
-        discountPercent: loc.discountPercent,
-        itemCount: shop.itemCount,
-      });
-      byKey.set(loc.key, prev);
-    }
-  }
-  const rows = [];
-  for (const [key, value] of byKey.entries()) {
-    if (value.perShop.length !== usable.length) continue;
-    const checkoutFee = value.perShop.reduce(
-      (sum, shop) => sum + computeMultiItemShippingFee(shop.itemCount, shop.fee, shop.discountPercent),
-      0
-    );
-    rows.push({ key, name: value.name, checkoutFee });
-  }
-  rows.sort((a, b) => a.name.localeCompare(b.name));
-  return rows;
-}
-
 export default function CheckoutPage() {
   const [items, setItems] = useState([]);
   const [shopDeliveries, setShopDeliveries] = useState([]);
@@ -145,44 +99,64 @@ export default function CheckoutPage() {
   const [formSummaryError, setFormSummaryError] = useState("");
 
   const shopIdsKey = useMemo(() => {
-    const ids = [...new Set(items.map((item) => Number(item.shopId)).filter((id) => id > 0))];
+    const ids = [...new Set(items.map((item) => parseShopId(item.shopId)).filter(Boolean))];
     ids.sort((a, b) => a - b);
     return ids.join(",");
   }, [items]);
 
-  const deliveryLocations = useMemo(() => {
+  const cartShops = useMemo(() => {
     const qtyByShop = new Map();
+    const nameByShop = new Map();
     for (const item of items) {
-      const shopId = Number(item.shopId);
+      const shopId = parseShopId(item.shopId);
       if (!shopId) continue;
-      qtyByShop.set(shopId, (qtyByShop.get(shopId) || 0) + (Number(item.quantity) || 0));
+      qtyByShop.set(shopId, (qtyByShop.get(shopId) || 0) + Math.max(1, Number(item.quantity) || 1));
+      if (item.shopName && !nameByShop.has(shopId)) {
+        nameByShop.set(shopId, String(item.shopName));
+      }
     }
-    const shops = [...qtyByShop.entries()].map(([shopId, itemCount]) => ({
+    return [...qtyByShop.entries()].map(([shopId, itemCount]) => ({
       shopId,
       itemCount,
+      shopName: nameByShop.get(shopId) || `Shop ${shopId}`,
       delivery: shopDeliveries.find((row) => row.shopId === shopId) || null,
     }));
-    return mergeCheckoutDeliveryLocations(shops);
   }, [items, shopDeliveries]);
 
-  const selectedDelivery =
-    deliveryLocations.find((loc) => loc.key === selectedDeliveryKey) || null;
-  const shipping = selectedDelivery ? Number(selectedDelivery.checkoutFee) || 0 : 0;
-  const itemsTotal = useMemo(
-    () =>
-      items.reduce(
-        (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0),
-        0
-      ),
-    [items]
-  );
-  const totalNaira = itemsTotal + shipping;
+  const deliveryStates = useMemo(() => listAllDeliveryStates(cartShops), [cartShops]);
 
-  /** Paystack expects amount in the smallest currency unit (kobo for NGN). */
+  const coverage = useMemo(
+    () => (selectedDeliveryKey ? evaluateDeliveryState(cartShops, selectedDeliveryKey) : null),
+    [cartShops, selectedDeliveryKey]
+  );
+
+  const selectedDelivery = coverage?.allSupported ? coverage.location : null;
+  const shipping = selectedDelivery
+    ? Number(estimateLocationShipping(selectedDelivery, items) ?? selectedDelivery.checkoutFee) || 0
+    : 0;
+
+  const totals = useMemo(() => {
+    return items.reduce(
+      (acc, row) => {
+        const qty = Number(row.quantity) || 0;
+        const price = Number(row.price) || 0;
+        const compare = Number(row.compareAtPrice) || 0;
+        const list = compare > price ? compare : price;
+        acc.itemsTotal += list * qty;
+        acc.discount += Math.max(0, list - price) * qty;
+        acc.payable += price * qty;
+        acc.units += qty;
+        return acc;
+      },
+      { itemsTotal: 0, discount: 0, payable: 0, units: 0 }
+    );
+  }, [items]);
+
+  const totalNaira = totals.payable + shipping;
   const amountKobo = Math.max(100, Math.round(totalNaira * 100));
 
   const fmt = (n) =>
-    `₦${n.toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
+    `₦${Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
 
   const loadProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -239,6 +213,16 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.querySelector("script[data-paystack-inline]")) return;
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    script.setAttribute("data-paystack-inline", "true");
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
 
@@ -282,63 +266,10 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!selectedDeliveryKey) return;
-    if (!deliveryLocations.some((loc) => loc.key === selectedDeliveryKey)) {
+    if (!deliveryStates.some((loc) => loc.key === selectedDeliveryKey)) {
       setSelectedDeliveryKey("");
     }
-  }, [deliveryLocations, selectedDeliveryKey]);
-
-  const paystackBase = useMemo(
-    () => ({
-      publicKey: PAYSTACK_PUBLIC_KEY,
-      currency: "NGN",
-    }),
-    []
-  );
-
-  // removed `usePaystackPayment` to avoid server-side `window` access during build
-
-  const bump = async (cartLineId, delta) => {
-    const row = items.find((r) => String(r.id) === String(cartLineId));
-    if (!row) return;
-    const q = Math.max(1, Math.min(99, (Number(row.quantity) || 1) + delta));
-    const prev = items;
-    setItems((rows) =>
-      rows.map((r) =>
-        String(r.id) === String(cartLineId) ? { ...r, quantity: q } : r
-      )
-    );
-    try {
-      const res = await fetch("/api/cart", {
-        method: "PATCH",
-        headers: buyerAuthHeaders(),
-        credentials: "include",
-        body: JSON.stringify({ cartLineId: Number(cartLineId), quantity: q }),
-      });
-      if (!res.ok) {
-        setItems(prev);
-      }
-    } catch {
-      setItems(prev);
-    }
-  };
-
-  const removeLine = async (cartLineId) => {
-    const prev = items;
-    setItems((rows) => rows.filter((row) => String(row.id) !== String(cartLineId)));
-    try {
-      const res = await fetch(
-        `/api/cart?cartLineId=${encodeURIComponent(String(cartLineId))}`,
-        {
-          method: "DELETE",
-          headers: buyerAuthHeaders(),
-          credentials: "include",
-        }
-      );
-      if (!res.ok) setItems(prev);
-    } catch {
-      setItems(prev);
-    }
-  };
+  }, [deliveryStates, selectedDeliveryKey]);
 
   const onSuccess = (reference) => {
     console.log(reference);
@@ -372,10 +303,12 @@ export default function CheckoutPage() {
       country,
     };
     const errors = validateCheckoutFields(values);
-    if (deliveryLocations.length > 0 && !selectedDelivery) {
+    if (!selectedDeliveryKey) {
       errors.delivery = "Select a delivery state.";
-    } else if (!deliveryLoading && items.length > 0 && deliveryLocations.length === 0) {
-      errors.delivery = "These vendors do not share a common delivery state.";
+    } else if (coverage && !coverage.allSupported) {
+      errors.delivery = "Not all shops in this order ship to the selected state.";
+    } else if (!deliveryLoading && items.length > 0 && deliveryStates.length === 0) {
+      errors.delivery = "Vendors in this cart have not set delivery states yet.";
     }
     setFieldErrors(errors);
 
@@ -408,11 +341,8 @@ export default function CheckoutPage() {
     }
 
     const email = checkoutEmail.trim();
-    const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
-    const firstname = nameParts[0] ?? email.split("@")[0];
-    const lastname = nameParts.slice(1).join(" ") || firstname;
 
-    if (!paystackReady) {
+    if (typeof window === "undefined" || !window.PaystackPop) {
       setFormSummaryError("Payment service not available. Try again in your browser.");
       return;
     }
@@ -447,350 +377,311 @@ export default function CheckoutPage() {
     }
   };
 
-  if (cartLoading || profileLoading) {
+  function Field({ id, label, error, children }) {
     return (
-      <div className="co-page">
-        <div className="co-body">
-          <p className="co-title" style={{ marginTop: 24 }}>
-            Loading checkout…
+      <div className="co-field">
+        <label className="co-label" htmlFor={id}>
+          {label}
+        </label>
+        {children}
+        {error ? (
+          <p id={`${id}-error`} className="co-field__error">
+            {error}
           </p>
-        </div>
+        ) : null}
       </div>
     );
   }
 
-  if (authRequired) {
-    return (
-      <div className="co-page">
-        <div className="co-body">
-          <h1 className="co-title">Checkout</h1>
-          <p role="status" style={{ marginTop: 16 }}>
-            Sign in to continue checkout.{" "}
-            <a href="/auth/login?role=customer">Sign in</a>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const shippingLabel = !selectedDeliveryKey
+    ? "Select state"
+    : coverage && !coverage.allSupported
+      ? "Unavailable"
+      : shipping === 0
+        ? "FREE"
+        : fmt(shipping);
 
   return (
-    <div className="co-page">
-      <div className="co-body">
-        <h1 className="co-title">Checkout</h1>
+    <div className="co-shell">
+      <div className="buyer-head">
+        <CustomerHeader />
+      </div>
+      <div className="co-page">
+        <div className="co-safe" role="note">
+          <IoLockClosed size={14} />
+          15-day no update refund
+        </div>
+        <nav className="co-crumb" aria-label="Breadcrumb">
+          <Link href="/">Home</Link>
+          <span>›</span>
+          <span>Checkout</span>
+        </nav>
 
-        <div className="co-main">
-          <div className="co-forms">
-            <div className="co-section">
-              <h2 className="co-section__title">Contact information</h2>
+        {cartLoading || profileLoading ? (
+          <div className="co-status co-status--loader" role="status" aria-label="Loading">
+            <span
+              className="site-process-loader__spinner"
+              style={{ borderColor: "#ededed", borderTopColor: "#00926e" }}
+            />
+          </div>
+        ) : authRequired ? (
+          <p className="co-status" role="status">
+            Sign in to continue checkout.
+          </p>
+        ) : (
+          <div className="co-layout">
+            <div className="co-main">
+              <div className="co-ship">
+                <span>
+                  <IoCheckmarkCircle size={18} />
+                  Free shipping special for you
+                </span>
+                <small>Limited-time offer</small>
+              </div>
+
               {formSummaryError ? (
                 <p className="co-field__error co-field__error--summary" role="alert">
                   {formSummaryError}
                 </p>
               ) : null}
-              <div className="co-field">
-                <label className="co-label" htmlFor="co-fullname">
-                  Full name
-                </label>
-                <input
-                  id="co-fullname"
-                  className={`co-input${fieldErrors.fullName ? " co-input--error" : ""}`}
-                  placeholder="Jane Doe"
-                  autoComplete="name"
-                  value={fullName}
-                  onChange={(e) => {
-                    setFullName(e.target.value);
-                    clearFieldError("fullName");
-                  }}
-                  aria-invalid={Boolean(fieldErrors.fullName)}
-                  aria-describedby={fieldErrors.fullName ? "co-fullname-error" : undefined}
-                />
-                {fieldErrors.fullName ? (
-                  <p id="co-fullname-error" className="co-field__error">
-                    {fieldErrors.fullName}
-                  </p>
-                ) : null}
-              </div>
-              <div className="co-row">
-                <div className="co-field">
-                  <label className="co-label" htmlFor="co-email">
-                    Email
-                  </label>
-                  <input
-                    id="co-email"
-                    type="email"
-                    className={`co-input${fieldErrors.checkoutEmail ? " co-input--error" : ""}`}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    value={checkoutEmail}
-                    onChange={(e) => {
-                      setCheckoutEmail(e.target.value);
-                      clearFieldError("checkoutEmail");
-                    }}
-                    aria-invalid={Boolean(fieldErrors.checkoutEmail)}
-                    aria-describedby={
-                      fieldErrors.checkoutEmail ? "co-email-error" : undefined
-                    }
-                  />
-                  {fieldErrors.checkoutEmail ? (
-                    <p id="co-email-error" className="co-field__error">
-                      {fieldErrors.checkoutEmail}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="co-field">
-                  <label className="co-label" htmlFor="co-phone">
-                    Phone
-                  </label>
-                  <input
-                    id="co-phone"
-                    type="tel"
-                    className={`co-input${fieldErrors.phone ? " co-input--error" : ""}`}
-                    placeholder="+234 …"
-                    autoComplete="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      clearFieldError("phone");
-                    }}
-                    aria-invalid={Boolean(fieldErrors.phone)}
-                    aria-describedby={fieldErrors.phone ? "co-phone-error" : undefined}
-                  />
-                  {fieldErrors.phone ? (
-                    <p id="co-phone-error" className="co-field__error">
-                      {fieldErrors.phone}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
 
-            <div className="co-section">
-              <h2 className="co-section__title">Shipping address</h2>
-              <div className="co-field">
-                <label className="co-label" htmlFor="co-street">
-                  Street address
-                </label>
-                <input
-                  id="co-street"
-                  className={`co-input${fieldErrors.street ? " co-input--error" : ""}`}
-                  placeholder="123 Main Street"
-                  autoComplete="street-address"
-                  value={street}
-                  onChange={(e) => {
-                    setStreet(e.target.value);
-                    clearFieldError("street");
-                  }}
-                  aria-invalid={Boolean(fieldErrors.street)}
-                  aria-describedby={fieldErrors.street ? "co-street-error" : undefined}
-                />
-                {fieldErrors.street ? (
-                  <p id="co-street-error" className="co-field__error">
-                    {fieldErrors.street}
-                  </p>
-                ) : null}
-              </div>
-              <div className="co-grid-2">
-                <div className="co-field">
-                  <label className="co-label" htmlFor="co-city">
-                    City
-                  </label>
-                  <input
-                    id="co-city"
-                    className={`co-input${fieldErrors.city ? " co-input--error" : ""}`}
-                    placeholder="Lagos"
-                    value={city}
-                    onChange={(e) => {
-                      setCity(e.target.value);
-                      clearFieldError("city");
-                    }}
-                    aria-invalid={Boolean(fieldErrors.city)}
-                    aria-describedby={fieldErrors.city ? "co-city-error" : undefined}
-                  />
-                  {fieldErrors.city ? (
-                    <p id="co-city-error" className="co-field__error">
-                      {fieldErrors.city}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="co-field">
-                  <label className="co-label" htmlFor="co-zip">
-                    ZIP / Postal code
-                  </label>
-                  <input
-                    id="co-zip"
-                    className={`co-input${fieldErrors.zip ? " co-input--error" : ""}`}
-                    placeholder="101241"
-                    value={zip}
-                    onChange={(e) => {
-                      setZip(e.target.value);
-                      clearFieldError("zip");
-                    }}
-                    aria-invalid={Boolean(fieldErrors.zip)}
-                    aria-describedby={fieldErrors.zip ? "co-zip-error" : undefined}
-                  />
-                  {fieldErrors.zip ? (
-                    <p id="co-zip-error" className="co-field__error">
-                      {fieldErrors.zip}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-              <div className="co-field">
-                <label className="co-label" htmlFor="co-country">
-                  Country
-                </label>
-                <input
-                  id="co-country"
-                  className={`co-input${fieldErrors.country ? " co-input--error" : ""}`}
-                  placeholder="Nigeria"
-                  autoComplete="country-name"
-                  value={country}
-                  onChange={(e) => {
-                    setCountry(e.target.value);
-                    clearFieldError("country");
-                  }}
-                  aria-invalid={Boolean(fieldErrors.country)}
-                  aria-describedby={fieldErrors.country ? "co-country-error" : undefined}
-                />
-                {fieldErrors.country ? (
-                  <p id="co-country-error" className="co-field__error">
-                    {fieldErrors.country}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="co-section">
-              <h2 className="co-section__title">Delivery location</h2>
-              <p className="co-delivery-hint">
-                Choose the state this order should be delivered to. The fee comes from the vendor&apos;s shipping zones.
-              </p>
-              <div className="co-field">
-                <label className="co-label" htmlFor="co-delivery-state">
-                  Delivery state
-                </label>
-                <select
-                  id="co-delivery-state"
-                  className={`co-input${fieldErrors.delivery ? " co-input--error" : ""}`}
-                  value={selectedDeliveryKey}
-                  disabled={deliveryLoading || deliveryLocations.length === 0}
-                  onChange={(e) => {
-                    setSelectedDeliveryKey(e.target.value);
-                    clearFieldError("delivery");
-                  }}
-                  aria-invalid={Boolean(fieldErrors.delivery)}
-                  aria-describedby={fieldErrors.delivery ? "co-delivery-error" : undefined}
-                >
-                  <option value="">
-                    {deliveryLoading
-                      ? "Loading states…"
-                      : deliveryLocations.length
-                        ? "Select a state"
-                        : "No delivery states available"}
-                  </option>
-                  {deliveryLocations.map((loc) => (
-                    <option key={loc.key} value={loc.key}>
-                      {loc.name} · {fmt(loc.checkoutFee)}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.delivery ? (
-                  <p id="co-delivery-error" className="co-field__error">
-                    {fieldErrors.delivery}
-                  </p>
-                ) : null}
-              </div>
-              {selectedDelivery ? (
-                <p className="co-delivery-hint">
-                  Delivery to {selectedDelivery.name} · {fmt(shipping)}
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <aside className="co-summary" aria-label="Order summary">
-            <h2 className="co-summary__title">Order summary</h2>
-            {cartError ? (
-              <p className="co-line__name" role="alert">
-                {cartError}
-              </p>
-            ) : null}
-            {!cartError && items.length === 0 ? (
-              <p className="co-line__name">Your cart is empty.</p>
-            ) : null}
-            {items.map((item) => {
-              const unit = Number(item.price) || 0;
-              const q = Number(item.quantity) || 1;
-              const thumb =
-                Array.isArray(item.images) && item.images[0]
-                  ? item.images[0]
-                  : "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop&q=80";
-              return (
-                <div key={item.id} className="co-line">
-                  <img className="co-line__thumb" src={thumb} alt="" />
-                  <div className="co-line__body">
-                    <div className="co-line__top">
-                      <p className="co-line__name">{item.name || "Item"}</p>
-                      <span className="co-line__price">{fmt(unit * q)}</span>
-                    </div>
-                    <div className="co-line__bottom">
-                      <div className="co-qty">
-                        <button
-                          type="button"
-                          aria-label="Decrease quantity"
-                          onClick={() => void bump(item.id, -1)}
-                        >
-                          −
-                        </button>
-                        <span>{String(q).padStart(2, "0")}</span>
-                        <button
-                          type="button"
-                          aria-label="Increase quantity"
-                          onClick={() => void bump(item.id, 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        className="co-remove"
-                        onClick={() => void removeLine(item.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
+              <section className="co-panel" aria-labelledby="co-address-title">
+                  <div className="co-panel__head">
+                    <h2 id="co-address-title">Shipping address</h2>
                   </div>
+                  <Field id="co-fullname" label="Full name" error={fieldErrors.fullName}>
+                    <input
+                      id="co-fullname"
+                      className={`co-input${fieldErrors.fullName ? " co-input--error" : ""}`}
+                      placeholder="Jane Doe"
+                      autoComplete="name"
+                      value={fullName}
+                      onChange={(e) => {
+                        setFullName(e.target.value);
+                        clearFieldError("fullName");
+                      }}
+                      aria-invalid={Boolean(fieldErrors.fullName)}
+                    />
+                  </Field>
+                  <div className="co-row">
+                    <Field id="co-email" label="Email" error={fieldErrors.checkoutEmail}>
+                      <input
+                        id="co-email"
+                        type="email"
+                        className={`co-input${fieldErrors.checkoutEmail ? " co-input--error" : ""}`}
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                        value={checkoutEmail}
+                        onChange={(e) => {
+                          setCheckoutEmail(e.target.value);
+                          clearFieldError("checkoutEmail");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.checkoutEmail)}
+                      />
+                    </Field>
+                    <Field id="co-phone" label="Phone" error={fieldErrors.phone}>
+                      <input
+                        id="co-phone"
+                        type="tel"
+                        className={`co-input${fieldErrors.phone ? " co-input--error" : ""}`}
+                        placeholder="+234 …"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          clearFieldError("phone");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.phone)}
+                      />
+                    </Field>
+                  </div>
+                  <Field id="co-street" label="Street address" error={fieldErrors.street}>
+                    <input
+                      id="co-street"
+                      className={`co-input${fieldErrors.street ? " co-input--error" : ""}`}
+                      placeholder="123 Main Street"
+                      autoComplete="street-address"
+                      value={street}
+                      onChange={(e) => {
+                        setStreet(e.target.value);
+                        clearFieldError("street");
+                      }}
+                      aria-invalid={Boolean(fieldErrors.street)}
+                    />
+                  </Field>
+                  <div className="co-grid-2">
+                    <Field id="co-city" label="City" error={fieldErrors.city}>
+                      <input
+                        id="co-city"
+                        className={`co-input${fieldErrors.city ? " co-input--error" : ""}`}
+                        placeholder="Lagos"
+                        value={city}
+                        onChange={(e) => {
+                          setCity(e.target.value);
+                          clearFieldError("city");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.city)}
+                      />
+                    </Field>
+                    <Field id="co-zip" label="ZIP / Postal code" error={fieldErrors.zip}>
+                      <input
+                        id="co-zip"
+                        className={`co-input${fieldErrors.zip ? " co-input--error" : ""}`}
+                        placeholder="101241"
+                        value={zip}
+                        onChange={(e) => {
+                          setZip(e.target.value);
+                          clearFieldError("zip");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.zip)}
+                      />
+                    </Field>
+                  </div>
+                  <div className="co-grid-2">
+                    <Field id="co-country" label="Country" error={fieldErrors.country}>
+                      <input
+                        id="co-country"
+                        className={`co-input${fieldErrors.country ? " co-input--error" : ""}`}
+                        placeholder="Nigeria"
+                        autoComplete="country-name"
+                        value={country}
+                        onChange={(e) => {
+                          setCountry(e.target.value);
+                          clearFieldError("country");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.country)}
+                      />
+                    </Field>
+                    <Field id="co-delivery-state" label="Delivery state" error={fieldErrors.delivery}>
+                      <select
+                        id="co-delivery-state"
+                        className={`co-input${fieldErrors.delivery ? " co-input--error" : ""}`}
+                        value={selectedDeliveryKey}
+                        disabled={deliveryLoading || deliveryStates.length === 0}
+                        onChange={(e) => {
+                          setSelectedDeliveryKey(e.target.value);
+                          clearFieldError("delivery");
+                        }}
+                        aria-invalid={Boolean(fieldErrors.delivery)}
+                      >
+                        <option value="">
+                          {deliveryLoading
+                            ? "Loading states…"
+                            : deliveryStates.length
+                              ? "Select a state"
+                              : "No delivery states available"}
+                        </option>
+                        {deliveryStates.map((loc) => (
+                          <option key={loc.key} value={loc.key}>
+                            {loc.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  {coverage ? (
+                    <p
+                      className={`co-coverage${coverage.allSupported ? " is-ok" : " is-warn"}`}
+                      role="status"
+                    >
+                      {coverage.allSupported
+                        ? `All shops in this order ship to ${coverage.name}.`
+                        : `Not all shops ship to ${coverage.name}. These shops do not deliver there: ${coverage.unsupported.join(", ")}.`}
+                    </p>
+                  ) : (
+                    <p className="co-delivery-hint">
+                      Select a delivery state to see whether every shop in this order ships there.
+                    </p>
+                  )}
+              </section>
+
+              <section className="co-items" aria-labelledby="co-items-title">
+                <div className="co-panel__head">
+                  <h2 id="co-items-title">Item details ({totals.units})</h2>
+                  <Link href="/cart">View all ›</Link>
                 </div>
-              );
-            })}
-            <div className="co-totals">
-              <div className="co-totals__row">
-                <span>Shipping</span>
-                <span>
-                  {!selectedDelivery
-                    ? deliveryLocations.length
-                      ? "Select state"
-                      : "—"
-                    : shipping === 0
-                      ? "Free"
-                      : fmt(shipping)}
-                </span>
-              </div>
-              <div className="co-totals__row co-totals__row--total">
-                <span>Total</span>
-                <span>{fmt(totalNaira)}</span>
-              </div>
+                {cartError ? (
+                  <p className="co-status" role="alert">
+                    {cartError}
+                  </p>
+                ) : null}
+                {!cartError && items.length === 0 ? (
+                  <p className="co-status">Your cart is empty.</p>
+                ) : null}
+                <div className="co-items__rail">
+                  {items.map((item) => {
+                    const unit = Number(item.price) || 0;
+                    const compare = Number(item.compareAtPrice) || 0;
+                    const thumb =
+                      item.thumbnail ||
+                      (Array.isArray(item.images) && item.images[0] ? item.images[0] : "");
+                    const href = item.productId ? `/${item.productId}` : "/cart";
+                    return (
+                      <Link key={String(item.id)} href={href} className="co-item">
+                        <div className="co-item__thumb">
+                          {thumb && (item.thumbnailIsVideo || isVideoUrl(thumb)) ? (
+                            <video src={thumb} muted loop playsInline autoPlay preload="metadata" />
+                          ) : thumb ? (
+                            <img src={thumb} alt="" />
+                          ) : null}
+                        </div>
+                        <p className="co-item__was">
+                          {compare > unit ? <s>{fmt(compare)}</s> : null}
+                        </p>
+                        <p className="co-item__now">{fmt(unit)}</p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
-            <button
-              onClick={handlePayClick}
-              type="button"
-              className="co-cta"
-              disabled={items.length === 0 || totalNaira <= 0}
-            >
-              Continue to payment
-            </button>
-          </aside>
-        </div>
+
+            <aside className="co-summary" aria-label="Order summary">
+              <h2>Order summary</h2>
+              <dl>
+                <div>
+                  <dt>Item(s) total:</dt>
+                  <dd>{fmt(totals.itemsTotal)}</dd>
+                </div>
+                {totals.discount > 0 ? (
+                  <div>
+                    <dt>Item(s) discount:</dt>
+                    <dd className="is-off">-{fmt(totals.discount)}</dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt>Subtotal:</dt>
+                  <dd>{fmt(totals.payable)}</dd>
+                </div>
+                <div>
+                  <dt>Shipping:</dt>
+                  <dd className={selectedDelivery && shipping === 0 ? "is-free" : ""}>
+                    {shippingLabel}
+                  </dd>
+                </div>
+              </dl>
+              <div className="co-summary__total">
+                <span>Order total:</span>
+                <strong>{fmt(totalNaira)}</strong>
+              </div>
+              <p className="co-summary__legal">
+                By submitting your order, you agree to our Terms of Use and acknowledge that you have read our Privacy Policy.
+              </p>
+              <button
+                onClick={handlePayClick}
+                type="button"
+                className="co-cta"
+                disabled={items.length === 0 || totalNaira <= 0 || !selectedDelivery}
+              >
+                Submit order ({totals.units})
+              </button>
+              <p className="co-summary__lock">
+                <IoLockClosed size={14} />
+                You will not be charged until you review this order.
+              </p>
+            </aside>
+          </div>
+        )}
       </div>
     </div>
   );

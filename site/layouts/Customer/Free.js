@@ -40,12 +40,7 @@ import logo_img from "../../images/Deedyte.png";
 import Solution from "../../components/floaters.js/Solution";
 import Resources from "../../components/floaters.js/Resources";
 import MenuComp from "../../components/floaters.js/Menu";
-import {
-  APP_STORE_URL,
-  LEGAL_AND_DOC_LINKS,
-  PLAY_STORE_URL,
-} from "../../lib/siteNavigation";
-import { formatCategoryLabel } from "../../lib/categoryLabel";
+import SiteFooter from "../../components/SiteFooter";
 
 // ============================================================================
 // CONSTANTS
@@ -115,7 +110,6 @@ function CustomerFreeLayout({ children }) {
   const [headlineIndex, setHeadlineIndex] = useState(0);
   const [screenWidth, setScreenWidth] = useState(0);
   const [headerScrolled, setHeaderScrolled] = useState(false);
-  const [shopCategories, setShopCategories] = useState([]);
 
   const layoutRef = useRef(null);
   const headerRef = useRef(null);
@@ -123,23 +117,6 @@ function CustomerFreeLayout({ children }) {
   // ============================================================================
   // EFFECTS
   // ============================================================================
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/storefront/categories")
-      .then((response) => response.json())
-      .then((payload) => {
-        if (active && Array.isArray(payload?.categories)) {
-          setShopCategories(payload.categories);
-        }
-      })
-      .catch(() => {
-        if (active) setShopCategories([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   // Update logged in state based on entrepreneur ID
   useEffect(() => {
@@ -396,136 +373,7 @@ function CustomerFreeLayout({ children }) {
         {children}
       </main>
 
-      {/* Footer */}
-      <footer className="site-footer">
-        <section className="footer-banner" aria-hidden="true" />
-
-        <section className="footer-main">
-          {/* Logo and Contact */}
-          <div className="footer-brand">
-            <div className="footer-logo-row">
-              <img
-                className="footer-logo"
-                src={logo_img.src}
-                alt="Deedyte logo"
-                width={48}
-                height={48}
-                style={{ width: 48, height: 48, objectFit: "contain" }}
-              />
-            </div>
-            <span className="footer-contact-spacer" aria-hidden="true" />
-            <div>
-              <h6 className="footer-contact">admin@deedyte.com</h6>
-            </div>
-          </div>
-
-          <div className="footer-column">
-            <h6 className="footer-heading">Shop categories</h6>
-            <ul className="footer-links">
-              {shopCategories.map((category) => (
-                <li className="footer-link" key={category.path}>
-                  <a href={category.path} style={{ color: "#fff" }}>
-                    {formatCategoryLabel(category.title)}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="footer-column">
-            <h6 className="footer-heading">Get the app</h6>
-            <ul className="footer-links">
-              <li className="footer-link">
-                <a
-                  href={APP_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "#fff" }}
-                >
-                  App Store
-                </a>
-              </li>
-              <li className="footer-link">
-                <a
-                  href={PLAY_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "#fff" }}
-                >
-                  Google Play
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div className="footer-column">
-            <h6 className="footer-heading">Legal & docs</h6>
-            <ul className="footer-links">
-              {LEGAL_AND_DOC_LINKS.map((link) => (
-                <li
-                  className="footer-link"
-                  key={link.path}
-                  onClick={() => (window.location.href = link.path)}
-                >
-                  {link.title}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <hr className="footer-divider" />
-
-        {/* Copyright & Social Links */}
-        <section className="footer-bottom copywright">
-          <div className="footer-copyright">
-            <small>&#169; Copyright {new Date().getFullYear()}</small>
-          </div>
-
-          <div className="footer-social">
-            <ul className="footer-social-list">
-              <li
-                className="footer-social-item"
-                onClick={() =>
-                  window.open(
-                    "https://www.facebook.com/profile.php?id=61566898641430"
-                  )
-                }
-              >
-                <i className="fa-brands fa-facebook fa-lg footer-social-icon" />
-              </li>
-              <li
-                className="footer-social-item"
-                onClick={() =>
-                  window.open(
-                    "https://x.com/Deedyte_shop?t=NgevY7O7ygFe_AW0C-OgSg&s=09"
-                  )
-                }
-              >
-                <i className="fa-brands fa-twitter fa-lg footer-social-icon" />
-              </li>
-              <li
-                className="footer-social-item"
-                onClick={() =>
-                  window.open(
-                    "https://whatsapp.com/channel/0029VacobY6LY6d7M19cx90O"
-                  )
-                }
-              >
-                <i className="fa-brands fa-whatsapp fa-lg footer-social-icon" />
-              </li>
-              <li
-                className="footer-social-item"
-                onClick={() =>
-                  window.open("https://youtube.com/@deedyte?si=Euobslo-XoWD0Kqc")
-                }
-              >
-                <i className="fa-brands fa-youtube fa-lg footer-social-icon" />
-              </li>
-            </ul>
-          </div>
-        </section>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

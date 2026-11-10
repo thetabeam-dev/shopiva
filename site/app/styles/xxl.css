@@ -7,6 +7,14 @@
     flex-shrink: 0;
 }
 
+.buyer-header img,
+.buyer-header__logo {
+    height: 40px;
+    width: 40px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
 .deedyte-ups{
     width: 100%;
     background-color: #000;
@@ -135,9 +143,12 @@
         justify-content: space-between;
         align-items: center;
     }
-    .buyer-header img{
+    .buyer-header img,
+    .buyer-header__logo {
         height: 40px;
         width: 40px;
+        object-fit: contain;
+        flex-shrink: 0;
     }
 
     .buyer-search {
@@ -314,11 +325,18 @@
         width: 100%;
         margin: 0;
         border-radius: 10px;
-        cursor: pointer;
         display: flex;
         flex-direction: column;
         color: inherit;
         text-decoration: none;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .deedyte-home .product-card__media{
+        color: inherit;
+        text-decoration: none;
+        display: block;
     }
 
     .deedyte-home .card-thumbnail{
@@ -360,6 +378,7 @@
         color: #333;
         font-weight: 400;
         min-height: 34px;
+        padding: 8px 10px 0;
     }
 
     .deedyte-home .card-price-row{
@@ -401,6 +420,40 @@
         cursor: pointer;
         color: #111;
         flex-shrink: 0;
+        position: relative;
+        z-index: 2;
+        pointer-events: auto;
+    }
+
+    .deedyte-home .card-cart.is-added{
+        background: #00926e;
+        border-color: #00926e;
+        color: #fff;
+    }
+
+    .buyer-cart-link{
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .buyer-cart-count{
+        position: absolute;
+        top: -8px;
+        right: -10px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: #00926e;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
     }
 
     .deedyte-home .card-badge{

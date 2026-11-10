@@ -29,7 +29,7 @@ const DEFAULT_STYLES = {
     alignItems: "center",
     justifyContent: "center",
     zIndex: "100000",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
   content: {
     color: "#fff",
@@ -38,6 +38,12 @@ const DEFAULT_STYLES = {
     borderRadius: "10px",
   },
 };
+
+const PROCESS_LOADER_HTML = `
+  <div class="site-process-loader" role="status" aria-label="Loading">
+    <span class="site-process-loader__spinner"></span>
+  </div>
+`;
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -135,7 +141,7 @@ export function entrepreneur_overlay_setup(status, content = "Loading...", optio
     }
 
     // Create and show overlay
-    const overlay = createOverlayElement(className, id, content, styles);
+    const overlay = createOverlayElement(className, id, PROCESS_LOADER_HTML, styles);
     document.body.appendChild(overlay);
     
     // Prevent body scroll when overlay is open
@@ -191,7 +197,7 @@ export function buyer_overlay_setup(status, content = "Loading...", options = {}
     const overlay = createOverlayElement(
       className, 
       id, 
-      content, 
+      PROCESS_LOADER_HTML, 
       { ...styles, content: buyerContentStyles }
     );
     document.body.appendChild(overlay);
@@ -222,31 +228,12 @@ export function buyer_overlay_setup(status, content = "Loading...", options = {}
  * @param {string} [type="entrepreneur"] - Overlay type ('entrepreneur' | 'buyer')
  * @returns {boolean} True if overlay was shown
  */
-export function showLoadingOverlay(message = "Please wait...", type = "entrepreneur") {
-  const spinnerHTML = `
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-      <div style="
-        width: 40px; 
-        height: 40px; 
-        border: 3px solid rgba(255,255,255,0.3); 
-        border-top-color: #fff; 
-        border-radius: 50%; 
-        animation: spin 1s linear infinite;
-      "></div>
-      <p style="margin: 0; font-size: 16px;">${message}</p>
-    </div>
-    <style>
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
-  `;
-
+export function showLoadingOverlay(_message = "Please wait...", type = "entrepreneur") {
   if (type === "buyer") {
-    return buyer_overlay_setup(true, spinnerHTML);
+    return buyer_overlay_setup(true);
   }
   
-  return entrepreneur_overlay_setup(true, spinnerHTML);
+  return entrepreneur_overlay_setup(true);
 }
 
 /**

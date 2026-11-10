@@ -17,6 +17,7 @@ import logo_img from "../../../images/Deedyte.png";
 import { entrepreneur_overlay_setup } from "../../../reusables/overlay";
 import { setNewCookie } from "../../actions/auth-cookies";
 import { resolvePostLoginNavigation } from "../../../reusables/redirectAfterVendorLogin";
+import { saveCustomerAccountHint } from "../../../reusables/customerAccountHint";
 import {
   set_entrepreneur_has_shop,
   set_entrepreneur_shop_details,
@@ -32,12 +33,19 @@ function authQuery(role) {
   return `?role=${r}`;
 }
 
+function safeNextPath(raw) {
+  const next = String(raw || "").trim();
+  if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/auth")) return "";
+  return next;
+}
+
 export default function AuthLoginPage() {
   const router = useRouter();
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const roleParam = searchParams.get("role");
   const role = roleParam === "customer" ? ROLES.customer : ROLES.entrepreneur;
+  const nextPath = safeNextPath(searchParams.get("next"));
   const cookieRole = role === ROLES.entrepreneur ? 1 : 0;
 
   const session = useSession();
@@ -50,7 +58,7 @@ export default function AuthLoginPage() {
     } else {
       dispatch(reset_entrepreneur_shop());
     }
-    router.replace(nav.path);
+    router.replace(nextPath || nav.path);
   }
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
@@ -78,6 +86,12 @@ export default function AuthLoginPage() {
         const response = await result.json();
         if (response.bool) {
           await setNewCookie(response.cookie, cookieRole);
+          if (role === ROLES.customer) {
+            saveCustomerAccountHint({
+              email: session.data?.user?.email || email,
+              name: session.data?.user?.name || "",
+            });
+          }
           await applyPostLoginNavigation(role);
         } else {
           oauthLoginInProgress.current = false;
@@ -155,6 +169,9 @@ export default function AuthLoginPage() {
           const response = await result.json();
           if (response.bool) {
             await setNewCookie(response.cookie, cookieRole);
+            if (role === ROLES.customer) {
+              saveCustomerAccountHint({ email, name: "" });
+            }
             await applyPostLoginNavigation(role);
           } else {
             handleLoginError(response.data);

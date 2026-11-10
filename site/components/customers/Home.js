@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { IoCartOutline, IoStar, IoStarHalf, IoStarOutline } from "react-icons/io5";
-
-function formatNgn(n) {
-    return `₦${Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
-}
+import { IoStar, IoStarHalf, IoStarOutline } from "react-icons/io5";
+import ProductCard from "./ProductCard";
+import { buyerAuthHeaders } from "../../reusables/shopBackendAuth";
+import { CART_UPDATED_EVENT, notifyCartUpdated } from "../../reusables/cartEvents";
 
 function formatSold(n) {
     const sold = Number(n) || 0;
@@ -41,6 +39,7 @@ export default function CustomerHome() {
     const [sort, setSort] = useState("sold");
     const [categoryKey, setCategoryKey] = useState("");
     const [cartBusyId, setCartBusyId] = useState("");
+    const [addedIds, setAddedIds] = useState(() => new Set());
 
     useEffect(() => {
         let active = true;
@@ -56,6 +55,31 @@ export default function CustomerHome() {
             });
         return () => {
             active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        async function loadCarted() {
+            try {
+                const response = await fetch("/api/cart", {
+                    method: "GET",
+                    credentials: "include",
+                    headers: buyerAuthHeaders(),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!active || !response.ok) return;
+                const items = Array.isArray(payload.items) ? payload.items : [];
+                setAddedIds(new Set(items.map((row) => String(row.productId))));
+            } catch {
+                if (active) setAddedIds(new Set());
+            }
+        }
+        loadCarted();
+        window.addEventListener(CART_UPDATED_EVENT, loadCarted);
+        return () => {
+            active = false;
+            window.removeEventListener(CART_UPDATED_EVENT, loadCarted);
         };
     }, []);
 
@@ -102,11 +126,16 @@ export default function CustomerHome() {
             const response = await fetch("/api/cart", {
                 method: "POST",
                 credentials: "include",
-                headers: { "Content-Type": "application/json" },
+                headers: buyerAuthHeaders(),
                 body: JSON.stringify({ inventoryId: product.inventoryId, quantity: 1 }),
             });
             if (response.status === 401) {
-                window.location.href = "/login";
+                window.location.href = "/cart";
+                return;
+            }
+            if (response.ok) {
+                setAddedIds((prev) => new Set(prev).add(String(product.id)));
+                notifyCartUpdated();
             }
         } finally {
             setCartBusyId("");
@@ -174,50 +203,24 @@ export default function CustomerHome() {
                 {visible.map((product) => {
                     const soldLabel = formatSold(product.sold);
                     return (
-                        <Link key={product.id} href={product.path} className="product-card shadow-sm">
-                            <div className="card-thumbnail">
-                                {product.thumbnailIsVideo && product.thumbnail ? (
-                                    <video
-                                        src={product.thumbnail}
-                                        muted
-                                        loop
-                                        playsInline
-                                        autoPlay
-                                        preload="metadata"
-                                    />
-                                ) : product.thumbnail ? (
-                                    <img src={product.thumbnail} alt={product.name} />
-                                ) : null}
-                            </div>
-                            <div className="card-detail">
-                                <div className="card-title">{product.name}</div>
-                                <div className="card-price-row">
-                                    <b className="card-price">{formatNgn(product.price)}</b>
-                                    {product.compareAtPrice ? (
-                                        <span className="card-compare">{formatNgn(product.compareAtPrice)}</span>
-                                    ) : null}
-                                    {soldLabel ? <span className="card-sold">{soldLabel}</span> : null}
-                                    <button
-                                        type="button"
-                                        className="card-cart"
-                                        aria-label="Add to cart"
-                                        onClick={(event) => addToCart(event, product)}
-                                        disabled={cartBusyId === String(product.id)}
-                                    >
-                                        <IoCartOutline size={16} />
-                                    </button>
-                                </div>
-                                {product.featured ? (
-                                    <p className="card-badge">Best-Selling Item{product.category ? ` in ${product.category}` : ""}</p>
-                                ) : null}
-                                <StarRow rating={product.rating} count={product.reviewCount} />
-                                {product.brand ? (
-                                    <p className="card-brand">
-                                        <span>Star seller</span> Brand: {product.brand}
-                                    </p>
-                                ) : null}
-                            </div>
-                        </Link>
+                        <ProductCard
+                            key={product.id}
+                            product={product}
+                            onAddToCart={addToCart}
+                            cartBusy={cartBusyId}
+                            added={addedIds.has(String(product.id))}
+                            extra={soldLabel ? <span className="card-sold">{soldLabel}</span> : null}
+                        >
+                            {product.featured ? (
+                                <p className="card-badge">Best-Selling Item{product.category ? ` in ${product.category}` : ""}</p>
+                            ) : null}
+                            <StarRow rating={product.rating} count={product.reviewCount} />
+                            {product.brand ? (
+                                <p className="card-brand">
+                                    <span>Star seller</span> Brand: {product.brand}
+                                </p>
+                            ) : null}
+                        </ProductCard>
                     );
                 })}
             </div>

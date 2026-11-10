@@ -332,7 +332,13 @@ a {
 .customer-layout.customer-restricted-layout {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.customer-layout.customer-restricted-layout > .site-footer {
+  position: relative;
+  z-index: 1;
 }
 
 .customer-restricted-layout__bg-video {
@@ -475,6 +481,27 @@ a {
 
 #entrepreneur-overlay {
   display: flex;
+}
+
+.site-process-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-process-loader__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: site-process-spin 0.8s linear infinite;
+}
+
+@keyframes site-process-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Payment Form Modal */
