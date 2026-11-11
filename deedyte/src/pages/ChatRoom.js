@@ -178,6 +178,36 @@ function HeaderActionCard({ title, subtitle, onPress, alertLabel = '', disabled 
   );
 }
 
+function VariantDetails({ source }) {
+  const details = Array.isArray(source?.variantDetails) ? source.variantDetails : [];
+  const label = String(source?.variantLabel ?? '').trim();
+  if (!details.length && !label) return null;
+  const price = Number(source?.itemAmount ?? source?.amount) || 0;
+  return (
+    <View style={styles.variantBox}>
+      <Text style={styles.variantBoxTitle}>
+        {`Selected option${source?.variantName ? ` · ${source.variantName}` : ''}`}
+      </Text>
+      {details.length ? (
+        details.map((d) => (
+          <Text key={`${d?.label}-${d?.value}`} style={styles.variantBoxLine}>
+            <Text style={styles.variantBoxLabel}>{`${String(d?.label ?? '')}: `}</Text>
+            {String(d?.value ?? '')}
+          </Text>
+        ))
+      ) : (
+        <Text style={styles.variantBoxLine}>{label}</Text>
+      )}
+      {price > 0 ? (
+        <Text style={styles.variantBoxLine}>
+          <Text style={styles.variantBoxLabel}>Price: </Text>
+          {formatInvoiceMoney(price)}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInvoice, canPay, outdated = false, cancelled = false, paid = false, viewerIsVendor = false, pendingRequest = false }) {
   const out = item.outgoing;
   const request = item.invoiceRequest;
@@ -201,6 +231,7 @@ function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInv
                 </Text>
               </View>
             </View>
+            <VariantDetails source={request} />
             {destination ? <Text style={styles.invoiceLine}>{`Ship to: ${destination}`}</Text> : null}
             <Text style={[styles.bubbleMeta, styles.waTplTime]}>{item.timeLabel}</Text>
           </View>
@@ -304,6 +335,7 @@ function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInv
               <Text style={styles.waTplLead}>{formatInvoiceMoney(total)}</Text>
               {` is your checkout total. ${followOn}`}
             </Text>
+            <VariantDetails source={invoice} />
             <Text style={[styles.bubbleMeta, styles.waTplTime]}>{item.timeLabel}</Text>
           </View>
           {paid ? (
@@ -781,10 +813,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     return '';
   }, [messages]);
   const invoiceAlreadySent = !pendingRequestId;
-  const requestedQty = useMemo(() => {
-    const row = messages.find((m) => m.id === pendingRequestId);
-    return Math.max(1, Number(row?.invoiceRequest?.qty) || 1);
-  }, [messages, pendingRequestId]);
+  const pendingRequest = useMemo(
+    () => messages.find((m) => m.id === pendingRequestId)?.invoiceRequest ?? null,
+    [messages, pendingRequestId],
+  );
+  const requestedQty = Math.max(1, Number(pendingRequest?.qty) || 1);
   const openInvoicePending = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const row = messages[i];
@@ -927,7 +960,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   }, [roomId, pendingShopId, appRolePayload, navigation, chat, headerTitle, storageScope]);
 
   const [requestSending, setRequestSending] = useState(false);
-  const postInvoiceRequest = useCallback(async (shippingAddress, qty) => {
+  const postInvoiceRequest = useCallback(async (shippingAddress, qty, variant) => {
     const activeRoomId = await ensureRoomId();
     if (!activeRoomId) return false;
     const out = await emitChatSocketAck('create_message', {
@@ -937,7 +970,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         kind: 'invoice_request',
         qty: Math.max(1, Number(qty) || 1),
         shippingAddress: shippingAddress || undefined,
-        itemAmount: itemAmount || undefined,
+        inventoryId: variant?.inventoryId || undefined,
+        variantLabel: variant?.label || undefined,
+        variantName: variant?.name || undefined,
+        variantDetails: variant?.details?.length ? variant.details : undefined,
+        itemAmount: variant?.price || itemAmount || undefined,
         itemTitle: itemTitle || undefined,
         itemImage: itemImage || undefined,
         productId: productId || undefined,
@@ -971,11 +1008,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     setQtyOpen(true);
   }, [requestSending, latestBuyerShipping]);
 
-  const onSubmitQty = useCallback(async (qty) => {
+  const onSubmitQty = useCallback(async (qty, variant) => {
     if (requestSending) return;
     setRequestSending(true);
     try {
-      const sent = await postInvoiceRequest(requestShippingRef.current || latestBuyerShipping, qty);
+      const sent = await postInvoiceRequest(requestShippingRef.current || latestBuyerShipping, qty, variant);
       if (sent) setQtyOpen(false);
     } finally {
       setRequestSending(false);
@@ -1045,6 +1082,10 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
           kind: 'invoice',
           amount: payload.amount,
           qty: requestedQty,
+          inventoryId: pendingRequest?.inventoryId || undefined,
+          variantLabel: pendingRequest?.variantLabel || undefined,
+          variantName: pendingRequest?.variantName || undefined,
+          variantDetails: pendingRequest?.variantDetails || undefined,
           shipping: payload.shipping,
           deliveryTime: payload.deliveryTime,
           deliveryTimeKey: payload.deliveryTimeKey,
@@ -1073,7 +1114,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     } finally {
       setInvoiceSending(false);
     }
-  }, [invoiceSending, roomId, shopId, latestBuyerShipping, mapMessage, productId, itemTitle, itemImage, invoiceAlreadySent, requestedQty]);
+  }, [invoiceSending, roomId, shopId, latestBuyerShipping, mapMessage, productId, itemTitle, itemImage, invoiceAlreadySent, requestedQty, pendingRequest]);
 
   const openInvoiceCheckout = useCallback((invoice) => {
     if (appRolePayload !== 'customer' || !invoice) return;
@@ -1108,6 +1149,8 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
           qty: Math.max(1, Number(invoice.qty) || 1),
           shop_id: sid || undefined,
           productId: Number(invoice.productId || productId) || undefined,
+          inventoryId: Number(invoice.inventoryId) || undefined,
+          variantLabel: String(invoice.variantLabel || '').trim(),
         },
       ],
     };
@@ -1629,6 +1672,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         itemTitle={itemTitle}
         itemImage={itemImage}
         itemAmount={itemAmount}
+        productId={productId}
         onCancel={() => setQtyOpen(false)}
         onSubmit={onSubmitQty}
       />
@@ -1636,7 +1680,8 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         visible={invoiceOpen}
         sending={invoiceSending}
         destination={buyerDestination}
-        itemAmount={itemAmount}
+        itemAmount={Number(pendingRequest?.itemAmount) || itemAmount}
+        lockedPrice={Number(pendingRequest?.itemAmount) > 0}
         itemTitle={itemTitle}
         itemImage={itemImage}
         productId={productId}
@@ -1649,6 +1694,17 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
 }
 
 const styles = StyleSheet.create({
+  variantBox: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#D7E8E2',
+    backgroundColor: '#F3F8F6',
+  },
+  variantBoxTitle: { marginBottom: 4, fontSize: 12, fontWeight: '800', color: BRAND, letterSpacing: 0.3 },
+  variantBoxLine: { fontSize: 14, lineHeight: 20, color: '#111111' },
+  variantBoxLabel: { fontWeight: '700' },
   flex: {
     flex: 1,
     backgroundColor: BG,

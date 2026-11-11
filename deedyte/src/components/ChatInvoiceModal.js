@@ -58,6 +58,7 @@ export default function ChatInvoiceModal({
   itemImage = '',
   productId = 0,
   quantity = 1,
+  lockedPrice = false,
   onCancel,
   onSubmit,
 }) {
@@ -94,7 +95,7 @@ export default function ChatInvoiceModal({
       .then((data) => {
         const detail = normalizeStorefrontProductDetail(data);
         if (!detail || cancelled) return;
-        const price = Number(detail.price) || fallback.price;
+        const price = lockedPrice && fallback.price > 0 ? fallback.price : Number(detail.price) || fallback.price;
         const title = String(detail.name ?? fallback.title).trim() || fallback.title;
         const image = String(getProductImageUri(detail) ?? fallback.image).trim();
         const next = { title, image, price, productId: pid };
@@ -105,7 +106,7 @@ export default function ChatInvoiceModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, itemAmount, itemTitle, itemImage, productId]);
+  }, [visible, itemAmount, itemTitle, itemImage, productId, lockedPrice]);
 
   const submit = () => {
     if (sending) return;
