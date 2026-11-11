@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,7 +13,17 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProductCardMedia } from './ProductCardMedia';
+import ProductVariantCardPicker from './ProductVariantCardPicker';
 import { formatNaira } from '../utils/formatNaira';
+import { getStorefrontProduct } from '../api/storefront';
+import { parseBulkTiers, unitPriceForBulk } from '../utils/bulkPricing';
+import { normalizeStorefrontProductDetail } from '../utils/storefrontProductNormalize';
+import {
+  filterVariantDisplayAttrKeys,
+  formatAttributeLabel,
+  getVariantRowPrice,
+  variantAttributeKeys,
+} from '../utils/storefrontProductDetail';
 
 const BRAND = '#00926E';
 const BLACK = '#111111';
@@ -28,8 +38,9 @@ const MAX_QTY = 9999;
  *   itemTitle?: string;
  *   itemImage?: string;
  *   itemAmount?: number;
+ *   productId?: number;
  *   onCancel: () => void;
- *   onSubmit: (qty: number) => void | Promise<void>;
+ *   onSubmit: (qty: number, variant: { inventoryId?: number; label: string; price?: number } | null) => void | Promise<void>;
  * }} props
  */
 export default function ChatQuantityModal({
@@ -38,19 +49,108 @@ export default function ChatQuantityModal({
   itemTitle = '',
   itemImage = '',
   itemAmount = 0,
+  productId = 0,
   onCancel,
   onSubmit,
 }) {
   const insets = useSafeAreaInsets();
   const [qtyText, setQtyText] = useState('1');
 
+  const [variants, setVariants] = useState(/** @type {Record<string, unknown>[]} */ ([]));
+  const [productPrice, setProductPrice] = useState(0);
+  const [bulkTiers, setBulkTiers] = useState(/** @type {ReturnType<typeof parseBulkTiers>} */ ([]));
+  const [variantsLoading, setVariantsLoading] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState(/** @type {Record<string, unknown> | null} */ (null));
+
   useEffect(() => {
     if (visible) setQtyText('1');
   }, [visible]);
 
+  useEffect(() => {
+    if (!visible) return undefined;
+    setSelectedVariant(null);
+    setVariants([]);
+    setProductPrice(0);
+    setBulkTiers([]);
+    const pid = Number(productId) || 0;
+    if (!(pid > 0)) return undefined;
+    let cancelled = false;
+    setVariantsLoading(true);
+    getStorefrontProduct(pid)
+      .then((data) => {
+        if (cancelled) return;
+        const d = normalizeStorefrontProductDetail(data);
+        setProductPrice(Number(d?.price) || 0);
+        setBulkTiers(parseBulkTiers(d?.bulkDiscount));
+        const raw = d?.hasVariants && Array.isArray(d.variants) ? d.variants.filter((v) => v && typeof v === 'object') : [];
+        const base = variantAttributeKeys(raw).length
+          ? raw
+          : raw.map((v, i) => ({ ...v, attributes: { option: `Option ${i + 1}` } }));
+        const rows = base.map((v, index) => {
+          const attrs = v.attributes && typeof v.attributes === 'object' ? v.attributes : {};
+          const attributes = {};
+          Object.keys(attrs).forEach((k) => {
+            attributes[k] = String(attrs[k] ?? '').trim();
+          });
+          return { ...v, attributes, optionKey: `${String(v.id ?? 'variant')}-${index}` };
+        });
+        setVariants(rows);
+        if (rows.length === 1) setSelectedVariant(rows[0]);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setVariantsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, productId]);
+
+  const attrKeys = useMemo(() => {
+    const keys = variantAttributeKeys(variants);
+    const filtered = filterVariantDisplayAttrKeys(keys);
+    return filtered.length ? filtered : keys;
+  }, [variants]);
+  const hasVariants = variants.length > 0;
+  const variantMissing = hasVariants && !selectedVariant;
+
   const qty = Math.min(MAX_QTY, Math.max(0, parseInt(qtyText, 10) || 0));
   const setQty = (next) => setQtyText(String(Math.min(MAX_QTY, Math.max(1, next))));
-  const price = Number(itemAmount) || 0;
+  const variantPrice = selectedVariant ? getVariantRowPrice(selectedVariant) : NaN;
+  const basePrice = Number.isFinite(variantPrice) && variantPrice > 0
+    ? variantPrice
+    : hasVariants
+      ? 0
+      : productPrice || Number(itemAmount) || 0;
+  const price = basePrice > 0 ? unitPriceForBulk(basePrice, bulkTiers, Math.max(1, qty)) : 0;
+  const canSubmit = qty > 0 && !sending && !variantsLoading && !variantMissing;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    let variant = null;
+    if (selectedVariant) {
+      const a = selectedVariant.attributes && typeof selectedVariant.attributes === 'object' ? selectedVariant.attributes : {};
+      const label = attrKeys
+        .map((k) => (a[k] ? `${formatAttributeLabel(k)}: ${a[k]}` : ''))
+        .filter(Boolean)
+        .join(' · ');
+      const inventoryId = Number(selectedVariant.id);
+      const index = variants.findIndex((v) => v.optionKey === selectedVariant.optionKey);
+      const details = attrKeys
+        .filter((k) => a[k])
+        .map((k) => ({ label: formatAttributeLabel(k), value: String(a[k]) }));
+      const sku = String(selectedVariant.sku ?? '').trim();
+      if (sku) details.push({ label: 'SKU', value: sku });
+      variant = {
+        name: index >= 0 && index < 26 ? `Variant ${String.fromCharCode(65 + index)}` : `Variant ${index + 1}`,
+        details,
+        inventoryId: Number.isFinite(inventoryId) && inventoryId > 0 ? inventoryId : undefined,
+        label,
+        price: price > 0 ? price : undefined,
+      };
+    }
+    onSubmit(qty, variant);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
@@ -67,6 +167,19 @@ export default function ChatQuantityModal({
                 <Text style={styles.productTitle} numberOfLines={2}>{itemTitle || 'Product'}</Text>
                 {price > 0 ? <Text style={styles.productPrice}>{formatNaira(price)}</Text> : null}
               </View>
+            </View>
+          ) : null}
+          {variantsLoading ? (
+            <ActivityIndicator style={styles.variantLoading} color={BRAND} />
+          ) : hasVariants ? (
+            <View style={styles.variantBlock}>
+              <Text style={styles.variantTitle}>{variants.length === 1 ? 'Features' : 'Select a variant'}</Text>
+              <ProductVariantCardPicker
+                attrKeys={attrKeys}
+                variants={variants}
+                selectedVariant={selectedVariant}
+                onSelect={setSelectedVariant}
+              />
             </View>
           ) : null}
           <View style={styles.stepper}>
@@ -103,9 +216,9 @@ export default function ChatQuantityModal({
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
             <Pressable
-              onPress={() => qty > 0 && !sending && onSubmit(qty)}
-              disabled={qty <= 0 || sending}
-              style={[styles.sendBtn, (qty <= 0 || sending) && styles.sendBtnDisabled]}
+              onPress={submit}
+              disabled={!canSubmit}
+              style={[styles.sendBtn, !canSubmit && styles.sendBtnDisabled]}
             >
               {sending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.sendText}>Request invoice</Text>}
             </Pressable>
@@ -150,6 +263,9 @@ const styles = StyleSheet.create({
   productCopy: { flex: 1, minWidth: 0 },
   productTitle: { fontSize: 15, fontWeight: '700', color: BLACK },
   productPrice: { marginTop: 4, fontSize: 14, fontWeight: '700', color: BRAND },
+  variantLoading: { marginTop: 16 },
+  variantBlock: { marginTop: 14 },
+  variantTitle: { marginBottom: 8, fontSize: 14, fontWeight: '700', color: BLACK },
   stepper: { marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   stepBtn: {
     width: 44,
