@@ -114,7 +114,7 @@ export function HomeStackScreen() {
       />
       <HomeStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <HomeStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />
-      <HomeStack.Screen name="Cart" component={CartScreen} options={cartOpt} />
+      {/* <HomeStack.Screen name="Cart" component={CartScreen} options={cartOpt} /> */}
       <HomeStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt} />
       <HomeStack.Screen name="Checkout-wallet-topup" component={CheckoutWalletTopUpScreen} options={{ ...cartCheckoutOpt, title: 'Top up to pay' }} />
       <HomeStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt} />

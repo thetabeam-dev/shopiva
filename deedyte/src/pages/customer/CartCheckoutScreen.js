@@ -15,13 +15,17 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { parseBulkTiers, unitPriceForBulk } from '../../utils/bulkPricing';
+import { postChatInvoicePaid } from '../../utils/chatInvoicePaid';
+import { CommonActions, StackActions, useFocusEffect, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaystack } from 'react-native-paystack-webview';
 import { useProfile } from '../../context/ProfileContext';
 import { fetchBuyerCart, fetchBuyerCartProductShopId, createUnpaidCheckoutOrder, completeCheckoutOrder, fetchEscrowFee } from '../../api/buyer';
 import { fetchWallet } from '../../api/user';
-import { getStorefrontShopDelivery } from '../../api/storefront';
+import { getStorefrontProduct, getStorefrontShopDelivery } from '../../api/storefront';
+import { normalizeStorefrontProductDetail } from '../../utils/storefrontProductNormalize';
+import { getProductImageUri } from '../../utils/productImageUtils';
 import { canUsePaystackCheckout } from '../../paystack/paystackNativeGate';
 import { formatNaira } from '../../utils/formatNaira';
 import WalletProcessingOverlay from '../../components/WalletProcessingOverlay';
@@ -153,7 +157,7 @@ function normalizeCheckoutLine(row, index = 0) {
 }
 
 /** @param {{ lines: Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string }>; styles: object }} p */
-function OrderLinesList({ lines, styles: S }) {
+function OrderLinesList({ lines, styles: S, onChangeQty }) {
   return (
     <>
       {lines.map((line, idx) => {
@@ -174,6 +178,36 @@ function OrderLinesList({ lines, styles: S }) {
               <Text style={S.orderMeta}>
                 {formatNaira(line.unitPrice)} × {line.qty}
               </Text>
+              {line.baseUnitPrice && line.unitPrice < line.baseUnitPrice ? (
+                <Text style={S.bulkAppliedNote}>
+                  Bulk discount applied (was {formatNaira(line.baseUnitPrice)} each)
+                </Text>
+              ) : null}
+              {onChangeQty ? (
+                <View style={S.qtyStepper}>
+                  <Pressable
+                    onPress={() => onChangeQty(line.key, line.qty - 1)}
+                    disabled={line.qty <= 1}
+                    hitSlop={8}
+                    style={[S.qtyBtn, line.qty <= 1 && S.qtyBtnDisabled]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Decrease quantity"
+                  >
+                    <Icon name="remove" size={16} color="#111" />
+                  </Pressable>
+                  <Text style={S.qtyValue}>{line.qty}</Text>
+                  <Pressable
+                    onPress={() => onChangeQty(line.key, line.qty + 1)}
+                    disabled={line.qty >= 99}
+                    hitSlop={8}
+                    style={[S.qtyBtn, line.qty >= 99 && S.qtyBtnDisabled]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Increase quantity"
+                  >
+                    <Icon name="add" size={16} color="#111" />
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
             <Text style={S.orderLineTotal}>{formatNaira(lineTotal)}</Text>
           </View>
@@ -191,15 +225,102 @@ export default function CartCheckoutScreen({ navigation }) {
   const { user } = useProfile();
   const route = useRoute();
   const { popup } = usePaystack();
+  const isChatInvoice = String(route.params?.checkoutSource ?? '') === 'chat_invoice';
+  const invoiceShippingFee = Number(route.params?.invoiceShipping);
+  const chatRoomIdParam = String(route.params?.chatRoomId ?? route.params?.returnChat?.chat?.roomId ?? '');
+  const invoiceMessageIdParam = route.params?.invoiceMessageId ? String(route.params.invoiceMessageId) : '';
+  const chatInvoicePaid = useMemo(
+    () => (isChatInvoice
+      ? { roomId: chatRoomIdParam, invoiceMessageId: invoiceMessageIdParam || undefined }
+      : null),
+    [isChatInvoice, chatRoomIdParam, invoiceMessageIdParam],
+  );
+  const invoiceShippingAddress = route.params?.invoiceShippingAddress && typeof route.params.invoiceShippingAddress === 'object'
+    ? route.params.invoiceShippingAddress
+    : null;
 
   const [cartLoading, setCartLoading] = useState(true);
   const [checkoutLines, setCheckoutLines] = useState(
     /** @type {Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string; shop_id?: number | null; cartItemId?: number; inventoryId?: number; productId?: number }>} */([]),
   );
 
+  /** productId -> bulk tiers; invoice price is the base, a tier only applies when it is cheaper per item. */
+  const [bulkTiersByProduct, setBulkTiersByProduct] = useState(
+    /** @type {Record<string, Array<{ minQuantity: number; totalPrice: number }>>} */ ({}),
+  );
+  const invoiceProductIds = useMemo(
+    () => (isChatInvoice
+      ? [...new Set(checkoutLines.map((line) => line.productId).filter((id) => Number(id) > 0))].join(',')
+      : ''),
+    [isChatInvoice, checkoutLines],
+  );
+  useEffect(() => {
+    if (!invoiceProductIds) return undefined;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        invoiceProductIds.split(',').map(async (id) => {
+          try {
+            const data = await getStorefrontProduct(Number(id));
+            const detail = normalizeStorefrontProductDetail(data) ?? data;
+            return [id, parseBulkTiers(detail?.bulkDiscount ?? data?.bulkDiscount ?? data?.product?.bulkDiscount)];
+          } catch {
+            return [id, []];
+          }
+        }),
+      );
+      if (!cancelled) setBulkTiersByProduct(Object.fromEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceProductIds]);
+
+  const priceLine = useCallback((line, qty) => {
+    const base = Number(line.baseUnitPrice ?? line.unitPrice) || 0;
+    const tiers = bulkTiersByProduct[String(line.productId ?? '')] ?? [];
+    const bulkUnit = unitPriceForBulk(base, tiers, qty);
+    return { ...line, qty, baseUnitPrice: base, unitPrice: Math.min(base, bulkUnit) };
+  }, [bulkTiersByProduct]);
+
+  useEffect(() => {
+    if (!isChatInvoice || !Object.keys(bulkTiersByProduct).length) return;
+    setCheckoutLines((prev) => prev.map((line) => priceLine(line, line.qty)));
+  }, [isChatInvoice, bulkTiersByProduct, priceLine]);
+
+  const onChangeLineQty = useCallback((key, nextQty) => {
+    const qty = Math.max(1, Math.min(99, Math.round(Number(nextQty) || 1)));
+    setCheckoutLines((prev) => prev.map((line) => (line.key === key ? priceLine(line, qty) : line)));
+  }, [priceLine]);
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  /** The vendor priced shipping for the invoice address; changes must go through the chat. */
+  const addressLocked = isChatInvoice && Boolean(invoiceShippingAddress);
+  const returnChat = route.params?.returnChat && typeof route.params.returnChat === 'object'
+    ? route.params.returnChat
+    : null;
+  const onEditAddressInChat = useCallback(() => {
+    const params = { openShippingEdit: Date.now() };
+    const state = navigation.getState();
+    const routes = state?.routes ?? [];
+    const chatIndex = returnChat?.routeKey ? routes.findIndex((r) => r.key === returnChat.routeKey) : -1;
+    if (chatIndex >= 0 && chatIndex < (state?.index ?? 0)) {
+      navigation.dispatch({ ...CommonActions.setParams(params), source: routes[chatIndex].key });
+      navigation.dispatch(StackActions.pop(state.index - chatIndex));
+      return;
+    }
+    if (returnChat?.tab && returnChat?.routeName) {
+      navigation.getParent()?.navigate(returnChat.tab, {
+        screen: returnChat.routeName,
+        params: { ...(returnChat.chat ? { chat: returnChat.chat } : {}), ...params },
+        merge: true,
+      });
+      return;
+    }
+    navigation.goBack();
+  }, [navigation, returnChat]);
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
@@ -235,14 +356,36 @@ export default function CartCheckoutScreen({ navigation }) {
 
       if (hasNavLines) {
         setCartLoading(true);
-        const normalized = rawNav
-          .map((row, i) => normalizeCheckoutLine(row, i))
-          .filter((x) => x != null);
-        if (!cancelled) {
-
-          setCheckoutLines(/** @type {typeof checkoutLines} */(normalized));
-          setCartLoading(false);
-        }
+        void (async () => {
+          const normalized = rawNav
+            .map((row, i) => normalizeCheckoutLine(row, i))
+            .filter((x) => x != null);
+          const hydrated = await Promise.all(
+            normalized.map(async (line) => {
+              if (!line.productId) return line;
+              if (line.image && line.title && line.title !== 'Chat invoice') return line;
+              try {
+                const data = await getStorefrontProduct(line.productId);
+                const detail = normalizeStorefrontProductDetail(data);
+                if (!detail) return line;
+                const title = line.title && line.title !== 'Chat invoice'
+                  ? line.title
+                  : String(detail.name ?? line.title).trim() || line.title;
+                return {
+                  ...line,
+                  title,
+                  image: line.image || getProductImageUri(detail) || '',
+                };
+              } catch {
+                return line;
+              }
+            }),
+          );
+          if (!cancelled) {
+            setCheckoutLines(/** @type {typeof checkoutLines} */(hydrated));
+            setCartLoading(false);
+          }
+        })();
         return () => {
           cancelled = true;
         };
@@ -317,6 +460,25 @@ export default function CartCheckoutScreen({ navigation }) {
     }, [user]),
   );
 
+  useEffect(() => {
+    if (!isChatInvoice || !invoiceShippingAddress) return;
+    const addr = invoiceShippingAddress;
+    const nextStreet = String(addr.street ?? '').trim();
+    const nextArea1 = String(addr.area1 ?? addr.junction ?? '').trim();
+    const nextArea2 = String(addr.area2 ?? '').trim();
+    const nextZip = String(addr.zip ?? '').trim();
+    const nextState = matchNgState(addr.state) || matchNgState(addr.label);
+    const nextCity = nextState
+      ? matchCity(nextState, addr.city) || matchCityLoose(nextState, [addr.city, addr.label])
+      : '';
+    if (nextStreet) setStreet(nextStreet);
+    if (nextArea1) setArea1(nextArea1);
+    if (nextArea2) setArea2(nextArea2);
+    if (nextZip) setZip(nextZip);
+    if (nextState) setCountry(nextState);
+    if (nextCity) setCity(nextCity);
+  }, [isChatInvoice, invoiceShippingAddress]);
+
   const subtotal = useMemo(
     () => checkoutLines.reduce((s, l) => s + l.unitPrice * l.qty, 0),
     [checkoutLines],
@@ -379,7 +541,12 @@ export default function CartCheckoutScreen({ navigation }) {
     }
   }, [checkoutLines, selectedDelivery]);
   const [escrowCharge, setEscrowCharge] = useState(null);
-  const chargedShipping = estimatedShippingFee != null ? estimatedShippingFee : shippingCost;
+  const chargedShipping =
+    isChatInvoice && Number.isFinite(invoiceShippingFee) && invoiceShippingFee >= 0
+      ? invoiceShippingFee
+      : estimatedShippingFee != null
+        ? estimatedShippingFee
+        : shippingCost;
   const total = Math.max(0, subtotal + chargedShipping + (escrowCharge || 0));
 
   useEffect(() => {
@@ -543,11 +710,13 @@ export default function CartCheckoutScreen({ navigation }) {
       .filter(Boolean)
       .join(', ');
     const uid = Number(user?.id);
-    const shippingMethod = selectedDelivery
-      ? `vendor_delivery:${selectedDelivery.name}`
-      : 'vendor_delivery';
+    const shippingMethod = isChatInvoice
+      ? ''
+      : selectedDelivery
+        ? `vendor_delivery:${selectedDelivery.name}`
+        : 'vendor_delivery';
     const feeByShop = new Map();
-    if (selectedDelivery?.perShop?.length) {
+    if (!isChatInvoice && selectedDelivery?.perShop?.length) {
       for (const shopFee of selectedDelivery.perShop) {
         const shopLines = checkoutLines.filter(
           (line) => parseShopId(line.shop_id) === shopFee.shopId,
@@ -575,7 +744,7 @@ export default function CartCheckoutScreen({ navigation }) {
       const shopId = String(parseShopId(line.shop_id) || line.shop_id || 'default-shop');
       if (!acc[shopId]) acc[shopId] = [];
       acc[shopId].push({
-        item_id: String(line.productId),
+        item_id: String(line.productId || (isChatInvoice ? 'chat-invoice' : '')),
         unit: line.qty,
         unit_price: line.unitPrice,
         total: line.unitPrice * line.qty,
@@ -595,6 +764,8 @@ export default function CartCheckoutScreen({ navigation }) {
       return {
         shop_id: shopId,
         shipping_fee: shopShipping,
+        shipping_fee_fixed: isChatInvoice,
+        chat_room_id: isChatInvoice && chatRoomIdParam ? chatRoomIdParam : undefined,
         shipping_method: shippingMethod,
         subtotal: orderSubtotal,
         items,
@@ -620,6 +791,7 @@ export default function CartCheckoutScreen({ navigation }) {
     };
   }, [
     street, area1, area2, city, zip, country, user?.id, selectedDelivery, checkoutLines, chargedShipping,
+    isChatInvoice, chatRoomIdParam,
   ]);
 
   const onPaystackCheckout = useCallback(() => {
@@ -641,7 +813,7 @@ export default function CartCheckoutScreen({ navigation }) {
       );
       return;
     }
-    if (checkoutLines.some((l) => !l.inventoryId)) {
+    if (!isChatInvoice && checkoutLines.some((l) => !l.inventoryId)) {
       setFormBanner('Each cart line needs a product variant (inventory). Refresh your cart and try again.');
       return;
     }
@@ -660,7 +832,7 @@ export default function CartCheckoutScreen({ navigation }) {
       setFormBanner('You must be signed in to pay.');
       return;
     }
-    if (deliveryLocations.length > 0 && !selectedDelivery) {
+    if (!isChatInvoice && deliveryLocations.length > 0 && !selectedDelivery) {
       setFormBanner('Please select a delivery location before paying.');
       return;
     }
@@ -681,7 +853,9 @@ export default function CartCheckoutScreen({ navigation }) {
           res && typeof res === 'object' && 'reference' in res
             ? String(/** @type {{ reference?: string }} */(res).reference)
             : reference;
-        console.log("reference", reference)
+        if (chatInvoicePaid) {
+          void postChatInvoicePaid({ ...chatInvoicePaid, reference: refStr, lines: checkoutLines, total });
+        }
         navigation.replace('Payment-success', {
           reference: refStr,
           subtotal,
@@ -716,6 +890,7 @@ export default function CartCheckoutScreen({ navigation }) {
       },
     });
   }, [
+    chatInvoicePaid,
     isPaying,
     hasBlockingErrors,
     subtotal,
@@ -737,6 +912,7 @@ export default function CartCheckoutScreen({ navigation }) {
     popup,
     navigation,
     buildCheckoutPayload,
+    isChatInvoice,
   ]);
 
   const onContinue = useCallback(() => {
@@ -758,17 +934,19 @@ export default function CartCheckoutScreen({ navigation }) {
       setFormBanner('Please complete all fields correctly before continuing.');
       return;
     }
-    if (deliveryLoading) {
+    if (!isChatInvoice && deliveryLoading) {
       Alert.alert('Checking delivery', 'Please wait while we confirm where this shop delivers.');
       return;
     }
-    const selectedState = String(country || '').trim();
-    const shipsToState = deliveryLocations.some(
-      (loc) => String(loc.name || '').trim().toLowerCase() === selectedState.toLowerCase(),
-    );
-    if (!shipsToState) {
-      setDeliveryBlockedOpen(true);
-      return;
+    if (!isChatInvoice) {
+      const selectedState = String(country || '').trim();
+      const shipsToState = deliveryLocations.some(
+        (loc) => String(loc.name || '').trim().toLowerCase() === selectedState.toLowerCase(),
+      );
+      if (!shipsToState) {
+        setDeliveryBlockedOpen(true);
+        return;
+      }
     }
     setOrderSummaryOpen(true);
   }, [
@@ -780,6 +958,7 @@ export default function CartCheckoutScreen({ navigation }) {
     deliveryLoading,
     country,
     deliveryLocations,
+    isChatInvoice,
   ]);
 
   const onConfirmDeliveryLocation = useCallback(() => {
@@ -824,6 +1003,9 @@ export default function CartCheckoutScreen({ navigation }) {
         shipping: chargedShipping,
         itemCount: totalUnits,
         checkout: buildCheckoutPayload(`wallet_${uid}_${Date.now()}`),
+        chatInvoicePaid: chatInvoicePaid
+          ? { ...chatInvoicePaid, lines: checkoutLines, total }
+          : undefined,
       });
       return;
     }
@@ -844,6 +1026,9 @@ export default function CartCheckoutScreen({ navigation }) {
             completeCheckoutOrder(checkout)
               .then((data) => {
                 setIsPaying(false);
+                if (chatInvoicePaid) {
+                  void postChatInvoicePaid({ ...chatInvoicePaid, reference: checkout.reference, lines: checkoutLines, total });
+                }
                 navigation.replace('Payment-success', {
                   reference: checkout.reference,
                   subtotal,
@@ -863,7 +1048,7 @@ export default function CartCheckoutScreen({ navigation }) {
       ],
     );
 
-  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, chargedShipping, totalUnits, buildCheckoutPayload]);
+  }, [navigation, total, walletBalance, walletCoversTotal, user?.id, subtotal, chargedShipping, totalUnits, buildCheckoutPayload, chatInvoicePaid, checkoutLines]);
 
   const inputStyle = (key) => [
     styles.input,
@@ -954,6 +1139,17 @@ export default function CartCheckoutScreen({ navigation }) {
                 <View style={styles.cardTitleRow}>
                   <Text style={styles.cardTitle}>Shipping address</Text>
                   {locationOverlay}
+                  {addressLocked ? (
+                    <Pressable
+                      onPress={onEditAddressInChat}
+                      style={styles.locationBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit shipping address in chat"
+                    >
+                      <Icon name="create-outline" size={14} color={PRIMARY} />
+                      <Text style={styles.locationBtnText}>Edit</Text>
+                    </Pressable>
+                  ) : (
                   <Pressable
                     onPress={onUseCurrentLocation}
                     disabled={isLocating}
@@ -964,6 +1160,7 @@ export default function CartCheckoutScreen({ navigation }) {
                     <Icon name="locate-outline" size={14} color={PRIMARY} />
                     <Text style={styles.locationBtnText}>{isLocating ? 'Locating…' : 'Use current location'}</Text>
                   </Pressable>
+                  )}
                 </View>
 
                 <Text style={styles.label}>Street address</Text>
@@ -972,7 +1169,8 @@ export default function CartCheckoutScreen({ navigation }) {
                   onChangeText={setStreet}
                   placeholder="123 Main Street"
                   placeholderTextColor="#AAA"
-                  style={inputStyle('street')}
+                  style={[inputStyle('street'), addressLocked && styles.inputLocked]}
+                  editable={!addressLocked}
                   accessibilityLabel="Street address"
                 />
                 {showErrors && errors.street ? <Text style={styles.errorText}>{errors.street}</Text> : null}
@@ -982,7 +1180,8 @@ export default function CartCheckoutScreen({ navigation }) {
                   onChangeText={setArea1}
                   placeholder="Estate, landmark, or nearest bus stop"
                   placeholderTextColor="#AAA"
-                  style={inputStyle('area1')}
+                  style={[inputStyle('area1'), addressLocked && styles.inputLocked]}
+                  editable={!addressLocked}
                   accessibilityLabel="Area 1"
                 />
                 {showErrors && errors.area1 ? <Text style={styles.errorText}>{errors.area1}</Text> : null}
@@ -993,14 +1192,16 @@ export default function CartCheckoutScreen({ navigation }) {
                   onChangeText={setArea2}
                   placeholder="Extra landmark or direction"
                   placeholderTextColor="#AAA"
-                  style={inputStyle('area2')}
+                  style={[inputStyle('area2'), addressLocked && styles.inputLocked]}
+                  editable={!addressLocked}
                   accessibilityLabel="Area 2"
                 />
 
                 <Text style={styles.label}>State</Text>
                 <Pressable
                   onPress={() => setStatePickerOpen(true)}
-                  style={[styles.countryBox, styles.statePicker, showErrors && errors.country ? styles.inputError : null]}
+                  disabled={addressLocked}
+                  style={[styles.countryBox, styles.statePicker, showErrors && errors.country ? styles.inputError : null, addressLocked && styles.inputLocked]}
                   accessibilityRole="button"
                   accessibilityLabel="Select state"
                 >
@@ -1019,7 +1220,8 @@ export default function CartCheckoutScreen({ navigation }) {
                     }
                     setCityPickerOpen(true);
                   }}
-                  style={[styles.countryBox, styles.statePicker, showErrors && errors.city ? styles.inputError : null]}
+                  disabled={addressLocked}
+                  style={[styles.countryBox, styles.statePicker, showErrors && errors.city ? styles.inputError : null, addressLocked && styles.inputLocked]}
                   accessibilityRole="button"
                   accessibilityLabel="Select city"
                 >
@@ -1036,7 +1238,8 @@ export default function CartCheckoutScreen({ navigation }) {
                   onChangeText={setZip}
                   placeholder="101241"
                   placeholderTextColor="#AAA"
-                  style={inputStyle('zip')}
+                  style={[inputStyle('zip'), addressLocked && styles.inputLocked]}
+                  editable={!addressLocked}
                   keyboardType="default"
                   accessibilityLabel="ZIP or postal code"
                 />
@@ -1151,7 +1354,11 @@ export default function CartCheckoutScreen({ navigation }) {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.orderModalCard}>
-                  <OrderLinesList lines={checkoutLines} styles={styles} />
+                  <OrderLinesList
+                    lines={checkoutLines}
+                    styles={styles}
+                    onChangeQty={isChatInvoice ? onChangeLineQty : undefined}
+                  />
                 </View>
                 <View style={styles.orderModalTotals}>
                   <View style={styles.orderModalTotalRow}>
@@ -1159,9 +1366,11 @@ export default function CartCheckoutScreen({ navigation }) {
                     <Text style={styles.orderModalTotalValue}>{formatNaira(subtotal)}</Text>
                   </View>
                   <View style={styles.orderModalTotalRow}>
-                    <Text style={styles.orderModalTotalLabel}>Estimated Shipping</Text>
+                    <Text style={styles.orderModalTotalLabel}>{isChatInvoice ? 'Shipping' : 'Estimated Shipping'}</Text>
                     <Text style={styles.orderModalTotalValue}>
-                      {estimatedShippingFee == null ? shippingLabel : formatNaira(estimatedShippingFee)}
+                      {isChatInvoice
+                        ? formatNaira(chargedShipping)
+                        : estimatedShippingFee == null ? shippingLabel : formatNaira(estimatedShippingFee)}
                     </Text>
                   </View>
                   <View style={styles.orderModalTotalRow}>
@@ -1344,6 +1553,7 @@ export default function CartCheckoutScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  inputLocked: { opacity: 0.6 },
   flex: { flex: 1 },
   quoteOverlay: {
     flex: 1,
@@ -1483,6 +1693,20 @@ const styles = StyleSheet.create({
   orderTitle: { fontSize: 15, fontWeight: '600', color: '#111' },
   orderVariant: { fontSize: 13, color: MUTED, marginTop: 2 },
   orderMeta: { fontSize: 13, color: MUTED, marginTop: 4 },
+  bulkAppliedNote: { marginTop: 2, fontSize: 12, fontWeight: '600', color: '#00926E' },
+  qtyStepper: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 10 },
+  qtyBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  qtyBtnDisabled: { opacity: 0.4 },
+  qtyValue: { minWidth: 20, textAlign: 'center', fontSize: 15, fontWeight: '700', color: '#111' },
   orderLineTotal: { fontSize: 15, fontWeight: '700', color: '#111' },
   formBanner: {
     backgroundColor: ERROR_BG,

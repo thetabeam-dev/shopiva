@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatNaira } from '../../utils/formatNaira';
 import { setLastOpenedChatRoomId } from '../../utils/lastOpenedChatRoom';
+import { chatPreviewText } from '../../utils/chatPreview';
 
 function normalizeAmount(value) {
   const n = Number(value);
@@ -34,7 +35,7 @@ function hueFromText(text) {
 function roomRecordToChatItem(room) {
   const roomId = String(room.id ?? '').trim();
   const orderId = String(room.order_id ?? '').trim();
-  const name = orderId ? `Order #${orderId}` : 'Chat';
+  const name = String(room.counterpart_name ?? room.counterpartName ?? '').trim() || 'Chat';
   return {
     id: roomId,
     roomId,
@@ -43,7 +44,7 @@ function roomRecordToChatItem(room) {
     avatarHue: hueFromText(roomId || name),
     unreadCount: 0,
     lastAtLabel: '',
-    lastMessage: String(room.last_message ?? '').trim() || 'No messages yet',
+    lastMessage: chatPreviewText(room.last_message) || 'No messages yet',
   };
 }
 
@@ -79,6 +80,22 @@ export default function PaymentSuccessScreen({ navigation, route }) {
 
   const paidLabel = useMemo(() => formatNaira(total), [total]);
   const parentTabNav = navigation.getParent();
+  const chatRoomRoute = useMemo(() => {
+    const routes = navigation.getState()?.routes ?? [];
+    for (let i = routes.length - 1; i >= 0; i -= 1) {
+      if (routes[i].name === 'chat-room' || routes[i].name === 'Inbox') return routes[i];
+    }
+    return null;
+  }, [navigation]);
+  const onBack = useCallback(() => {
+    if (chatRoomRoute) {
+      const routes = navigation.getState()?.routes ?? [];
+      const depth = routes.length - 1 - routes.findIndex((r) => r.key === chatRoomRoute.key);
+      if (depth > 0) navigation.pop(depth);
+      return;
+    }
+    navigation.goBack();
+  }, [chatRoomRoute, navigation]);
   const receiptText = useMemo(() => {
     const lines = [
       'DEEDYTE PAYMENT RECEIPT',
@@ -233,8 +250,8 @@ export default function PaymentSuccessScreen({ navigation, route }) {
             <Text style={styles.utilityBtnText}>Share receipt</Text>
           </Pressable>
         </View>
-        <Pressable style={styles.ghostBtn} onPress={() => navigation.goBack()} accessibilityRole="button">
-          <Text style={styles.ghostBtnText}>Back To Cart</Text>
+        <Pressable style={styles.ghostBtn} onPress={onBack} accessibilityRole="button">
+          <Text style={styles.ghostBtnText}>{chatRoomRoute ? 'Back to Chat Room' : 'Back To Cart'}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

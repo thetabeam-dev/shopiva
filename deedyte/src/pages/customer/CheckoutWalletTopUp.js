@@ -5,6 +5,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import Icon from 'react-native-vector-icons/Ionicons';
 import { fetchWallet } from '../../api/user';
 import { completeCheckoutOrder } from '../../api/buyer';
+import { postChatInvoicePaid } from '../../utils/chatInvoicePaid';
 import { connectChatSocket } from '../../socket/chatSocket';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatNaira } from '../../utils/formatNaira';
@@ -38,6 +39,10 @@ export default function CheckoutWalletTopUpScreen() {
     setCompleting(true);
     try {
       const data = await completeCheckoutOrder(checkout);
+      const chatPaid = route.params?.chatInvoicePaid;
+      if (chatPaid) {
+        void postChatInvoicePaid({ ...chatPaid, reference: checkout.reference });
+      }
       navigation.replace('Payment-success', {
         reference: checkout.reference,
         subtotal: Number(route.params?.subtotal) || 0,
@@ -54,7 +59,7 @@ export default function CheckoutWalletTopUpScreen() {
       Alert.alert('Checkout', message);
       return false;
     }
-  }, [checkout, navigation, orderTotal, route.params?.itemCount, route.params?.shipping, route.params?.subtotal]);
+  }, [checkout, navigation, orderTotal, route.params?.itemCount, route.params?.shipping, route.params?.subtotal, route.params?.chatInvoicePaid]);
 
   const refreshWallet = useCallback(async () => {
     const row = await fetchWallet();

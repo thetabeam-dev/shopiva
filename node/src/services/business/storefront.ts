@@ -13,14 +13,18 @@ import {
   GetShippingZonesByShopService,
 } from "./shipping.js";
 
+export async function GetStorefrontShopByIdService(shopId: number) {
+  const rows = await shopModel.getShopById(shopId);
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  const slug = String((row as { slug?: unknown } | undefined)?.slug ?? "").trim();
+  if (!slug) return null;
+  return GetStorefrontShopBySlugService(slug);
+}
+
 export async function GetStorefrontShopBySlugService(slug: string) {
   const row = await shopModel.getStorefrontBySlug(slug);
   if (!row) return null;
   const shopId = (row as { id: number }).id;
-  if (shopId != null && Number.isFinite(Number(shopId))) {
-    const zones = await GetShippingZonesByShopService(Number(shopId));
-    if (!Array.isArray(zones) || zones.length === 0) return null;
-  }
   let shopPolicies: {
     deliverypolicy: unknown;
     refundpolicy: unknown;

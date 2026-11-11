@@ -79,17 +79,18 @@ export default function ShippingZoneEditScreen({ route }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => setTutorialOpen(true)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Tutorial"
-          style={{ paddingRight: 4 }}
-        >
-          <Icon name="play-circle-outline" size={26} color={BRAND} />
-        </TouchableOpacity>
-      ),
+      headerRight: () => null,
+      // headerRight: () => (
+      //   <TouchableOpacity
+      //     onPress={() => setTutorialOpen(true)}
+      //     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      //     accessibilityRole="button"
+      //     accessibilityLabel="Tutorial"
+      //     style={{ paddingRight: 4 }}
+      //   >
+      //     <Icon name="play-circle-outline" size={26} color={BRAND} />
+      //   </TouchableOpacity>
+      // ),
     });
   }, [navigation]);
 
@@ -201,10 +202,10 @@ export default function ShippingZoneEditScreen({ route }) {
       Alert.alert('States required', `Select at least one state in ${selectedGeo.name}.`);
       return;
     }
-    if (baseFee <= 0) {
-      Alert.alert('Base fee required', 'Enter a base shipping fee for the first item.');
-      return;
-    }
+    // if (baseFee <= 0) {
+    //   Alert.alert('Base fee required', 'Enter a base shipping fee for the first item.');
+    //   return;
+    // }
     if (!shopId || !userId) {
       Alert.alert('Unable to save', 'Missing shop information. Please try again.');
       return;
@@ -219,8 +220,8 @@ export default function ShippingZoneEditScreen({ route }) {
         zoneId,
         name,
         locations,
-        baseFee,
-        discountPercent,
+        baseFee: existingZone?.baseFee ?? 0,
+        discountPercent: existingZone?.discountPercent ?? 0,
         pinColor,
       });
 
@@ -368,10 +369,11 @@ export default function ShippingZoneEditScreen({ route }) {
             </View>
           </Pressable>
           <Text style={sharedStyles.fieldHint}>
-            Only states in the selected geo-political zone are listed. Then set the shipping fee below.
+            Only states in the selected geo-political zone are listed.
           </Text>
         </View>
 
+        {/* Fees are set per order in the chat invoice for now.
         <View style={{ marginBottom: 20 }}>
           <Text style={sharedStyles.fieldLabel}>Base Shipping Fee (1st item)</Text>
           <View style={sharedStyles.inputWrap}>
@@ -407,6 +409,7 @@ export default function ShippingZoneEditScreen({ route }) {
         </View>
 
         <ShippingPreviewCard lines={previewLines} />
+        */}
       </ScrollView>
 
       <View

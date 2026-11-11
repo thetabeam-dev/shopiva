@@ -114,8 +114,8 @@ export async function SaveShippingZoneService(
     throw new Error(`${name.trim()} is already a shipping zone. Edit that zone instead.`);
   }
 
-  if (baseFee <= 0) {
-    throw new Error("Base fee must be greater than 0");
+  if (baseFee < 0) {
+    throw new Error("Base fee cannot be negative");
   }
 
   if (discountPercent < 0 || discountPercent > 100) {

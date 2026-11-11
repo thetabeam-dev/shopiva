@@ -37,6 +37,7 @@ import {
   getVariantRowPrice,
 } from '../../utils/storefrontProductDetail';
 import { normalizeStorefrontProductDetail } from '../../utils/storefrontProductNormalize';
+import { parseBulkTiers, unitPriceForBulk } from '../../utils/bulkPricing';
 import { extractCustomerPolicySections } from '../../utils/shopPoliciesForCustomer';
 import {
   addBuyerCartLine,
@@ -66,17 +67,6 @@ const CART_TOAST_MS = 2400;
 /**
  * @param {{ route: { params?: { product?: object; vendor?: { id: number; name?: string; slug?: string }; category?: string } }; navigation: import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> }} props
  */
-function unitPriceForBulk(base, tiers, quantity) {
-  const qty = Math.max(1, Math.trunc(Number(quantity) || 1));
-  let chosen = null;
-  for (const tier of tiers) {
-    if (tier.minQuantity <= qty) chosen = tier;
-  }
-  if (!chosen) return base;
-  const unit = chosen.totalPrice / chosen.minQuantity;
-  return Number.isFinite(unit) && unit > 0 ? unit : base;
-}
-
 export default function ProductScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, signOut } = useAuth();
@@ -227,20 +217,7 @@ export default function ProductScreen({ route, navigation }) {
   }, [productIdParam, detailRetryToken, loggedIn]);
 
   const d = detailProduct;
-  const bulkTiers = useMemo(() => {
-    const raw = d?.bulkDiscount;
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .map(tier => {
-        if (!tier || typeof tier !== 'object') return null;
-        const minQuantity = Number(String(tier.minQuantity ?? tier.minQty ?? '').replace(/[^\d]/g, ''));
-        const totalPrice = Number(String(tier.totalPrice ?? '').replace(/[^\d.]/g, '').replace(/\.(?=.*\.)/g, ''));
-        if (!Number.isFinite(minQuantity) || minQuantity < 2) return null;
-        if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
-        return { minQuantity, totalPrice };
-      })
-      .filter(Boolean);
-  }, [d?.bulkDiscount]);
+  const bulkTiers = useMemo(() => parseBulkTiers(d?.bulkDiscount), [d?.bulkDiscount]);
   const variants = useMemo(() => {
     const raw = d?.variants;
     return Array.isArray(raw)
@@ -660,9 +637,9 @@ export default function ProductScreen({ route, navigation }) {
     };
   }, [refreshProductOrderState]);
 
-  useEffect(() => {
-    void syncCartMembership();
-  }, [syncCartMembership]);
+  // useEffect(() => {
+  //   void syncCartMembership();
+  // }, [syncCartMembership]);
 
   const checkoutUnitPrice = useMemo(() => {
     if (!d) {
@@ -818,6 +795,36 @@ export default function ProductScreen({ route, navigation }) {
     signOut,
   ]);
 
+  const handleChatWithVendor = useCallback(() => {
+    if (!loggedIn) {
+      Alert.alert('Sign in required', 'Please sign in to chat with this vendor.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => void signOut() },
+      ]);
+      return;
+    }
+    const sid = resolvedShopId ?? parseShopId(shopId);
+    if (!sid) {
+      Alert.alert('Chat unavailable', 'This shop could not be identified.');
+      return;
+    }
+    const recipient = String(shopName || '').trim();
+    const itemAmount = Number(product?.priceUsd) || 0;
+    const itemTitle = String(product?.title ?? '').trim();
+    const productId = Number(d?.id ?? routeProduct?.id ?? routeProductId) || 0;
+    const itemImage = String(product?.uri ?? getProductImageUri(d) ?? getProductImageUri(routeProduct) ?? '').trim();
+    navigation.navigate('Inbox', {
+      chat: {
+        shopId: sid,
+        name: recipient,
+        itemAmount,
+        itemTitle,
+        itemImage,
+        productId,
+      },
+    });
+  }, [loggedIn, signOut, shopName, resolvedShopId, shopId, navigation, product, d, routeProduct, routeProductId]);
+
   const handleBuyNow = useCallback(async () => {
     if (!ensureReadyForCartOrCheckout()) return;
 
@@ -939,25 +946,28 @@ export default function ProductScreen({ route, navigation }) {
             </Text>
           </View>
         </View>
+        {!loggedIn ? (
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={[styles.headerCartHit, !loggedIn && styles.headerLoginHit]}
+          style={[styles.headerCartHit, styles.headerLoginHit]}
           onPress={() => {
-            if (loggedIn) {
-              navigation.navigate('Cart');
-            } else {
-              void signOut();
-            }
+            void signOut();
           }}
           accessibilityRole="button"
-          accessibilityLabel={loggedIn ? 'Open cart' : 'Login'}
+          accessibilityLabel="Login"
         >
-          {loggedIn ? (
-            <Icon name="cart-outline" size={24} color="#000000" />
-          ) : (
-            <Text style={styles.headerLoginText}>Login</Text>
-          )}
+          <Text style={styles.headerLoginText}>Login</Text>
         </TouchableOpacity>
+        ) : null}
+        {/* <TouchableOpacity
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.headerCartHit}
+          onPress={() => navigation.navigate('Cart')}
+          accessibilityRole="button"
+          accessibilityLabel="Open cart"
+        >
+          <Icon name="cart-outline" size={24} color="#000000" />
+        </TouchableOpacity> */}
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.moreHit}
@@ -1234,13 +1244,17 @@ export default function ProductScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
         <TouchableOpacity
-          style={[
-            styles.addCart,
-            selectedLineInCart && !readyToPayOrderId && styles.addCartOutlined,
-            (cartToggleBusy || awaitingShippingQuote) && styles.addCartBusy,
-          ]}
-          activeOpacity={cartToggleBusy || awaitingShippingQuote ? 1 : 0.88}
-          disabled={cartToggleBusy || awaitingShippingQuote}
+          style={styles.addCart}
+          activeOpacity={0.88}
+          onPress={() => {
+            void handleChatWithVendor();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Chat with vendor"
+        >
+          <Text style={styles.addCartText}>Chat with vendor</Text>
+        </TouchableOpacity>
+        {/* Add to cart
           onPress={() => {
             if (readyToPayOrderId) {
               navigation.navigate('Order-detail', { orderId: readyToPayOrderId, autoPay: true });
@@ -1253,32 +1267,8 @@ export default function ProductScreen({ route, navigation }) {
               void performAddToCart(selectedInventoryId);
             }
           }}
-          accessibilityRole="button"
-          accessibilityLabel={
-            readyToPayOrderId
-              ? 'Make payment to continue'
-              : awaitingShippingQuote
-              ? 'Awaiting shipping fee'
-              : selectedLineInCart
-                ? 'Remove from cart'
-                : 'Add to cart'
-          }
-        >
-          <Text
-            style={[
-              styles.addCartText,
-              selectedLineInCart && !readyToPayOrderId && styles.addCartTextOutlined,
-            ]}
-          >
-            {readyToPayOrderId
-              ? 'Make payment to continue'
-              : awaitingShippingQuote
-              ? 'Awaiting shipping fee'
-              : selectedLineInCart
-                ? 'Remove from cart'
-                : 'Add to cart'}
-          </Text>
-        </TouchableOpacity>
+        */}
+        {/* Buy now
         <TouchableOpacity
           style={[styles.buyNow, awaitingShippingQuote && !readyToPayOrderId && styles.addCartBusy]}
           activeOpacity={awaitingShippingQuote && !readyToPayOrderId ? 1 : 0.88}
@@ -1315,6 +1305,7 @@ export default function ProductScreen({ route, navigation }) {
             />
           )}
         </TouchableOpacity>
+        */}
         {selectedVariant ? (
           <View style={styles.selectedVariantCard}>
             <Text style={styles.selectedVariantTitle}>Selected variant</Text>

@@ -87,16 +87,33 @@ export async function handleCreateRoom(
   payload: Record<string, unknown>,
   ack?: unknown
 ): Promise<void> {
-  const order_id = parsePositiveInt(payload.order_id);
-  const recipient_id = parsePositiveInt(payload.recipient_id);
+  const shop_id = parsePositiveInt(payload.shop_id ?? payload.shopId);
+  let order_id = parsePositiveInt(payload.order_id);
+  let recipient_id = parsePositiveInt(payload.recipient_id);
+  let counterpart_name = "";
   const initiator_role = (payload.initiator_role as ParticipantRole) ?? "buyer";
   const recipient_role = (payload.recipient_role as ParticipantRole) ?? "seller";
 
-  if (!order_id || !recipient_id) {
+  if (shop_id && !recipient_id) {
+    const shop = await chatModel.getShopOwnerId(shop_id);
+    if (!shop) {
+      respond(ack, {
+        success: false,
+        result: null,
+        message: "Shop not found",
+        error: "shop_not_found",
+      });
+      return;
+    }
+    recipient_id = shop.ownerId;
+    counterpart_name = shop.shopName;
+  }
+
+  if ((!order_id && !shop_id) || !recipient_id) {
     respond(ack, {
       success: false,
       result: null,
-      message: "order_id and recipient_id are required",
+      message: "shop_id or order_id and recipient_id are required",
       error: "invalid_payload",
     });
     return;
@@ -111,17 +128,18 @@ export async function handleCreateRoom(
     return;
   }
 
-  const existingId = await chatModel.findRoomForOrderAndUsers(
-    order_id,
-    userId,
-    recipient_id
-  );
+  const existingId = shop_id && !order_id
+    ? await chatModel.findRoomForUsers(userId, recipient_id)
+    : await chatModel.findRoomForOrderAndUsers(order_id as number, userId, recipient_id);
   if (existingId) {
     const room = await chatModel.getRoomById(existingId);
+    const name =
+      counterpart_name ||
+      (await chatModel.getCounterpartName(existingId, userId, initiator_role));
     respond(ack, {
       success: true,
-      result: { room, existing: true },
-      message: "Room already exists for this order",
+      result: { room: room ? { ...room, counterpart_name: name } : room, existing: true },
+      message: shop_id && !order_id ? "Room already exists with this vendor" : "Room already exists for this order",
     });
     if (room) {
       nsp.to(`user:${recipient_id}`).emit("room_created", { room, existing: true });
@@ -130,17 +148,20 @@ export async function handleCreateRoom(
   }
 
   const room = await chatModel.createRoom({
-    order_id,
+    order_id: order_id ?? 0,
     initiator: userId,
     participants: [
       { user_id: userId, role: initiator_role },
       { user_id: recipient_id, role: recipient_role },
     ],
   });
+  const name =
+    counterpart_name ||
+    (await chatModel.getCounterpartName(room.id, userId, initiator_role));
 
   respond(ack, {
     success: true,
-    result: { room, existing: false },
+    result: { room: { ...room, counterpart_name: name }, existing: false },
     message: "Room created",
   });
 
@@ -148,13 +169,15 @@ export async function handleCreateRoom(
   const recipientAppRole = appRoleToNotificationRole(recipient_role) ?? "vendor";
   void (async () => {
     const title = "New chat";
-    const message = "A new chat was opened for your order.";
+    const message = shop_id && !order_id
+      ? "A customer started a chat with your shop."
+      : "A new chat was opened for your order.";
     await createAndEmitNotification({
       recipientId: recipient_id,
       title,
       message,
       sourceType: "chat",
-      sourceId: order_id,
+      sourceId: order_id ?? shop_id ?? 0,
       role: recipientAppRole,
     });
     const { rows } = await (await db()).query<{ devicetoken: string | null }>(
@@ -166,11 +189,13 @@ export async function handleCreateRoom(
     await sendFcmForActivities(
       token,
       "New Chat Started",
-      "A new chat has been started regarding your order. Open DeeDyte to view the conversation.",
+      shop_id && !order_id
+        ? "A customer started a chat with your shop. Open DeeDyte to reply."
+        : "A new chat has been started regarding your order. Open DeeDyte to view the conversation.",
       null,
       {
-        type: "order",
-        order_id,
+        type: "chat",
+        order_id: order_id ?? 0,
         role: recipientAppRole,
       },
     );
@@ -401,9 +426,34 @@ export async function handleGetRooms(
     return;
   }
   const rooms = await chatModel.listRoomsForUser(userId, role);
+  const named = await Promise.all(
+    (Array.isArray(rooms) ? rooms : []).map(async (room) => {
+      let counterpart_name = "";
+      try {
+        counterpart_name = await chatModel.getCounterpartName(
+          String(room.id),
+          userId,
+          role,
+        );
+      } catch {
+        counterpart_name = role === "buyer" ? "Seller" : "Customer";
+      }
+      let shop_id: number | null = null;
+      let shop_slug = "";
+      try {
+        const shop = await chatModel.getShopForRoom(String(room.id));
+        shop_id = shop?.shopId ?? null;
+        shop_slug = shop?.shopSlug ?? "";
+        if (!counterpart_name && shop?.shopName) counterpart_name = shop.shopName;
+      } catch {
+        shop_id = null;
+      }
+      return { ...room, counterpart_name, shop_id, shop_slug };
+    }),
+  );
   respond(ack, {
     success: true,
-    result: { rooms },
+    result: { rooms: named },
     message: "ok",
   });
 }
@@ -437,9 +487,20 @@ export async function handleGetRoomMessages(
 
   const messages = await chatModel.listMessages(room_id, userId, lim);
   await chatModel.markRoomRead(room_id, userId);
+  const role = parseAppRoleToParticipant(payload);
+  const counterpart_name = await chatModel.getCounterpartName(room_id, userId, role);
+  let shop_id: number | null = null;
+  let shop_slug = "";
+  try {
+    const shop = await chatModel.getShopForRoom(room_id);
+    shop_id = shop?.shopId ?? null;
+    shop_slug = shop?.shopSlug ?? "";
+  } catch {
+    shop_id = null;
+  }
   respond(ack, {
     success: true,
-    result: { messages },
+    result: { messages, counterpart_name, shop_id, shop_slug },
     message: "ok",
   });
   const others = await chatModel.otherParticipantIds(room_id, userId);

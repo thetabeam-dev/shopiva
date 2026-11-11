@@ -97,6 +97,7 @@ export type OrderListRow = {
   delivery: string;
   date: string | null;
   shipping_address?: string;
+  payment_reference?: string;
   customer_lat?: number | null;
   customer_lng?: number | null;
 };

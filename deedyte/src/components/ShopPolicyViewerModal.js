@@ -46,7 +46,7 @@ export default function ShopPolicyViewerModal({
   const isDelivery = /delivery/i.test(title || '') || locationRows.length > 0;
   const sheetTitle = isDelivery ? 'Delivery details' : title;
   const sheetSubtitle = isDelivery
-    ? 'See where this vendor delivers and the delivery fee.'
+    ? 'See where this vendor delivers.'
     : 'Review this vendor\'s shop policy before placing your order.';
   const methodTitle = deliveryMethod?.title || 'Vendor delivery';
   const methodBody = deliveryMethod?.description || 'Delivered directly by the vendor.';
@@ -100,9 +100,6 @@ export default function ShopPolicyViewerModal({
                         <View key={loc.name} style={styles.locationRow}>
                           <Text style={styles.locationTitle}>{loc.name}</Text>
                           <View style={styles.locationRight}>
-                            {loc.fee != null && Number.isFinite(Number(loc.fee)) ? (
-                              <Text style={styles.locationFee}>{formatNaira(loc.fee)}</Text>
-                            ) : null}
                             <Icon name="chevron-forward" size={18} color="#8A9194" />
                           </View>
                         </View>
@@ -111,7 +108,7 @@ export default function ShopPolicyViewerModal({
                     <View style={styles.infoNotice}>
                       <Icon name="information-circle-outline" size={20} color={BRAND} />
                       <Text style={styles.noticeText}>
-                        Delivery fee depends on your selected location and will be added at checkout.
+                        The vendor will confirm the delivery fee for your location in your checkout invoice.
                       </Text>
                     </View>
                     <View style={[styles.sectionHeading, styles.methodHeading]}>

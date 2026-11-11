@@ -120,7 +120,7 @@ export function ExploreStackScreen() {
       />
       <ExploreStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <ExploreStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />
-      <ExploreStack.Screen name="Cart" component={CartScreen} options={cartOpt} />
+      {/* <ExploreStack.Screen name="Cart" component={CartScreen} options={cartOpt} /> */}
       <ExploreStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt} />
       <ExploreStack.Screen name="Checkout-wallet-topup" component={CheckoutWalletTopUpScreen} options={{ ...cartCheckoutOpt, title: 'Top up to pay' }} />
       <ExploreStack.Screen name="Payment-success" component={PaymentSuccessScreen} options={paySuccessOpt} />

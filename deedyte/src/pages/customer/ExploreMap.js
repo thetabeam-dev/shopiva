@@ -552,7 +552,7 @@ export default function ExploreMap({ navigation, route }) {
         </MapView>
         )}
         <View style={styles.overlay} pointerEvents="box-none">
-          <View style={[styles.zoomStack, { bottom: 304 + insets.bottom }]}>
+          <View style={[styles.zoomStack, { bottom: 330 + insets.bottom }]}>
             <TouchableOpacity
               style={styles.zoomBtn}
               onPress={() => zoomBy(0.8)}
@@ -571,7 +571,7 @@ export default function ExploreMap({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={[styles.locateBtn, { bottom: 300 + insets.bottom }]}
+            style={[styles.locateBtn, { bottom: 330 + insets.bottom }]}
             onPress={goToMyLocation}
             accessibilityRole="button"
             accessibilityLabel="Show my location"

@@ -398,6 +398,8 @@ function metadataOrdersFromVerifyData(data: Record<string, unknown>): Array<{
   shop_id: number | null;
   subtotal: number;
   shipping_fee: number;
+  shipping_fee_fixed: boolean;
+  chat_room_id: string;
   items: Array<Record<string, unknown>>;
 }> {
   const meta = data.metadata && typeof data.metadata === "object"
@@ -430,6 +432,8 @@ function metadataOrdersFromVerifyData(data: Record<string, unknown>): Array<{
         shop_id: Number.isFinite(shopId) && shopId > 0 ? shopId : null,
         subtotal: Number.isFinite(parsedSubtotal) ? parsedSubtotal : subtotal,
         shipping_fee: Number.isFinite(shippingFee) ? shippingFee : 0,
+        shipping_fee_fixed: order.shipping_fee_fixed === true && Number.isFinite(shippingFee) && shippingFee > 0,
+        chat_room_id: String(order.chat_room_id ?? "").trim(),
         items,
       };
     });
@@ -563,7 +567,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
             customer_id: String(buyerUserId),
             shop_id: String(order.shop_id ?? 0),
             amount_paid: order.subtotal,
-            shipping_fee: 0,
+            shipping_fee: order.shipping_fee_fixed ? order.shipping_fee : 0,
             tax: 0,
             charges: 0,
             total_paid: order.subtotal,
@@ -608,7 +612,7 @@ export async function confirmCartCheckoutAndCreateChatRoom(
             notes: `Payment received via Paystack - Reference: ${ref}`,
             meta: JSON.stringify({
               paystack_charge_id: txnId,
-              shipping_fee_status: "pending",
+              shipping_fee_status: order.shipping_fee_fixed ? "set" : "pending",
               estimated_shipping_fee: Number(order.shipping_fee ?? 0),
             }),
           });
@@ -634,8 +638,12 @@ export async function confirmCartCheckoutAndCreateChatRoom(
           `SELECT * FROM orders WHERE payment_reference = $1`,
           [ref],
         );
-        const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, created, txnId, false);
-        if (rooms.length) {
+        const chatInvoiceShops = new Set(
+          metadataOrders.filter((order) => order.chat_room_id).map((order) => String(order.shop_id)),
+        );
+        const needsRoom = created.filter((row) => !chatInvoiceShops.has(String(row.shop_id)));
+        const rooms = await createCheckoutRoomsForOrderRows(buyerUserId, needsRoom, txnId, false);
+        if (rooms.length || needsRoom.length < created.length) {
           return { rooms, transaction_id: txnId };
         }
       }

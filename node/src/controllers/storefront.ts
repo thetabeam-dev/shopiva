@@ -2,10 +2,19 @@ import type { Request, Response } from "express";
 import type { AuthRequest } from "../middleware/auth.js";
 import {
   GetStorefrontShopBySlugService,
+  GetStorefrontShopByIdService,
   GetStorefrontProductsByShopIdService,
   GetStorefrontProductService,
   GetStorefrontShopDeliveryService,
 } from "../services/business/storefront.js";
+
+async function loadStorefrontShop(key: string) {
+  if (/^\d+$/.test(key)) {
+    const byId = await GetStorefrontShopByIdService(Number(key));
+    if (byId?.shop) return byId;
+  }
+  return GetStorefrontShopBySlugService(key);
+}
 import { recordProductView } from "../services/buyer/productHistory.js";
 import { recordShopView } from "../services/buyer/shopHistory.js";
 
@@ -16,7 +25,7 @@ export async function GetStorefrontShopController(req: AuthRequest, res: Respons
       res.status(400).json({ error: "Slug is required" });
       return;
     }
-    const result = await GetStorefrontShopBySlugService(slug);
+    const result = await loadStorefrontShop(slug);
     if (!result?.shop) {
       res.status(404).json({ error: "Shop not found" });
       return;
@@ -59,7 +68,7 @@ export async function GetStorefrontProductsController(req: Request, res: Respons
       res.status(400).json({ error: "Slug is required" });
       return;
     }
-    const shopResult = await GetStorefrontShopBySlugService(slug);
+    const shopResult = await loadStorefrontShop(slug);
     if (!shopResult?.shop) {
       res.status(404).json({ error: "Shop not found" });
       return;

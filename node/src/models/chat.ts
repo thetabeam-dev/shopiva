@@ -8,6 +8,8 @@ export type ChatRoomRecord = {
   last_message: string;
   created_at: Date;
   updated_at: Date;
+  unread_count?: number;
+  counterpart_name?: string | null;
 };
 
 export type ChatMessageRecord = {
@@ -39,6 +41,77 @@ export class chatModel {
         [room_id]
       );
       return rows[0] ?? null;
+    }
+  );
+
+  static findRoomForUsers = withErrorHandling(
+    async (userA: number, userB: number): Promise<string | null> => {
+      const { rows } = await (await db()).query<{ id: string }>(
+        `SELECT cr.id AS id
+         FROM chat_rooms cr
+         WHERE EXISTS (
+             SELECT 1 FROM chat_room_participants p
+             WHERE p.room_id = cr.id AND p.user_id = $1
+           )
+           AND EXISTS (
+             SELECT 1 FROM chat_room_participants p
+             WHERE p.room_id = cr.id AND p.user_id = $2
+           )
+         ORDER BY cr.updated_at DESC
+         LIMIT 1`,
+        [userA, userB]
+      );
+      return rows[0]?.id ?? null;
+    }
+  );
+
+  static getShopForRoom = withErrorHandling(
+    async (room_id: string): Promise<{ shopId: number; shopName: string; shopSlug: string } | null> => {
+      const { rows } = await (await db()).query<{
+        shop_id: string | number | null;
+        name: string | null;
+        slug: string | null;
+      }>(
+        `SELECT COALESCE(s_order.id, s_owner.id) AS shop_id,
+                COALESCE(NULLIF(TRIM(s_order.name), ''), NULLIF(TRIM(s_owner.name), '')) AS name,
+                COALESCE(NULLIF(TRIM(s_order.slug), ''), NULLIF(TRIM(s_owner.slug), '')) AS slug
+         FROM chat_rooms cr
+         LEFT JOIN orders o ON o.id = cr.order_id AND cr.order_id > 0
+         LEFT JOIN shops s_order ON s_order.id::text = TRIM(o.shop_id::text)
+         LEFT JOIN LATERAL (
+           SELECT s.id, s.name, s.slug
+           FROM chat_room_participants p
+           INNER JOIN shops s ON s.ownerid = p.user_id
+           WHERE p.room_id = cr.id AND p.role = 'seller'
+           ORDER BY s.id
+           LIMIT 1
+         ) s_owner ON true
+         WHERE cr.id = $1
+         LIMIT 1`,
+        [room_id],
+      );
+      const shopId = Number(rows[0]?.shop_id);
+      if (!Number.isFinite(shopId) || shopId < 1) return null;
+      return {
+        shopId,
+        shopName: String(rows[0]?.name ?? "").trim(),
+        shopSlug: String(rows[0]?.slug ?? "").trim(),
+      };
+    },
+  );
+
+  static getShopOwnerId = withErrorHandling(
+    async (shop_id: number): Promise<{ ownerId: number; shopName: string } | null> => {
+      const { rows } = await (await db()).query<{ ownerid: number; name: string | null }>(
+        `SELECT ownerid, name FROM shops WHERE id = $1 LIMIT 1`,
+        [shop_id]
+      );
+      const ownerId = Number(rows[0]?.ownerid);
+      if (!Number.isFinite(ownerId) || ownerId < 1) return null;
+      return {
+        ownerId,
+        shopName: String(rows[0]?.name ?? "").trim(),
+      };
     }
   );
 
@@ -158,6 +231,72 @@ export class chatModel {
     }
   );
 
+  /** Display name of the other party: shop name for buyers, customer name for sellers. */
+  static getCounterpartName = withErrorHandling(
+    async (
+      room_id: string,
+      user_id: number,
+      participantRole?: ParticipantRole | null,
+    ): Promise<string> => {
+      const pool = await db();
+      const role =
+        participantRole === "buyer" || participantRole === "seller"
+          ? participantRole
+          : (await chatModel.getParticipantRole(room_id, user_id));
+
+      const { rows: people } = await pool.query<{
+        fname: string | null;
+        lname: string | null;
+        email: string | null;
+      }>(
+        `SELECT u.fname, u.lname, u.email
+         FROM chat_room_participants op
+         INNER JOIN users u ON u.id = op.user_id
+         WHERE op.room_id = $1 AND op.user_id <> $2
+         ORDER BY CASE op.role
+           WHEN 'seller' THEN 0
+           WHEN 'buyer' THEN 1
+           ELSE 2
+         END
+         LIMIT 1`,
+        [room_id, user_id],
+      );
+      const person = people[0];
+      const personName = String(
+        [person?.fname, person?.lname].filter(Boolean).join(" "),
+      ).trim();
+      const emailName = String(person?.email ?? "").split("@")[0]?.trim() ?? "";
+
+      let shopName = "";
+      if (role === "buyer") {
+        try {
+          const { rows: shops } = await pool.query<{ name: string | null }>(
+            `SELECT s.name
+             FROM chat_rooms cr
+             INNER JOIN orders o ON o.id = cr.order_id
+             LEFT JOIN shops s ON (
+               s.id::text = TRIM(o.shop_id::text)
+               OR s.ownerid = (
+                 SELECT op.user_id FROM chat_room_participants op
+                 WHERE op.room_id = cr.id AND op.role = 'seller'
+                 LIMIT 1
+               )
+             )
+             WHERE cr.id = $1
+             LIMIT 1`,
+            [room_id],
+          );
+          shopName = String(shops[0]?.name ?? "").trim();
+        } catch {
+          shopName = "";
+        }
+      }
+
+      if (role === "buyer") return shopName || personName || emailName || "Seller";
+      return personName || emailName || "Customer";
+    },
+  );
+
   /** Current user's participant role in a room (buyer / seller / admin). */
   static getParticipantRole = withErrorHandling(
     async (
@@ -268,7 +407,25 @@ export class chatModel {
       if (!msg) {
         throw new Error("Failed to create message");
       }
-      const preview = (input.content ?? "").slice(0, 500);
+      let preview = (input.content ?? "").slice(0, 500);
+      try {
+        const parsed = JSON.parse(String(input.content ?? ""));
+        const kind = parsed && typeof parsed === "object" ? String(parsed.kind ?? parsed.type ?? "") : "";
+        const title = String(parsed?.itemTitle ?? "").trim();
+        const labels: Record<string, string> = {
+          invoice: "Checkout invoice",
+          invoice_request: "Checkout invoice requested",
+          invoice_paid: "Order placed · Paid",
+          invoice_cancelled: "Checkout invoice cancelled",
+          shipping: "Shipping details",
+          inquiry: "Product enquiry",
+        };
+        if (labels[kind]) {
+          preview = title && kind !== "shipping" && kind !== "invoice_cancelled" ? `${labels[kind]}: ${title}` : labels[kind];
+        }
+      } catch {
+        /* keep preview */
+      }
       await pool.query(
         `UPDATE chat_rooms SET last_message = $2, updated_at = now() WHERE id = $1`,
         [input.room_id, preview]

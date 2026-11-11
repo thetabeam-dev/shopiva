@@ -50,6 +50,14 @@ function shopRating(shop) {
   };
 }
 
+function formatSoldLabel(sold) {
+  const n = Number(sold) || 0;
+  if (n >= 10000) return `${Math.round(n / 1000)}K+ sold`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K+ sold`;
+  if (n > 0) return `${n} sold`;
+  return '';
+}
+
 function formatCategoryLabel(category) {
   return String(category ?? '')
     .split(' ')
@@ -152,17 +160,25 @@ export default function HomeScreen() {
             try {
               const data = await getStorefrontProducts(shop.slug);
               const products = Array.isArray(data?.products) ? data.products : [];
-              return products.map(product => ({
-                id: String(product.id),
-                title: String(product.name ?? 'Product'),
-                uri: getProductImageUri(product),
-                price: Number(product.minPrice ?? product.price) || 0,
-                comparePrice: Number(product.maxPrice) || 0,
-                category: String(product?.category ?? '').trim().toLowerCase(),
-                hasVariants: Boolean(product?.hasVariants),
-                shop,
-                product,
-              }));
+              return products.map(product => {
+                const price = Number(product.minPrice ?? product.price) || 0;
+                const compare = Number(
+                  product.compareAtPrice ?? product.compare_at_price ?? product.maxPrice,
+                ) || 0;
+                return {
+                  id: String(product.id),
+                  title: String(product.name ?? 'Product'),
+                  uri: getProductImageUri(product),
+                  price,
+                  comparePrice: compare > price ? compare : 0,
+                  sold: Number(product.sold ?? product.soldCount ?? 0) || 0,
+                  category: String(product?.category ?? '').trim().toLowerCase(),
+                  hasVariants: Boolean(product?.hasVariants),
+                  featured: Boolean(product.is_featured ?? product.isFeatured ?? product.featured),
+                  shop,
+                  product,
+                };
+              });
             } catch {
               return [];
             }
@@ -229,6 +245,10 @@ export default function HomeScreen() {
     if (selectedCategory === 'all') return arrivals;
     return arrivals.filter(item => categoryKey(item.category) === categoryKey(selectedCategory));
   }, [arrivals, selectedCategory]);
+  const visibleRecentlyViewed = useMemo(() => {
+    if (selectedCategory === 'all') return recentlyViewed;
+    return recentlyViewed.filter(item => categoryKey(item.category) === categoryKey(selectedCategory));
+  }, [recentlyViewed, selectedCategory]);
 
   const loadCartProducts = useCallback(async () => {
     try {
@@ -286,9 +306,9 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadCartProducts();
+      // void loadCartProducts();
       void loadRecentlyViewed();
-    }, [loadCartProducts, loadRecentlyViewed]),
+    }, [loadRecentlyViewed]),
   );
 
   const addLine = useCallback(async (inventoryId, unitPrice) => {
@@ -521,7 +541,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {recentlyViewed.length ? (
+      {visibleRecentlyViewed.length ? (
         <View style={styles.recentBlock}>
           <View style={styles.recentHead}>
             <Text style={styles.recentTitle}>Recently viewed</Text>
@@ -540,7 +560,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.recentRow}
           >
-            {recentlyViewed.map(item => (
+            {visibleRecentlyViewed.map(item => (
               <TouchableOpacity
                 key={`recent-${item.shop?.id}-${item.id}`}
                 style={styles.recentCard}
@@ -561,8 +581,8 @@ export default function HomeScreen() {
           {Array.from({ length: 6 }, (_, index) => (
             <View key={index} style={styles.card}>
               <View style={[styles.cardImage, styles.bone]} />
-              <View>
-                <View style={[styles.boneLine, { width: '92%', marginTop: 8 }]} />
+              <View style={styles.cardBody}>
+                <View style={[styles.boneLine, { width: '92%' }]} />
                 <View style={[styles.boneLine, { width: '64%', marginTop: 6 }]} />
                 <View style={[styles.boneLine, { width: '48%', marginTop: 8, height: 12 }]} />
               </View>
@@ -574,52 +594,55 @@ export default function HomeScreen() {
           {visibleArrivals.map(item => {
             const showCompare = item.comparePrice > item.price && item.price > 0;
             const { rating, count } = shopRating(item.shop);
-            const inCart = cartLinesByProduct.has(String(item.id));
+            const soldLabel = formatSoldLabel(item.sold) || (count > 0 ? `${count} sold` : '');
+            const official = Boolean(
+              item.shop?.isVerified ?? item.shop?.is_verified ?? item.shop?.isverified,
+            );
+            const shopLabel = String(item.shop?.name ?? '').trim();
+            const showTopRated = item.featured || rating >= 4.5;
             return (
               <TouchableOpacity
                 key={`${item.shop?.id}-${item.id}`}
                 style={styles.card}
-                activeOpacity={0.9}
+                activeOpacity={0.92}
                 onPress={() => openProduct(item)}
               >
                 <ProductCardMedia uri={item.uri} style={styles.cardImage} />
-                <View>
-                <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                <View style={styles.ratingRow}>
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <Icon
-                      key={star}
-                      name={rating >= star ? 'star' : rating >= star - 0.5 ? 'star-half' : 'star-outline'}
-                      size={12}
-                      color={rating > 0 ? '#E8A317' : '#D0D0D0'}
-                    />
-                  ))}
-                  <Text style={styles.ratingText}>
-                    {rating > 0 ? rating.toFixed(1) : 'New'}
-                    {count > 0 ? ` (${count})` : ''}
-                  </Text>
-                </View>
-                <View style={styles.priceRow}>
-                  <View style={styles.priceCopy}>
-                    <Text style={styles.cardPrice}>{formatNaira(item.price)}</Text>
-                    {showCompare ? (
-                      <Text style={styles.comparePrice}>{formatNaira(item.comparePrice)}</Text>
-                    ) : null}
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                  {showTopRated ? (
+                    <Text style={styles.cardPromo} numberOfLines={1}>
+                      {`Top Rated${item.category ? ` in ${formatCategoryLabel(item.category)}` : ''}`}
+                    </Text>
+                  ) : null}
+                  <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Icon
+                        key={star}
+                        name={rating >= star ? 'star' : rating >= star - 0.5 ? 'star-half' : 'star-outline'}
+                        size={11}
+                        color={rating > 0 ? '#F5A623' : '#D8D8D8'}
+                      />
+                    ))}
+                    {soldLabel ? <Text style={styles.ratingText}>{soldLabel}</Text> : null}
                   </View>
-                  <TouchableOpacity
-                    style={[styles.cartBtn, inCart && styles.cartBtnOn]}
-                    onPress={() => { void onCartPress(item); }}
-                    disabled={Boolean(cartBusyId)}
-                    hitSlop={6}
-                    accessibilityLabel={inCart ? 'Remove from cart' : 'Add to cart'}
-                  >
-                    {cartBusyId === `${item.shop?.id}-${item.id}` ? (
-                      <ActivityIndicator size="small" color={inCart ? '#FFFFFF' : '#00926E'} />
-                    ) : (
-                      <Icon name={inCart ? 'cart' : 'cart-outline'} size={18} color={inCart ? '#FFFFFF' : '#111111'} />
-                    )}
-                  </TouchableOpacity>
-                </View>
+                  {official && shopLabel ? (
+                    <View style={styles.brandRow}>
+                      <Icon name="shield-checkmark" size={12} color="#8B6914" />
+                      <Text style={styles.brandText} numberOfLines={1}>
+                        {`Brand Official Store: ${shopLabel}`}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.priceRow}>
+                    <View style={styles.priceCopy}>
+                      {showCompare ? <Text style={styles.lastDay}>Last day</Text> : null}
+                      <Text style={styles.cardPrice}>{formatNaira(item.price)}</Text>
+                      {showCompare ? (
+                        <Text style={styles.comparePrice}>{formatNaira(item.comparePrice)}</Text>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -694,7 +717,7 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[styles.applyBtn, (variantSheet?.selected == null || cartBusyId) && styles.applyBtnOff]}
             disabled={variantSheet?.selected == null || Boolean(cartBusyId)}
             onPress={() => { void confirmVariant(); }}
@@ -706,7 +729,7 @@ export default function HomeScreen() {
                 {variantSheet?.selected == null ? 'Select an option' : 'Add to cart'}
               </Text>
             )}
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
     </Modal>
@@ -716,14 +739,15 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFFFFF' },
-  scroll: { flex: 1 },
+  screen: { flex: 1, backgroundColor: '#F5F5F5' },
+  scroll: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 0,
+    backgroundColor: '#FFFFFF',
   },
   identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 16, minWidth: 0 },
   identityText: { flex: 1, minWidth: 0, maxWidth: '72%' },
@@ -874,7 +898,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bellActive: { backgroundColor: '#00926E' },
-  chipRow: { height: 48, flexGrow: 0, marginTop: 8, backgroundColor: '#FFFFFF' },
+  chipRow: { height: 48, flexGrow: 0, backgroundColor: '#FFFFFF' },
   chips: { paddingHorizontal: 16, alignItems: 'flex-end', gap: 18 },
   chip: { alignItems: 'center', paddingBottom: 6 },
   chipText: { fontSize: 16, color: '#8A8A8A' },
@@ -999,7 +1023,7 @@ const styles = StyleSheet.create({
   bannerDotOn: { width: 16, backgroundColor: '#00926E' },
   recentBlock: {
     paddingTop: 4,
-    marginBottom: 4,
+    marginBottom: 24,
   },
   recentHead: {
     paddingHorizontal: 16,
@@ -1019,11 +1043,12 @@ const styles = StyleSheet.create({
   },
   recentCard: {
     width: 132,
+    overflow: 'hidden',
   },
   recentImage: {
     width: 132,
     height: 132,
-    borderRadius: 12,
+    borderRadius: 7,
     backgroundColor: '#F3F3F3',
   },
   recentName: {
@@ -1040,8 +1065,8 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
   grid: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingHorizontal: 2,
+    paddingTop: 4,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
@@ -1071,13 +1096,11 @@ const styles = StyleSheet.create({
   },
   listBody: { flex: 1, minWidth: 0 },
   card: {
-    width: '48%',
-    marginBottom: 14,
-    backgroundColor: '#f9f9f9',
+    width: '49.3%',
+    marginBottom: 4,
+    backgroundColor: '#FFFFFF',
     borderRadius: 7,
-    // borderWidth: 1,
-    // borderColor: '#D5D8DE',
-    padding: 8,
+    overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
@@ -1085,20 +1108,42 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#F3F3F3',
   },
+  cardBody: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
   cardTitle: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 18,
-    color: '#222222',
-    minHeight: 36,
+    fontSize: 13,
+    lineHeight: 17,
+    color: '#1A1A1A',
+    minHeight: 34,
+  },
+  cardPromo: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#E85D04',
   },
   ratingRow: {
     marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 1,
   },
-  ratingText: { marginLeft: 4, fontSize: 12, color: '#666666' },
+  ratingText: { marginLeft: 4, fontSize: 11, color: '#6B6B6B' },
+  brandRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  brandText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#6B6B6B',
+  },
   priceRow: {
     marginTop: 6,
     flexDirection: 'row',
@@ -1106,10 +1151,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
-  priceCopy: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  priceCopy: { flex: 1, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 5 },
+  lastDay: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#F56200',
+  },
   cardPrice: { fontSize: 16, fontWeight: '800', color: '#111111' },
   comparePrice: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#9A9A9A',
     textDecorationLine: 'line-through',
   },

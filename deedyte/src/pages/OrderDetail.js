@@ -919,8 +919,13 @@ export default function OrderDetailScreen() {
       );
       return;
     }
+    const fromChatRoomId = String(route.params?.fromChatRoomId ?? '');
+    if (fromChatRoomId && fromChatRoomId === String(orderInfo.room.id) && navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
     navigation.navigate('Inbox', {
-      chat: { roomId: orderInfo.room.id, name: `Order #${orderInfo.order.id}` }
+      chat: { roomId: orderInfo.room.id, name: '' }
     });
   };
 
@@ -1157,6 +1162,7 @@ export default function OrderDetailScreen() {
             ...base,
             event_type: 'shipping',
             stage: 'order_shipping',
+            invoice_delivery_time: orderInfo?.order?.estimated_delivery_date || orderInfo?.order?.shipping_method,
           },
         });
         return;
@@ -1590,6 +1596,7 @@ export default function OrderDetailScreen() {
                     ? orderInfo.order_items.reduce((acc, curr) => acc + Number(curr.total_price || 0), 0)
                     : 0) +
                   ((['unpaid', 'payment_received', ''].includes(String(orderInfo?.order?.fulfillment_status ?? ''))
+                    && !(Number(orderInfo?.order?.shipping_fee) > 0)
                     ? 0
                     : Number(orderInfo?.order?.shipping_fee || 0)) +
                   (auth.activeRole === 'vendor' ? 0 : (escrowCharge || 0))),
@@ -1677,6 +1684,7 @@ export default function OrderDetailScreen() {
               icon="calendar-outline"
               label="Estimated Delivery"
               value={String(
+                optionLabel(FULFILLMENT_TIMEFRAME_OPTIONS, orderInfo?.order?.estimated_delivery_date) ||
                 orderInfo?.order?.estimated_delivery_date?.split('_').join(' ') ||
                 'Not available',
               )}
@@ -1830,7 +1838,8 @@ export default function OrderDetailScreen() {
               : 0;
             const isVendor = auth.activeRole === 'vendor';
             const status = String(orderInfo?.order?.fulfillment_status ?? '');
-            const shippingPending = status === '' || status === 'unpaid' || status === 'payment_received';
+            const shippingPending = (status === '' || status === 'unpaid' || status === 'payment_received')
+              && !(Number(orderInfo?.order?.shipping_fee) > 0);
             const showEscrowFee = !isVendor;
             const escrowFee = showEscrowFee ? (escrowCharge || 0) : 0;
             const shipping = shippingPending ? 0 : Number(orderInfo?.order?.shipping_fee || 0);

@@ -241,6 +241,11 @@ export default function VendorShopScreen({ route, navigation }) {
   );
   const [deliveryError, setDeliveryError] = useState('');
   const slug = String(vendor?.slug ?? '').trim();
+  const storefrontKey =
+    slug ||
+    (parseShopId(vendor?.id) || parseShopId(vendor?.shop_id)
+      ? String(parseShopId(vendor?.id) || parseShopId(vendor?.shop_id))
+      : '');
 
   const resolvedShopId = useMemo(
     () =>
@@ -278,7 +283,7 @@ export default function VendorShopScreen({ route, navigation }) {
   }, [category]);
 
   useEffect(() => {
-    if (!slug) {
+    if (!storefrontKey) {
       setProductsLoading(false);
       setProductsError('This shop is missing a link (slug).');
       setApiProducts([]);
@@ -291,8 +296,8 @@ export default function VendorShopScreen({ route, navigation }) {
       setProductsError('');
       try {
         const [shopRes, prodRes] = await Promise.all([
-          getStorefrontShop(slug).catch(() => ({ shop: {}, shopPolicies: null, reviews: [] })),
-          getStorefrontProducts(slug),
+          getStorefrontShop(storefrontKey).catch(() => ({ shop: {}, shopPolicies: null, reviews: [] })),
+          getStorefrontProducts(storefrontKey),
         ]);
         
         if (cancelled) return;
@@ -338,7 +343,7 @@ export default function VendorShopScreen({ route, navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [storefrontKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -414,7 +419,7 @@ export default function VendorShopScreen({ route, navigation }) {
 
   const deliveryHeaderActions = (
     <>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={[styles.circleBrown, styles.heroIconGap]}
         onPress={() => navigation.navigate('Cart')}
         activeOpacity={0.85}
@@ -422,7 +427,7 @@ export default function VendorShopScreen({ route, navigation }) {
         accessibilityLabel="Open cart"
       >
         <Icon name="cart-outline" size={20} color="#000000" />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       {/* <TouchableOpacity
         style={[styles.circleBrown, styles.heroIconGap]}
         onPress={openDeliveryDetails}

@@ -378,14 +378,14 @@ const server = app.listen(process.env.PORT, async () => {
   //   }
   // });
 
-  nodeCron.schedule("*/10 * * * * *", async () => {
-    try {
-      const result = await sendAbandonedCartReminders();
-      console.log("[cart-reminder] pending-cart job complete", result);
-    } catch (error) {
-      console.error("[cart-reminder] pending-cart job failed", error);
-    }
-  });
+  // nodeCron.schedule("*/10 * * * * *", async () => {
+  //   try {
+  //     const result = await sendAbandonedCartReminders();
+  //     console.log("[cart-reminder] pending-cart job complete", result);
+  //   } catch (error) {
+  //     console.error("[cart-reminder] pending-cart job failed", error);
+  //   }
+  // });
 });
 
 app.post("/notify", async (req, res) => {

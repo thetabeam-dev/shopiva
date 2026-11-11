@@ -48,17 +48,18 @@ export default function ShippingZonesScreen({ navigation, route }) {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => setTutorialOpen(true)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Tutorial"
-          style={{ paddingRight: 4 }}
-        >
-          <Icon name="play-circle-outline" size={26} color={BRAND} />
-        </TouchableOpacity>
-      ),
+      headerRight: () => null,
+      // headerRight: () => (
+      //   <TouchableOpacity
+      //     onPress={() => setTutorialOpen(true)}
+      //     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      //     accessibilityRole="button"
+      //     accessibilityLabel="Tutorial"
+      //     style={{ paddingRight: 4 }}
+      //   >
+      //     <Icon name="play-circle-outline" size={26} color={BRAND} />
+      //   </TouchableOpacity>
+      // ),
     });
   }, [navigation]);
 
@@ -161,7 +162,7 @@ export default function ShippingZonesScreen({ navigation, route }) {
         >
           <View style={{ flex: 1 }}>
             <Text style={sharedStyles.sectionSubtitle}>
-              Manage shipping fees for different locations.
+              Manage the states you can ship to.
             </Text>
           </View>
 
@@ -193,11 +194,16 @@ export default function ShippingZonesScreen({ navigation, route }) {
             <View style={{ flex: 1 }}>
               <Text style={sharedStyles.zoneName}>{zone.name}</Text>
               <Text style={sharedStyles.zoneMeta}>
+                {zone.locations.length ? zone.locations.join(', ') : 'No states selected'}
+              </Text>
+              {/* Fees are set per order in the chat invoice for now.
+              <Text style={sharedStyles.zoneMeta}>
                 Base Fee (1st item): {formatNaira(zone.baseFee)}
               </Text>
               <Text style={sharedStyles.zoneMeta}>
                 Discount: {zone.discountPercent}%
               </Text>
+              */}
             </View>
             <Pressable
               hitSlop={10}

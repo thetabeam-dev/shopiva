@@ -167,6 +167,15 @@ export async function confirmCheckoutPayment(body) {
  * Body matches the Paystack metadata shape: customer_id, shipping_address, tax, orders, reference.
  * @param {Record<string, unknown>} body
  */
+export async function fetchOrderIdByReference(reference) {
+  const ref = encodeURIComponent(String(reference ?? '').trim());
+  if (!ref) return 0;
+  const res = await apiFetchAuth(`/orders/by-reference/${ref}`);
+  if (!res.ok) return 0;
+  const data = await readJson(res);
+  return Number(data?.order_id) || 0;
+}
+
 export async function completeCheckoutOrder(body) {
   const res = await apiFetchAuth('/buyer/checkout/complete', {
     method: 'POST',

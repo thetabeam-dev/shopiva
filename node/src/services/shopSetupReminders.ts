@@ -47,29 +47,7 @@ export const SHOP_SETUP_AUDIT_SQL = `
       FROM products p
       WHERE p.shop_id = s.id
     ) AS no_products,
-    NOT (
-      (
-        EXISTS (
-          SELECT 1
-          FROM shipping_fee_models sfm
-          WHERE sfm.shop_id = s.id
-            AND sfm.base_fee > 0
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM shipping_multi_item_discounts smid
-          WHERE smid.shop_id = s.id
-            AND smid.base_fee > 0
-        )
-      )
-      AND EXISTS (
-        SELECT 1
-        FROM shipping_zones sz
-        WHERE sz.shop_id = s.id
-          AND sz.base_fee > 0
-          AND COALESCE(cardinality(sz.locations), 0) > 0
-      )
-    ) AS shipping_not_configured
+    FALSE AS shipping_not_configured
   FROM shops s
   INNER JOIN users u ON u.id = s.ownerid
   ORDER BY s.id ASC

@@ -11,9 +11,9 @@ import { set_notifications } from '../../redux/notifications';
 import { VendorHomeStackScreen } from '../stacks/vendor/Home';
 import { VendorProductStackScreen } from '../stacks/vendor/Product';
 import { VendorActivitiesStackScreen } from '../stacks/vendor/Activities';
+import { VendorChatStackScreen } from '../stacks/vendor/Chat';
 import { VendorProfileStackScreen } from '../stacks/vendor/Profile';
 import { WalletStackScreen } from '../stacks/Wallet';
-import VendorShippingRequiredGate from '../components/VendorShippingRequiredGate';
 import VendorShopLocationGate from '../components/VendorShopLocationGate';
 
 
@@ -42,7 +42,7 @@ function useActivitiesBadge() {
     return itemRole === 'buyer' || itemRole === 'customer';
   }).length;
 
-  const total = changes + chatTotal;
+  const total = changes;
   return total > 0 ? total : undefined;
 }
 
@@ -50,6 +50,8 @@ export default function VendorTabs() {
   const { nested_nav } = useSelector((s) => s?.nested_nav);
   const [tabBarStyle, setTabBarStyle] = React.useState('flex');
   const activitiesBadge = useActivitiesBadge();
+  const chatTotal = useUnreadChatTotal();
+  const chatBadge = chatTotal > 0 ? chatTotal : undefined;
 
   React.useEffect(() => {
     if (nested_nav?.boolean) {
@@ -61,7 +63,6 @@ export default function VendorTabs() {
 
   return (
     <ProfileProvider>
-      <VendorShippingRequiredGate />
       <VendorShopLocationGate />
       <Tab.Navigator
         screenOptions={({ route }) => ({
@@ -69,6 +70,7 @@ export default function VendorTabs() {
             let iconName = 'ellipse-outline';
             if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
             else if (route.name === 'Activities') iconName = focused ? 'pulse' : 'pulse-outline';
+            else if (route.name === 'Chat') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
             else if (route.name === 'Profile') iconName = focused ? 'person-circle' : 'person-circle-outline';
             else if (route.name === 'Products') iconName = focused ? 'pricetags' : 'pricetags-outline';
             else if (route.name === 'Wallet') iconName = focused ? 'wallet' : 'wallet-outline';
@@ -83,6 +85,11 @@ export default function VendorTabs() {
         })}
       >
         <Tab.Screen name="Home" component={VendorHomeStackScreen} />
+        <Tab.Screen
+          name="Chat"
+          component={VendorChatStackScreen}
+          options={{ tabBarBadge: chatBadge }}
+        />
         <Tab.Screen
           name="Activities"
           component={VendorActivitiesStackScreen}

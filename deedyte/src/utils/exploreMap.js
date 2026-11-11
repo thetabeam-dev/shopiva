@@ -5,11 +5,7 @@ export function shopLogo(vendor) {
 }
 
 export function shopCover(vendor) {
-  const banner = String(vendor?.banner ?? '').trim();
-  if (banner) return banner;
-  const productThumb = String(vendor?.products?.[0]?.thumbnail_url ?? '').trim();
-  if (productThumb) return productThumb;
-  return shopLogo(vendor);
+  return String(vendor?.banner ?? '').trim();
 }
 
 export function vendorCoordinate(vendor) {

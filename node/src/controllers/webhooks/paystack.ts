@@ -246,6 +246,8 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
         const items = Array.isArray(order.items) ? order.items : [];
         const shop_id = order.shop_id;
         const shipping_fee = Number(order.shipping_fee) || 0;
+        const shippingFixed = order.shipping_fee_fixed === true && shipping_fee > 0;
+        const chatRoomId = String(order.chat_room_id ?? "").trim();
         const shipping_method = String(order.shipping_method ?? "");
         const subtotal = Number(order.subtotal) || 0;
 
@@ -253,7 +255,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
           customer_id: customerId,
           shop_id: String(shop_id ?? ""),
           amount_paid: subtotal,
-          shipping_fee: 0,
+          shipping_fee: shippingFixed ? shipping_fee : 0,
           tax,
           charges: 0,
           total_paid: subtotal,
@@ -280,7 +282,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
         } catch (err) {
           console.error("checkout escrow row failed", err);
         }
-        try {
+        if (!chatRoomId) try {
           const created = await ensurePaidOrderChatRoom(userId, Number(orderId), shop_id);
           if (Array.isArray(created)) rooms.push(...created);
         } catch (err) {
@@ -306,7 +308,7 @@ export async function CompleteCheckoutController(req: AuthRequest, res: Response
           meta: JSON.stringify({
             channel: "wallet",
             paid_at: new Date().toISOString(),
-            shipping_fee_status: "pending",
+            shipping_fee_status: shippingFixed ? "set" : "pending",
             estimated_shipping_fee: shipping_fee,
           }),
         });

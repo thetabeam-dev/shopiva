@@ -161,12 +161,17 @@ function variantListIssue(variants) {
   return '';
 }
 
-function newBulkTier() {
+function newBulkTier(minQty = 2) {
   return {
     id: `tier_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    minQty: '',
+    minQty: String(minQty),
     totalPrice: '',
   };
+}
+
+function tierQtyTooLow(tier) {
+  const digits = String(tier?.minQty ?? '').replace(/[^\d]/g, '');
+  return digits !== '' && Number(digits) < 2;
 }
 
 function bulkDiscountIssue(enabled, tiers) {
@@ -176,7 +181,7 @@ function bulkDiscountIssue(enabled, tiers) {
     totalPrice: Number(String(tier.totalPrice).replace(/[^\d.]/g, '')),
   }));
   if (parsed.some(tier => !Number.isFinite(tier.minQty) || tier.minQty < 2)) {
-    return 'Each bulk tier needs a minimum quantity of at least 2.';
+    return 'Bulk purchase must start from 2.';
   }
   if (parsed.some(tier => !Number.isFinite(tier.totalPrice) || tier.totalPrice <= 0)) {
     return 'Each bulk tier needs a total price greater than 0.';
@@ -1929,7 +1934,7 @@ export default function VendorCreateProductScreen() {
                       <View style={styles.half}>
                         <Text style={styles.dimLabel}>Minimum quantity</Text>
                         <TextInput
-                          style={styles.input}
+                          style={[styles.input, tierQtyTooLow(tier) && styles.inputError]}
                           keyboardType="number-pad"
                           value={tier.minQty}
                           onChangeText={text =>
@@ -1944,6 +1949,9 @@ export default function VendorCreateProductScreen() {
                           placeholder="2"
                           placeholderTextColor="#9CA3AF"
                         />
+                        {tierQtyTooLow(tier) ? (
+                          <Text style={styles.errorText}>Bulk purchase must start from 2</Text>
+                        ) : null}
                       </View>
                       <View style={styles.half}>
                         <Text style={styles.dimLabel}>Total price (₦)</Text>
@@ -1975,7 +1983,19 @@ export default function VendorCreateProductScreen() {
               })}
               <TouchableOpacity
                 style={styles.bulkAdd}
-                onPress={() => setBulkTiers(current => [...current, newBulkTier()])}
+                onPress={() => {
+                  if (bulkTiers.some(tierQtyTooLow)) {
+                    Alert.alert('Minimum quantity', 'Bulk purchase must start from 2');
+                    return;
+                  }
+                  setBulkTiers(current => {
+                    const highest = current.reduce(
+                      (max, tier) => Math.max(max, Number(tier.minQty) || 0),
+                      1,
+                    );
+                    return [...current, newBulkTier(highest + 1)];
+                  });
+                }}
                 activeOpacity={0.85}
               >
                 <Text style={styles.bulkAddText}>+ Add another price tier</Text>
