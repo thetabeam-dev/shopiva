@@ -31,6 +31,7 @@ import { computeMultiItemShippingFee, normalizeShopDelivery } from '../utils/ven
 import { formatShippingAddress, shippingAddressState } from '../utils/shippingAddress';
 import FormKeyboardAvoiding from '../components/FormKeyboardAvoiding';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { deliveryTimeKey } from '../utils/deliveryTime';
 
 const VendorRejectReason = [
   { label: 'out of stock', value: 'out_of_stock' },
@@ -198,6 +199,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
   const [confirmPerformancePolicy, setConfirmPerformancePolicy] =
     useState(false);
   const [shippingFee, setShippingFee] = useState('');
+  const fixedShippingFee = Number(data?.shipping_fee) > 0 ? Number(data.shipping_fee) : null;
   const [shopShippingCap, setShopShippingCap] = useState(null);
 
   const navigation = useNavigation();
@@ -398,6 +400,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                 </Text>
               </View>
 
+              {fixedShippingFee != null ? null : (
               <View style={styles.processingCard}>
                 <Text style={styles.processingSectionTitle}>Set shipping fee</Text>
                 <Text style={styles.processingFieldHint}>
@@ -412,6 +415,7 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                   onChangeText={(txt) => setShippingFee(formatShippingFeeInput(txt))}
                 />
               </View>
+              )}
 
               <View style={styles.processingCard}>
                 <Text style={styles.processingSectionSubtitle}>
@@ -500,15 +504,15 @@ function Acceptance({ acceptance_value, updateAccptance, data }) {
                     );
                     return;
                   }
-                  const shippingFeeAmount = shippingFeeNumber(shippingFee);
-                  if (!Number.isFinite(shippingFeeAmount) || shippingFeeAmount < 0 || shippingFee.trim() === '') {
+                  const shippingFeeAmount = fixedShippingFee ?? shippingFeeNumber(shippingFee);
+                  if (fixedShippingFee == null && (!Number.isFinite(shippingFeeAmount) || shippingFeeAmount < 0 || shippingFee.trim() === '')) {
                     Alert.alert(
                       'Shipping fee required',
                       'Enter the shipping fee for this delivery address.',
                     );
                     return;
                   }
-                  if (shopShippingCap != null && shippingFeeAmount > shopShippingCap) {
+                  if (fixedShippingFee == null && shopShippingCap != null && shippingFeeAmount > shopShippingCap) {
                     Alert.alert(
                       'Shipping fee',
                       `This fee cannot be more than ${formatNaira(shopShippingCap)}, the shipping fee set on your shop for this State.`,
@@ -714,7 +718,7 @@ function Shipping({ data }) {
   const [withinCommittedTimeframe, setWithinCommittedTimeframe] =
     useState(false);
   const [shippingMethod, setShippingMethod] = useState(null);
-  const [estimatedDelivery, setEstimatedDelivery] = useState(null);
+  const [estimatedDelivery, setEstimatedDelivery] = useState(() => deliveryTimeKey(data?.invoice_delivery_time));
   const [logisticProvider, setLogisticProvider] = useState('');
   const [trackingId, setTrackingId] = useState('');
   const [vendorPhone, setVendorPhone] = useState('');

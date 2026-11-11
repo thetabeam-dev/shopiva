@@ -104,8 +104,8 @@ export default function RecentlyViewedProductsScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadItems();
-      void loadCartProducts();
-    }, [loadItems, loadCartProducts]),
+      // void loadCartProducts();
+    }, [loadItems]),
   );
 
   const addLine = useCallback(async (inventoryId, unitPrice) => {
@@ -255,7 +255,7 @@ export default function RecentlyViewedProductsScreen() {
                           <Text style={styles.comparePrice}>{formatNaira(item.comparePrice)}</Text>
                         ) : null}
                       </View>
-                      <TouchableOpacity
+                      {/* <TouchableOpacity
                         style={[styles.cartBtn, inCart && styles.cartBtnOn]}
                         onPress={() => { void onCartPress(item); }}
                         disabled={Boolean(cartBusyId)}
@@ -267,7 +267,7 @@ export default function RecentlyViewedProductsScreen() {
                         ) : (
                           <Icon name={inCart ? 'cart' : 'cart-outline'} size={18} color={inCart ? '#FFFFFF' : '#111111'} />
                         )}
-                      </TouchableOpacity>
+                      </TouchableOpacity> */}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -339,7 +339,7 @@ export default function RecentlyViewedProductsScreen() {
                 );
               })}
             </ScrollView>
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={[styles.applyBtn, (variantSheet?.selected == null || cartBusyId) && styles.applyBtnOff]}
               disabled={variantSheet?.selected == null || Boolean(cartBusyId)}
               onPress={() => { void confirmVariant(); }}
@@ -351,7 +351,7 @@ export default function RecentlyViewedProductsScreen() {
                   {variantSheet?.selected == null ? 'Select an option' : 'Add to cart'}
                 </Text>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
       </Modal>

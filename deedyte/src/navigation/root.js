@@ -45,6 +45,8 @@ function withTabSelected(route, tabName, nestedScreen) {
 
 /** Open the customer Cart tab (nested stack screen `Cart`). */
 export function navigateToCartTab() {
+  return false;
+  /*
   if (!navigationRef.isReady()) return false;
 
   const root = navigationRef.getRootState();
@@ -69,6 +71,7 @@ export function navigateToCartTab() {
     }),
   );
   return true;
+  */
 }
 
 export function navigateToActivitiesScreen(screen, params) {

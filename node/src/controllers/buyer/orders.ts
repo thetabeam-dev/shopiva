@@ -271,3 +271,40 @@ export async function GetBuyerOrderByIdController(req: AuthRequest, res: Respons
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }
 }
+
+/**
+ * GET /orders/by-reference/:reference
+ * Resolves the order id for a payment reference when the caller is the buyer or the shop owner.
+ */
+export async function GetOrderIdByReferenceController(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const userId = Number(req.user?.id);
+    const reference = String(req.params.reference ?? "").trim();
+    if (!Number.isFinite(userId) || userId <= 0) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    if (!reference) {
+      res.status(400).json({ error: "reference is required" });
+      return;
+    }
+    const pool = await db();
+    const { rows } = await pool.query<{ id: number }>(
+      `SELECT o.id
+       FROM orders o
+       LEFT JOIN shops s ON s.id::text = o.shop_id
+       WHERE o.payment_reference = $1
+         AND (o.customer_id = $2 OR s.ownerid = $3)
+       ORDER BY o.id ASC
+       LIMIT 1`,
+      [reference, String(userId), userId],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+    res.status(200).json({ order_id: rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}

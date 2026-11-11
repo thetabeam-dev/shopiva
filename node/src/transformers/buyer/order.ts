@@ -29,12 +29,68 @@ export const orderTransformer = async (
     }
     const order = { ...orderRow, escrow_fee: Number.isFinite(feeKobo) ? feeKobo / 100 : 0 };
 
-    const { rows: [room] } = await pool.query(
+    let { rows: [room] } = await pool.query(
         `SELECT * 
          FROM chat_rooms
          WHERE order_id = $1`,
         [orderId]
     );
+    const paymentRef = String(orderRow.payment_reference ?? "");
+    if (paymentRef) {
+        const { rows: [invoiceRoom] } = await pool.query(
+            `SELECT cr.*, m.content AS paid_content
+             FROM chat_messages m
+             JOIN chat_rooms cr ON cr.id = m.room_id
+             WHERE m.type = 'system'
+               AND position($1 in m.content) > 0
+             ORDER BY m.created_at DESC
+             LIMIT 1`,
+            [`"reference":${JSON.stringify(paymentRef)}`]
+        );
+        if (invoiceRoom) {
+            const { paid_content: paidContent, ...roomRow } = invoiceRoom;
+            room = roomRow;
+            if (!order.estimated_delivery_date) {
+                try {
+                    const paidCard = JSON.parse(String(paidContent ?? "{}"));
+                    const { rows: [invoiceMsg] } = await pool.query(
+                        `SELECT content FROM chat_messages WHERE id = $1`,
+                        [String(paidCard.invoiceMessageId ?? "")]
+                    );
+                    const invoiceCard = invoiceMsg ? JSON.parse(String(invoiceMsg.content)) : {};
+                    const deliveryKey = String(invoiceCard.deliveryTimeKey ?? "").trim();
+                    if (/^\d+_hrs$/.test(deliveryKey)) {
+                        await pool.query(
+                            `UPDATE orders SET estimated_delivery_date = $1 WHERE id = $2 AND estimated_delivery_date IS NULL`,
+                            [deliveryKey, orderId]
+                        );
+                        order.estimated_delivery_date = deliveryKey;
+                    }
+                } catch {
+                    // Older invoices have no delivery key; the vendor picks it when shipping.
+                }
+            }
+        }
+        if (invoiceRoom && !(Number(order.shipping_fee) > 0) && String(order.fulfillment_status) === "payment_received") {
+            const { rows: [paidEvent] } = await pool.query(
+                `SELECT meta FROM order_events
+                 WHERE order_id = $1 AND stage = 'payment_received'
+                 ORDER BY id ASC LIMIT 1`,
+                [orderId]
+            );
+            let meta: Record<string, unknown> = {};
+            try {
+                meta = typeof paidEvent?.meta === "string" ? JSON.parse(paidEvent.meta) : (paidEvent?.meta ?? {});
+            } catch {
+                meta = {};
+            }
+            const agreedFee = Number(meta.estimated_shipping_fee);
+            if (Number.isFinite(agreedFee) && agreedFee > 0) {
+                await pool.query(`UPDATE orders SET shipping_fee = $1 WHERE id = $2`, [agreedFee, orderId]);
+                order.shipping_fee = agreedFee;
+            }
+        }
+    }
     
     userId = order.customer_id;
     shopId = order.shop_id;

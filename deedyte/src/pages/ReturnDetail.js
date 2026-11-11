@@ -606,7 +606,7 @@ export default function ReturnDetailScreen() {
   const onMail = () => {
     if (blockIfCancelled()) return;
     navigation.navigate('Inbox', {
-      chat: { roomId: returnInfo.room.id, name: `Order #${returnInfo.return.id}` }
+      chat: { roomId: returnInfo.room.id, name: '' }
     });
   };
 

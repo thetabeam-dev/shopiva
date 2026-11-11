@@ -12,11 +12,14 @@
 
     .shop-page{
         height: 100%;
+        min-height: 100%;
         overflow: auto;
         width: 100%;
         display: flex;
         position: relative;
         flex-direction: column;
+        background-color: #fff;
+        color: #111;
     }
 
     .shop-page-header{

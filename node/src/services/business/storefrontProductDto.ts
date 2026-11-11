@@ -61,7 +61,7 @@ export function unitPriceForBulkQuantity(
           const row = tier as { minQuantity?: unknown; minQty?: unknown; totalPrice?: unknown };
           const minQuantity = Number(String(row.minQuantity ?? row.minQty ?? "").replace(/[^\d]/g, ""));
           const totalPrice = Number(String(row.totalPrice ?? "").replace(/[^\d.]/g, "").replace(/\.(?=.*\.)/g, ""));
-          if (!Number.isFinite(minQuantity) || minQuantity < 1) return null;
+          if (!Number.isFinite(minQuantity) || minQuantity < 2) return null;
           if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
           return { minQuantity, totalPrice };
         })
@@ -340,7 +340,7 @@ export function buildStorefrontProductDetail(
           const row = tier as { minQuantity?: unknown; minQty?: unknown; totalPrice?: unknown };
           const minQuantity = Number(String(row.minQuantity ?? row.minQty ?? "").replace(/[^\d]/g, ""));
           const totalPrice = Number(String(row.totalPrice ?? "").replace(/[^\d.]/g, "").replace(/\.(?=.*\.)/g, ""));
-          if (!Number.isFinite(minQuantity) || minQuantity < 1) return null;
+          if (!Number.isFinite(minQuantity) || minQuantity < 2) return null;
           if (!Number.isFinite(totalPrice) || totalPrice <= 0) return null;
           return { minQuantity, totalPrice };
         })

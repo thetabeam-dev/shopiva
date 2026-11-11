@@ -19,8 +19,10 @@ export class model{
     static createUserDoc = withErrorHandling(async (
     payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string }
     ) => {
-        const { role, fname, lname, email, provider, password, src, deviceId, deviceToken, whatsappMarketingConsent } = payload;
+        const { role, fname, lname, email, phone, provider, password, src, deviceId, deviceToken, whatsappMarketingConsent } = payload;
         const pool = await db();
+        const phoneVal =
+            phone != null && String(phone).trim() !== "" ? String(phone).trim() : null;
         const notificationPreferences = {
             email: { enabled: true, marketing: false, updates: true },
             sms: { enabled: true, critical: true },
@@ -34,19 +36,19 @@ export class model{
 
         if (src === "web") {
             const { rows } = await pool.query(
-                `INSERT INTO users (role, fname, lname, email, provider, password, createdAt, notificationPreferences)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `INSERT INTO users (role, fname, lname, email, phone, provider, password, createdAt, notificationPreferences)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                  RETURNING *`,
-                [role, fname, lname, email, provider, password, new Date(), JSON.stringify(notificationPreferences)]
+                [role, fname, lname, email, phoneVal, provider, password, new Date(), JSON.stringify(notificationPreferences)]
             );
             return rows[0];
         }
 
         const { rows } = await pool.query(
-                `INSERT INTO users (role, fname, lname, email, provider, password, createdAt, deviceId, notificationPreferences)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                `INSERT INTO users (role, fname, lname, email, phone, provider, password, createdAt, deviceId, notificationPreferences)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING *`,
-            [role, fname, lname, email, provider, password, new Date(), deviceId, JSON.stringify(notificationPreferences)]
+            [role, fname, lname, email, phoneVal, provider, password, new Date(), deviceId, JSON.stringify(notificationPreferences)]
         );
         return rows[0];
     });
@@ -75,14 +77,15 @@ export class model{
         return rows[0].count;
     })
 
-    static countPhone = withErrorHandling(async (phone: string | number) => {
+    static countPhone = withErrorHandling(async (phone: string | number, exceptUserId?: number) => {
+        const exceptId = Number(exceptUserId);
         const { rows } = await (await db()).query(
-            `SELECT COUNT(*) AS count FROM users WHERE phone = $1`,
-            [phone]
+            exceptId > 0
+                ? `SELECT COUNT(*) AS count FROM users WHERE phone = $1 AND id <> $2`
+                : `SELECT COUNT(*) AS count FROM users WHERE phone = $1`,
+            exceptId > 0 ? [phone, exceptId] : [phone]
         );
-        console.log(rows)
-        console.log(phone)
-        return rows[0].count;
+        return Number(rows[0].count);
     })
 
     static findUserById = withErrorHandling(async (id: number)  => {
@@ -150,7 +153,9 @@ export class model{
                 location?: Record<string, unknown> | null;
             }
         ) => {
-            const { fname, lname, gender, id, preferredLanguage, timezone, location } = payload;
+            const { fname, lname, gender, phone, id, preferredLanguage, timezone, location } = payload;
+            const phoneVal =
+                phone != null && String(phone).trim() !== "" ? String(phone).trim() : null;
 
             const locationJson =
                 location !== undefined && location !== null ? JSON.stringify(location) : null;
@@ -161,16 +166,18 @@ export class model{
                     fname = COALESCE($1, fname),
                     lname = COALESCE($2, lname),
                     gender = COALESCE($3, gender),
-                    preferredlanguage = COALESCE($4, preferredlanguage),
-                    timezone = COALESCE($5, timezone),
-                    location = $6
-                WHERE id = $7
+                    phone = COALESCE($4, phone),
+                    preferredlanguage = COALESCE($5, preferredlanguage),
+                    timezone = COALESCE($6, timezone),
+                    location = $7
+                WHERE id = $8
                 RETURNING *
                 `,
                 [
                     fname ?? null,
                     lname ?? null,
                     gender ?? null,
+                    phoneVal,
                     preferredLanguage ?? null,
                     timezone ?? null,
                     (locationJson),

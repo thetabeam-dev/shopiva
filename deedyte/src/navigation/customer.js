@@ -5,9 +5,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import { HomeStackScreen } from '../stacks/customer/Home';
 import { ExploreStackScreen } from '../stacks/customer/Explore';
 import { ProfileStackScreen } from '../stacks/customer/Profile';
-import { CartStackScreen } from '../stacks/customer/Cart';
+// import { CartStackScreen } from '../stacks/customer/Cart';
 import { WalletStackScreen } from '../stacks/Wallet';
 import { ActivitiesStackScreen } from '../stacks/customer/Activities';
+import { ChatStackScreen } from '../stacks/customer/Chat';
 import { ProfileProvider } from '../context/ProfileContext';
 import { useAuth } from '../hooks/useAuth';
 import { useUnreadChatTotal } from '../components/UnreadMessageBadge';
@@ -40,7 +41,7 @@ function useActivitiesBadge() {
     return itemRole === 'buyer' || itemRole === 'customer';
   }).length;
 
-  const total = changes + chatTotal + reviewCount;
+  const total = changes + reviewCount;
   return total > 0 ? total : undefined;
 }
 
@@ -48,6 +49,8 @@ export default function CustomerTab() {
   const { nested_nav } = useSelector(s => s?.nested_nav);
   const { isGuest } = useAuth();
   const activitiesBadge = useActivitiesBadge();
+  const chatTotal = useUnreadChatTotal();
+  const chatBadge = chatTotal > 0 ? chatTotal : undefined;
   const [tabBarStyle, setTabBarStyle] = React.useState('flex');
 
   React.useEffect(() => {
@@ -69,10 +72,10 @@ export default function CustomerTab() {
               iconName = focused ? 'home' : 'home-outline';
             } else if (route.name === 'Explore') {
               iconName = focused ? 'compass' : 'compass-outline';
-            } else if (route.name === 'Cart') {
-              iconName = focused ? 'cart' : 'cart-outline';
             } else if (route.name === 'Activities') {
               iconName = focused ? 'pulse' : 'pulse-outline';
+            } else if (route.name === 'Chat') {
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
             } else if (route.name === 'Wallet') {
               iconName = focused ? 'wallet' : 'wallet-outline';
             } else if (route.name === 'Profile') {
@@ -92,12 +95,19 @@ export default function CustomerTab() {
         <Tab.Screen name="Explore" component={ExploreStackScreen} />
         {isGuest ? null : (
           <Tab.Screen
+            name="Chat"
+            component={ChatStackScreen}
+            options={{ tabBarBadge: chatBadge }}
+          />
+        )}
+        {isGuest ? null : (
+          <Tab.Screen
             name="Activities"
             component={ActivitiesStackScreen}
             options={{ tabBarBadge: activitiesBadge }}
           />
         )}
-        {isGuest ? null : <Tab.Screen name="Cart" component={CartStackScreen} />}
+        {/* {isGuest ? null : <Tab.Screen name="Cart" component={CartStackScreen} />} */}
         {isGuest ? null : <Tab.Screen name="Wallet" component={WalletStackScreen} />}
         <Tab.Screen name="Profile" component={ProfileStackScreen} />
       </Tab.Navigator>

@@ -29,6 +29,8 @@ import EntrepreneurFreeLayout from "../layouts/Entrepreneur/Free";
 
 // Customer Layout Imports
 import CustomerFreeLayout from "../layouts/Customer/Free";
+import CustomerRestrictedLayout from "../layouts/Customer/Restricted";
+import { requiresAuth } from "../reusables/verifyAuth";
 
 // ============================================================================
 // CONSTANTS
@@ -142,7 +144,7 @@ export default function App({ session, children }) {
   return (
     <>
       <AppShell session={session} pathname={pathname}>{children}</AppShell>
-      {isWebAllowedPath(pathname) ? null : <DownloadAppGate />}
+      {/* {isWebAllowedPath(pathname) ? null : <DownloadAppGate />} */}
     </>
   );
 }
@@ -229,6 +231,10 @@ function Customer({ children }) {
   // Auth pages use AuthLayout
   if (isAuthPage(pathname)) {
     return <AuthLayout>{children}</AuthLayout>;
+  }
+
+  if (requiresAuth(pathname)) {
+    return <CustomerRestrictedLayout>{children}</CustomerRestrictedLayout>;
   }
 
   return <CustomerFreeLayout>{children}</CustomerFreeLayout>;

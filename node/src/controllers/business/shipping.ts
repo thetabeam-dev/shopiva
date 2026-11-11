@@ -156,11 +156,11 @@ export async function SaveShippingZoneController(
       return;
     }
 
-    const baseFeeNum = Number(baseFee);
-    if (!Number.isFinite(baseFeeNum) || baseFeeNum <= 0) {
+    const baseFeeNum = Number(baseFee ?? 0);
+    if (!Number.isFinite(baseFeeNum) || baseFeeNum < 0) {
       res.status(400).json({
         success: false,
-        error: "Base fee must be a positive number",
+        error: "Base fee cannot be negative",
       });
       return;
     }

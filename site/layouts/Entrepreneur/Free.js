@@ -430,7 +430,7 @@ export default function EntrepreneurFreeLayout({ children }) {
         {children}
       </main>
 
-      {/* Footer */}
+      {isPublicInfoPage ? (
       <footer className="site-footer">
         <section className="footer-banner" aria-hidden="true" />
 
@@ -624,6 +624,7 @@ export default function EntrepreneurFreeLayout({ children }) {
           </div>
         </section>
       </footer>
+      ) : null}
     </>
   );
 }

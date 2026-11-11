@@ -66,9 +66,9 @@ function resolveNotificationTarget(meta, data) {
       : null;
   }
 
-  if (type === 'cart' || type === 'checkout' || type === 'abandoned_cart') {
-    return { screen: 'Cart', role: 'customer' };
-  }
+  // if (type === 'cart' || type === 'checkout' || type === 'abandoned_cart') {
+  //   return { screen: 'Cart', role: 'customer' };
+  // }
 
   if (type === 'order' || type === 'orders') {
     return orderId
@@ -224,7 +224,7 @@ function navigateWhenReady(target) {
       const screenName = String(target.screen ?? '');
       const ok =
         screenName.toLowerCase() === 'cart'
-          ? navigateToCartTab()
+          ? false // navigateToCartTab()
           : navigateToActivitiesScreen(screenName, target.params);
       if (!ok && attempt < 20) {
         setTimeout(() => tryNavigate(attempt + 1), 250);

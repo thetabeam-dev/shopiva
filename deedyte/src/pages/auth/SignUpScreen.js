@@ -26,6 +26,7 @@ export default function SignUpScreen({ navigation, route }) {
   const allowSkip = route?.params?.allowSkip !== false;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -63,8 +64,15 @@ export default function SignUpScreen({ navigation, route }) {
     const n = name.trim();
     const em = email.trim().toLowerCase();
     const pwd = password;
+    let phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.startsWith('234')) phoneDigits = phoneDigits.slice(3);
+    phoneDigits = phoneDigits.replace(/^0+/, '');
     if (!n || !em || !pwd) {
-      Alert.alert('Missing fields', 'Fill in name, email, and password.');
+      Alert.alert('Missing fields', 'Fill in name, email, phone, and password.');
+      return;
+    }
+    if (!/^[789]\d{9}$/.test(phoneDigits)) {
+      Alert.alert('Phone', 'Enter a valid Nigerian mobile number.');
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
@@ -78,7 +86,12 @@ export default function SignUpScreen({ navigation, route }) {
 
     setSubmitting(true);
     try {
-      const result = await registerAccount({ name: n, email: em, password: pwd });
+      const result = await registerAccount({
+        name: n,
+        email: em,
+        password: pwd,
+        phone: `+234${phoneDigits}`,
+      });
       if (!result.ok) {
         Alert.alert('Sign up failed', result.message || 'Try again.');
         return;
@@ -97,7 +110,7 @@ export default function SignUpScreen({ navigation, route }) {
     } finally {
       setSubmitting(false);
     }
-  }, [navigation, name, email, password]);
+  }, [navigation, name, email, phone, password]);
 
   const onSkipAuth = useCallback(async () => {
     try {
@@ -171,6 +184,24 @@ export default function SignUpScreen({ navigation, route }) {
               <Icon name="checkmark" size={18} color="#000000" />
             </View>
           ) : null}
+        </View>
+
+        <Text style={styles.label}>Phone number</Text>
+        <View style={styles.phoneRow}>
+          <View style={styles.dialCode}>
+            <Text style={styles.dialCodeText}>+234</Text>
+          </View>
+          <View style={[styles.inputWrap, styles.phoneInputWrap]}>
+            <TextInput
+              style={styles.input}
+              placeholder="8012345678"
+              placeholderTextColor={AUTH.textMuted}
+              keyboardType="phone-pad"
+              value={phone}
+              onChangeText={setPhone}
+              editable={!submitting && !oauthBusy}
+            />
+          </View>
         </View>
 
         <Text style={styles.label}>Email</Text>
@@ -306,6 +337,29 @@ const styles = StyleSheet.create({
     color: AUTH.text,
     marginBottom: 8,
     marginTop: 18,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dialCode: {
+    height: 52,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: AUTH.border,
+    backgroundColor: AUTH.inputBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialCodeText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: AUTH.text,
+  },
+  phoneInputWrap: {
+    flex: 1,
   },
   inputWrap: {
     position: 'relative',

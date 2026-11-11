@@ -104,7 +104,7 @@ export default function NotificationsScreen() {
       const roomId = String(room?.id ?? '').trim();
       if (!roomId) return false;
       navigation.navigate('Inbox', {
-        chat: { roomId, name: `Order #${sourceId}` },
+        chat: { roomId, name: '' },
       });
       return true;
     }

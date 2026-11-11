@@ -26,7 +26,7 @@ export async function GET() {
       ORDER BY p.updated_at DESC NULLS LAST
     `);
     urls = products.rows.map((product) => {
-      const loc = `${SITE_ORIGIN}/store/${encodeURIComponent(product.slug)}/${product.id}`;
+      const loc = `${SITE_ORIGIN}/${product.id}`;
       const lastmod = product.updated_at
         ? new Date(product.updated_at).toISOString()
         : new Date().toISOString();

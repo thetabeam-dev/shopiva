@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db } from "../config/database.js";
 import type { PoolClient } from "pg";
-import { formatPhoneNumber } from "../utils/phone.js";
+import { formatPhoneNumber, requireNigerianMobile } from "../utils/phone.js";
 import paystackTools from "../utils/paystack.js";
 import { storePaystackVirtualAccount, updateWalletAddressByUserId } from "../models/wallet.js";
 
@@ -179,7 +179,8 @@ export function requireTwoNameParts(input: {
 
 export async function SignupService(payload: NewUserDocument & { src: string; deviceId: string; deviceToken: string; name?: string }) {
     const { fname, lname } = requireTwoNameParts(payload);
-    payload = { ...payload, fname, lname };
+    const phoneVal = requireNigerianMobile(payload.phone);
+    payload = { ...payload, fname, lname, phone: phoneVal as unknown as number };
 
     const userDoc = await model.findUserByEmail(payload.email);
 
@@ -213,13 +214,9 @@ export async function SignupService(payload: NewUserDocument & { src: string; de
         throw new Error("Email already registered");
     }
 
-    // Check if phone already exists (skip when absent — OAuth / partial profiles)
-    const phoneVal = formatPhoneNumber(payload.phone);
-    if (phoneVal) {
-        const phoneExists = await model.countPhone(phoneVal);
-        if (phoneExists > 0) {
-            throw new Error("Phone number already registered");
-        }
+    const phoneExists = await model.countPhone(phoneVal);
+    if (phoneExists > 0) {
+        throw new Error("Phone number already registered");
     }
 
     // Hash password
@@ -407,7 +404,7 @@ export async function UpdateEmailService(id: number, email: string) {
 }
 
 export async function UpdatePhoneService(id: number, phone: string | number) {
-    const phoneNorm = formatPhoneNumber(phone) ?? "";
+    const phoneNorm = requireNigerianMobile(phone);
 
     const existing = await model.findUserById(id);
     if (!existing || existing.length === 0) {
@@ -417,9 +414,13 @@ export async function UpdatePhoneService(id: number, phone: string | number) {
         existing[0].phone != null && String(existing[0].phone).trim() !== ""
             ? String(existing[0].phone).trim()
             : "";
+    const previousNorm = formatPhoneNumber(previousPhone) ?? "";
+    if (previousNorm === phoneNorm) {
+        const { password, ...userWithoutPassword } = existing[0];
+        return userWithoutPassword;
+    }
 
-    // Check if phone already exists
-    const phoneExists = await model.countPhone(phoneNorm);
+    const phoneExists = await model.countPhone(phoneNorm, id);
     if (phoneExists > 0) {
         throw new Error("Phone number already in use");
     }

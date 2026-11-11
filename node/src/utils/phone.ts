@@ -17,3 +17,12 @@ export function formatPhoneNumber(value: unknown): string | null {
     digits = digits.replace(/^0+/, "");
     return digits || null;
 }
+
+/** Nigerian GSM: 10 subscriber digits after stripping 0 / 234 (e.g. 8032639894). */
+export function requireNigerianMobile(value: unknown): string {
+    const digits = formatPhoneNumber(value);
+    if (!digits || digits.length !== 10 || !/^[789]/.test(digits)) {
+        throw new Error("Enter a valid Nigerian mobile number (11 digits starting with 0).");
+    }
+    return digits;
+}

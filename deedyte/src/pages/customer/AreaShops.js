@@ -4,7 +4,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { normalizeVendorState, vendorStateRaw } from './Vendors';
 
 function shopCover(vendor) {
-  return String(vendor?.logo ?? '').trim();
+  return String(vendor?.banner ?? '').trim();
 }
 
 function shopPlace(vendor) {

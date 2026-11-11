@@ -281,19 +281,11 @@ export default function EntrepreneurRestrictedLayout({ children }) {
           backgroundColor: "#f7f7f7",
         }}
       >
-        <div style={{ textAlign: "center" }}>
-          <div 
-            style={{
-              width: "40px",
-              height: "40px",
-              border: "3px solid #ededed",
-              borderTopColor: "#00926e",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 16px",
-            }}
+        <div className="site-process-loader" role="status" aria-label="Loading">
+          <span
+            className="site-process-loader__spinner"
+            style={{ borderColor: "#ededed", borderTopColor: "#00926e" }}
           />
-          <p style={{ color: "#666" }}>Loading...</p>
         </div>
         <style jsx>{`
           @keyframes spin {

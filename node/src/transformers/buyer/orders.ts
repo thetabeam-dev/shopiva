@@ -65,7 +65,8 @@ export const ordersTransformer = async (
                 ? parseFloat(o.amount_paid)
                 : Number(o.amount_paid);
         const status = String(o.fulfillment_status ?? "");
-        const feeSet = status !== "" && status !== "unpaid" && status !== "payment_received";
+        const feeSet = (status !== "" && status !== "unpaid" && status !== "payment_received")
+            || Number(o.shipping_fee ?? 0) > 0;
         const shipping = feeSet ? Number(o.shipping_fee ?? 0) : 0;
         const amount = (Number.isFinite(goods) ? goods : 0) + (Number.isFinite(shipping) ? shipping : 0);
 
@@ -84,6 +85,7 @@ export const ordersTransformer = async (
             delivery: String(o.shipping_method ?? ""),
             date: o.created_at != null ? String(o.created_at) : null,
             shipping_address: String(o.shipping_address ?? ""),
+            payment_reference: String(o.payment_reference ?? ""),
             customer_lat: null,
             customer_lng: null,
         };

@@ -65,7 +65,8 @@ export const ordersTransformer = async (
                 ? parseFloat(o.amount_paid)
                 : Number(o.amount_paid);
         const status = String(o.fulfillment_status ?? "");
-        const feeSet = status !== "" && status !== "unpaid" && status !== "payment_received";
+        const feeSet = (status !== "" && status !== "unpaid" && status !== "payment_received")
+            || Number(o.shipping_fee ?? 0) > 0;
         const shipping = feeSet ? Number(o.shipping_fee ?? 0) : 0;
         const amount = (Number.isFinite(goods) ? goods : 0) + (Number.isFinite(shipping) ? shipping : 0);
 

@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from "./siteNavigation";
 
-function productUrl(slug, id) {
-  return `${SITE_ORIGIN}/store/${encodeURIComponent(String(slug))}/${id}`;
+function productUrl(id) {
+  return `${SITE_ORIGIN}/${id}`;
 }
 
 function firstImages(product) {
@@ -18,8 +18,8 @@ function offerPrice(product) {
   return amount.toFixed(2);
 }
 
-export function productJsonLd(product, slug) {
-  const url = productUrl(slug, product?.id);
+export function productJsonLd(product) {
+  const url = productUrl(product?.id);
   const images = firstImages(product);
   const shopName = String(product?.shopName ?? "").trim() || "DeeDyte";
 

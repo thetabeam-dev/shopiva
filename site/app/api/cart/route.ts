@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "../lib/database";
 import { getCustomerUserId } from "../lib/customerAuth";
+import { isVideoUrl } from "@/lib/storefrontProducts";
+
+function mediaUrl(raw: unknown) {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://cdn.deedyte.com/${value.replace(/^\//, "")}`;
+}
 
 const MISSING_TABLE = "42P01";
 
@@ -34,15 +42,18 @@ export async function GET(request: NextRequest) {
          i.product_id,
          i.sku,
          i.price,
+         i.compare_at_price,
          i.currency,
          CASE
            WHEN i.track_inventory IS FALSE THEN GREATEST(0, COALESCE(i.quantity, 0))
            ELSE GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0))
          END AS stock,
          p.name,
+         p.thumbnail_url,
          p.images,
          p.shop_id,
-         s.slug AS shop_slug
+         s.slug AS shop_slug,
+         s.name AS shop_name
        FROM cart_items ci
        INNER JOIN inventory i ON i.id = ci.inventory_id
        INNER JOIN products p ON p.id = i.product_id
@@ -52,21 +63,33 @@ export async function GET(request: NextRequest) {
       [auth.userId]
     );
 
-    const items = rows.map((r) => ({
-      id: String(r.cart_line_id),
-      cartLineId: Number(r.cart_line_id),
-      productId: Number(r.product_id),
-      inventoryId: Number(r.inventory_id),
-      name: String(r.name ?? ""),
-      sku: r.sku != null ? String(r.sku) : null,
-      price: Number(r.price) || 0,
-      currency: r.currency != null ? String(r.currency) : "NGN",
-      quantity: Number(r.quantity) || 1,
-      stock: Number(r.stock) || 0,
-      shopId: Number(r.shop_id) || 0,
-      shopSlug: r.shop_slug != null ? String(r.shop_slug) : "",
-      images: Array.isArray(r.images) ? r.images.map(String) : [],
-    }));
+    const items = rows.map((r) => {
+      const thumbnail =
+        mediaUrl(r.thumbnail_url) ||
+        (Array.isArray(r.images) ? mediaUrl(r.images.find(Boolean)) : "");
+      return {
+        id: String(r.cart_line_id),
+        cartLineId: Number(r.cart_line_id),
+        productId: Number(r.product_id),
+        inventoryId: Number(r.inventory_id),
+        name: String(r.name ?? ""),
+        sku: r.sku != null ? String(r.sku) : null,
+        price: Number(r.price) || 0,
+        compareAtPrice:
+          r.compare_at_price != null && Number(r.compare_at_price) > Number(r.price)
+            ? Number(r.compare_at_price)
+            : 0,
+        currency: r.currency != null ? String(r.currency) : "NGN",
+        quantity: Number(r.quantity) || 1,
+        stock: Number(r.stock) || 0,
+        shopId: Number(r.shop_id) || 0,
+        shopSlug: r.shop_slug != null ? String(r.shop_slug) : "",
+        shopName: r.shop_name != null ? String(r.shop_name) : "",
+        images: Array.isArray(r.images) ? r.images.map(String) : [],
+        thumbnail,
+        thumbnailIsVideo: isVideoUrl(thumbnail),
+      };
+    });
 
     return NextResponse.json({ items });
   } catch (err: unknown) {
