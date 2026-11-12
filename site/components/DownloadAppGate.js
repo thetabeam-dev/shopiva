@@ -100,11 +100,16 @@ export default function DownloadAppGate({
         style={{
           width: "100%",
           maxWidth: 420,
+          height: 400,
           background: "#fff",
           borderRadius: 16,
           padding: "32px 24px",
           textAlign: "center",
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.25)",
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         <h2 id="download-app-title" style={{ fontSize: 22, fontWeight: 800, color: "#111", marginBottom: 12 }}>
@@ -113,7 +118,15 @@ export default function DownloadAppGate({
         <p style={{ fontSize: 15, lineHeight: 1.5, color: "#555", marginBottom: 24 }}>
           {message}
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <a
             href={APP_STORE_URL}
             target="_blank"
@@ -137,7 +150,7 @@ export default function DownloadAppGate({
               type="button"
               onClick={onClose}
               style={{
-                marginTop: 8,
+                marginTop: "auto",
                 border: 0,
                 background: "transparent",
                 color: "#00926E",
@@ -149,7 +162,15 @@ export default function DownloadAppGate({
               Not now
             </button>
           ) : (
-            <a href="/" style={{ marginTop: 8, color: "#00926E", fontWeight: 600, textDecoration: "none" }}>
+            <a
+              href="/"
+              style={{
+                marginTop: "auto",
+                color: "#00926E",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
               Back to home
             </a>
           )}
