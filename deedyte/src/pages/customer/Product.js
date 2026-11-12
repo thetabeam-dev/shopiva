@@ -809,7 +809,9 @@ export default function ProductScreen({ route, navigation }) {
       return;
     }
     const recipient = String(shopName || '').trim();
-    const itemAmount = Number(product?.priceUsd) || 0;
+    const variantId = hasVariants && selectedVariant ? Number(selectedVariant.id) || 0 : 0;
+    const variantPrice = variantId ? getVariantRowPrice(/** @type {Record<string, unknown>} */ (selectedVariant)) : NaN;
+    const itemAmount = Number.isFinite(variantPrice) && variantPrice > 0 ? variantPrice : Number(product?.priceUsd) || 0;
     const itemTitle = String(product?.title ?? '').trim();
     const productId = Number(d?.id ?? routeProduct?.id ?? routeProductId) || 0;
     const itemImage = String(product?.uri ?? getProductImageUri(d) ?? getProductImageUri(routeProduct) ?? '').trim();
@@ -821,9 +823,10 @@ export default function ProductScreen({ route, navigation }) {
         itemTitle,
         itemImage,
         productId,
+        variantId: variantId || undefined,
       },
     });
-  }, [loggedIn, signOut, shopName, resolvedShopId, shopId, navigation, product, d, routeProduct, routeProductId]);
+  }, [loggedIn, signOut, shopName, resolvedShopId, shopId, navigation, product, d, routeProduct, routeProductId, hasVariants, selectedVariant]);
 
   const handleBuyNow = useCallback(async () => {
     if (!ensureReadyForCartOrCheckout()) return;
@@ -1225,7 +1228,7 @@ export default function ProductScreen({ route, navigation }) {
             </View>
           ) : null}
         </View>
-        <Text style={styles.quantityLabel}>Quantity</Text>
+        {/* <Text style={styles.quantityLabel}>Quantity</Text>
         <View style={styles.qtyPill}>
           <TouchableOpacity
             style={styles.qtyBtn}
@@ -1242,7 +1245,7 @@ export default function ProductScreen({ route, navigation }) {
           >
             <Icon name="add" size={22} color="#000000" />
           </TouchableOpacity>
-        </View>
+        </View> */}
         <TouchableOpacity
           style={styles.addCart}
           activeOpacity={0.88}
@@ -1252,7 +1255,7 @@ export default function ProductScreen({ route, navigation }) {
           accessibilityRole="button"
           accessibilityLabel="Chat with vendor"
         >
-          <Text style={styles.addCartText}>Chat with vendor</Text>
+          <Text style={styles.addCartText}>Start Purchase</Text>
         </TouchableOpacity>
         {/* Add to cart
           onPress={() => {

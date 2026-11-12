@@ -251,11 +251,24 @@ export default function DisputeDetailScreen() {
     }
 
     if (dispute.status === "resolved") {
-      setLoading(true)
-      let id = await fetchReturnId(dispute.order_id, auth.activeRole);
-      setLoading(false)
+      setLoading(true);
+      let ret = null;
+      try {
+        ret = await fetchReturnId(dispute.order_id, auth.activeRole);
+      } catch {
+        ret = null;
+      } finally {
+        setLoading(false);
+      }
+      if (!ret?.ok || ret.id == null) {
+        Alert.alert(
+          'No return',
+          'This dispute was resolved without a return. The buyer keeps the item and was refunded for it.',
+        );
+        return;
+      }
       navigation.navigate("Return-detail", {
-        returnId: id.id,
+        returnId: ret.id,
       });
       return;
     }

@@ -56,6 +56,9 @@ const DISPUTE_REASONS = [
   { label: 'Other', value: 'other' },
 ];
 
+/** Reasons the buyer can only prove with a photo of what arrived. */
+const PHOTO_REQUIRED_REASONS = new Set(['not_as_described', 'wrong_item', 'damaged_item', 'defective_item']);
+
 const RESOLUTIONS = [
   // { label: 'Full refund', value: 'refund' },
   // { label: 'Replacement item', value: 'replacement' },
@@ -489,7 +492,7 @@ export default function OpenDispute() {
       Alert.alert('Reason required', 'Select what is wrong with your order.');
       return false;
     }
-    if (evidence.length < MIN_EVIDENCE) {
+    if (PHOTO_REQUIRED_REASONS.has(reasonCode) && evidence.length < MIN_EVIDENCE) {
       Alert.alert(
         'Photos required',
         `Add at least ${MIN_EVIDENCE} photo showing the issue.`
@@ -718,8 +721,10 @@ export default function OpenDispute() {
 
           
           <Section
-            title="Add photos"
-            subtitle="Clear photos of the item and packaging help us review faster."
+            title={PHOTO_REQUIRED_REASONS.has(reasonCode) ? 'Add photos (required)' : 'Add photos (optional)'}
+            subtitle={PHOTO_REQUIRED_REASONS.has(reasonCode)
+              ? 'Add at least one clear photo of the item and packaging showing the issue.'
+              : 'Clear photos of the item and packaging help us review faster.'}
           >
             <ScrollView
               horizontal
