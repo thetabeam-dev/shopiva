@@ -206,9 +206,6 @@ export default function CustomerHome() {
                         <ProductCard
                             key={product.id}
                             product={product}
-                            onAddToCart={addToCart}
-                            cartBusy={cartBusyId}
-                            added={addedIds.has(String(product.id))}
                             extra={soldLabel ? <span className="card-sold">{soldLabel}</span> : null}
                         >
                             {product.featured ? (

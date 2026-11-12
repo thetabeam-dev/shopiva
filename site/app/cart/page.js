@@ -439,8 +439,6 @@ export default function CartPage() {
                       <ProductCard
                         key={product.id}
                         product={product}
-                        onAddToCart={addExploreToCart}
-                        cartBusy={cartBusyId}
                       />
                     ))}
                   </div>

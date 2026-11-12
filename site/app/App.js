@@ -218,12 +218,34 @@ function Entrepreneur({ children }) {
 // ============================================================================
 
 /**
+ * Buyer shopping surfaces (home, PDP, vendors, shop storefront) use the
+ * restricted shell so store marketing CSS does not break the product feed.
+ * @param {string} pathname
+ */
+function usesBuyerShoppingShell(pathname) {
+  const path = (pathname || "").split("?")[0].replace(/\/+$/, "") || "/";
+  const parts = path.split("/").filter(Boolean);
+  if (path === "/") return true;
+  if (parts[0] === "vendors") return true;
+  // Product detail: /{numericId}
+  if (parts.length === 1 && /^\d+$/.test(parts[0])) return true;
+  // Public shop storefront: /store/{slug} (not /store/cart etc.)
+  if (
+    parts[0] === "store" &&
+    parts.length >= 2 &&
+    !["cart", "checkouts", "orders", "disputes", "inbox"].includes(parts[1])
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Customer layout wrapper component
- * All customer routes use the Free layout (marketing shell).
  *
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components
- * @returns {JSX.Element} Customer free layout (or Auth layout)
+ * @returns {JSX.Element} Customer layout (or Auth layout)
  */
 function Customer({ children }) {
   const pathname = usePathname();
@@ -233,7 +255,7 @@ function Customer({ children }) {
     return <AuthLayout>{children}</AuthLayout>;
   }
 
-  if (requiresAuth(pathname)) {
+  if (requiresAuth(pathname) || usesBuyerShoppingShell(pathname)) {
     return <CustomerRestrictedLayout>{children}</CustomerRestrictedLayout>;
   }
 

@@ -51,7 +51,18 @@ export function isWebAllowedPath(pathname) {
   return false;
 }
 
-export default function DownloadAppGate() {
+/**
+ * @param {{
+ *   onClose?: () => void;
+ *   title?: string;
+ *   message?: string;
+ * }} [props]
+ */
+export default function DownloadAppGate({
+  onClose,
+  title = "Continue on the DeeDyte app",
+  message = "Shopping, selling and managing orders are only available on the DeeDyte mobile app. Download it from the App Store or Play Store to continue.",
+} = {}) {
   const [playStoreUrl, setPlayStoreUrl] = useState(PLAY_STORE_URL);
 
   useEffect(() => {
@@ -71,6 +82,9 @@ export default function DownloadAppGate() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="download-app-title"
+      onClick={onClose ? (event) => {
+        if (event.target === event.currentTarget) onClose();
+      } : undefined}
       style={{
         position: "fixed",
         inset: 0,
@@ -94,11 +108,10 @@ export default function DownloadAppGate() {
         }}
       >
         <h2 id="download-app-title" style={{ fontSize: 22, fontWeight: 800, color: "#111", marginBottom: 12 }}>
-          Continue on the DeeDyte app
+          {title}
         </h2>
         <p style={{ fontSize: 15, lineHeight: 1.5, color: "#555", marginBottom: 24 }}>
-          Shopping, selling and managing orders are only available on the DeeDyte mobile app.
-          Download it from the App Store or Play Store to continue.
+          {message}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <a
@@ -119,9 +132,27 @@ export default function DownloadAppGate() {
             <img src="/svgs/play_store.svg" alt="" style={{ height: 32, width: 32 }} />
             <b>Play Store</b>
           </a>
-          <a href="/" style={{ marginTop: 8, color: "#00926E", fontWeight: 600, textDecoration: "none" }}>
-            Back to home
-          </a>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                marginTop: 8,
+                border: 0,
+                background: "transparent",
+                color: "#00926E",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: 15,
+              }}
+            >
+              Not now
+            </button>
+          ) : (
+            <a href="/" style={{ marginTop: 8, color: "#00926E", fontWeight: 600, textDecoration: "none" }}>
+              Back to home
+            </a>
+          )}
         </div>
       </div>
     </div>

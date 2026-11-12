@@ -1,34 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import logo_img from "../images/Deedyte.png";
 import {
   APP_STORE_URL,
   LEGAL_AND_DOC_LINKS,
   PLAY_STORE_URL,
 } from "../lib/siteNavigation";
-import { formatCategoryLabel } from "../lib/categoryLabel";
 
 export default function SiteFooter() {
-  const [shopCategories, setShopCategories] = useState([]);
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/storefront/categories")
-      .then((response) => response.json())
-      .then((payload) => {
-        if (active && Array.isArray(payload?.categories)) {
-          setShopCategories(payload.categories);
-        }
-      })
-      .catch(() => {
-        if (active) setShopCategories([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   return (
     <footer className="site-footer">
       <section className="footer-banner" aria-hidden="true" />
@@ -49,19 +28,6 @@ export default function SiteFooter() {
           <div>
             <h6 className="footer-contact">admin@deedyte.com</h6>
           </div>
-        </div>
-
-        <div className="footer-column">
-          <h6 className="footer-heading">Shop categories</h6>
-          <ul className="footer-links">
-            {shopCategories.map((category) => (
-              <li className="footer-link" key={category.path}>
-                <a href={category.path} style={{ color: "#fff" }}>
-                  {formatCategoryLabel(category.title)}
-                </a>
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className="footer-column">

@@ -11,6 +11,7 @@ import ProductVariantCardPicker, {
 } from "@/components/customers/ProductVariantCardPicker";
 import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 import dynamic from "next/dynamic";
+import DownloadAppGate from "@/components/DownloadAppGate";
 
 const PaystackBinder = dynamic(() => import("./paystackBinder"), { ssr: false });
 
@@ -83,43 +84,6 @@ function ProfileIcon() {
         </svg>
     );
 }
-function CartIcon() {
-    return (
-        <svg
-            className="customer-shell-header__svg"
-            width={22}
-            height={22}
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden
-        >
-            <path
-                d="M2 3L2.26491 3.0883C3.58495 3.52832 4.24497 3.74832 4.62248 4.2721C5 4.79587 5 5.49159 5 6.88304V9.5C5 12.3284 5 13.7426 5.87868 14.6213C6.75736 15.5 8.17157 15.5 11 15.5H13M19 15.5H17"
-                stroke="#000"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-            />
-            <path
-                d="M7.5 18C8.32843 18 9 18.6716 9 19.5C9 20.3284 8.32843 21 7.5 21C6.67157 21 6 20.3284 6 19.5C6 18.6716 6.67157 18 7.5 18Z"
-                stroke="#000"
-                strokeWidth="1.5"
-            />
-            <path
-                d="M16.5 18.0001C17.3284 18.0001 18 18.6716 18 19.5001C18 20.3285 17.3284 21.0001 16.5 21.0001C15.6716 21.0001 15 20.3285 15 19.5001C15 18.6716 15.6716 18.0001 16.5 18.0001Z"
-                stroke="#000"
-                strokeWidth="1.5"
-            />
-            <path
-                d="M5 6H8M5.5 13H16.0218C16.9812 13 17.4609 13 17.8366 12.7523C18.2123 12.5045 18.4013 12.0636 18.7792 11.1818L19.2078 10.1818C20.0173 8.29294 20.4221 7.34853 19.9775 6.67426C19.5328 6 18.5054 6 16.4504 6H12"
-                stroke="#000"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-            />
-        </svg>
-    );
-}
-
 function formatNgn(n) {
     return `₦${Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
 }
@@ -164,6 +128,17 @@ function shownPrice(inv, product) {
     return formatNgn(raw);
 }
 
+function priceRangeLabel(rows, product) {
+    const prices = (Array.isArray(rows) ? rows : [])
+        .map((row) => Number(row?.price))
+        .filter((n) => Number.isFinite(n) && n > 0);
+    if (!prices.length) return shownPrice(null, product);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    if (min === max) return formatNgn(min);
+    return `${formatNgn(min)} - ${formatNgn(max)}`;
+}
+
 export default function ProductDetail({ product }) {
     const shopSlug = String(product?.slug ?? "");
     const productId = product?.id != null ? String(product.id) : "";
@@ -176,12 +151,16 @@ export default function ProductDetail({ product }) {
     const [loadError, setLoadError] = useState(product ? "" : "Product not found");
 
     const [activeImageIndex, setActiveImageIndex] = useState(0);
-    const [selectedInvId, setSelectedInvId] = useState(
-        () => inventoryFromProduct(product)[0]?.id ?? null
-    );
-    const [selectedOptionKey, setSelectedOptionKey] = useState(
-        () => inventoryFromProduct(product)[0]?.optionKey ?? null
-    );
+    const [selectedInvId, setSelectedInvId] = useState(() => {
+        const rows = inventoryFromProduct(product);
+        return rows.length === 1 ? rows[0]?.id ?? null : null;
+    });
+    const [selectedOptionKey, setSelectedOptionKey] = useState(() => {
+        const rows = inventoryFromProduct(product);
+        return rows.length === 1 ? rows[0]?.optionKey ?? null : null;
+    });
+    const [actionMessage, setActionMessage] = useState("");
+    const [appGateOpen, setAppGateOpen] = useState(false);
     const [localQty, setLocalQty] = useState(1);
     /** null | "adding" | "removing" — drives disabled state and button label while a request runs. */
     const [cartAction, setCartAction] = useState(null);
@@ -212,14 +191,18 @@ export default function ProductDetail({ product }) {
 
     const activeImage = gallery[activeImageIndex] ?? gallery[0];
 
-    const selectedInv = useMemo(
-        () =>
-            inventory.find((i) => i.optionKey === selectedOptionKey) ??
-            inventory.find((i) => i.id === selectedInvId) ??
-            inventory[0] ??
-            null,
-        [inventory, selectedInvId, selectedOptionKey]
-    );
+    const attrKeys = useMemo(() => variantAttributeKeys(inventory), [inventory]);
+    const hasVariantOptions = inventory.length > 0 && attrKeys.length > 0;
+    const requiresVariantPick = hasVariantOptions && inventory.length > 1;
+
+    const selectedInv = useMemo(() => {
+        const byKey = inventory.find((i) => i.optionKey === selectedOptionKey);
+        if (byKey) return byKey;
+        const byId = inventory.find((i) => i.id === selectedInvId);
+        if (byId) return byId;
+        if (!requiresVariantPick && inventory.length === 1) return inventory[0];
+        return null;
+    }, [inventory, selectedInvId, selectedOptionKey, requiresVariantPick]);
 
     const bulkTiers = useMemo(() => {
         const raw = product?.bulkDiscount;
@@ -235,8 +218,6 @@ export default function ProductDetail({ product }) {
             })
             .filter(Boolean);
     }, [product?.bulkDiscount]);
-
-    const attrKeys = useMemo(() => variantAttributeKeys(inventory), [inventory]);
 
     const selectedCartLine = useMemo(() => {
         if (selectedInv?.id == null) return null;
@@ -258,7 +239,14 @@ export default function ProductDetail({ product }) {
     }, [selectedInv?.stock]);
 
     const selectedPriceNaira = Number(selectedInv?.price) || 0;
-    const unitPrice = unitPriceForBulk(selectedPriceNaira, bulkTiers, qty);
+    const unitPrice = selectedInv
+        ? unitPriceForBulk(selectedPriceNaira, bulkTiers, 1)
+        : 0;
+    const displayPrice = selectedInv
+        ? formatNgn(unitPrice)
+        : hasVariantOptions
+            ? priceRangeLabel(inventory, product)
+            : shownPrice(null, product);
     /** Paystack NGN amount in kobo (smallest unit). */
     const buyNowAmountKobo = Math.max(100, Math.round(unitPrice * qty * 100));
 
@@ -296,6 +284,16 @@ export default function ProductDetail({ product }) {
     useEffect(() => {
         void loadCustomerSession();
     }, [loadCustomerSession]);
+
+    const handleStartPurchase = useCallback(() => {
+        setActionMessage("");
+        if (!product || loadError) return;
+        if (requiresVariantPick && !selectedInv) {
+            setActionMessage("Choose an option (variant) to continue.");
+            return;
+        }
+        setAppGateOpen(true);
+    }, [product, loadError, requiresVariantPick, selectedInv]);
 
     const goPrev = useCallback(() => {
         setActiveImageIndex((i) => {
@@ -497,23 +495,14 @@ export default function ProductDetail({ product }) {
         setProductReviews(Array.isArray(product?.productReviews) ? product.productReviews : []);
         setReviewMetrics(product?.reviewMetrics ?? null);
         setLoadError(product ? "" : "Product not found");
-        const first = inventoryFromProduct(product)[0];
-        setSelectedInvId(first?.id ?? null);
-        setSelectedOptionKey(first?.optionKey ?? null);
+        const rows = inventoryFromProduct(product);
+        const only = rows.length === 1 ? rows[0] : null;
+        setSelectedInvId(only?.id ?? null);
+        setSelectedOptionKey(only?.optionKey ?? null);
         setLocalQty(1);
+        setActionMessage("");
         setActiveImageIndex(0);
     }, [product]);
-
-    useEffect(() => {
-        const el = document.querySelector(".customer-main");
-        if (!el) return;
-        el.style.height = "100vh";
-        el.style.display = "flex";
-        el.style.flexDirection = "column";
-        el.style.overflow = "hidden";
-        el.style.borderRadius = "unset";
-        el.style.backgroundColor = "#fff";
-    }, []);
 
     const onPaystackSuccess = (reference) => {
         console.log(reference);
@@ -718,6 +707,18 @@ export default function ProductDetail({ product }) {
                         </div>
                     </div>
 
+                    <div className="pdp-description">
+                        <h2 className="pdp-section-heading">Description</h2>
+                        {product?.description ? (
+                            <div
+                                className="pdp-buybox__desc pdp-buybox__desc--html"
+                                dangerouslySetInnerHTML={{ __html: product.description }}
+                            />
+                        ) : (
+                            <p className="pdp-buybox__desc">No description provided for this product.</p>
+                        )}
+                    </div>
+
                     <div className="pdp-reviews-wrap">
                         <ProductReviews reviews={productReviews} metrics={reviewMetrics} />
                         <ShopDetails shop={product?.shop} />
@@ -746,9 +747,7 @@ export default function ProductDetail({ product }) {
                                     ? formatNgn(selectedInv.compare_at_price)
                                     : ""}
                             </span>
-                            <span className="pdp-buybox__price">
-                                {selectedInv ? formatNgn(unitPrice) : shownPrice(selectedInv, product)}
-                            </span>
+                            <span className="pdp-buybox__price">{displayPrice}</span>
                         </div>
                         <div className="pdp-buybox__rating">
                             <span className="pdp-stars" aria-hidden>
@@ -771,10 +770,14 @@ export default function ProductDetail({ product }) {
                         </div>
                     </div>
 
+                    {requiresVariantPick && !selectedInv ? (
+                        <p className="pdp-variant-hint">Choose an option (variant) to see the exact price.</p>
+                    ) : null}
+
                     {bulkTiers.length > 0 ? (
                         <div className="pdp-bulk">
                             <h2 className="pdp-section-heading">Bulk discount</h2>
-                            <p className="pdp-bulk__hint">Buy more and pay less per item.</p>
+                            <p className="pdp-bulk__hint">Buy more and pay less per item. Quantity is chosen when you request a checkout invoice in chat.</p>
                             {bulkTiers.map((tier) => (
                                 <div key={`${tier.minQuantity}-${tier.totalPrice}`} className="pdp-bulk__row">
                                     <span className="pdp-bulk__qty">Buy {tier.minQuantity}</span>
@@ -784,13 +787,10 @@ export default function ProductDetail({ product }) {
                                     </span>
                                 </div>
                             ))}
-                            {qty >= (bulkTiers[0]?.minQuantity ?? Infinity) ? (
-                                <p className="pdp-bulk__applied">Bulk price applied at {formatNgn(unitPrice)} each</p>
-                            ) : null}
                         </div>
                     ) : null}
 
-                    {inventory.length > 0 && attrKeys.length ? (
+                    {hasVariantOptions ? (
                         <div className="pdp-variant-pickers">
                             <h2 className="pdp-section-heading">
                                 {inventory.length === 1 ? "Features" : "Options (variant)"}
@@ -804,65 +804,22 @@ export default function ProductDetail({ product }) {
                         </div>
                     ) : null}
 
-                    <p className="pdp-qty-label">Quantity</p>
-                    <div className="pdp-qty-pill" role="group" aria-label="Quantity">
-                        <button
-                            type="button"
-                            className="pdp-qty-pill__btn"
-                            aria-label="Decrease quantity"
-                            disabled={!product || !selectedInv || !!loadError || cartAction != null || qty <= 1}
-                            onClick={() => bumpQty(-1)}
-                        >
-                            −
-                        </button>
-                        <span className="pdp-qty-pill__value" aria-live="polite">
-                            {cartAction != null ? "…" : qty}
-                        </span>
-                        <button
-                            type="button"
-                            className="pdp-qty-pill__btn"
-                            aria-label="Increase quantity"
-                            disabled={!product || !selectedInv || !!loadError || cartAction != null || qty >= maxUnits}
-                            onClick={() => bumpQty(1)}
-                        >
-                            +
-                        </button>
-                    </div>
+                    {/* Quantity is chosen in chat when requesting a checkout invoice, matching the app. */}
 
                     <div className="pdp-ctas">
                         <div className="pdp-ctas__actions">
                             <button
                                 type="button"
                                 className="pdp-btn pdp-btn--primary"
-                                disabled={!product || !selectedInv || !!loadError || cartAction != null}
-                                aria-pressed={selectedInvInCart}
-                                onClick={() => void changeUnits(selectedInvInCart ? -selectedQty : localQty)}
+                                disabled={!product || !!loadError}
+                                onClick={() => void handleStartPurchase()}
                             >
-                                {cartAction === "adding"
-                                    ? "Adding…"
-                                    : cartAction === "removing"
-                                        ? "Removing…"
-                                        : selectedInvInCart
-                                            ? "Remove from cart"
-                                            : "Add to cart"}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => void handleBuyNow()}
-                                className="pdp-btn pdp-btn--secondary"
-                                disabled={!product || !selectedInv || !!loadError}
-                            >
-                                Buy now
+                                Start Purchase
                             </button>
                         </div>
-                        {cartMessage ? (
-                            <p className="pdp-option__label" role="status" style={{ marginTop: 8 }}>
-                                {cartMessage}
-                            </p>
-                        ) : null}
-                        {payMessage ? (
+                        {actionMessage ? (
                             <p className="pdp-option__label" role="alert" style={{ marginTop: 8 }}>
-                                {payMessage}
+                                {actionMessage}
                             </p>
                         ) : null}
                     </div>
@@ -896,18 +853,6 @@ export default function ProductDetail({ product }) {
                         </div>
                     ) : null}
 
-                    <div className="pdp-description">
-                        <h2 className="pdp-section-heading">Description</h2>
-                        {product?.description ? (
-                            <div
-                                className="pdp-buybox__desc pdp-buybox__desc--html"
-                                dangerouslySetInnerHTML={{ __html: product.description }}
-                            />
-                        ) : (
-                            <p className="pdp-buybox__desc">No description provided for this product.</p>
-                        )}
-                    </div>
-
                     {/* <p className="pdp-muted-link">
             <button type="button" className="pdp-link pdp-link--muted">
               Delivery terms &amp; conditions
@@ -935,6 +880,13 @@ export default function ProductDetail({ product }) {
           </div> */}
                 </aside>
             </div>
+            {appGateOpen ? (
+                <DownloadAppGate
+                    onClose={() => setAppGateOpen(false)}
+                    title="Continue in the DeeDyte app"
+                    message="To chat with the vendor and complete this purchase, continue in the DeeDyte mobile app. Download it from the App Store or Play Store."
+                />
+            ) : null}
         </div>
     );
 }

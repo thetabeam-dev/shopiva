@@ -91,7 +91,8 @@ function shouldShowCustomerShellHeader(pathname) {
 function shouldShowCustomerBgVideo(pathname) {
   const path = (pathname || "").split("?")[0] || "/";
   const norm = path.replace(/\/+$/, "") || "/";
-  if (norm === "/") return true;
+  // Product feed home stays opaque white — video was fighting the grid/footer stack.
+  if (norm === "/") return false;
   if (norm === "/vendors" || norm.startsWith("/vendors/")) return true;
   if (norm === "/user-profile" || norm.startsWith("/user-profile/")) return true;
   if (norm === "/store" || norm.startsWith("/store/")) return true;
