@@ -248,6 +248,22 @@
   min-width: 0;
 }
 
+button.deedyte-ups-item--action {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.deedyte-ups-item--action:hover h3 {
+  text-decoration: underline;
+}
+
 .deedyte-ups-item h3 {
   margin: 0;
   font-size: 12px;
