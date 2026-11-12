@@ -142,7 +142,7 @@ export default function Dashboard() {
       armMutedInline();
       const playPromise = video.play();
       if (playPromise?.catch) {
-        playPromise.catch(() => {});
+        playPromise.catch(() => { });
       }
     };
 
@@ -207,7 +207,7 @@ export default function Dashboard() {
   // RENDER
   // ============================================================================
 
-  return ( 
+  return (
     <>
       {/* Hero Section */}
       <section className="hero-section">
@@ -259,7 +259,7 @@ export default function Dashboard() {
 
               {/* Order Button */}
               <div className="order_btn">
-                <button onClick={e => window.location.href = "/vendors"}>Order Now</button>
+                <button onClick={e => window.location.href = "/"}>Order Now</button>
               </div>
 
               {/* Download Buttons */}

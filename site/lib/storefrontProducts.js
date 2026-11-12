@@ -88,7 +88,7 @@ const FALLBACK_SQL = `
     AND btrim(s.slug) <> ''
   GROUP BY p.id, s.slug, s.name, m.average_rating, m.review_count
   ORDER BY p.is_featured DESC, MAX(p.created_at) DESC
-  LIMIT 80
+  LIMIT $1 OFFSET $2
 `;
 
 const FULL_SQL = `
@@ -130,19 +130,37 @@ const FULL_SQL = `
     AND btrim(s.slug) <> ''
   GROUP BY p.id, s.slug, s.name, m.average_rating, m.review_count, oi.sold
   ORDER BY p.is_featured DESC, MAX(p.created_at) DESC
-  LIMIT 80
+  LIMIT $1 OFFSET $2
 `;
 
-export async function listHomeProducts() {
+/**
+ * @param {{ limit?: number, offset?: number }} [options]
+ * @returns {Promise<{ products: ReturnType<typeof mapProductRows>, hasMore: boolean, nextOffset: number }>}
+ */
+export async function listHomeProducts({ limit = 40, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const fetchLimit = safeLimit + 1;
+
+  async function run(sql) {
+    const result = await query(sql, [fetchLimit, safeOffset]);
+    const mapped = mapProductRows(result.rows);
+    const hasMore = mapped.length > safeLimit;
+    const products = hasMore ? mapped.slice(0, safeLimit) : mapped;
+    return {
+      products,
+      hasMore,
+      nextOffset: safeOffset + products.length,
+    };
+  }
+
   try {
-    const result = await query(FULL_SQL);
-    return mapProductRows(result.rows);
+    return await run(FULL_SQL);
   } catch (error) {
     console.error("Home products lookup with sales/reviews failed:", error);
   }
 
-  const fallback = await query(FALLBACK_SQL);
-  return mapProductRows(fallback.rows);
+  return run(FALLBACK_SQL);
 }
 
 function coerceSpecs(raw) {

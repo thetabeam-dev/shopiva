@@ -33,8 +33,14 @@ function StarRow({ rating, count }) {
     );
 }
 
+const PAGE_SIZE = 40;
+
 export default function CustomerHome() {
     const [products, setProducts] = useState([]);
+    const [nextOffset, setNextOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [windowDays, setWindowDays] = useState(null);
     const [sort, setSort] = useState("sold");
     const [categoryKey, setCategoryKey] = useState("");
@@ -43,20 +49,59 @@ export default function CustomerHome() {
 
     useEffect(() => {
         let active = true;
-        fetch("/api/storefront/products")
+        setLoading(true);
+        fetch(`/api/storefront/products?limit=${PAGE_SIZE}&offset=0`)
             .then((response) => response.json())
             .then((payload) => {
-                if (active && Array.isArray(payload?.products)) {
-                    setProducts(payload.products);
-                }
+                if (!active) return;
+                const rows = Array.isArray(payload?.products) ? payload.products : [];
+                setProducts(rows);
+                setHasMore(Boolean(payload?.hasMore));
+                setNextOffset(
+                    Number.isFinite(Number(payload?.nextOffset))
+                        ? Number(payload.nextOffset)
+                        : rows.length
+                );
             })
             .catch(() => {
-                if (active) setProducts([]);
+                if (!active) return;
+                setProducts([]);
+                setHasMore(false);
+                setNextOffset(0);
+            })
+            .finally(() => {
+                if (active) setLoading(false);
             });
         return () => {
             active = false;
         };
     }, []);
+
+    async function loadMore() {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        try {
+            const response = await fetch(
+                `/api/storefront/products?limit=${PAGE_SIZE}&offset=${nextOffset}`
+            );
+            const payload = await response.json().catch(() => ({}));
+            const rows = Array.isArray(payload?.products) ? payload.products : [];
+            setProducts((prev) => {
+                const seen = new Set(prev.map((row) => String(row.id)));
+                return [...prev, ...rows.filter((row) => !seen.has(String(row.id)))];
+            });
+            setHasMore(Boolean(payload?.hasMore));
+            setNextOffset(
+                Number.isFinite(Number(payload?.nextOffset))
+                    ? Number(payload.nextOffset)
+                    : nextOffset + rows.length
+            );
+        } catch {
+            setHasMore(false);
+        } finally {
+            setLoadingMore(false);
+        }
+    }
 
     useEffect(() => {
         let active = true;
@@ -176,7 +221,7 @@ export default function CustomerHome() {
                 </div>
                 <div className="deedyte-home-toolbar-right">
                     <label>
-                        Filter by category
+                        {/* Filter by category */}
                         <select value={categoryKey} onChange={(event) => setCategoryKey(event.target.value)}>
                             <option value="">All</option>
                             {categories.map((category) => (
@@ -221,8 +266,20 @@ export default function CustomerHome() {
                     );
                 })}
             </div>
-            {!visible.length ? (
+            {!loading && !visible.length ? (
                 <p className="deedyte-home-empty">No products yet.</p>
+            ) : null}
+            {hasMore ? (
+                <div className="deedyte-home-load-more">
+                    <button
+                        type="button"
+                        className="deedyte-home-load-more__btn"
+                        onClick={() => void loadMore()}
+                        disabled={loadingMore}
+                    >
+                        {loadingMore ? "Loading…" : "Load more"}
+                    </button>
+                </div>
             ) : null}
         </section>
     );

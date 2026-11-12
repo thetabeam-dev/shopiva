@@ -107,10 +107,11 @@
   min-height: 56px;
   background: #fff !important;
   color: #000;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: stretch;
+  column-gap: 10px;
   padding: 10px 16px;
   box-sizing: border-box;
   flex: 0 0 auto;
@@ -126,12 +127,14 @@
   width: 36px;
   object-fit: contain;
   flex-shrink: 0;
+  justify-self: start;
 }
 
 .buyer-search {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   max-width: 560px;
+  justify-self: center;
   height: 40px;
   display: flex;
   align-items: center;
@@ -187,6 +190,7 @@
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+  justify-self: end;
 }
 
 .buyer-auth,
@@ -342,6 +346,8 @@
 
 #deedyte-home {
   border-radius: 0;
+  display: flex;
+  flex-direction: column;
   background: #fff;
 }
 
@@ -563,6 +569,36 @@
   color: #777;
 }
 
+.deedyte-home-load-more {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 28px 0 8px;
+}
+
+.deedyte-home-load-more__btn {
+  min-width: 160px;
+  height: 44px;
+  padding: 0 28px;
+  border: 1.5px solid #00926e;
+  border-radius: 999px;
+  background: #fff;
+  color: #00926e;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.deedyte-home-load-more__btn:hover:not(:disabled) {
+  background: #e0f6ef;
+}
+
+.deedyte-home-load-more__btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 /* ── Phones ── */
 @media screen and (max-width: 700px) {
   .buyer-head {
@@ -595,11 +631,11 @@
 
   .buyer-header {
     padding: 8px 12px;
-    gap: 8px;
+    column-gap: 8px;
     min-height: 52px;
     max-height: 52px;
     height: 52px;
-    flex-wrap: nowrap;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .buyer-auth__copy,
@@ -608,18 +644,21 @@
   }
 
   .buyer-search {
-    flex: 1 1 auto;
-    min-width: 120px;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 36px;
+    padding-left: 12px;
+    justify-self: stretch;
+  }
+
+  .buyer-header-group {
+    justify-self: end;
   }
 
   .deedyte-categories {
     flex: 0 0 auto;
     padding: 8px 12px;
-  }
-
-  .buyer-search {
-    height: 36px;
-    padding-left: 12px;
   }
 
   .deedyte-home {
