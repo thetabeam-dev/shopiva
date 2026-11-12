@@ -1433,7 +1433,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     <>
     {
       Platform.OS === 'android' &&
-      <SafeAreaView style={[styles.flex, keyboardInset > 0 && { paddingBottom: keyboardInset }]} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.flex, keyboardInset > 0 && { paddingBottom: keyboardInset }]} edges={['left', 'right']}>
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
