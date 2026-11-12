@@ -9,7 +9,7 @@ import { sendFcmForActivities } from "../services/firebaseConfig.js";
 import { creditOrderPayoutToWallet, creditUserWallet } from "../models/wallet.js";
 import { GetShopOwnerByShopIdService } from "../services/business/shop.js";
 import { sendNotificationEmail } from "../services/email.js";
-import { recordEscrowRelease, reduceEscrowHeld, syncOrderEscrowStatus } from "../models/escrow.js";
+import { recordEscrowRelease, syncOrderEscrowStatus } from "../models/escrow.js";
 import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 import { calculateEscrowFee, policy } from "../utils/escrow.js";
 
@@ -447,7 +447,6 @@ export const handleOrderAcceptance = async (
           `SELECT shipping_fee, customer_id FROM orders WHERE id = $1`,
           [order_id],
         );
-        const buyerId = Number(current.rows[0]?.customer_id);
         const paidEvent = await p.query<{ meta: unknown }>(
           `SELECT meta FROM order_events
            WHERE order_id = $1 AND stage = 'payment_received'
@@ -463,45 +462,15 @@ export const handleOrderAcceptance = async (
         const deductedShipping = [chargedEstimate, clientEstimate, Number(current.rows[0]?.shipping_fee ?? 0)]
           .filter((value) => Number.isFinite(value) && value > 0)
           .reduce((max, value) => Math.max(max, value), 0);
+        const finalShippingFee = deductedShipping > 0 ? deductedShipping : shippingFee;
         await p.query(
           `UPDATE orders
            SET shipping_fee = $1,
                total_paid = COALESCE(amount_paid, 0) + $1,
                updated_at = NOW()
            WHERE id = $2`,
-          [shippingFee, order_id],
+          [finalShippingFee, order_id],
         );
-        const excessNaira = deductedShipping - shippingFee;
-        if (excessNaira > 0 && Number.isFinite(buyerId) && buyerId > 0) {
-          try {
-            const excessKobo = Math.round(excessNaira * 100);
-            const credit = await creditUserWallet(
-              buyerId,
-              excessKobo,
-              `order:${order_id}:shipping-refund:${Math.round(deductedShipping * 100)}-${Math.round(shippingFee * 100)}`,
-              `Shipping fee refund for order #${order_id}`,
-            );
-            if (credit.credited) {
-              await reduceEscrowHeld(Number(order_id), excessKobo);
-              notifyUser(buyerId, "wallet_credited", {
-                balance_kobo: credit.balance_kobo,
-                transactions: credit.transactions ?? [],
-              });
-              const refundMessage = `${nairaLabel(excessNaira)} from your shipping fee was returned to your wallet.`;
-              await createAndEmitNotification({
-                recipientId: buyerId,
-                title: "Shipping refund",
-                message: refundMessage,
-                sourceType: "order",
-                sourceId: Number(order_id),
-                role: "buyer",
-              });
-              await pushWalletFcm(buyerId, "Shipping refund", refundMessage);
-            }
-          } catch (err) {
-            console.error("shipping fee refund failed", err);
-          }
-        }
       }
       const orderPayload = await broadcastOrderUpdate(
         "order_acceptance",

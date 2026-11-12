@@ -1673,6 +1673,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         itemImage={itemImage}
         itemAmount={itemAmount}
         productId={productId}
+        initialVariantId={Number(productId) === Number(chat?.productId) ? Number(chat?.variantId) || 0 : 0}
         onCancel={() => setQtyOpen(false)}
         onSubmit={onSubmitQty}
       />

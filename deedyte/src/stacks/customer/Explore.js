@@ -14,8 +14,12 @@ import PaymentFailedScreen from '../../pages/customer/PaymentFailedScreen';
 import NotificationsScreen from '../../pages/NotificationsScreen';
 import OrderDetailScreen from '../../pages/OrderDetail';
 import DisputeDetailScreen from '../../pages/DisputeDetail';
+import OpenDisputeScreen from '../../pages/OpenDispute';
+import OrderActionScreen from '../../pages/OrderAction';
 import ReturnDetailScreen from '../../pages/ReturnDetail';
 import ChatRoomScreen from '../../pages/ChatRoom';
+import DisputeActionScreen from '../../pages/DisputeAction';
+import ReturnActionScreen from '../../pages/ReturnAction';
 
 const ExploreStack = createNativeStackNavigator();
 
@@ -132,6 +136,10 @@ export function ExploreStackScreen() {
       /> */}
       <ExploreStack.Screen name="Order-detail" component={OrderDetailScreen} options={{ title: 'Order detail', headerBackVisible: false, headerShadowVisible: false }} />
       <ExploreStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ title: 'Dispute detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <ExploreStack.Screen name="Dispute-action" component={DisputeActionScreen} options={{ headerShown: true, title: 'Disputes', headerBackVisible: true, headerShadowVisible: false }} />
+      <ExploreStack.Screen name="Return-action" component={ReturnActionScreen} options={{ headerShown: true, title: 'Return action', headerBackVisible: true, headerShadowVisible: false }} />
+      <ExploreStack.Screen name="Order-action" component={OrderActionScreen} options={{ headerShown: true, title: 'Order-action', headerBackVisible: true, headerShadowVisible: false }} />
+      <ExploreStack.Screen name="Open-dispute" component={OpenDisputeScreen} options={{ headerShown: true, title: 'Open dispute', headerBackVisible: true, headerShadowVisible: false }} />
       <ExploreStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ title: 'Return detail', headerBackVisible: false, headerShadowVisible: false }} />
       <ExploreStack.Screen
         name="Inbox"

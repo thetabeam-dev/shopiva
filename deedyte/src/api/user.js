@@ -57,9 +57,11 @@ export async function fetchReturnId(orderId, role) {
   if (!res.ok) {
     return { ok: false, message: pickError(data, res) };
   }
+  const id = data?.id?.id ?? null;
+  if (id == null) return { ok: false, id: null, message: 'No return for this order.' };
   return {
     ok: true,
-    id: data.id.id
+    id
   };
 }
 

@@ -19,6 +19,9 @@ import { ordersTransformer as vendorOrdersTransformer } from "../transformers/bu
 import { orderTransformer as customerOrderTransFormer } from "../transformers/buyer/order.js";
 import { ordersTransformer as customerOrdersTransformer } from "../transformers/buyer/orders.js";
 import { sendFcmForActivities } from "../services/firebaseConfig.js";
+import { creditUserWallet } from "../models/wallet.js";
+import { syncOrderEscrowStatus } from "../models/escrow.js";
+import { nairaLabel, pushWalletFcm } from "../services/walletPush.js";
 
 type DisputeSocketPayload = {
   // result: unknown;
@@ -326,6 +329,19 @@ export const handleDisputeResponse = async(
       );
     }
 
+    if (
+      response &&
+      (response as any).will_return_item === false &&
+      dispute?.order_id != null &&
+      shop?.id != null
+    ) {
+      try {
+        await refundGoodsWithoutReturn(Number(dispute.order_id), Number(shop.id));
+      } catch (refundErr) {
+        console.error("[dispute_acceptance] refund failed:", refundErr);
+      }
+    }
+
     const socketPayload = await broadcastDisputeUpdate(
       "dispute_acceptance",
       shop.id,
@@ -423,4 +439,54 @@ async function finishNewDispute(
   await OrderHandler.orderEvent(payload);
 
 
+}
+/** Buyer keeps the item: refund what they paid for the goods only; the shipping fee stays with the vendor. */
+async function refundGoodsWithoutReturn(orderId: number, shopId: number) {
+  const pool = await db();
+  const { rows: [order] } = await pool.query<{
+    amount_paid: string | number | null;
+    customer_id: string | number | null;
+    payment_status: string | null;
+  }>(
+    `SELECT amount_paid, customer_id, payment_status FROM orders WHERE id = $1 AND shop_id = $2`,
+    [orderId, shopId],
+  );
+  if (!order) return;
+  const paid = String(order.payment_status ?? "").toLowerCase() === "success";
+  const buyerId = Number(order.customer_id);
+  const goodsNaira = Math.max(0, Number(order.amount_paid ?? 0));
+  if (!paid || !(goodsNaira > 0) || !Number.isFinite(buyerId) || buyerId <= 0) return;
+  const goodsKobo = Math.round(goodsNaira * 100);
+  const credit = await creditUserWallet(
+    buyerId,
+    goodsKobo,
+    `order:${orderId}:dispute-refund`,
+    `Dispute refund for order #${orderId}`,
+  );
+  if (!credit.credited) return;
+  await pool.query(
+    `UPDATE escrow_transactions
+     SET amount_refunded_kobo = amount_refunded_kobo + $2,
+         status = 'refunded',
+         refunded_at = NOW(),
+         updated_at = NOW()
+     WHERE order_id = $1
+       AND amount_released_kobo + amount_refunded_kobo + $2 <= amount_held_kobo`,
+    [orderId, goodsKobo],
+  );
+  await syncOrderEscrowStatus(orderId);
+  notifyUser(buyerId, "wallet_credited", {
+    balance_kobo: credit.balance_kobo,
+    transactions: credit.transactions ?? [],
+  });
+  const message = `${nairaLabel(goodsNaira)} for order #${orderId} was refunded to your wallet. You can keep the item. Shipping is not refunded.`;
+  await createAndEmitNotification({
+    recipientId: buyerId,
+    title: "Dispute refund",
+    message,
+    sourceType: "order",
+    sourceId: orderId,
+    role: "buyer",
+  });
+  await pushWalletFcm(buyerId, "Dispute refund", message);
 }

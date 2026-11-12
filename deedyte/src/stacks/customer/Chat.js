@@ -10,6 +10,9 @@ import OrderDetailScreen from '../../pages/OrderDetail';
 import OrderActionScreen from '../../pages/OrderAction';
 import OpenDisputeScreen from '../../pages/OpenDispute';
 import DisputeDetailScreen from '../../pages/DisputeDetail';
+import DisputeActionScreen from '../../pages/DisputeAction';
+import ReturnDetailScreen from '../../pages/ReturnDetail';
+import ReturnActionScreen from '../../pages/ReturnAction';
 
 const HEADER = '#075E54';
 const ChatStack = createNativeStackNavigator();
@@ -95,6 +98,9 @@ export function ChatStackScreen() {
       <ChatStack.Screen name="Order-action" component={OrderActionScreen} options={{ headerShown: true, title: 'Order-action', headerBackVisible: true, headerShadowVisible: false }} />
       <ChatStack.Screen name="Open-dispute" component={OpenDisputeScreen} options={{ headerShown: true, title: 'Open dispute', headerBackVisible: true, headerShadowVisible: false }} />
       <ChatStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ headerShown: true, title: 'Dispute detail', headerBackVisible: true, headerShadowVisible: false }} />
+      <ChatStack.Screen name="Dispute-action" component={DisputeActionScreen} options={{ headerShown: true, title: 'Disputes', headerBackVisible: true, headerShadowVisible: false }} />
+      <ChatStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ headerShown: true, title: 'Return detail', headerBackVisible: true, headerShadowVisible: false }} />
+      <ChatStack.Screen name="Return-action" component={ReturnActionScreen} options={{ headerShown: true, title: 'Return action', headerBackVisible: true, headerShadowVisible: false }} />
     </ChatStack.Navigator>
   );
 }

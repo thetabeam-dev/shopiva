@@ -14,9 +14,13 @@ import HomeScreen from "../../pages/vendor/Home"
 import NotificationsScreen from "../../pages/NotificationsScreen";
 import OrderDetailScreen from "../../pages/OrderDetail";
 import DisputeDetailScreen from "../../pages/DisputeDetail";
+import OpenDisputeScreen from '../../pages/OpenDispute';
+import OrderActionScreen from '../../pages/OrderAction';
 import ReturnDetailScreen from "../../pages/ReturnDetail";
 import ChatRoomScreen from "../../pages/ChatRoom";
 import { NotificationBell } from "../../components/NotificationBell";
+import DisputeActionScreen from '../../pages/DisputeAction';
+import ReturnActionScreen from '../../pages/ReturnAction';
 /** Bundled logo for native stack header (do not use `{ uri: '../assets/...' }` for local files). */
 const DEEDYTE_LOGO = require('../../assets/Deedyte.png');
 // import { set_connect_modal } from '../../redux/modal/connect';
@@ -150,6 +154,10 @@ export function VendorHomeStackScreen() {
       />
       <HomeStack.Screen name="Order-detail" component={OrderDetailScreen} options={{ title: 'Order detail', headerBackVisible: false, headerShadowVisible: false }} />
       <HomeStack.Screen name="Dispute-detail" component={DisputeDetailScreen} options={{ title: 'Dispute detail', headerBackVisible: false, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Dispute-action" component={DisputeActionScreen} options={{ headerShown: true, title: 'Disputes', headerBackVisible: true, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Return-action" component={ReturnActionScreen} options={{ headerShown: true, title: 'Return action', headerBackVisible: true, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Order-action" component={OrderActionScreen} options={{ headerShown: true, title: 'Order-action', headerBackVisible: true, headerShadowVisible: false }} />
+      <HomeStack.Screen name="Open-dispute" component={OpenDisputeScreen} options={{ headerShown: true, title: 'Open dispute', headerBackVisible: true, headerShadowVisible: false }} />
       <HomeStack.Screen name="Return-detail" component={ReturnDetailScreen} options={{ title: 'Return detail', headerBackVisible: false, headerShadowVisible: false }} />
       <HomeStack.Screen
         name="Inbox"

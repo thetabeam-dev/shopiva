@@ -39,6 +39,7 @@ const MAX_QTY = 9999;
  *   itemImage?: string;
  *   itemAmount?: number;
  *   productId?: number;
+ *   initialVariantId?: number;
  *   onCancel: () => void;
  *   onSubmit: (qty: number, variant: { inventoryId?: number; label: string; price?: number } | null) => void | Promise<void>;
  * }} props
@@ -50,6 +51,7 @@ export default function ChatQuantityModal({
   itemImage = '',
   itemAmount = 0,
   productId = 0,
+  initialVariantId = 0,
   onCancel,
   onSubmit,
 }) {
@@ -95,7 +97,9 @@ export default function ChatQuantityModal({
           return { ...v, attributes, optionKey: `${String(v.id ?? 'variant')}-${index}` };
         });
         setVariants(rows);
-        if (rows.length === 1) setSelectedVariant(rows[0]);
+        const preset = initialVariantId > 0 ? rows.find((v) => Number(v.id) === Number(initialVariantId)) : null;
+        if (preset) setSelectedVariant(preset);
+        else if (rows.length === 1) setSelectedVariant(rows[0]);
       })
       .catch(() => {})
       .finally(() => {
@@ -104,7 +108,7 @@ export default function ChatQuantityModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, productId]);
+  }, [visible, productId, initialVariantId]);
 
   const attrKeys = useMemo(() => {
     const keys = variantAttributeKeys(variants);
