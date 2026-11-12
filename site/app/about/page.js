@@ -252,9 +252,7 @@ export default function Dashboard() {
 
             <div>
               <p className="theme">
-                DeeDyte is your pocket mall! Whether you are unready to shop in
-                physical stores, use Deedyte to order from the closest vendor at
-                your locations and get delivery at your doorstep in minutes.
+                DeeDyte is revolutionising e-commerce by making buying and selling safer for everyone. Discover products, connect with trusted vendors, and enjoy a more secure shopping experience.
               </p>
 
               {/* Order Button */}

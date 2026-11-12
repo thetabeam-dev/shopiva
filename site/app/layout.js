@@ -22,9 +22,9 @@ import { buildSearchAppearanceSchema } from "../lib/organizationSchema";
 export async function generateMetadata() {
   const imageUrl = ORGANIZATION_LOGO;
   const title =
-    "DeeDyte Nigeria | Online Shopping for Fashion, Electronics & Local Delivery";
+    "DeeDyte Nigeria | Making Commerce Safe For Everyone";
   const description =
-    "DeeDyte Nigeria is an on-demand marketplace for fashion, electronics, home, and more. Shop nearby vendors with secure checkout and delivery to your location.";
+    "DeeDyte is revolutionising e-commerce by making buying and selling safer for everyone. Discover products, connect with trusted vendors, and enjoy a more secure shopping experience.";
 
   return {
     metadataBase: new URL("https://www.deedyte.com"),
@@ -69,7 +69,7 @@ export default async function RootLayout({ children }) {
         </title>
         <meta
           name="description"
-          content="DeeDyte Nigeria is an on-demand marketplace for fashion, electronics, home, and more. Shop nearby vendors with secure checkout and delivery to your location."
+          content="DeeDyte is revolutionising e-commerce by making buying and selling safer for everyone. Discover products, connect with trusted vendors, and enjoy a more secure shopping experience."
         />
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
