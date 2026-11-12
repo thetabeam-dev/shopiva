@@ -345,6 +345,43 @@ export class product {
     return rows;
   });
 
+  /**
+   * Buyer home feed: published products across active shops, newest featured first.
+   * Extra shop/sold columns ride on each row for the listing DTO.
+   */
+  static listPublishedHomeFeed = withErrorHandling(
+    async (limit: number, offset: number): Promise<Array<ProductRow & Record<string, unknown>>> => {
+      const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+      const safeOffset = Math.max(Number(offset) || 0, 0);
+      const { rows } = await (await db()).query<ProductRow & Record<string, unknown>>(
+        `SELECT
+           p.*,
+           s.id AS feed_shop_id,
+           s.slug AS feed_shop_slug,
+           s.name AS feed_shop_name,
+           COALESCE(m.average_rating, 0) AS feed_shop_rating,
+           COALESCE(m.review_count, 0) AS feed_shop_review_count,
+           COALESCE(sold.units, 0)::int AS feed_sold
+         FROM products p
+         INNER JOIN shops s ON s.id = p.shop_id
+         LEFT JOIN shop_review_metrics m ON m.shop_id = s.id
+         LEFT JOIN (
+           SELECT item_id, SUM(units)::int AS units
+           FROM order_items
+           GROUP BY item_id
+         ) sold ON sold.item_id = p.id::text
+         WHERE p.is_published = true
+           AND s.isactive = true
+           AND s.slug IS NOT NULL
+           AND btrim(s.slug) <> ''
+         ORDER BY p.is_featured DESC, p.created_at DESC
+         LIMIT $1 OFFSET $2`,
+        [safeLimit, safeOffset]
+      );
+      return rows;
+    }
+  );
+
   static getReviewsByShopId = withErrorHandling(async (shopId: number) => {
     const { rows } = await (await db()).query(
       `SELECT

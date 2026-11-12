@@ -4,6 +4,7 @@ import {
   GetStorefrontShopBySlugService,
   GetStorefrontShopByIdService,
   GetStorefrontProductsByShopIdService,
+  GetStorefrontHomeProductsService,
   GetStorefrontProductService,
   GetStorefrontShopDeliveryService,
 } from "../services/business/storefront.js";
@@ -76,6 +77,17 @@ export async function GetStorefrontProductsController(req: Request, res: Respons
     const shopId = (shopResult.shop as { id: number }).id;
     const products = await GetStorefrontProductsByShopIdService(shopId);
     res.status(200).json({ products });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+export async function GetStorefrontHomeProductsController(req: Request, res: Response): Promise<void> {
+  try {
+    const limit = Number(req.query.limit ?? 40);
+    const offset = Number(req.query.offset ?? 0);
+    const data = await GetStorefrontHomeProductsService(limit, offset);
+    res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
   }

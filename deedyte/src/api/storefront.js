@@ -40,6 +40,20 @@ export async function getStorefrontProducts(slug) {
 }
 
 /**
+ * Paginated buyer home catalog across shops.
+ * @param {{ limit?: number, offset?: number }} [options]
+ * @returns {Promise<{ products: unknown[], hasMore: boolean, nextOffset: number }>}
+ */
+export async function getStorefrontHomeProducts({ limit = 40, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const res = await apiFetch(
+    `/storefront/products?limit=${encodeURIComponent(String(safeLimit))}&offset=${encodeURIComponent(String(safeOffset))}`,
+  );
+  return readJson(res);
+}
+
+/**
  * @param {number | string} productId
  * @returns {Promise<{ product: Record<string, unknown>; inventory: unknown[]; shopPolicies?: Record<string, unknown> | null; productReviews?: unknown[]; reviewMetrics?: Record<string, unknown> | null }>}
  */
