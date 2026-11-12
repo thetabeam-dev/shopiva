@@ -4,10 +4,6 @@ import './styles/s.css'
 import './styles/xxl.css'
 
 
-import '../styles/s.css'
-import '../styles/m.css'
-import '../styles/l.css'
-import '../styles/xl.css'
 import '../styles/xxl.css'
 
 

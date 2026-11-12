@@ -20,17 +20,17 @@ import "./styles/xl.css";
 import "./styles/xxl.css";
 
 // Images
-import Inventory from "../images/warehouse-storage-shelves-with-cardboard-boxes.jpg";
-import Bank from "../images/payday.webp";
-import Delivery from "../images/safe.webp";
-import Fraud from "../images/fraud.jpg";
-import Screenshot from "../images/screenshot.png";
+import Inventory from "../../images/warehouse-storage-shelves-with-cardboard-boxes.jpg";
+import Bank from "../../images/payday.webp";
+import Delivery from "../../images/safe.webp";
+import Fraud from "../../images/fraud.jpg";
+import Screenshot from "../../images/screenshot.png";
 
 // SVG Icons
-import BasketSvg from "../svgs/basket.svg";
-import PhoneSvg from "../svgs/phone.svg";
-import BikeSvg from "../svgs/bike.svg";
-import { APP_STORE_URL, PLAY_STORE_URL } from "../lib/siteNavigation";
+import BasketSvg from "../../svgs/basket.svg";
+import PhoneSvg from "../../svgs/phone.svg";
+import BikeSvg from "../../svgs/bike.svg";
+import { APP_STORE_URL, PLAY_STORE_URL } from "../../lib/siteNavigation";
 
 // ============================================================================
 // CONSTANTS
