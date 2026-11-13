@@ -24,6 +24,7 @@ const INFO_PAGES = [
   "sitemap",
   "pricing",
   "blogs",
+  "how-it-works",
 ];
 
 /**

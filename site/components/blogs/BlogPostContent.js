@@ -14,7 +14,9 @@ export default function BlogPostContent({ post }) {
   return (
     <article className="blog-post">
       <div className="blog-post__media">
-        {post.image ? <img src={post.image} alt="" /> : null}
+        {post.image ? (
+          <img src={post.image} alt={post.imageAlt || post.title} />
+        ) : null}
       </div>
       <div className="blog-post__content">
         <Link className="blog-post__back" href="/blogs">

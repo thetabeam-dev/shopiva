@@ -1,22 +1,8 @@
 /**
  * DeeDyte blog posts — focused niche set for acquisition, trust, and brand.
+ * Thumbnails in /public/blog are real Pexels/Unsplash photos (see CREDITS.md).
  * @module lib/blogPosts
  */
-
-import warehouseImg from "../images/warehouse-storage-shelves-with-cardboard-boxes.jpg";
-import safeImg from "../images/safe.webp";
-import shopImg from "../images/Online-Shop_n7.webp";
-import shopImgAlt from "../images/Online-Shop_e8.webp";
-import paydayImg from "../images/payday.webp";
-import fraudImg from "../images/fraud.jpg";
-import screenshotImg from "../images/screenshot.png";
-import featuresImg from "../images/FEATURES_Integration.webp";
-
-function imageSrc(asset) {
-  if (!asset) return "";
-  if (typeof asset === "string") return asset;
-  return String(asset.src ?? "");
-}
 
 /**
  * @typedef {{
@@ -28,6 +14,7 @@ function imageSrc(asset) {
  *   category: string,
  *   minutes: number,
  *   image: string,
+ *   imageAlt: string,
  *   keywords: string[],
  *   body: string[],
  * }} BlogPost
@@ -54,11 +41,22 @@ function slugify(title) {
  *   date: string,
  *   minutes?: number,
  *   image: string,
+ *   imageAlt: string,
  *   keywords?: string[],
  * }} input
  * @returns {BlogPost}
  */
-function post({ title, category, excerpt, body, date, minutes = 5, image, keywords = [] }) {
+function post({
+  title,
+  category,
+  excerpt,
+  body,
+  date,
+  minutes = 5,
+  image,
+  imageAlt,
+  keywords = [],
+}) {
   const baseKeywords = [
     ...keywords,
     "DeeDyte",
@@ -75,7 +73,8 @@ function post({ title, category, excerpt, body, date, minutes = 5, image, keywor
     author: "DeeDyte Team",
     category,
     minutes,
-    image: imageSrc(image),
+    image,
+    imageAlt,
     keywords: [...new Set(baseKeywords.map((value) => String(value).trim()).filter(Boolean))],
     body,
   };
@@ -86,7 +85,8 @@ export const BLOG_POSTS = [
   post({
     category: "Buyer acquisition",
     date: "2026-11-10",
-    image: fraudImg,
+    image: "/blog/avoid-shopping-scams.jpg",
+    imageAlt: "Man shopping online with a laptop and credit card at home",
     keywords: [
       "online shopping scams Nigeria",
       "avoid shopping scams",
@@ -107,7 +107,8 @@ export const BLOG_POSTS = [
   post({
     category: "Brand education",
     date: "2026-11-08",
-    image: safeImg,
+    image: "/blog/escrow-payment.jpg",
+    imageAlt: "Hands holding a smartphone and credit card during an online payment",
     keywords: [
       "what is escrow payment",
       "how escrow works",
@@ -128,7 +129,8 @@ export const BLOG_POSTS = [
   post({
     category: "Buyer trust",
     date: "2026-11-05",
-    image: safeImg,
+    image: "/blog/verify-online-seller.jpg",
+    imageAlt: "Woman carefully checking a smartphone while holding a payment card",
     keywords: [
       "verify online seller",
       "check seller before payment",
@@ -149,7 +151,8 @@ export const BLOG_POSTS = [
   post({
     category: "Vendor acquisition",
     date: "2026-11-02",
-    image: shopImg,
+    image: "/blog/start-selling-online.jpg",
+    imageAlt: "Online seller packing orders at a desk with shipping boxes and a computer",
     keywords: [
       "start selling online Nigeria",
       "online business Nigeria",
@@ -170,7 +173,8 @@ export const BLOG_POSTS = [
   post({
     category: "Vendor acquisition",
     date: "2026-10-30",
-    image: shopImgAlt,
+    image: "/blog/whatsapp-instagram-store.jpg",
+    imageAlt: "Smartphone screen showing WhatsApp, Instagram, and other social apps",
     keywords: [
       "WhatsApp vs Instagram selling",
       "social commerce Nigeria",
@@ -191,7 +195,8 @@ export const BLOG_POSTS = [
   post({
     category: "Brand positioning",
     date: "2026-10-27",
-    image: safeImg,
+    image: "/blog/escrow-marketplaces.jpg",
+    imageAlt: "Two people shaking hands across a desk to seal a trusted agreement",
     keywords: [
       "why escrow is important",
       "escrow online marketplace",
@@ -212,7 +217,8 @@ export const BLOG_POSTS = [
   post({
     category: "Vendor education",
     date: "2026-10-24",
-    image: paydayImg,
+    image: "/blog/build-customer-trust.jpg",
+    imageAlt: "Diverse business team celebrating trust with a handshake in a meeting",
     keywords: [
       "build customer trust online",
       "online vendor trust",
@@ -233,7 +239,8 @@ export const BLOG_POSTS = [
   post({
     category: "Organic traffic",
     date: "2026-10-21",
-    image: fraudImg,
+    image: "/blog/seller-doesnt-deliver.jpg",
+    imageAlt: "Customer signing for a package delivery on a courier’s handheld device",
     keywords: [
       "seller did not deliver",
       "online order not delivered",
@@ -254,7 +261,8 @@ export const BLOG_POSTS = [
   post({
     category: "Brand authority",
     date: "2026-10-18",
-    image: featuresImg,
+    image: "/blog/future-ecommerce-nigeria.jpg",
+    imageAlt: "Hand pointing at business growth charts and ecommerce analytics reports",
     keywords: [
       "future of e-commerce Nigeria",
       "Nigeria ecommerce trends",
@@ -275,7 +283,8 @@ export const BLOG_POSTS = [
   post({
     category: "Buyer acquisition",
     date: "2026-10-15",
-    image: warehouseImg,
+    image: "/blog/buy-online-safely.jpg",
+    imageAlt: "Person entering card details on a laptop while shopping online",
     keywords: [
       "buy products online safely Nigeria",
       "safe online shopping tips",

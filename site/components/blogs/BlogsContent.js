@@ -52,7 +52,9 @@ export default function BlogsContent() {
         {posts.map((post) => (
           <Link className="blog-card" href={`/blogs/${post.slug}`} key={post.slug}>
             <div className="blog-card__media">
-              {post.image ? <img src={post.image} alt="" /> : null}
+              {post.image ? (
+                <img src={post.image} alt={post.imageAlt || post.title} loading="lazy" />
+              ) : null}
             </div>
             <div className="blog-card__body">
               <p className="blog-card__category">{post.category}</p>
