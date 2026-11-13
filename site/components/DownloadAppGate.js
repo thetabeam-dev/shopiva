@@ -23,6 +23,7 @@ const INFO_PAGES = [
   "contact",
   "sitemap",
   "pricing",
+  "blogs",
 ];
 
 /**

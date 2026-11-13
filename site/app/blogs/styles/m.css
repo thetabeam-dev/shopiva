@@ -1,0 +1,26 @@
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  .blog-page__hero {
+    padding: 40px 20px 32px;
+  }
+
+  .blog-page__hero h1 {
+    font-size: 1.75rem;
+  }
+
+  .blog-page__body {
+    padding: 24px 16px 64px;
+  }
+
+  .blog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .blog-card__body {
+    padding: 14px 14px 16px;
+  }
+
+  .blog-post__content {
+    padding: 22px 18px 0;
+  }
+}

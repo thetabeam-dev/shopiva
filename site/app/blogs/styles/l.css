@@ -1,0 +1,14 @@
+@media screen and (min-width: 769px) and (max-width: 991px) {
+  .blog-page__hero {
+    padding: 44px 28px 36px;
+  }
+
+  .blog-page__body {
+    padding: 28px 24px 72px;
+  }
+
+  .blog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+}

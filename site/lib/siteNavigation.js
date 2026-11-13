@@ -5,6 +5,7 @@ export const LEGAL_AND_DOC_LINKS = [
   { title: "Legal", path: "/legal" },
   { title: "Contact Us", path: "/contact" },
   { title: "About", path: "/about" },
+  { title: "Blog", path: "/blogs" },
   { title: "Privacy Policy", path: "/privacy-policy" },
   { title: "Terms of Use", path: "/terms-of-use" },
 ];
