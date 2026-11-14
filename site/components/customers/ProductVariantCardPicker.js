@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IoCheckmarkCircle, IoChevronDown } from "react-icons/io5";
+import "./assets/product-variant-picker.css";
 
 function formatNgn(n) {
   return `₦${Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
@@ -45,10 +46,22 @@ function SpecTile({ label, value }) {
   );
 }
 
-function VariantCard({ variant, index, attrKeys, selected, disabled, onPress, showPrice = true }) {
+function attributeEntries(variant, attrKeys) {
   const attrs = variant?.attributes && typeof variant.attributes === "object" ? variant.attributes : {};
+  const keys = Array.isArray(attrKeys) && attrKeys.length > 0 ? attrKeys : Object.keys(attrs);
+  const entries = [];
+  for (const key of keys) {
+    const raw = attrs[key] != null ? String(attrs[key]).trim() : "";
+    if (!raw || raw === "—" || raw === "-") continue;
+    entries.push({ key, label: formatAttributeLabel(key).toUpperCase(), value: raw });
+  }
+  return entries;
+}
+
+function VariantCard({ variant, index, attrKeys, selected, disabled, onPress, showPrice = true }) {
   const price = Number(variant?.price);
   const priceLabel = Number.isFinite(price) && price > 0 ? formatNgn(price) : "—";
+  const specs = attributeEntries(variant, attrKeys);
 
   return (
     <button
@@ -64,12 +77,13 @@ function VariantCard({ variant, index, attrKeys, selected, disabled, onPress, sh
         {selected ? <IoCheckmarkCircle size={20} color="#00926e" /> : null}
       </div>
       <div className="pdp-variant-card__grid">
-        {attrKeys.map((key) => {
-          const raw = attrs[key] != null ? String(attrs[key]).trim() : "";
-          if (!raw || raw === "—" || raw === "-") return null;
-          return <SpecTile key={key} label={formatAttributeLabel(key).toUpperCase()} value={raw} />;
-        })}
+        {specs.map((spec) => (
+          <SpecTile key={spec.key} label={spec.label} value={spec.value} />
+        ))}
         {showPrice && priceLabel !== "—" ? <SpecTile label="PRICE" value={priceLabel} /> : null}
+        {specs.length === 0 && priceLabel === "—" ? (
+          <SpecTile label="OPTION" value={`Choice ${index + 1}`} />
+        ) : null}
       </div>
     </button>
   );
@@ -95,13 +109,9 @@ export default function ProductVariantCardPicker({ attrKeys = [], variants = [],
 
   const summary = useMemo(() => {
     if (!selectedVariant) return "";
-    const attrs =
-      selectedVariant.attributes && typeof selectedVariant.attributes === "object"
-        ? selectedVariant.attributes
-        : {};
-    const details = attrKeys
-      .map((key) => (attrs[key] ? `${formatAttributeLabel(key)}: ${attrs[key]}` : ""))
-      .filter(Boolean);
+    const details = attributeEntries(selectedVariant, attrKeys).map(
+      (entry) => `${formatAttributeLabel(entry.key)}: ${entry.value}`,
+    );
     const price = Number(selectedVariant.price);
     const pricePart = Number.isFinite(price) && price > 0 ? formatNgn(price) : "";
     if (pricePart && details.length) return `${pricePart} · ${details.join(" · ")}`;
@@ -132,27 +142,31 @@ export default function ProductVariantCardPicker({ attrKeys = [], variants = [],
         ? createPortal(
             <div className="pdp-variant-sheet">
               <button type="button" className="pdp-variant-sheet__backdrop" aria-label="Close" onClick={() => setOpen(false)} />
-              <div className="pdp-variant-sheet__panel" role="dialog" aria-label="Choose a variant">
+              <div className="pdp-variant-sheet__panel" role="dialog" aria-modal="true" aria-label="Choose a variant">
                 <div className="pdp-variant-sheet__header">
                   <div className="pdp-variant-sheet__grabber" />
                   <h3>Choose a variant</h3>
                   <p>Pick color, material, and other options. The price updates for your selection.</p>
                 </div>
                 <div className="pdp-variant-sheet__list">
-                  {rows.map((variant, index) => (
-                    <VariantCard
-                      key={variant.optionKey || `${variant.id}-${index}`}
-                      variant={variant}
-                      index={index}
-                      attrKeys={attrKeys}
-                      selected={variantMatches(variant, selectedVariant)}
-                      disabled={!isPurchasable(variant)}
-                      onPress={() => {
-                        onSelect(variant);
-                        setOpen(false);
-                      }}
-                    />
-                  ))}
+                  {rows.length === 0 ? (
+                    <p className="pdp-variant-sheet__empty">No variants are available for this product.</p>
+                  ) : (
+                    rows.map((variant, index) => (
+                      <VariantCard
+                        key={variant.optionKey || `${variant.id}-${index}`}
+                        variant={variant}
+                        index={index}
+                        attrKeys={attrKeys}
+                        selected={variantMatches(variant, selectedVariant)}
+                        disabled={!isPurchasable(variant)}
+                        onPress={() => {
+                          onSelect(variant);
+                          setOpen(false);
+                        }}
+                      />
+                    ))
+                  )}
                 </div>
                 <div className="pdp-variant-sheet__footer">
                   <button type="button" className="pdp-variant-sheet__done" onClick={() => setOpen(false)}>
