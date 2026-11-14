@@ -46,7 +46,7 @@
         background-color: transparent;
     }
 
-    header {
+    .customer-free-layout header{
         height: 100vh;
         background-color: transparent;
         /* background-color: ; */
@@ -159,7 +159,7 @@
     }
 
 
-    main {
+    .customer-free-layout main{
         height: calc(100vh - 60px);
         display: flex;
         flex-direction: column;

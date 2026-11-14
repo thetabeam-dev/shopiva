@@ -12,7 +12,6 @@
 import React, { useEffect, useRef } from "react";
 
 // Styles
-import "../global.css";
 import "./styles/s.css";
 import "./styles/m.css";
 import "./styles/l.css";

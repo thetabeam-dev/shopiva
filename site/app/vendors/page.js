@@ -3,6 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getVendorsOnMapByCategory } from "../../lib/productApi";
+import CustomerHeader from "@/components/customers/Header";
+import CustomerHeaderHead from "@/components/customers/HeaderHead";
+import "../styles/xxl.css";
 import "./styles/s.css";
 import "./styles/xxl.css";
 import Select from "react-select";
@@ -261,45 +264,54 @@ function VendorsDiscoverContent() {
   })
 
   return (
-    <div className="customer-vendors-page">
-      {/* <Link href="/" className="customer-vendors-page__back">
-        ← Back to map
-      </Link>
-      <h1>Discovered vendors</h1>
-      <p className="customer-vendors-page__meta">
-        {category ? `Category: ${category}` : "No category selected"}
-      </p>
-      {loading ? (
-        <p className="customer-vendors-page__loading">Loading…</p>
-      ) : null}
-      {err ? (
-        <p className="customer-vendors-page__error" role="alert">
-          {err}
-        </p>
-      ) : null}
-      {!loading && !err && rows.length === 0 ? (
-        <p className="customer-vendors-page__empty">No vendors in this category.</p>
-      ) : null}
-      {!loading && !err && rows.length > 0 ? (
-        <ul>
-          {rows.map((v) => (
-            <li key={v.id}>
-              <p className="customer-vendors-page__shop-name">{v.name}</p>
-              <p className="customer-vendors-page__shop-meta">
-                {[v.address, v.city].filter(Boolean).join(" · ") ||
-                  "Address not on file"}
-                {v.state ? ` · ${v.state}` : ""}
-                {v.slug ? ` · ${v.slug}` : ""}
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : null} */}
-      
+    <>
+      <div className="buyer-head">
+        <CustomerHeaderHead />
+        <CustomerHeader />
+      </div>
+      <div className="customer-vendors-page">
       <div className="vendor-card-cnt">
-        {displayedRows.map((vendor, index) =>
-          renderVendorCard(vendor, index)
-        )}
+        {loading ? (
+          <div
+            style={{
+              width: "100%",
+              minHeight: "280px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#3d3d3d",
+              fontSize: "15px",
+            }}
+          >
+            Loading vendors…
+          </div>
+        ) : null}
+
+        {!loading && err ? (
+          <div
+            style={{
+              width: "100%",
+              minHeight: "280px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "12px",
+              textAlign: "center",
+              padding: "24px",
+            }}
+            role="alert"
+          >
+            <EmptyVendorsIcon />
+            <span style={{ color: "#3d3d3d", fontSize: "15px", maxWidth: "320px" }}>
+              {err}
+            </span>
+          </div>
+        ) : null}
+
+        {!loading && !err
+          ? displayedRows.map((vendor, index) => renderVendorCard(vendor, index))
+          : null}
 
         {!loading && !err && displayedRows.length === 0 ? (
           <div
@@ -367,6 +379,7 @@ function VendorsDiscoverContent() {
       ) : null}
 
     </div>
+    </>
   );
 }
 
@@ -374,9 +387,15 @@ export default function CustomerVendorsPage() {
   return (
     <Suspense
       fallback={
-        <div className="customer-vendors-page">
-          <p className="customer-vendors-page__loading">Loading…</p>
-        </div>
+        <>
+          <div className="buyer-head">
+            <CustomerHeaderHead />
+            <CustomerHeader />
+          </div>
+          <div className="customer-vendors-page">
+            <p className="customer-vendors-page__loading">Loading…</p>
+          </div>
+        </>
       }
     >
       <VendorsDiscoverContent />

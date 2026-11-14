@@ -1,4 +1,4 @@
-@media screen and (min-width: 1200px) {
+@media screen and (min-width: 900px) {
   .pdp-page {
     --pdp-accent: #00926E;
     --pdp-accent-soft: #e0f6ef;
@@ -8,11 +8,11 @@
     --pdp-radius: 5px;
     min-height: 0;
     height: auto;
-    flex: 1;
-    overflow: hidden;
+    flex: none;
+    overflow: visible;
     width: 100%;
-    display: flex;
-    flex-direction: column;
+    max-width: 100%;
+    display: block;
     background: #fff;
     color: var(--pdp-text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -215,25 +215,24 @@
   .pdp-layout {
     display: flex;
     flex-direction: row;
-    align-items: stretch;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 40px;
     padding: 24px 48px 26px;
     max-width: 1320px;
     margin: 0 auto;
     width: 100%;
-    flex: 1;
+    flex: none;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     box-sizing: border-box;
   }
 
   .pdp-col-main {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     gap: 24px;
@@ -255,6 +254,17 @@
     align-items: stretch;
     justify-content: flex-start;
     gap: 12px;
+  }
+
+  .pdp-gallery > .thumbnail-list {
+    order: 0;
+    flex: 0 0 64px;
+    width: 64px;
+  }
+
+  .pdp-gallery > .pdp-gallery__stage {
+    order: 1;
+    flex: 1 1 auto;
   }
 
   .pdp-gallery__stage {
@@ -408,7 +418,8 @@
 
   .pdp-buybox {
     width: 400px;
-    flex-shrink: 0;
+    max-width: 400px;
+    flex: 0 0 400px;
     background: #fff;
     border-radius: var(--pdp-radius);
     padding: 8px 8px 8px 18px;
@@ -416,12 +427,12 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    max-height: 100%;
+    overflow: visible;
+    max-height: none;
     align-self: flex-start;
     position: sticky;
-    top: 0;
+    top: 12px;
+    color: var(--pdp-text);
   }
 
   .pdp-buybox__eyebrow {

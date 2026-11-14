@@ -1,4 +1,4 @@
-@media screen and (max-width: 480px) {
+@media screen and (max-width: 899px) {
   .pdp-page {
     --pdp-accent: #00926E;
     --pdp-accent-soft: #e0f6ef;
@@ -1229,12 +1229,12 @@
   font-size: 16px;
 }
 
-@media screen and (min-width: 1200px) {
+@media screen and (min-width: 900px) {
   .pdp-page {
     height: auto;
-    flex: 1;
+    flex: none;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .pdp-page .pdp-reviews-wrap {

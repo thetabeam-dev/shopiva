@@ -565,7 +565,7 @@ export default function ProductDetail({ product }) {
     };
 
     return (
-        <div className="shop-page pdp-page">
+        <div className="pdp-page">
             <PaystackBinder config={paystackBase} paymentRef={paymentRef} />
             <div className="pdp-layout">
                 <div className="pdp-col-main">

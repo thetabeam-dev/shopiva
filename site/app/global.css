@@ -1,4 +1,5 @@
-div {
-    height: unset;
-    width: unset;
-}
+/* Intentionally empty.
+ *
+ * This file previously reset every `div { height/width: unset }`, which leaked
+ * across client navigations and broke product / shopping layouts.
+ */

@@ -54,14 +54,14 @@ export default function CustomerHeaderHead() {
     <>
       {!dismissed ? (
         <div className="deedyte-app-banner" role="region" aria-label="Get the DeeDyte app">
-          <button
+          {/* <button
             type="button"
             className="deedyte-app-banner__close"
             aria-label="Dismiss"
             onClick={() => setDismissed(true)}
           >
             <IoClose size={18} color="#8A8A8A" />
-          </button>
+          </button> */}
           <img
             className="deedyte-app-banner__icon"
             src="/Deedyte.png"
