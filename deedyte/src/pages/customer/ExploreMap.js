@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
+  FlatList,
   Keyboard,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -15,7 +18,6 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { FlatList as GestureFlatList } from 'react-native-gesture-handler';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
 import { getVendorsOnMapByCategory } from '../../api';
@@ -31,7 +33,11 @@ import {
   vendorCoordinate,
 } from '../../utils/exploreMap';
 
-const MAP_CARD_W = Math.round(Dimensions.get('window').width * 0.72);
+const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
+const SHEET_PEEK = 236;
+const SHEET_EXPANDED = Math.round(SCREEN_H * 0.62);
+const SHOP_CARD_W = SCREEN_W - 32;
 
 function shopCategories(shop) {
   const raw = shop?.categories;
@@ -157,11 +163,51 @@ export default function ExploreMap({ navigation, route }) {
   const [locationPickerBusy, setLocationPickerBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mapBox, setMapBox] = useState(null);
+  /** @type {[string | null, function]} null = all categories */
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const mapRef = useRef(null);
   const webRef = useRef(null);
   const [webReady, setWebReady] = useState(false);
   const mapListRef = useRef(null);
   const searchRef = useRef(null);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
+  const sheetDragStart = useRef(SHEET_PEEK);
+
+  const snapSheet = (expanded) => {
+    setSheetExpanded(expanded);
+    Animated.spring(sheetHeight, {
+      toValue: expanded ? SHEET_EXPANDED : SHEET_PEEK,
+      useNativeDriver: false,
+      friction: 9,
+      tension: 68,
+    }).start();
+  };
+
+  const sheetPan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 6,
+      onPanResponderGrant: () => {
+        sheetHeight.stopAnimation((value) => {
+          sheetDragStart.current = value;
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        const next = Math.min(
+          SHEET_EXPANDED,
+          Math.max(SHEET_PEEK, sheetDragStart.current - gesture.dy),
+        );
+        sheetHeight.setValue(next);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const shouldExpand =
+          gesture.dy < -36 ||
+          gesture.vy < -0.55 ||
+          sheetDragStart.current - gesture.dy > (SHEET_PEEK + SHEET_EXPANDED) / 2;
+        snapSheet(shouldExpand);
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     let active = true;
@@ -224,11 +270,34 @@ export default function ExploreMap({ navigation, route }) {
     };
   }, [query, suggestionsOpen]);
 
+  const categoryOptions = useMemo(() => {
+    /** @type {Map<string, { key: string; label: string; count: number }>} */
+    const counts = new Map();
+    for (const shop of vendors) {
+      for (const cat of shopCategories(shop)) {
+        const key = cat.toLowerCase();
+        if (!key) continue;
+        const prev = counts.get(key) || { key, label: formatCategory(cat), count: 0 };
+        prev.count += 1;
+        counts.set(key, prev);
+      }
+    }
+    return Array.from(counts.values()).sort(
+      (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+    );
+  }, [vendors]);
+
   const mapShops = useMemo(() => (
     vendors
       .map((shop) => ({ shop, coordinate: vendorCoordinate(shop) }))
       .filter((pin) => pin.coordinate)
-  ), [vendors]);
+      .filter(({ shop }) => {
+        if (!selectedCategory) return true;
+        return shopCategories(shop).some(
+          (cat) => cat.toLowerCase() === selectedCategory,
+        );
+      })
+  ), [vendors, selectedCategory]);
 
   const visibleShops = useMemo(() => {
     if (selectedPlace) {
@@ -410,46 +479,112 @@ export default function ExploreMap({ navigation, route }) {
       latitudeDelta: 0.08,
       longitudeDelta: 0.08,
     });
+    if (!sheetExpanded) snapSheet(true);
     const index = visibleShops.findIndex((pin) => pin.shop.id === shop.id);
-    if (index >= 0) mapListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    if (index >= 0) {
+      requestAnimationFrame(() => {
+        mapListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.15 });
+      });
+    }
   };
 
   const openShop = (shop) => navigation.navigate('Vendor', { vendor: shop, category: '__all__' });
+  const sheetControlsBottom = (sheetExpanded ? SHEET_EXPANDED : SHEET_PEEK) + 16 + insets.bottom;
 
   return (
     <View style={styles.screen}>
-      <View style={styles.searchWrap}>
-        <Icon name="location-outline" size={18} color="#8A8A8A" />
-        <TextInput
-          ref={searchRef}
-          value={query}
-          onChangeText={(value) => {
-            setQuery(value);
-            setSuggestionsOpen(true);
-          }}
-          onFocus={() => setSuggestionsOpen(true)}
-          placeholder="Start your search"
-          placeholderTextColor="#9A9A9A"
-          style={styles.searchInput}
-          autoCorrect={false}
-          autoCapitalize="none"
-          returnKeyType="search"
-        />
-        {query ? (
-          <TouchableOpacity
-            onPress={() => {
-              setQuery('');
-              setSuggestions([]);
-              setSuggestionsOpen(false);
-              setSelectedPlace(null);
-              searchRef.current?.blur();
+      <View style={styles.topChrome} pointerEvents="box-none">
+        <View style={styles.searchWrap}>
+          <Icon name="location-outline" size={18} color="#8A8A8A" />
+          <TextInput
+            ref={searchRef}
+            value={query}
+            onChangeText={(value) => {
+              setQuery(value);
+              setSuggestionsOpen(true);
             }}
+            onFocus={() => setSuggestionsOpen(true)}
+            placeholder="Start your search"
+            placeholderTextColor="#9A9A9A"
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {query ? (
+            <TouchableOpacity
+              onPress={() => {
+                setQuery('');
+                setSuggestions([]);
+                setSuggestionsOpen(false);
+                setSelectedPlace(null);
+                searchRef.current?.blur();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear location search"
+            >
+              <Icon name="close" size={20} color="#111111" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryChips}
+          contentContainerStyle={styles.categoryChipsContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            style={[styles.categoryChip, !selectedCategory ? styles.categoryChipSelected : null]}
+            onPress={() => setSelectedCategory(null)}
             accessibilityRole="button"
-            accessibilityLabel="Clear location search"
+            accessibilityState={{ selected: !selectedCategory }}
+            accessibilityLabel="All shop categories"
           >
-            <Icon name="close" size={20} color="#111111" />
+            <Icon
+              name="grid-outline"
+              size={15}
+              color={!selectedCategory ? '#FFFFFF' : '#374151'}
+            />
+            <Text
+              style={[
+                styles.categoryChipText,
+                !selectedCategory ? styles.categoryChipTextSelected : null,
+              ]}
+            >
+              All
+            </Text>
           </TouchableOpacity>
-        ) : null}
+          {categoryOptions.map((option) => {
+            const selected = selectedCategory === option.key;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.categoryChip, selected ? styles.categoryChipSelected : null]}
+                onPress={() => setSelectedCategory(selected ? null : option.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`Filter by ${option.label}`}
+              >
+                <Icon
+                  name="storefront-outline"
+                  size={15}
+                  color={selected ? '#FFFFFF' : '#374151'}
+                />
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    selected ? styles.categoryChipTextSelected : null,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {suggestionError && suggestionsOpen ? (
@@ -521,7 +656,12 @@ export default function ExploreMap({ navigation, route }) {
           onRegionChangeComplete={setMapRegion}
           showsMyLocationButton={false}
           toolbarEnabled={false}
-          mapPadding={{ top: 72, right: 12, bottom: 210, left: 12 }}
+          mapPadding={{
+            top: 72,
+            right: 12,
+            bottom: (sheetExpanded ? SHEET_EXPANDED : SHEET_PEEK) + 24,
+            left: 12,
+          }}
           mapType="standard"
         >
           {showMe && savedCoord ? (
@@ -552,7 +692,7 @@ export default function ExploreMap({ navigation, route }) {
         </MapView>
         )}
         <View style={styles.overlay} pointerEvents="box-none">
-          <View style={[styles.zoomStack, { bottom: 330 + insets.bottom }]}>
+          <View style={[styles.zoomStack, { bottom: sheetControlsBottom }]}>
             <TouchableOpacity
               style={styles.zoomBtn}
               onPress={() => zoomBy(0.8)}
@@ -571,7 +711,7 @@ export default function ExploreMap({ navigation, route }) {
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={[styles.locateBtn, { bottom: 330 + insets.bottom }]}
+            style={[styles.locateBtn, { bottom: sheetControlsBottom }]}
             onPress={goToMyLocation}
             accessibilityRole="button"
             accessibilityLabel="Show my location"
@@ -579,46 +719,76 @@ export default function ExploreMap({ navigation, route }) {
             <Icon name="locate" size={22} color="#111111" />
           </TouchableOpacity>
 
-          <View style={[styles.mapSheet, { bottom: 12 + insets.bottom }]} collapsable={false}>
-            <View style={styles.mapSheetHead}>
-              <Text style={styles.mapSheetTitle}>
-                <Text style={styles.mapSheetCount}>({visibleShops.length})</Text> Shops In This Area
-              </Text>
-              <TouchableOpacity
-                style={styles.mapSheetAction}
-                onPress={() => navigation.navigate('Area-shops', {
-                  shopIds: visibleShops.map((item) => item.shop.id),
-                })}
+          <Animated.View
+            style={[
+              styles.mapSheet,
+              {
+                height: sheetHeight,
+                paddingBottom: Math.max(insets.bottom, 10),
+              },
+            ]}
+            collapsable={false}
+          >
+            <View {...sheetPan.panHandlers} style={styles.mapSheetHandleWrap}>
+              <View style={styles.mapSheetGrabber} />
+              <Pressable
+                style={styles.mapSheetHead}
+                onPress={() => snapSheet(!sheetExpanded)}
                 accessibilityRole="button"
-                accessibilityLabel="See shops in this area"
+                accessibilityLabel={sheetExpanded ? 'Collapse shop list' : 'Expand shop list'}
               >
-                <Icon name="arrow-forward" size={18} color="#111111" />
-              </TouchableOpacity>
+                <View style={styles.mapSheetHeadCopy}>
+                  <Text style={styles.mapSheetTitle}>Shops in this area</Text>
+                  <Text style={styles.mapSheetSubtitle}>
+                    <Text style={styles.mapSheetCount}>{visibleShops.length}</Text>
+                    {visibleShops.length === 1 ? ' shop nearby' : ' shops nearby'}
+                  </Text>
+                </View>
+                <View style={styles.mapSheetHeadActions}>
+                  <TouchableOpacity
+                    style={styles.mapSheetAction}
+                    onPress={() => navigation.navigate('Area-shops', {
+                      shopIds: visibleShops.map((item) => item.shop.id),
+                    })}
+                    accessibilityRole="button"
+                    accessibilityLabel="See all shops in this area"
+                  >
+                    <Icon name="arrow-forward" size={18} color="#111111" />
+                  </TouchableOpacity>
+                  <Icon
+                    name={sheetExpanded ? 'chevron-down' : 'chevron-up'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </View>
+              </Pressable>
             </View>
+
             {loading ? (
-              <ActivityIndicator color="#00926E" />
+              <ActivityIndicator color="#00926E" style={{ marginTop: 18 }} />
             ) : visibleShops.length === 0 ? (
               <Text style={styles.mapSheetEmpty}>No shops in this part of the map.</Text>
             ) : (
-              <GestureFlatList
+              <FlatList
                 ref={mapListRef}
-                horizontal
-                nestedScrollEnabled
                 data={visibleShops}
                 keyExtractor={(item) => String(item.shop.id)}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.mapCardRow}
-                onScrollToIndexFailed={() => { }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+                scrollEnabled={sheetExpanded}
+                contentContainerStyle={styles.mapCardColumn}
+                onScrollToIndexFailed={() => {}}
+                keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => (
                   <ShopBrowseCard
                     item={item.shop}
-                    width={MAP_CARD_W}
+                    width={SHOP_CARD_W}
                     onPress={() => openShop(item.shop)}
                   />
                 )}
               />
             )}
-          </View>
+          </Animated.View>
         </View>
       </View>
 
@@ -691,25 +861,68 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  searchWrap: {
+  topChrome: {
     position: 'absolute',
     top: 12,
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
+    zIndex: 6,
+    elevation: 6,
+  },
+  searchWrap: {
     height: 48,
+    marginHorizontal: 16,
     borderRadius: 24,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     gap: 8,
-    zIndex: 6,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 4,
   },
   searchInput: { flex: 1, fontSize: 16, color: '#111111' },
+  categoryChips: {
+    marginTop: 10,
+    maxHeight: 44,
+  },
+  categoryChipsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    maxWidth: 220,
+  },
+  categoryChipSelected: {
+    backgroundColor: '#00926E',
+    borderColor: '#00926E',
+  },
+  categoryChipText: {
+    color: '#374151',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  categoryChipTextSelected: {
+    color: '#FFFFFF',
+  },
   suggestError: {
     position: 'absolute',
-    top: 68,
+    top: 118,
     left: 16,
     right: 16,
     color: '#B42318',
@@ -718,7 +931,7 @@ const styles = StyleSheet.create({
   },
   suggestBox: {
     position: 'absolute',
-    top: 68,
+    top: 118,
     left: 16,
     right: 16,
     backgroundColor: '#FFFFFF',
@@ -794,31 +1007,71 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 12,
+    bottom: 0,
     zIndex: 4,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+  },
+  mapSheetHandleWrap: {
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  mapSheetGrabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: '#D1D5DB',
+    marginBottom: 8,
   },
   mapSheetHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
-  mapSheetTitle: { fontSize: 16, fontWeight: '700', color: '#111111' },
-  mapSheetAction: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mapSheetCount: { fontSize: 16, fontWeight: '700', color: '#00926E' },
+  mapSheetHeadCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
+  },
+  mapSheetTitle: { fontSize: 17, fontWeight: '700', color: '#111111' },
+  mapSheetSubtitle: { marginTop: 2, fontSize: 13, color: '#6B7280' },
+  mapSheetHeadActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  mapSheetAction: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapSheetCount: { fontSize: 13, fontWeight: '700', color: '#00926E' },
   mapSheetEmpty: {
     marginHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+    marginTop: 8,
     borderRadius: 7,
     padding: 14,
     color: '#6B7280',
+    backgroundColor: '#F9FAFB',
   },
-  mapCardRow: { paddingHorizontal: 16, gap: 12, marginBottom: Platform.OS === 'android' ? 40 : 10 },
+  mapCardColumn: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    gap: 12,
+  },
   tip: {
     width: 168,
     backgroundColor: '#FFFFFF',

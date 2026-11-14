@@ -79,6 +79,38 @@
   font-weight: 500;
 }
 
+.vendor-store__profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vendor-store__share {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  background: #fff;
+  color: #111;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vendor-store__share:hover:not(:disabled) {
+  border-color: #00926e;
+  color: #00926e;
+}
+
+.vendor-store__share:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .vendor-store__stats {
   display: flex;
   align-items: stretch;

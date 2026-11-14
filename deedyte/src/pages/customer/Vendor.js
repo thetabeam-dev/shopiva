@@ -513,7 +513,14 @@ export default function VendorShopScreen({ route, navigation }) {
               style={styles.shareBtn}
               activeOpacity={0.85}
               onPress={() => {
-                // Share.share({ message: displayName }).catch(() => {});
+                const storeSlug = String(shopMeta.slug ?? slug ?? '').trim();
+                if (!storeSlug) return;
+                const url = `https://www.deedyte.com/store/${encodeURIComponent(storeSlug)}`;
+                Share.share({
+                  message: `Check out ${displayName} on DeeDyte! ${url}`,
+                  title: displayName,
+                  url,
+                }).catch(() => {});
               }}
             >
               <Text style={styles.shareBtnText}>Share profile</Text>

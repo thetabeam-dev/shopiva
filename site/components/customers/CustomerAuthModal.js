@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
-import { usePathname } from "next/navigation";
+// import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { IoLockClosed } from "react-icons/io5";
 import { entrepreneur_overlay_setup } from "../../reusables/overlay";
 import { setNewCookie } from "../../app/actions/auth-cookies";
+// Passport OAuth (temporarily disconnected)
+// import { startPassportOAuth } from "../../reusables/passportOAuth";
 import {
   clearCustomerAccountHint,
   hintInitial,
@@ -14,15 +15,14 @@ import {
   readCustomerAccountHint,
   saveCustomerAccountHint,
 } from "../../reusables/customerAccountHint";
-import gg_svg from "../../svgs/google-color-svgrepo-com (1).svg";
+// import gg_svg from "../../svgs/google-color-svgrepo-com (1).svg";
 import "./assets/customer-auth-modal.css";
 
 const LOGIN_ENDPOINT = "/api/user/signin";
 const SIGNUP_ENDPOINT = "/api/user/signup";
 
 export default function CustomerAuthModal({ onAuthenticated, onClose }) {
-  const pathname = usePathname();
-  const session = useSession();
+  // const pathname = usePathname();
   const [view, setView] = useState("chooser");
   const [hint, setHint] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -54,44 +54,21 @@ export default function CustomerAuthModal({ onAuthenticated, onClose }) {
     onAuthenticated?.();
   }
 
-  useEffect(() => {
-    if (session.status !== "authenticated") return;
-    if (typeof window === "undefined" || window.sessionStorage?.getItem("auth_oauth_pending") !== "true") {
-      return;
-    }
-    window.sessionStorage.removeItem("auth_oauth_pending");
-    entrepreneur_overlay_setup(true);
-    fetch(LOGIN_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: session.data?.user?.email,
-        provider: session.data?.provider,
-      }),
-    })
-      .then(async (result) => {
-        const response = await result.json();
-        if (response.bool) {
-          await finishLogin(response.cookie, {
-            email: session.data?.user?.email,
-            name: session.data?.user?.name,
-          });
-        } else {
-          entrepreneur_overlay_setup(false);
-          setError(response.data || "Sign in failed");
-        }
-      })
-      .catch(() => {
-        entrepreneur_overlay_setup(false);
-        setError("Sign in failed");
-      });
-  }, [session.status, session.data?.user?.email, session.data?.provider]);
-
-  function startGoogle() {
-    sessionStorage.setItem("auth_oauth_pending", "true");
-    entrepreneur_overlay_setup(true);
-    signIn("google", { callbackUrl: pathname || "/" });
-  }
+  // Passport OAuth (temporarily disconnected)
+  // function startGoogle() {
+  //   try {
+  //     setError("");
+  //     entrepreneur_overlay_setup(true);
+  //     const next =
+  //       pathname && pathname.startsWith("/") && !pathname.startsWith("/auth")
+  //         ? pathname
+  //         : "/";
+  //     startPassportOAuth("google", { role: "customer", next });
+  //   } catch (err) {
+  //     entrepreneur_overlay_setup(false);
+  //     setError(err?.message || "Could not start Google sign-in");
+  //   }
+  // }
 
   async function handlePasswordSignIn(event) {
     event.preventDefault();
@@ -198,16 +175,18 @@ export default function CustomerAuthModal({ onAuthenticated, onClose }) {
             )}
             {error ? <p className="customer-auth-modal__error">{error}</p> : null}
             <div className="customer-auth-modal__actions">
+              {/* Passport OAuth (temporarily disconnected)
               <button type="button" className="customer-auth-modal__btn" onClick={startGoogle} disabled={busy}>
                 <img src={gg_svg.src} alt="" />
                 Continue with Google
               </button>
+              */}
               <button
                 type="button"
                 className="customer-auth-modal__btn"
                 onClick={() => setView("password")}
               >
-                Use another way to sign in
+                Sign in with email
               </button>
             </div>
             <div className="customer-auth-modal__alt">

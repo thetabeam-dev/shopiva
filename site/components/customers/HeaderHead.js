@@ -70,7 +70,7 @@ export default function CustomerHeaderHead() {
             height={40}
           />
           <div className="deedyte-app-banner__copy">
-            <strong>DeeDyte: Shop nearby deals</strong>
+            <strong>DeeDyte: Shop Safe Online</strong>
             <span>Shop incredible deals on DeeDyte!</span>
           </div>
           <a

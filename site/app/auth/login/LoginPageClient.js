@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import React, { useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useDispatch } from "react-redux";
@@ -9,15 +8,17 @@ import { useDispatch } from "react-redux";
 import "../styles/xxl.css";
 import "react-phone-number-input/style.css";
 
-import gg_svg from "../../../svgs/google-color-svgrepo-com (1).svg";
-import a_svg from "../../../svgs/apple-logo-svgrepo-com.svg";
-import fb_svg from "../../../svgs/facebook-svgrepo-com (1).svg";
+// Passport OAuth (temporarily disconnected)
+// import gg_svg from "../../../svgs/google-color-svgrepo-com (1).svg";
+// import a_svg from "../../../svgs/apple-logo-svgrepo-com.svg";
+// import fb_svg from "../../../svgs/facebook-svgrepo-com (1).svg";
 import logo_img from "../../../images/Deedyte.png";
 
 import { entrepreneur_overlay_setup } from "../../../reusables/overlay";
 import { setNewCookie } from "../../actions/auth-cookies";
 import { resolvePostLoginNavigation } from "../../../reusables/redirectAfterVendorLogin";
 import { saveCustomerAccountHint } from "../../../reusables/customerAccountHint";
+// import { startPassportOAuth } from "../../../reusables/passportOAuth";
 import {
   set_entrepreneur_has_shop,
   set_entrepreneur_shop_details,
@@ -47,8 +48,7 @@ export default function AuthLoginPage() {
   const role = roleParam === "customer" ? ROLES.customer : ROLES.entrepreneur;
   const nextPath = safeNextPath(searchParams.get("next"));
   const cookieRole = role === ROLES.entrepreneur ? 1 : 0;
-
-  const session = useSession();
+  // const oauthError = searchParams.get("oauth_error");
 
   async function applyPostLoginNavigation(loginRole) {
     const nav = await resolvePostLoginNavigation(loginRole);
@@ -64,46 +64,26 @@ export default function AuthLoginPage() {
   const [pwd, setPwd] = useState("");
   const validation = useRef(false);
   const book = useRef({ email: false, pwd: false });
-  const oauthLoginInProgress = useRef(false);
 
-  useEffect(() => {
-    if (session.status !== "authenticated") return;
-    // Only call backend when user just completed OAuth from this page (clicked a button), not when landing with an existing session
-    if (typeof window === "undefined" || window.sessionStorage?.getItem("auth_oauth_pending") !== "true") return;
-    if (oauthLoginInProgress.current) return;
-    oauthLoginInProgress.current = true;
-    window.sessionStorage.removeItem("auth_oauth_pending");
-
-    fetch(LOGIN_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: session.data?.user?.email,
-        provider: session.data?.provider,
-      }),
-    })
-      .then(async (result) => {
-        const response = await result.json();
-        if (response.bool) {
-          await setNewCookie(response.cookie, cookieRole);
-          if (role === ROLES.customer) {
-            saveCustomerAccountHint({
-              email: session.data?.user?.email || email,
-              name: session.data?.user?.name || "",
-            });
-          }
-          await applyPostLoginNavigation(role);
-        } else {
-          oauthLoginInProgress.current = false;
-          addErrMssg([{ mssg: response.data || "Login failed" }], document.querySelector(".pwd")?.parentElement);
-          entrepreneur_overlay_setup(false, "Try Again...");
-        }
-      })
-      .catch((err) => {
-        oauthLoginInProgress.current = false;
-        console.error("OAuth login error:", err);
-      });
-  }, [session.status, session.data?.user?.email, session.data?.provider, cookieRole, role, router, dispatch]);
+  // Passport OAuth (temporarily disconnected)
+  // useEffect(() => {
+  //   if (!oauthError) return;
+  //   addErrMssg([{ mssg: oauthError }], document.querySelector(".pwd")?.parentElement || document.querySelector(".form-cnt"));
+  // }, [oauthError]);
+  //
+  // function startOAuth(provider) {
+  //   try {
+  //     entrepreneur_overlay_setup(true, "One Moment Please...");
+  //     startPassportOAuth(provider, { role, next: nextPath });
+  //   } catch (err) {
+  //     console.error("Passport OAuth start error:", err);
+  //     entrepreneur_overlay_setup(false, "Try Again...");
+  //     addErrMssg(
+  //       [{ mssg: err?.message || "Could not start sign-in" }],
+  //       document.querySelector(".pwd")?.parentElement || document.querySelector(".form-cnt"),
+  //     );
+  //   }
+  // }
 
   function addErrMssg(err, pElem) {
     if (!pElem) return;
@@ -195,22 +175,24 @@ export default function AuthLoginPage() {
       <div className="form-cnt">
         <section>
           <section style={{ marginLeft: "0px", flexDirection: "row", display: "flex", alignItems: "flex-start" }}>
-            <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="Deedyte" />
+            <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="DeeDyte" />
           </section>
           <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#666" }}>
             Sign in as {role === ROLES.entrepreneur ? "Entrepreneur" : "Customer"}
           </p>
+          {/* Passport OAuth (temporarily disconnected)
           <div style={{ display: "flex", width: "auto", gap: "10px", marginTop: 12 }}>
-            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("auth_oauth_pending", "true"); signIn("google", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
+            <button type="button" className="shadow-sm" onClick={() => startOAuth("google")} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
               <span><img src={gg_svg.src} style={{ height: "20px", width: "20px" }} alt="Google" /></span>
             </button>
-            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("auth_oauth_pending", "true"); signIn("apple", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
+            <button type="button" className="shadow-sm" onClick={() => startOAuth("apple")} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
               <span><img src={a_svg.src} style={{ height: "25px", width: "25px" }} alt="Apple" /></span>
             </button>
-            <button className="shadow-sm" onClick={() => { sessionStorage.setItem("auth_oauth_pending", "true"); signIn("facebook", { redirect: false }); }} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
+            <button type="button" className="shadow-sm" onClick={() => startOAuth("facebook")} style={{ padding: "2px 15px", height: "40px", background: "#fff", border: "none", borderRadius: "5px" }}>
               <span><img src={fb_svg.src} style={{ height: "20px", width: "20px" }} alt="Facebook" /></span>
             </button>
           </div>
+          */}
         </section>
 
         <section style={{ height: "auto" }}>

@@ -4,9 +4,10 @@
  * Public shop storefront (Temu-style vendor store).
  */
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { IoSearchOutline, IoStar } from "react-icons/io5";
+import { IoSearchOutline, IoShareOutline, IoStar } from "react-icons/io5";
+import { SITE_ORIGIN } from "@/lib/siteNavigation";
 import "./vendor-store.css";
 
 function formatNgn(n) {
@@ -117,6 +118,30 @@ export default function PublicShopPage() {
   const rating = Number(shop?.average_rating) || 0;
   const reviewCount = Number(shop?.review_count) || 0;
   const showingItems = tab !== "reviews" && tab !== "about";
+  const storeUrl = slug ? `${SITE_ORIGIN}/store/${encodeURIComponent(slug)}` : "";
+
+  const shareStore = useCallback(async () => {
+    if (!storeUrl) return;
+    const shareData = {
+      title: name,
+      text: `Check out ${name} on DeeDyte`,
+      url: storeUrl,
+    };
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share(shareData);
+        return;
+      }
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(storeUrl);
+        window.alert("Store link copied");
+        return;
+      }
+    } catch (err) {
+      if (err && typeof err === "object" && "name" in err && err.name === "AbortError") return;
+    }
+    window.prompt("Copy this store link", storeUrl);
+  }, [name, storeUrl]);
 
   return (
     <div className="vendor-store">
@@ -139,18 +164,30 @@ export default function PublicShopPage() {
             </div>
           </div>
         </div>
-        <div className="vendor-store__stats">
-          <div className="vendor-store__stat">
-            <b>{compactCount(shop?.soldCount)}</b>
-            <span>Sold</span>
-          </div>
-          <div className="vendor-store__stat">
-            <b>{compactCount(itemCount)}</b>
-            <span>Items</span>
-          </div>
-          <div className="vendor-store__stat">
-            <b>{rating > 0 ? rating.toFixed(1) : "—"}</b>
-            <span>Rating</span>
+        <div className="vendor-store__profile-actions">
+          <button
+            type="button"
+            className="vendor-store__share"
+            onClick={() => void shareStore()}
+            aria-label={`Share ${name}`}
+            disabled={!storeUrl}
+          >
+            <IoShareOutline size={18} aria-hidden />
+            <span>Share</span>
+          </button>
+          <div className="vendor-store__stats">
+            <div className="vendor-store__stat">
+              <b>{compactCount(shop?.soldCount)}</b>
+              <span>Sold</span>
+            </div>
+            <div className="vendor-store__stat">
+              <b>{compactCount(itemCount)}</b>
+              <span>Items</span>
+            </div>
+            <div className="vendor-store__stat">
+              <b>{rating > 0 ? rating.toFixed(1) : "—"}</b>
+              <span>Rating</span>
+            </div>
           </div>
         </div>
       </div>
