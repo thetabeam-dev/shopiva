@@ -63,6 +63,58 @@ export async function GetStorefrontProductsByShopIdService(shopId: number) {
   return buildStorefrontListingProducts(products as ProductRow[], inventoryRows as InventoryRow[]);
 }
 
+type HomeFeedRow = ProductRow & {
+  feed_shop_id?: unknown;
+  feed_shop_slug?: unknown;
+  feed_shop_name?: unknown;
+  feed_shop_rating?: unknown;
+  feed_shop_review_count?: unknown;
+  feed_sold?: unknown;
+};
+
+/**
+ * Paginated buyer home catalog (cross-shop).
+ */
+export async function GetStorefrontHomeProductsService(limit = 40, offset = 0) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const rows = (await productModel.listPublishedHomeFeed(safeLimit + 1, safeOffset)) as HomeFeedRow[];
+  const hasMore = rows.length > safeLimit;
+  const page = hasMore ? rows.slice(0, safeLimit) : rows;
+  const ids = page
+    .map((p: HomeFeedRow) => Number(p.id))
+    .filter((id: number) => Number.isFinite(id) && id > 0);
+  const inventoryRows = ids.length ? await inventoryModel.getByProductIds(ids) : [];
+  const listed = buildStorefrontListingProducts(page as ProductRow[], inventoryRows as InventoryRow[]);
+  const byId = new Map(page.map((row: HomeFeedRow) => [String(row.id), row]));
+  const products = listed.map((item) => {
+    const row = byId.get(String(item.id));
+    const shopId = Number(row?.feed_shop_id ?? row?.shop_id) || 0;
+    return {
+      ...item,
+      thumbnail: item.thumbnail || String(row?.thumbnail_url ?? "").trim(),
+      sold: Number(row?.feed_sold) || 0,
+      featured: Boolean(row?.is_featured),
+      is_featured: Boolean(row?.is_featured),
+      compareAtPrice: item.maxPrice > item.minPrice ? item.maxPrice : 0,
+      shop: {
+        id: shopId,
+        slug: String(row?.feed_shop_slug ?? "").trim(),
+        name: String(row?.feed_shop_name ?? "").trim(),
+        ratingAverage: Number(row?.feed_shop_rating) || 0,
+        average_rating: Number(row?.feed_shop_rating) || 0,
+        reviewCount: Number(row?.feed_shop_review_count) || 0,
+        review_count: Number(row?.feed_shop_review_count) || 0,
+      },
+    };
+  });
+  return {
+    products,
+    hasMore,
+    nextOffset: safeOffset + products.length,
+  };
+}
+
 /** JSONB columns are usually objects; normalize string payloads for consistent clients. */
 function parseJsonbPolicyField(v: unknown): unknown {
   if (v == null) return null;

@@ -45,23 +45,6 @@
         background-color: transparent;
     }
     
-    header{
-        height: 100vh;
-        background-color: transparent;
-        /* background-color: ; */
-        /* opacity: .5; */
-        display: flex;
-        position: relative;
-        margin: 0;
-        overflow: hidden;
-        /* flex-direction: column; */
-        z-index: 1000;
-        padding: 0;
-        top: 0;
-        align-items: flex-start;
-    
-        justify-content: space-between;
-    }
     
     
     
@@ -134,7 +117,7 @@
         -webkit-overflow-scrolling: touch;
     }
 
-    .customer-free-main{
+    .customer-free-main {
         flex: 1 0 auto;
         width: 100%;
         height: auto !important;
@@ -149,7 +132,7 @@
     }
     
     
-    main{
+    main:not(.customer-free-main) {
         height: calc(100vh - 60px);
         display: flex;
         flex-direction: column;
@@ -158,7 +141,7 @@
         background-color: #f8f8f8;
     }
     
-    main section{
+    main:not(.customer-free-main) section{
         width: 100%;
         display: flex;
         overflow: hidden;
@@ -169,12 +152,12 @@
     
     }
     
-    main section h4{
+    main:not(.customer-free-main) section h4{
         width: 100%;
         text-align: center;
     }
     
-    main section button{
+    main:not(.customer-free-main) section button{
         padding: 10px;
         background-color: #fff;
         color: #00926e;
@@ -182,12 +165,12 @@
         border-radius: 5px;
     }
     
-    main section button:hover{
+    main:not(.customer-free-main) section button:hover{
         background-color: #00926e;
         color: #fff;
     }
     
-    main section ul{
+    main:not(.customer-free-main) section ul{
         list-style-type: none;
         display: flex;
         justify-content: space-between;
@@ -206,7 +189,7 @@
     
     
     
-    main section:nth-child(2){
+    main:not(.customer-free-main) section:nth-child(2){
         background-color: #00351ce8;
         border-radius: 25px 25px 0px 0px;
         color: #fff;
@@ -217,13 +200,13 @@
     }
     
     
-    main section:nth-child(2) div{
+    main:not(.customer-free-main) section:nth-child(2) div{
         height: fit-content;
         width: 100%;
         /* background-color: #fff; */
     }
     
-    main section:nth-child(2) div ul{
+    main:not(.customer-free-main) section:nth-child(2) div ul{
         list-style-type: none;
         display: flex;
         height: 100%;
@@ -233,7 +216,7 @@
         justify-content: space-between;
     }
     
-    main section:nth-child(2) div ul li{
+    main:not(.customer-free-main) section:nth-child(2) div ul li{
         width: 200px;
         background-color: #fff;
         display: flex;
@@ -244,15 +227,15 @@
         justify-content: space-between;
     }
     
-    main section:nth-child(2) div ul li:nth-child(3){
+    main:not(.customer-free-main) section:nth-child(2) div ul li:nth-child(3){
         width: 200px;
     }
-    main section:nth-child(2) div ul li:nth-child(3){
+    main:not(.customer-free-main) section:nth-child(2) div ul li:nth-child(3){
         font-size: 7.5vh;
         font-weight: 100;
     }
     
-    main section:nth-child(3){
+    main:not(.customer-free-main) section:nth-child(3){
         background-color: #00351ce8;
         /* border-radius: 25px 25px 0px 0px; */
         color: #fff;
@@ -262,13 +245,13 @@
         font-weight: 500;
     }
     
-    main section:nth-child(3) div{
+    main:not(.customer-free-main) section:nth-child(3) div{
         height: auto;
         width: 100%;
         /* background-color: #fff; */
     }
     
-    main section:nth-child(3) div ul{
+    main:not(.customer-free-main) section:nth-child(3) div ul{
         list-style-type: none;
         display: flex;
         height: 100%;
@@ -278,7 +261,7 @@
         justify-content: space-between;
     }
     
-    main section:nth-child(3) div ul li{
+    main:not(.customer-free-main) section:nth-child(3) div ul li{
         width: 45%;
         background-color: #00351ce8;
         display: flex;
@@ -288,7 +271,7 @@
         justify-content: space-between;
     }
     
-    main section:nth-child(4){
+    main:not(.customer-free-main) section:nth-child(4){
         height: fit-content;
         display: flex;
         flex-direction: column;
@@ -297,7 +280,7 @@
         justify-content: space-between;
     }
     
-    main section:nth-child(4) .list-cnt{
+    main:not(.customer-free-main) section:nth-child(4) .list-cnt{
         width: 100%;
         display: flex;
         flex-direction: row;
@@ -308,7 +291,7 @@
     }
     
     
-    main section:nth-child(4) .list-cnt div{
+    main:not(.customer-free-main) section:nth-child(4) .list-cnt div{
         width: 100%;
         display: flex;
         flex-direction: column;

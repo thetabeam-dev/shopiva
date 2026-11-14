@@ -19,7 +19,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSelector } from 'react-redux';
-import { getStorefrontProduct, getStorefrontProducts, getVendorsOnMapByCategory } from '../../api';
+import { getStorefrontHomeProducts, getStorefrontProduct } from '../../api';
 import { addBuyerCartLine, deleteBuyerCartLine, fetchBuyerCart, fetchRecentlyViewedProducts } from '../../api/buyer';
 import { fetchWallet } from '../../api/user';
 import { connectChatSocket } from '../../socket/chatSocket';
@@ -66,6 +66,31 @@ function formatCategoryLabel(category) {
 }
 
 const BANNER_W = Dimensions.get('window').width - 32;
+const PAGE_SIZE = 40;
+
+function mapHomeProduct(product) {
+  const price = Number(product.minPrice ?? product.price) || 0;
+  const compare = Number(
+    product.compareAtPrice ?? product.compare_at_price ?? product.maxPrice,
+  ) || 0;
+  const shop =
+    product?.shop && typeof product.shop === 'object' && !Array.isArray(product.shop)
+      ? product.shop
+      : {};
+  return {
+    id: String(product.id),
+    title: String(product.name ?? 'Product'),
+    uri: getProductImageUri(product),
+    price,
+    comparePrice: compare > price ? compare : 0,
+    sold: Number(product.sold ?? product.soldCount ?? 0) || 0,
+    category: String(product?.category ?? '').trim().toLowerCase(),
+    hasVariants: Boolean(product?.hasVariants),
+    featured: Boolean(product.is_featured ?? product.isFeatured ?? product.featured),
+    shop,
+    product,
+  };
+}
 
 const BANNERS = [
   {
@@ -112,7 +137,10 @@ export default function HomeScreen() {
   const { user } = useProfile();
   const categoryRows = useSelector(selectCategoryRows);
   const [arrivals, setArrivals] = useState([]);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [bannerIndex, setBannerIndex] = useState(0);
@@ -149,51 +177,50 @@ export default function HomeScreen() {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const shops = await getVendorsOnMapByCategory('');
-      const withSlug = shops.filter(shop => String(shop?.slug ?? '').trim());
-      const collected = [];
-      const batchSize = 5;
-      for (let i = 0; i < withSlug.length && collected.length < 200; i += batchSize) {
-        const chunk = withSlug.slice(i, i + batchSize);
-        const lists = await Promise.all(
-          chunk.map(async shop => {
-            try {
-              const data = await getStorefrontProducts(shop.slug);
-              const products = Array.isArray(data?.products) ? data.products : [];
-              return products.map(product => {
-                const price = Number(product.minPrice ?? product.price) || 0;
-                const compare = Number(
-                  product.compareAtPrice ?? product.compare_at_price ?? product.maxPrice,
-                ) || 0;
-                return {
-                  id: String(product.id),
-                  title: String(product.name ?? 'Product'),
-                  uri: getProductImageUri(product),
-                  price,
-                  comparePrice: compare > price ? compare : 0,
-                  sold: Number(product.sold ?? product.soldCount ?? 0) || 0,
-                  category: String(product?.category ?? '').trim().toLowerCase(),
-                  hasVariants: Boolean(product?.hasVariants),
-                  featured: Boolean(product.is_featured ?? product.isFeatured ?? product.featured),
-                  shop,
-                  product,
-                };
-              });
-            } catch {
-              return [];
-            }
-          }),
-        );
-        collected.push(...lists.flat());
-      }
-      setArrivals(collected);
+      const data = await getStorefrontHomeProducts({ limit: PAGE_SIZE, offset: 0 });
+      const products = Array.isArray(data?.products) ? data.products : [];
+      setArrivals(products.map(mapHomeProduct));
+      setHasMore(Boolean(data?.hasMore));
+      setNextOffset(
+        Number.isFinite(Number(data?.nextOffset)) ? Number(data.nextOffset) : products.length,
+      );
     } catch {
-      if (!refresh) setArrivals([]);
+      if (!refresh) {
+        setArrivals([]);
+        setHasMore(false);
+        setNextOffset(0);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
+
+  const loadMoreArrivals = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await getStorefrontHomeProducts({ limit: PAGE_SIZE, offset: nextOffset });
+      const products = Array.isArray(data?.products) ? data.products : [];
+      setArrivals(prev => {
+        const seen = new Set(prev.map(item => String(item.id)));
+        return [
+          ...prev,
+          ...products.map(mapHomeProduct).filter(item => !seen.has(String(item.id))),
+        ];
+      });
+      setHasMore(Boolean(data?.hasMore));
+      setNextOffset(
+        Number.isFinite(Number(data?.nextOffset))
+          ? Number(data.nextOffset)
+          : nextOffset + products.length,
+      );
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loadingMore, nextOffset]);
 
   useEffect(() => {
     loadArrivals().catch(() => {});
@@ -655,6 +682,26 @@ export default function HomeScreen() {
             ? 'No products yet. Explore shops to see what is in stock.'
             : `No products in ${formatCategoryLabel(selectedCategory)}.`}
         </Text>
+      ) : null}
+      {hasMore ? (
+        <View style={styles.loadMoreWrap}>
+          <TouchableOpacity
+            style={[styles.loadMoreBtn, loadingMore && styles.loadMoreBtnOff]}
+            activeOpacity={0.85}
+            disabled={loadingMore}
+            onPress={() => {
+              void loadMoreArrivals();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Load more"
+          >
+            {loadingMore ? (
+              <ActivityIndicator color="#00926E" />
+            ) : (
+              <Text style={styles.loadMoreText}>Load more</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       ) : null}
     </ScrollView>
 
@@ -1177,4 +1224,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   empty: { paddingHorizontal: 20, paddingTop: 8, color: '#8A8A8A' },
+  loadMoreWrap: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  loadMoreBtn: {
+    minWidth: 160,
+    height: 44,
+    paddingHorizontal: 28,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#00926E',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreBtnOff: { opacity: 0.65 },
+  loadMoreText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#00926E',
+  },
 });

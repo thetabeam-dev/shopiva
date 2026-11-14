@@ -12,7 +12,6 @@
 import React, { useEffect, useRef } from "react";
 
 // Styles
-import "../global.css";
 import "./styles/s.css";
 import "./styles/m.css";
 import "./styles/l.css";
@@ -54,21 +53,21 @@ const APP_SCREENSHOT_URL = Screenshot.src;
 const HOW_IT_WORKS_STEPS = [
   {
     icon: PhoneSvg,
-    title: "Download The App",
+    title: "Explore DeeDyte",
     summary:
-      "Easily download our user-friendly app from your device's app store to get started with seamless ordering.",
+      "Discover products from different vendors, explore their shops, compare options, and find what you need in one convenient marketplace.",
   },
   {
     icon: BasketSvg,
-    title: "Place An Order",
+    title: "Connect and Make a Purchase",
     summary:
-      "Browse through our wide selection of items, add them to your cart, and complete your order with just a few taps.",
+      "Start a conversation with vendors, ask questions, discuss product details, and place your order with confidence through DeeDyte.",
   },
   {
     icon: BikeSvg,
-    title: "Get It Instantly",
+    title: "Receive Your Order with Confidence",
     summary:
-      "Sit back and relax as your delivery reaches straight to your door in no time.",
+      "Complete your payment through DeeDyte's secure transaction process. Your purchase is supported by escrow protection and dispute resolution to help make every transaction safer.",
   },
 ];
 
@@ -78,27 +77,27 @@ const HOW_IT_WORKS_STEPS = [
 const WHY_DEEDYTE_FEATURES = [
   {
     image: Bank,
-    title: "Secure Payment Processing",
+    title: "Protected Transactions",
     summary:
-      "Enjoy total peace of mind with every purchase. We use bank-level encryption, secure payment gateways like PayStack and FlutterWave, and advanced tokenization to protect your card details. Your financial information is never stored on our servers, ensuring rock-solid security and complete privacy for every transaction.",
+      "Shop with greater confidence knowing your transactions are supported by DeeDyte's escrow payment system. Rather than relying solely on direct payments to vendors, escrow provides an additional layer of protection by holding payment until the agreed transaction conditions are met.",
   },
   {
     image: Inventory,
-    title: "Instant Access to Local Inventory",
+    title: "Discover Products from Multiple Vendors",
     summary:
-      "Skip long shipping waits and discover what's available right in your neighborhood. Our smart geolocation technology instantly shows you real-time stock from nearby sellers and stores. Browse fresh, local products, compare prices quickly, and find exactly what you need without endless searching.",
+      "Find products across different shops in one convenient marketplace. Explore diverse product categories, discover new vendors, compare available options, and connect with sellers without having to navigate multiple platforms.",
   },
   {
     image: Delivery,
-    title: "Guaranteed Delivery Safeguards",
+    title: "A Better Buying Experience",
     summary:
-      "From the moment you place your order, we've got you covered. Enjoy end-to-end tracking, full delivery insurance, and protection against loss or damage. If anything goes wrong—late delivery, damaged items, or missing packages—we'll handle replacements or full refunds quickly and without hassle.",
+      "From placing your order to arranging delivery, DeeDyte helps bring buyers and vendors together through a structured transaction process. Keep your purchase organized and know what to expect as your order progresses.",
   },
   {
     image: Fraud,
-    title: "Zero-Tolerance Fraud Prevention",
+    title: "Dispute Resolution and Buyer Protection",
     summary:
-      "Shop confidently knowing we actively fight fraud on your behalf. Our AI-powered system monitors every transaction in real-time, while all sellers go through strict identity and business verification. Buyer reviews, secure escrow options, and counterfeit detection keep scams and fake products completely out of your shopping experience.",
+      "Online transactions should not leave buyers and vendors without support when things go wrong. DeeDyte provides a dispute resolution system designed to help address transaction disagreements, promote accountability, and create a safer environment for everyone doing business on the platform.",
   },
 ];
 
@@ -142,7 +141,7 @@ export default function Dashboard() {
       armMutedInline();
       const playPromise = video.play();
       if (playPromise?.catch) {
-        playPromise.catch(() => {});
+        playPromise.catch(() => { });
       }
     };
 
@@ -207,7 +206,7 @@ export default function Dashboard() {
   // RENDER
   // ============================================================================
 
-  return ( 
+  return (
     <>
       {/* Hero Section */}
       <section className="hero-section">
@@ -252,14 +251,12 @@ export default function Dashboard() {
 
             <div>
               <p className="theme">
-                DeeDyte is your pocket mall! Whether you are unready to shop in
-                physical stores, use Deedyte to order from the closest vendor at
-                your locations and get delivery at your doorstep in minutes.
+              DeeDyte is your trusted online marketplace! Discover products from different vendors, connect with sellers, and shop with confidence. With escrow payment protection and dispute resolution, we make buying and selling online safer, easier, and more reliable for everyone.
               </p>
 
               {/* Order Button */}
               <div className="order_btn">
-                <button onClick={e => window.location.href = "/vendors"}>Order Now</button>
+                <button onClick={e => window.location.href = "/"}>Order Now</button>
               </div>
 
               {/* Download Buttons */}

@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IoCartOutline, IoHeadsetOutline, IoPersonOutline, IoSearch } from "react-icons/io5";
+import { IoHeadsetOutline, IoPersonOutline, IoSearch } from "react-icons/io5";
 import Link from "next/link";
 import { getCookie } from "../../reusables/verifyAuth";
 import { saveCustomerAccountHint } from "../../reusables/customerAccountHint";
-import { CART_UPDATED_EVENT } from "../../reusables/cartEvents";
-import { buyerAuthHeaders } from "../../reusables/shopBackendAuth";
 
 function displayNameFromSession(data) {
     if (!data || typeof data !== "object") return "Account";
@@ -22,7 +20,6 @@ function displayNameFromSession(data) {
 
 export default function CustomerHeader() {
     const [sessionName, setSessionName] = useState(null);
-    const [cartCount, setCartCount] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -58,30 +55,6 @@ export default function CustomerHeader() {
         };
     }, []);
 
-    useEffect(() => {
-        let cancelled = false;
-        async function loadCount() {
-            try {
-                const res = await fetch("/api/cart", {
-                    method: "GET",
-                    headers: buyerAuthHeaders(),
-                    credentials: "include",
-                });
-                const data = await res.json().catch(() => ({}));
-                if (cancelled || !res.ok) return;
-                const items = Array.isArray(data.items) ? data.items : [];
-                setCartCount(items.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0));
-            } catch {
-                if (!cancelled) setCartCount(0);
-            }
-        }
-        loadCount();
-        window.addEventListener(CART_UPDATED_EVENT, loadCount);
-        return () => {
-            cancelled = true;
-            window.removeEventListener(CART_UPDATED_EVENT, loadCount);
-        };
-    }, []);
 
     const signedIn = Boolean(sessionName);
 
@@ -108,49 +81,20 @@ export default function CustomerHeader() {
 
                 <div className="buyer-header-group">
                     <Link
-                        style={{
-                            textDecoration: "none",
-                            color: "#000"
-                        }}
                         className="buyer-auth"
                         href={signedIn ? "/user-profile" : "/orders"}
+                        aria-label={signedIn ? `Account, ${sessionName}` : "Register or login"}
                     >
-                        <IoPersonOutline size={18} />
-                        &nbsp;
-                        <div>
-                            <small style={{fontSize: "10px"}}>
+                        <IoPersonOutline size={20} />
+                        <div className="buyer-auth__copy">
+                            <small className="buyer-auth__hello">
                                 {signedIn ? `Hi, ${sessionName}` : "Register / Login"}
                             </small>
-                            <small style={{fontSize: "12px", fontWeight: "600"}}>Order & Account</small>
+                            <small className="buyer-auth__label">Order & Account</small>
                         </div>
                     </Link>
-                </div>
-                <div className="buyer-header-group">
-                   
-                    <Link
-                        className="buyer-cart-link"
-                        style={{
-                        textDecoration: "none",
-                        color: "#000",
-                        background: "#fff"
-
-                    }} href={"/cart"}>
-                        <IoCartOutline color="#000" size={18} />
-                        {cartCount > 0 ? <span className="buyer-cart-count">{cartCount}</span> : null}
-                    </Link>
-                    &nbsp;
-                    &nbsp;
-                    &nbsp;
-
-                    <Link style={{
-                        textDecoration: "none",
-                        color: "#000",
-                        fontSize: "medium",
-                        display: "flex",
-                        alignItems: "center"
-                    }} href={"/support"} >
-                        <IoHeadsetOutline size={18} />
-                        &nbsp;
+                    <Link className="buyer-support" href={"/support"} aria-label="Support">
+                        <IoHeadsetOutline size={20} />
                         <small>Support</small>
                     </Link>
                 </div>

@@ -4,6 +4,7 @@ import {
   SITE_ORIGIN,
 } from "../lib/siteNavigation";
 import { listCategoriesWithProducts } from "../lib/storefrontCategories";
+import { listBlogPosts } from "../lib/blogPosts";
 
 const STATIC_PATHS = [
   "/",
@@ -45,20 +46,32 @@ async function shopEntries() {
   );
 }
 
+function blogEntries() {
+  return listBlogPosts().map((post) =>
+    entry(
+      `/blogs/${post.slug}`,
+      post.date ? new Date(post.date) : new Date(),
+      0.7,
+    ),
+  );
+}
+
 export default async function sitemap() {
   const pages = STATIC_PATHS.map((path) =>
-    entry(path, new Date(), path === "/" ? 1 : 0.8),
+    entry(path, new Date(), path === "/" ? 1 : path === "/blogs" ? 0.85 : 0.8),
   );
+  const blogs = blogEntries();
 
   try {
     const categories = await listCategoriesWithProducts();
     return [
       ...pages,
+      ...blogs,
       ...categories.map((category) => entry(category.path, new Date(), 0.8)),
       ...(await shopEntries()),
     ];
   } catch (error) {
     console.error("Sitemap storefront lookup failed:", error);
-    return pages;
+    return [...pages, ...blogs];
   }
 }

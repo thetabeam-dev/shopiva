@@ -390,6 +390,61 @@ a {
   border-top-right-radius: 10px; */
 }
 
+/* Buyer pages: main fills the layout unless the slim shell header is present. */
+.customer-layout.customer-restricted-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.customer-layout.customer-restricted-layout > .customer-main {
+  height: auto;
+  min-height: 0;
+  flex: 1 0 auto;
+  display: block;
+}
+
+.customer-layout.customer-restricted-layout > .customer-shell-header + .customer-main {
+  height: auto;
+  flex: 1 0 auto;
+}
+
+.customer-layout.customer-restricted-layout > .customer-main > .customer-content {
+  display: block;
+  height: auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.customer-layout.customer-restricted-layout > .customer-main > .customer-content > .customer-content__body {
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  width: 100%;
+}
+
+/* Product detail: keep page scroll on the layout, not a nested clipped main. */
+.customer-layout.customer-restricted-layout > .customer-main:has(.pdp-page) {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  display: block;
+}
+
+.customer-layout.customer-restricted-layout > .customer-main:has(.pdp-page) > .customer-content,
+.customer-layout.customer-restricted-layout > .customer-main:has(.pdp-page) > .customer-content > .customer-content__body {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.customer-layout.customer-restricted-layout > .site-footer {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  order: 3;
+}
+
 /* Content Section */
 .entrepreneur-content, .customer-content {
   width: calc(100% - 200px);
@@ -403,14 +458,19 @@ a {
   display: flex;
   flex-direction: row;
   justify-content: space-around;
+  align-items: flex-start;
   min-height: 0;
 }
 
 .customer-content__body {
   flex: 1;
   min-height: 0;
-  width: calc(100% - 240px);
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
   overflow: auto;
+  display: block;
+  align-self: stretch;
 }
 
 /* Aside is not rendered below 1200px (see Entrepreneur Restricted layout) */

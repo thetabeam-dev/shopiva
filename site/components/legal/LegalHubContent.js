@@ -26,6 +26,12 @@ const DOCS = [
       "Learn who we are and why we built an all-in-one commerce platform for buyers and sellers.",
   },
   {
+    title: "Blog",
+    href: "/blogs",
+    description:
+      "Guides and updates on local shopping, selling on DeeDyte, escrow protection, and product news.",
+  },
+  {
     title: "Contact Us",
     href: "/contact",
     description:

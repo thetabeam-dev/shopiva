@@ -1,8 +1,9 @@
 @media screen and (max-width: 480px) {
 
-    div{
-        height: unset;
-        width: unset;
+    .buyer-head {
+        width: 100%;
+        flex: 0 0 auto;
+        background: #fff;
     }
 
     /* .customer-vendor-page-category{
@@ -69,9 +70,8 @@
 
     .customer-vendors-page{
         /* padding: 15px; */
-        height: 100vh;
+        min-height: calc(100vh - 140px);
         width: 100%;
-        overflow: auto;
         background-color: #f9f9f9;
     }
 
@@ -79,7 +79,7 @@
         height: fit-content;
         padding: 15px;
         width: 100%;
-        margin-top: 108px;
+        margin-top: 0;
     }
 
     .vendor-card{

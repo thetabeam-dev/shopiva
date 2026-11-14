@@ -23,6 +23,8 @@ const INFO_PAGES = [
   "contact",
   "sitemap",
   "pricing",
+  "blogs",
+  "how-it-works",
 ];
 
 /**
@@ -51,7 +53,18 @@ export function isWebAllowedPath(pathname) {
   return false;
 }
 
-export default function DownloadAppGate() {
+/**
+ * @param {{
+ *   onClose?: () => void;
+ *   title?: string;
+ *   message?: string;
+ * }} [props]
+ */
+export default function DownloadAppGate({
+  onClose,
+  title = "Continue on the DeeDyte app",
+  message = "Shopping, selling and managing orders are only available on the DeeDyte mobile app. Download it from the App Store or Play Store to continue.",
+} = {}) {
   const [playStoreUrl, setPlayStoreUrl] = useState(PLAY_STORE_URL);
 
   useEffect(() => {
@@ -71,6 +84,9 @@ export default function DownloadAppGate() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="download-app-title"
+      onClick={onClose ? (event) => {
+        if (event.target === event.currentTarget) onClose();
+      } : undefined}
       style={{
         position: "fixed",
         inset: 0,
@@ -86,21 +102,33 @@ export default function DownloadAppGate() {
         style={{
           width: "100%",
           maxWidth: 420,
+          height: 400,
           background: "#fff",
           borderRadius: 16,
           padding: "32px 24px",
           textAlign: "center",
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.25)",
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         <h2 id="download-app-title" style={{ fontSize: 22, fontWeight: 800, color: "#111", marginBottom: 12 }}>
-          Continue on the DeeDyte app
+          {title}
         </h2>
         <p style={{ fontSize: 15, lineHeight: 1.5, color: "#555", marginBottom: 24 }}>
-          Shopping, selling and managing orders are only available on the DeeDyte mobile app.
-          Download it from the App Store or Play Store to continue.
+          {message}
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <a
             href={APP_STORE_URL}
             target="_blank"
@@ -119,9 +147,35 @@ export default function DownloadAppGate() {
             <img src="/svgs/play_store.svg" alt="" style={{ height: 32, width: 32 }} />
             <b>Play Store</b>
           </a>
-          <a href="/" style={{ marginTop: 8, color: "#00926E", fontWeight: 600, textDecoration: "none" }}>
-            Back to home
-          </a>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                marginTop: "auto",
+                border: 0,
+                background: "transparent",
+                color: "#00926E",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: 15,
+              }}
+            >
+              Not now
+            </button>
+          ) : (
+            <a
+              href="/"
+              style={{
+                marginTop: "auto",
+                color: "#00926E",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Back to home
+            </a>
+          )}
         </div>
       </div>
     </div>

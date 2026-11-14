@@ -91,8 +91,10 @@ function shouldShowCustomerShellHeader(pathname) {
 function shouldShowCustomerBgVideo(pathname) {
   const path = (pathname || "").split("?")[0] || "/";
   const norm = path.replace(/\/+$/, "") || "/";
-  if (norm === "/") return true;
-  if (norm === "/vendors" || norm.startsWith("/vendors/")) return true;
+  // Product feed home stays opaque white — video was fighting the grid/footer stack.
+  if (norm === "/") return false;
+  // Vendors uses the solid shopping chrome (buyer header + grey feed), not the video shell.
+  if (norm === "/vendors" || norm.startsWith("/vendors/")) return false;
   if (norm === "/user-profile" || norm.startsWith("/user-profile/")) return true;
   if (norm === "/store" || norm.startsWith("/store/")) return true;
   return false;
