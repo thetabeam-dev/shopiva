@@ -104,6 +104,10 @@ function tomtomLeafletHtml(tileUrl) {
   map.on('moveend', region);
   window.moveTo = function (lat, lng, zoom) { map.setView([lat, lng], zoom); };
   window.zoomBy = function (step) { map.setZoom(map.getZoom() + step); };
+  window.setMapInteractive = function (on) {
+    if (on) { map.dragging.enable(); map.touchZoom.enable(); map.scrollWheelZoom.enable(); map.doubleClickZoom.enable(); }
+    else { map.dragging.disable(); map.touchZoom.disable(); map.scrollWheelZoom.disable(); map.doubleClickZoom.disable(); }
+  };
   window.renderPins = function (shops, me) {
     pins.clearLayers();
     (shops || []).forEach(function (shop) {
@@ -243,6 +247,13 @@ export default function ExploreMap({ navigation, route }) {
     }
     mapRef.current?.animateToRegion(region, 400);
   }, [savedLatitude, savedLongitude, webReady]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !webReady) return;
+    webRef.current?.injectJavaScript(
+      `window.setMapInteractive && window.setMapInteractive(${sheetExpanded ? 'false' : 'true'}); true;`,
+    );
+  }, [sheetExpanded, webReady]);
 
   useEffect(() => {
     const search = query.trim();
@@ -615,82 +626,92 @@ export default function ExploreMap({ navigation, route }) {
           if (width > 0 && height > 0) setMapBox({ width, height });
         }}
       >
-        {Platform.OS === 'android' ? (
-          <WebView
-            ref={webRef}
-            style={mapBox ?? styles.map}
-            originWhitelist={['*']}
-            source={{ html: tomtomLeafletHtml(tomtomTileUrl()) }}
-            javaScriptEnabled
-            domStorageEnabled
-            onLoadEnd={() => setWebReady(true)}
-            onMessage={(event) => {
-              let message = null;
-              try { message = JSON.parse(event.nativeEvent.data); } catch { message = null; }
-              if (!message) return;
-              if (message.type === 'region') {
-                setMapRegion({
-                  latitude: Number(message.latitude),
-                  longitude: Number(message.longitude),
-                  latitudeDelta: Number(message.latitudeDelta),
-                  longitudeDelta: Number(message.longitudeDelta),
-                });
-                return;
-              }
-              if (message.type === 'shop') {
-                const match = visibleShops.find((item) => String(item.shop.id) === String(message.id));
-                if (match) openShop(match.shop);
-              }
-            }}
-          />
-        ) : (
-        <MapView
-          ref={mapRef}
+        <View
           style={mapBox ?? styles.map}
-          initialRegion={{
-            latitude: savedCoord?.latitude ?? 9.082,
-            longitude: savedCoord?.longitude ?? 8.6753,
-            latitudeDelta: savedCoord ? 0.2 : 8,
-            longitudeDelta: savedCoord ? 0.2 : 8,
-          }}
-          onRegionChangeComplete={setMapRegion}
-          showsMyLocationButton={false}
-          toolbarEnabled={false}
-          mapPadding={{
-            top: 72,
-            right: 12,
-            bottom: (sheetExpanded ? SHEET_EXPANDED : SHEET_PEEK) + 24,
-            left: 12,
-          }}
-          mapType="standard"
+          pointerEvents={sheetExpanded ? 'none' : 'auto'}
+          collapsable={false}
         >
-          {showMe && savedCoord ? (
-            <Marker coordinate={savedCoord} pinColor="#1A73E8" title="You" zIndex={2} />
-          ) : null}
-          {visibleShops.map(({ shop, coordinate }) => {
-            const categories = shopCategories(shop).map(formatCategory);
-            return (
-              <Marker
-                key={String(shop.id)}
-                coordinate={coordinate}
-                anchor={{ x: 0.5, y: 1 }}
-                tracksViewChanges={false}
-                onPress={() => openShop(shop)}
-              >
-                <View style={styles.tip} collapsable={false}>
-                  <Text style={styles.tipName} numberOfLines={1}>{shop.name || 'Shop'}</Text>
-                  <Text style={styles.tipMeta} numberOfLines={2}>
-                    {categories.length ? categories.join(', ') : 'No categories'}
-                  </Text>
-                  <Text style={styles.tipFee}>
-                    Avg shipping {formatNaira(shop.averageShippingFee ?? shop.average_shipping_fee)}
-                  </Text>
-                </View>
-              </Marker>
-            );
-          })}
-        </MapView>
-        )}
+          {Platform.OS === 'android' ? (
+            <WebView
+              ref={webRef}
+              style={StyleSheet.absoluteFillObject}
+              originWhitelist={['*']}
+              source={{ html: tomtomLeafletHtml(tomtomTileUrl()) }}
+              javaScriptEnabled
+              domStorageEnabled
+              onLoadEnd={() => setWebReady(true)}
+              onMessage={(event) => {
+                let message = null;
+                try { message = JSON.parse(event.nativeEvent.data); } catch { message = null; }
+                if (!message) return;
+                if (message.type === 'region') {
+                  setMapRegion({
+                    latitude: Number(message.latitude),
+                    longitude: Number(message.longitude),
+                    latitudeDelta: Number(message.latitudeDelta),
+                    longitudeDelta: Number(message.longitudeDelta),
+                  });
+                  return;
+                }
+                if (message.type === 'shop') {
+                  const match = visibleShops.find((item) => String(item.shop.id) === String(message.id));
+                  if (match) openShop(match.shop);
+                }
+              }}
+            />
+          ) : (
+          <MapView
+            ref={mapRef}
+            style={StyleSheet.absoluteFillObject}
+            scrollEnabled={!sheetExpanded}
+            zoomEnabled={!sheetExpanded}
+            rotateEnabled={!sheetExpanded}
+            pitchEnabled={!sheetExpanded}
+            initialRegion={{
+              latitude: savedCoord?.latitude ?? 9.082,
+              longitude: savedCoord?.longitude ?? 8.6753,
+              latitudeDelta: savedCoord ? 0.2 : 8,
+              longitudeDelta: savedCoord ? 0.2 : 8,
+            }}
+            onRegionChangeComplete={setMapRegion}
+            showsMyLocationButton={false}
+            toolbarEnabled={false}
+            mapPadding={{
+              top: 72,
+              right: 12,
+              bottom: (sheetExpanded ? SHEET_EXPANDED : SHEET_PEEK) + 24,
+              left: 12,
+            }}
+            mapType="standard"
+          >
+            {showMe && savedCoord ? (
+              <Marker coordinate={savedCoord} pinColor="#1A73E8" title="You" zIndex={2} />
+            ) : null}
+            {visibleShops.map(({ shop, coordinate }) => {
+              const categories = shopCategories(shop).map(formatCategory);
+              return (
+                <Marker
+                  key={String(shop.id)}
+                  coordinate={coordinate}
+                  anchor={{ x: 0.5, y: 1 }}
+                  tracksViewChanges={false}
+                  onPress={() => openShop(shop)}
+                >
+                  <View style={styles.tip} collapsable={false}>
+                    <Text style={styles.tipName} numberOfLines={1}>{shop.name || 'Shop'}</Text>
+                    <Text style={styles.tipMeta} numberOfLines={2}>
+                      {categories.length ? categories.join(', ') : 'No categories'}
+                    </Text>
+                    <Text style={styles.tipFee}>
+                      Avg shipping {formatNaira(shop.averageShippingFee ?? shop.average_shipping_fee)}
+                    </Text>
+                  </View>
+                </Marker>
+              );
+            })}
+          </MapView>
+          )}
+        </View>
         <View style={styles.overlay} pointerEvents="box-none">
           <View style={[styles.zoomStack, { bottom: sheetControlsBottom }]}>
             <TouchableOpacity
@@ -728,6 +749,7 @@ export default function ExploreMap({ navigation, route }) {
               },
             ]}
             collapsable={false}
+            pointerEvents="auto"
           >
             <View {...sheetPan.panHandlers} style={styles.mapSheetHandleWrap}>
               <View style={styles.mapSheetGrabber} />
@@ -771,12 +793,17 @@ export default function ExploreMap({ navigation, route }) {
             ) : (
               <FlatList
                 ref={mapListRef}
+                style={styles.mapSheetList}
                 data={visibleShops}
                 keyExtractor={(item) => String(item.shop.id)}
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
-                scrollEnabled={sheetExpanded}
+                scrollEnabled
+                bounces
                 contentContainerStyle={styles.mapCardColumn}
+                onScrollBeginDrag={() => {
+                  if (!sheetExpanded) snapSheet(true);
+                }}
                 onScrollToIndexFailed={() => {}}
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => (
@@ -1008,12 +1035,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 4,
+    zIndex: 8,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     overflow: 'hidden',
-    elevation: 12,
+    elevation: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.14,
@@ -1067,10 +1094,14 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     backgroundColor: '#F9FAFB',
   },
+  mapSheetList: {
+    flex: 1,
+  },
   mapCardColumn: {
     paddingHorizontal: 16,
     paddingBottom: 20,
     gap: 12,
+    flexGrow: 1,
   },
   tip: {
     width: 168,
