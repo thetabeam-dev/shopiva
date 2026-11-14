@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { shopCover, shopLogo, shopPlace } from '../utils/exploreMap';
 
@@ -22,9 +23,10 @@ function shopRating(item) {
  *   item: object;
  *   onPress: () => void;
  *   width: number;
+ *   delayPressIn?: number;
  * }} props
  */
-export default function ShopBrowseCard({ item, onPress, width }) {
+export default function ShopBrowseCard({ item, onPress, width, delayPressIn }) {
   const cover = shopCover(item);
   const logo = shopLogo(item);
   const place = shopPlace(item) || 'Location unavailable';
@@ -34,9 +36,20 @@ export default function ShopBrowseCard({ item, onPress, width }) {
     rating > 0
       ? `${rating.toFixed(1)}${count > 0 ? ` (${count})` : ''}`
       : 'No reviews yet';
+  const pressDelay =
+    Number.isFinite(delayPressIn)
+      ? delayPressIn
+      : Platform.OS === 'android'
+        ? 64
+        : 0;
 
   return (
-    <TouchableOpacity style={[styles.card, { width }]} activeOpacity={0.9} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.card, { width }]}
+      activeOpacity={0.9}
+      onPress={onPress}
+      delayPressIn={pressDelay}
+    >
       <View style={styles.coverWrap}>
         {cover ? (
           <Image source={{ uri: cover }} style={styles.cover} />

@@ -4,7 +4,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  FlatList,
   Keyboard,
   Modal,
   PanResponder,
@@ -17,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { FlatList } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MapView, { Marker } from 'react-native-maps';
 import { WebView } from 'react-native-webview';
@@ -177,6 +177,7 @@ export default function ExploreMap({ navigation, route }) {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetDragStart = useRef(SHEET_PEEK);
+  const sheetListDragging = useRef(false);
 
   const snapSheet = (expanded) => {
     setSheetExpanded(expanded);
@@ -800,9 +801,20 @@ export default function ExploreMap({ navigation, route }) {
                 nestedScrollEnabled
                 scrollEnabled
                 bounces
+                overScrollMode="never"
+                removeClippedSubviews={false}
                 contentContainerStyle={styles.mapCardColumn}
                 onScrollBeginDrag={() => {
+                  sheetListDragging.current = true;
                   if (!sheetExpanded) snapSheet(true);
+                }}
+                onScrollEndDrag={() => {
+                  requestAnimationFrame(() => {
+                    sheetListDragging.current = false;
+                  });
+                }}
+                onMomentumScrollEnd={() => {
+                  sheetListDragging.current = false;
                 }}
                 onScrollToIndexFailed={() => {}}
                 keyboardShouldPersistTaps="handled"
@@ -810,7 +822,11 @@ export default function ExploreMap({ navigation, route }) {
                   <ShopBrowseCard
                     item={item.shop}
                     width={SHOP_CARD_W}
-                    onPress={() => openShop(item.shop)}
+                    delayPressIn={Platform.OS === 'android' ? 120 : 0}
+                    onPress={() => {
+                      if (sheetListDragging.current) return;
+                      openShop(item.shop);
+                    }}
                   />
                 )}
               />
