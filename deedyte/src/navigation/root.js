@@ -96,3 +96,28 @@ export function navigateToActivitiesScreen(screen, params) {
   );
   return true;
 }
+
+/** Open a screen inside the Chat tab (chat-list / Inbox / chat-room). */
+export function navigateToChatScreen(screen, params) {
+  if (!navigationRef.isReady()) return false;
+  const target = String(screen || 'chat-list').trim() || 'chat-list';
+  const routes =
+    target === 'chat-list'
+      ? [{ name: 'chat-list' }]
+      : [{ name: 'chat-list' }, { name: target, params }];
+  navigationRef.dispatch(
+    CommonActions.navigate({
+      name: 'home',
+      params: {
+        screen: 'Chat',
+        params: {
+          state: {
+            index: routes.length - 1,
+            routes,
+          },
+        },
+      },
+    }),
+  );
+  return true;
+}

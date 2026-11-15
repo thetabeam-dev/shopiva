@@ -40,6 +40,8 @@ const MAX_QTY = 9999;
  *   itemAmount?: number;
  *   productId?: number;
  *   initialVariantId?: number;
+ *   shippingDestination?: string;
+ *   onEditShipping?: () => void;
  *   onCancel: () => void;
  *   onSubmit: (qty: number, variant: { inventoryId?: number; label: string; price?: number } | null) => void | Promise<void>;
  * }} props
@@ -52,6 +54,8 @@ export default function ChatQuantityModal({
   itemAmount = 0,
   productId = 0,
   initialVariantId = 0,
+  shippingDestination = '',
+  onEditShipping,
   onCancel,
   onSubmit,
 }) {
@@ -215,6 +219,24 @@ export default function ChatQuantityModal({
           {price > 0 && qty > 0 ? (
             <Text style={styles.subtotal}>Items subtotal: {formatNaira(price * qty)}</Text>
           ) : null}
+          {shippingDestination ? (
+            <View style={styles.shippingBlock}>
+              <Text style={styles.shippingLabel}>Ship to</Text>
+              <Text style={styles.shippingValue}>{shippingDestination}</Text>
+              {typeof onEditShipping === 'function' ? (
+                <Pressable
+                  onPress={onEditShipping}
+                  disabled={sending}
+                  style={({ pressed }) => [styles.editShippingBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit shipping address"
+                >
+                  <Icon name="create-outline" size={16} color={BRAND} />
+                  <Text style={styles.editShippingText}>Edit shipping address</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.actions}>
             <Pressable onPress={onCancel} style={styles.cancelBtn}>
               <Text style={styles.cancelText}>Cancel</Text>
@@ -294,6 +316,41 @@ const styles = StyleSheet.create({
     color: BLACK,
   },
   subtotal: { marginTop: 10, textAlign: 'center', fontSize: 14, fontWeight: '600', color: BLACK },
+  shippingBlock: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: '#D7E8E2',
+    backgroundColor: '#F3F8F6',
+  },
+  shippingLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#667781',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  shippingValue: {
+    marginTop: 4,
+    fontSize: 14,
+    lineHeight: 20,
+    color: BLACK,
+  },
+  editShippingBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  editShippingText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BRAND,
+  },
   actions: { marginTop: 16, flexDirection: 'row', gap: 8 },
   cancelBtn: {
     flex: 1,

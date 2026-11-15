@@ -29,6 +29,10 @@ import {
 } from '../moderation/messageModeration';
 import { connectChatSocket, emitChatSocketAck, getChatSocket } from '../socket/chatSocket';
 import { setLastOpenedChatRoomId } from '../utils/lastOpenedChatRoom';
+import {
+  hasSeenBuyerInvoiceTip,
+  markBuyerInvoiceTipSeen,
+} from '../utils/buyerChatTips';
 import { refreshUnreadChats } from '../components/UnreadMessageBadge';
 import { useSelector } from 'react-redux';
 import { fetchOrderIdByReference } from '../api/buyer';
@@ -54,7 +58,7 @@ function parseCardContent(content) {
     const parsed = JSON.parse(json);
     if (!parsed || typeof parsed !== 'object') return null;
     const kind = String(parsed.kind ?? parsed.type ?? '').toLowerCase();
-    if (kind === 'invoice' || kind === 'shipping' || kind === 'inquiry' || kind === 'invoice_cancelled' || kind === 'invoice_paid' || kind === 'invoice_request') return parsed;
+    if (kind === 'invoice' || kind === 'shipping' || kind === 'inquiry' || kind === 'invoice_cancelled' || kind === 'invoice_paid' || kind === 'invoice_request' || kind === 'invoice_request_declined') return parsed;
   } catch {
     return null;
   }
@@ -156,12 +160,17 @@ function TodayChip() {
 /**
  * @param {{ item: { id: string; text: string; outgoing: boolean; timeLabel: string; isRead?: boolean; invoice?: Record<string, unknown> | null }; onOpenInvoice?: (invoice: Record<string, unknown>) => void; canPay?: boolean }} p
  */
-function HeaderActionCard({ title, subtitle, onPress, alertLabel = '', disabled = false }) {
+function HeaderActionCard({ title, subtitle, onPress, alertLabel = '', disabled = false, highlight = false }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [styles.headerActionCard, pressed && styles.sendBtnPressed, disabled && styles.headerActionCardDisabled]}
+      style={({ pressed }) => [
+        styles.headerActionCard,
+        highlight && styles.headerActionCardHighlight,
+        pressed && styles.sendBtnPressed,
+        disabled && styles.headerActionCardDisabled,
+      ]}
     >
       <View style={styles.headerActionCopy}>
         {alertLabel ? (
@@ -171,10 +180,38 @@ function HeaderActionCard({ title, subtitle, onPress, alertLabel = '', disabled 
           </View>
         ) : null}
         <Text style={styles.headerActionTitle}>{title}</Text>
-        <Text style={styles.headerActionSubtitle} numberOfLines={1}>{subtitle}</Text>
+        <Text style={styles.headerActionSubtitle} numberOfLines={2}>{subtitle}</Text>
       </View>
       <Icon name={disabled ? 'checkmark-circle' : 'chevron-forward'} size={18} color={BRAND} />
     </Pressable>
+  );
+}
+
+function BuyerInvoiceTip({ visible, onDismiss }) {
+  if (!visible) return null;
+  return (
+    <View style={styles.buyerTipWrap} pointerEvents="box-none">
+      <View style={styles.buyerTipArrow} />
+      <View style={styles.buyerTipCard}>
+        <View style={styles.buyerTipIconWrap}>
+          <Icon name="bulb-outline" size={18} color="#FFFFFF" />
+        </View>
+        <View style={styles.buyerTipCopy}>
+          <Text style={styles.buyerTipTitle}>How to get an invoice</Text>
+          <Text style={styles.buyerTipBody}>
+            Tap Request checkout invoice above. Add your shipping address if asked, then the vendor can send your invoice to pay.
+          </Text>
+          <Pressable
+            onPress={onDismiss}
+            style={({ pressed }) => [styles.buyerTipBtn, pressed && styles.sendBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Got it"
+          >
+            <Text style={styles.buyerTipBtnText}>Got it</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -208,12 +245,27 @@ function VariantDetails({ source }) {
   );
 }
 
-function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInvoice, canPay, outdated = false, cancelled = false, paid = false, viewerIsVendor = false, pendingRequest = false }) {
+function Bubble({
+  item,
+  onOpenInvoice,
+  onCancelInvoice,
+  onViewOrder,
+  onCreateInvoice,
+  onDeclineInvoice,
+  canPay,
+  outdated = false,
+  cancelled = false,
+  paid = false,
+  declined = false,
+  viewerIsVendor = false,
+  pendingRequest = false,
+}) {
   const out = item.outgoing;
   const request = item.invoiceRequest;
   if (request) {
     const image = String(request.itemImage ?? '').trim();
     const destination = formatShippingAddress(request.shippingAddress);
+    const showVendorActions = viewerIsVendor && pendingRequest && !declined;
     return (
       <View style={[styles.bubbleRow, out ? styles.bubbleRowOut : styles.bubbleRowIn]}>
         <View style={[styles.waTpl, out ? styles.bubbleOut : styles.bubbleIn]}>
@@ -221,6 +273,11 @@ function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInv
             <Text style={[styles.invoiceKicker, styles.requestKicker]}>
               {viewerIsVendor ? 'Buyer requested a checkout invoice' : 'You requested a checkout invoice'}
             </Text>
+            {showVendorActions ? (
+              <Text style={styles.requestActionHint}>
+                Next step: create an invoice for this buyer, or decline the request.
+              </Text>
+            ) : null}
             <View style={styles.paidProductRow}>
               {image ? <ProductCardMedia uri={image} style={styles.paidProductImage} /> : null}
               <View style={styles.paidProductCopy}>
@@ -233,19 +290,37 @@ function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInv
             </View>
             <VariantDetails source={request} />
             {destination ? <Text style={styles.invoiceLine}>{`Ship to: ${destination}`}</Text> : null}
+            {declined ? (
+              <View style={styles.invoiceOutdated}>
+                <Icon name="close-circle" size={16} color="#B91C1C" />
+                <Text style={[styles.invoiceOutdatedText, styles.invoiceCancelledText]}>
+                  {viewerIsVendor ? 'You declined this invoice request.' : 'Vendor declined this invoice request.'}
+                </Text>
+              </View>
+            ) : null}
             <Text style={[styles.bubbleMeta, styles.waTplTime]}>{item.timeLabel}</Text>
           </View>
-          {viewerIsVendor && pendingRequest ? (
+          {showVendorActions ? (
             <>
               <View style={styles.waTplRule} />
               <Pressable
                 onPress={() => onCreateInvoice?.()}
+                style={({ pressed }) => [styles.waTplAction, styles.waTplActionPrimary, pressed && styles.sendBtnPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Create Invoice"
+              >
+                <Icon name="document-text-outline" size={18} color="#FFFFFF" />
+                <Text style={[styles.waTplActionText, styles.waTplActionTextOnPrimary]}>Create Invoice</Text>
+              </Pressable>
+              <View style={styles.waTplRule} />
+              <Pressable
+                onPress={() => onDeclineInvoice?.(item)}
                 style={({ pressed }) => [styles.waTplAction, pressed && styles.sendBtnPressed]}
                 accessibilityRole="button"
-                accessibilityLabel="Create checkout invoice"
+                accessibilityLabel="Decline Invoice"
               >
-                <Icon name="document-text-outline" size={18} color={BRAND} />
-                <Text style={styles.waTplActionText}>Create checkout invoice</Text>
+                <Icon name="close-circle-outline" size={18} color="#B91C1C" />
+                <Text style={[styles.waTplActionText, styles.waTplActionDanger]}>Decline Invoice</Text>
               </Pressable>
             </>
           ) : null}
@@ -314,27 +389,43 @@ function Bubble({ item, onOpenInvoice, onCancelInvoice, onViewOrder, onCreateInv
   }
   if (invoice) {
     const invoiceQty = Math.max(1, Number(invoice.qty) || 1);
-    const amount = (Number(invoice.amount) || 0) * invoiceQty;
+    const unitAmount = Number(invoice.amount) || 0;
+    const amount = unitAmount * invoiceQty;
     const shippingFee = Number(invoice.shipping) || 0;
     const total = amount + shippingFee;
     const logistics = String(invoice.logistics ?? '').trim();
     const delivery = String(invoice.deliveryTime ?? invoice.delivery_time ?? '').trim();
     const destination = String(invoice.destination ?? '').trim() || formatShippingAddress(invoice.shippingAddress);
-    const followOn = [
-      destination ? `Ship to ${destination}.` : '',
-      invoiceQty > 1 ? `Items ${invoiceQty} × ${formatInvoiceMoney(Number(invoice.amount) || 0)} = ${formatInvoiceMoney(amount)}.` : `Items ${formatInvoiceMoney(amount)}.`,
-      `Shipping ${formatInvoiceMoney(shippingFee)}.`,
-      logistics ? `Logistics ${logistics}.` : '',
-      delivery ? `Delivery ${delivery}.` : '',
-    ].filter(Boolean).join(' ');
+    const itemsValue =
+      invoiceQty > 1
+        ? `${invoiceQty} × ${formatInvoiceMoney(unitAmount)} = ${formatInvoiceMoney(amount)}`
+        : formatInvoiceMoney(amount);
+    const invoiceRows = [
+      ['Total', formatInvoiceMoney(total)],
+      destination ? ['Ship to', destination] : null,
+      ['Items', itemsValue],
+      ['Shipping', formatInvoiceMoney(shippingFee)],
+      logistics ? ['Logistics', logistics] : null,
+      delivery ? ['Delivery', delivery] : null,
+    ].filter(Boolean);
     return (
       <View style={[styles.bubbleRow, out ? styles.bubbleRowOut : styles.bubbleRowIn]}>
         <View style={[styles.waTpl, out ? styles.bubbleOut : styles.bubbleIn]}>
           <View style={styles.waTplBody}>
-            <Text style={styles.waTplText}>
-              <Text style={styles.waTplLead}>{formatInvoiceMoney(total)}</Text>
-              {` is your checkout total. ${followOn}`}
-            </Text>
+            <Text style={styles.invoiceKicker}>Checkout invoice</Text>
+            {invoiceRows.map(([label, value]) => (
+              <View key={label} style={styles.invoiceFieldRow}>
+                <Text style={styles.invoiceFieldLabel}>{label}</Text>
+                <Text
+                  style={[
+                    styles.invoiceFieldValue,
+                    label === 'Total' && styles.invoiceFieldValueStrong,
+                  ]}
+                >
+                  {value}
+                </Text>
+              </View>
+            ))}
             <VariantDetails source={invoice} />
             <Text style={[styles.bubbleMeta, styles.waTplTime]}>{item.timeLabel}</Text>
           </View>
@@ -653,6 +744,21 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
           isRead: Boolean(row.is_read ?? row.isRead ?? row.read),
         };
       }
+      const invoiceRequestDeclined = card?.kind === 'invoice_request_declined' ? card : null;
+      if (invoiceRequestDeclined) {
+        return {
+          id: String(row.id ?? `msg-${Date.now()}`),
+          text: outgoing ? 'You declined the invoice request.' : 'Vendor declined the invoice request.',
+          invoice: null,
+          shipping: null,
+          inquiry: null,
+          invoiceRequestDeclined,
+          outgoing,
+          timeLabel,
+          sentAt: Number.isNaN(d.getTime()) ? Date.now() : d.getTime(),
+          isRead: Boolean(row.is_read ?? row.isRead ?? row.read),
+        };
+      }
       return {
         id: String(row.id ?? `msg-${Date.now()}`),
         text: invoice
@@ -804,9 +910,18 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     });
     return ids;
   }, [messages]);
+  const declinedRequestIds = useMemo(() => {
+    const ids = new Set();
+    messages.forEach((row) => {
+      const ref = String(row?.invoiceRequestDeclined?.requestMessageId ?? '').trim();
+      if (ref) ids.add(ref);
+    });
+    return ids;
+  }, [messages]);
   /** The vendor may only invoice in answer to a buyer request that has no invoice yet. */
   const pendingRequestId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i]?.invoiceRequestDeclined) return '';
       if (messages[i]?.invoice) return '';
       if (messages[i]?.invoiceRequest) return messages[i].id;
     }
@@ -998,15 +1113,37 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
 
   const [qtyOpen, setQtyOpen] = useState(false);
   const requestShippingRef = useRef(null);
+  const [showBuyerInvoiceTip, setShowBuyerInvoiceTip] = useState(false);
+
+  const dismissBuyerInvoiceTip = useCallback(() => {
+    setShowBuyerInvoiceTip(false);
+    void markBuyerInvoiceTipSeen(user?.id);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (appRolePayload !== 'customer') {
+      setShowBuyerInvoiceTip(false);
+      return undefined;
+    }
+    let active = true;
+    hasSeenBuyerInvoiceTip(user?.id).then((seen) => {
+      if (active && !seen) setShowBuyerInvoiceTip(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [appRolePayload, user?.id]);
+
   const onRequestInvoice = useCallback(() => {
     if (requestSending) return;
+    dismissBuyerInvoiceTip();
     if (!latestBuyerShipping) {
       setShippingEditOpen(true);
       return;
     }
     requestShippingRef.current = latestBuyerShipping;
     setQtyOpen(true);
-  }, [requestSending, latestBuyerShipping]);
+  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip]);
 
   const onSubmitQty = useCallback(async (qty, variant) => {
     if (requestSending) return;
@@ -1329,6 +1466,44 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     );
   }, [roomId, mapMessage]);
 
+  const onDeclineInvoice = useCallback((item) => {
+    if (!roomId || !item?.id || appRolePayload !== 'vendor') return;
+    Alert.alert(
+      'Decline invoice request?',
+      'The buyer will be told you declined. They can send a new request later.',
+      [
+        { text: 'Keep request', style: 'cancel' },
+        {
+          text: 'Decline Invoice',
+          style: 'destructive',
+          onPress: async () => {
+            const out = await emitChatSocketAck('create_message', {
+              room_id: roomId,
+              type: 'system',
+              content: JSON.stringify({
+                kind: 'invoice_request_declined',
+                requestMessageId: item.id,
+              }),
+              app_role: 'vendor',
+            });
+            if (!out?.success) {
+              Alert.alert('Could not decline', out?.message || 'Try again.');
+              return;
+            }
+            const resultMsg =
+              out.result && typeof out.result === 'object' && 'message' in out.result
+                ? /** @type {Record<string, unknown>} */ (/** @type {{ message: unknown }} */ (out.result).message)
+                : null;
+            if (resultMsg) {
+              const mapped = mapMessage(resultMsg);
+              setMessages((prev) => (prev.some((p) => p.id === mapped.id) ? prev : [...prev, mapped]));
+            }
+          },
+        },
+      ],
+    );
+  }, [roomId, mapMessage, appRolePayload]);
+
   const renderItem = useCallback(
     ({ item }) => (
       <Bubble
@@ -1337,15 +1512,28 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         outdated={outdatedInvoiceIds.has(item.id)}
         cancelled={cancelledInvoiceIds.has(item.id)}
         paid={paidInvoiceIds.has(item.id)}
+        declined={declinedRequestIds.has(item.id)}
         onViewOrder={onViewOrder}
         onCancelInvoice={onCancelInvoice}
+        onDeclineInvoice={onDeclineInvoice}
         viewerIsVendor={appRolePayload === 'vendor'}
         pendingRequest={item.id === pendingRequestId}
         onCreateInvoice={() => setInvoiceOpen(true)}
         onOpenInvoice={openInvoiceCheckout}
       />
     ),
-    [appRolePayload, openInvoiceCheckout, outdatedInvoiceIds, cancelledInvoiceIds, paidInvoiceIds, onCancelInvoice, onViewOrder, pendingRequestId],
+    [
+      appRolePayload,
+      openInvoiceCheckout,
+      outdatedInvoiceIds,
+      cancelledInvoiceIds,
+      paidInvoiceIds,
+      declinedRequestIds,
+      onCancelInvoice,
+      onDeclineInvoice,
+      onViewOrder,
+      pendingRequestId,
+    ],
   );
 
   const openShippingEditParam = route.params?.openShippingEdit;
@@ -1355,6 +1543,12 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     setShippingEditOpen(true);
     navigation.setParams({ openShippingEdit: undefined });
   }, [openShippingEditParam, appRolePayload, hasBuyerShipping, navigation]);
+
+  const buyerNeedsInvoiceTip =
+    appRolePayload === 'customer' &&
+    showBuyerInvoiceTip &&
+    !pendingRequestId &&
+    !openInvoicePending;
 
   const headerActionCard =
     appRolePayload === 'vendor' ? (
@@ -1378,6 +1572,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
               ? `Ship to ${buyerDestination}`
               : 'Add your shipping address to get an invoice'}
         disabled={Boolean(pendingRequestId) || openInvoicePending || requestSending}
+        highlight={buyerNeedsInvoiceTip}
         onPress={onRequestInvoice}
       />
     ) : null;
@@ -1393,6 +1588,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     >
       <MonitoringNotice />
       {headerActionCard}
+      <BuyerInvoiceTip visible={buyerNeedsInvoiceTip} onDismiss={dismissBuyerInvoiceTip} />
     </View>
   );
 
@@ -1459,7 +1655,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
                       <Text style={styles.emptyMessagesText}>Loading messages…</Text>
                     </>
                   ) : (
-                    <Text style={styles.emptyMessagesText}>No messages yet. Say hello.</Text>
+                    <Text style={styles.emptyMessagesText}>
+                      {appRolePayload === 'customer'
+                        ? 'No messages yet. Tap Request checkout invoice above to start buying, or say hello.'
+                        : 'No messages yet. Say hello.'}
+                    </Text>
                   )}
                 </View>
               }
@@ -1674,6 +1874,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         itemAmount={itemAmount}
         productId={productId}
         initialVariantId={Number(productId) === Number(chat?.productId) ? Number(chat?.variantId) || 0 : 0}
+        shippingDestination={hasBuyerShipping ? buyerDestination : ''}
+        onEditShipping={() => {
+          setQtyOpen(false);
+          setTimeout(() => setShippingEditOpen(true), Platform.OS === 'ios' ? 350 : 0);
+        }}
         onCancel={() => setQtyOpen(false)}
         onSubmit={onSubmitQty}
       />
@@ -1933,6 +2138,11 @@ const styles = StyleSheet.create({
   },
   headerActionAlertText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
   headerActionCardDisabled: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
+  headerActionCardHighlight: {
+    borderColor: BRAND,
+    backgroundColor: '#E8F8F2',
+    borderWidth: 2,
+  },
   headerActionCard: {
     marginHorizontal: 0,
     marginTop: 0,
@@ -1947,6 +2157,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  buyerTipWrap: {
+    marginTop: 8,
+    paddingHorizontal: 2,
+  },
+  buyerTipArrow: {
+    alignSelf: 'center',
+    width: 0,
+    height: 0,
+    marginBottom: -1,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: BRAND,
+  },
+  buyerTipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: BRAND,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+  buyerTipIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  buyerTipCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  buyerTipTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: BLACK,
+  },
+  buyerTipBody: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: MUTED,
+  },
+  buyerTipBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: BRAND,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  buyerTipBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   headerActionCopy: {
     flex: 1,
@@ -2014,6 +2297,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: BLACK,
   },
+  invoiceFieldRow: {
+    marginTop: 8,
+  },
+  invoiceFieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: MUTED,
+    marginBottom: 2,
+  },
+  invoiceFieldValue: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: BLACK,
+  },
+  invoiceFieldValueStrong: {
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
+  },
   invoiceMeta: {
     marginTop: 8,
     textAlign: 'right',
@@ -2046,16 +2348,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.12)',
   },
   waTplAction: {
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 12,
   },
+  waTplActionPrimary: {
+    backgroundColor: BRAND,
+    marginHorizontal: 10,
+    marginVertical: 8,
+    borderRadius: 10,
+  },
   waTplActionText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: BRAND,
+  },
+  waTplActionTextOnPrimary: {
+    color: '#FFFFFF',
+  },
+  requestActionHint: {
+    marginTop: 6,
+    marginBottom: 8,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: '#047857',
   },
 });
