@@ -34,18 +34,22 @@ export async function listCategoriesWithProducts() {
     console.error("Categories table lookup failed:", error);
   }
 
-  const result = await query(`
-    SELECT MIN(TRIM(p.category)) AS category
-    FROM products p
-    INNER JOIN shops s ON s.id = p.shop_id
-    WHERE p.is_published = true
-      AND p.category IS NOT NULL
-      AND btrim(p.category) <> ''
-      AND s.isactive = true
-    GROUP BY LOWER(TRIM(p.category))
-    HAVING COUNT(*) >= 1
-    ORDER BY LOWER(TRIM(p.category))
-  `);
-
-  return mapCategoryRows(result.rows);
+  try {
+    const result = await query(`
+      SELECT MIN(TRIM(p.category)) AS category
+      FROM products p
+      INNER JOIN shops s ON s.id = p.shop_id
+      WHERE p.is_published = true
+        AND p.category IS NOT NULL
+        AND btrim(p.category) <> ''
+        AND s.isactive = true
+      GROUP BY LOWER(TRIM(p.category))
+      HAVING COUNT(*) >= 1
+      ORDER BY LOWER(TRIM(p.category))
+    `);
+    return mapCategoryRows(result.rows);
+  } catch (error) {
+    console.error("Categories products fallback lookup failed:", error);
+    return [];
+  }
 }

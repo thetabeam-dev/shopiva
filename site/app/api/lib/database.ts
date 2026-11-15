@@ -2,17 +2,30 @@ import { Pool, PoolClient } from "pg";
 
 let pool: Pool | null = null;
 
+export function hasDatabaseUrl(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
+
 function getPool(): Pool {
   if (pool) return pool;
 
   const max = Number(process.env.DB_POOL_MAX ?? 10);
   const connectionString = process.env.DATABASE_URL?.trim() || undefined;
   const onVercel = Boolean(process.env.VERCEL);
-  const isProd = process.env.NODE_ENV === "production";
+  // next build sets this; allow missing DATABASE_URL so static generation can degrade.
+  const isBuild =
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.NEXT_PHASE === "phase-export";
 
-  if (!connectionString && (onVercel || isProd)) {
+  if (!connectionString && onVercel && !isBuild) {
     throw new Error(
-      "DATABASE_URL is not set. On Vercel, add DATABASE_URL (Neon connection string) under Project → Settings → Environment Variables."
+      "DATABASE_URL is not set. On Vercel, add DATABASE_URL (Neon connection string) under Project → Settings → Environment Variables for Production and Preview."
+    );
+  }
+
+  if (!connectionString && onVercel && isBuild) {
+    throw new Error(
+      "DATABASE_URL is not set at build time (optional for sitemap). Add it in Vercel env for runtime + richer builds."
     );
   }
 
