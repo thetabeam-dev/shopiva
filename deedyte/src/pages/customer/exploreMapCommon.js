@@ -21,7 +21,7 @@ import {
 export const SCREEN_W = Dimensions.get('window').width;
 export const SCREEN_H = Dimensions.get('window').height;
 /** Collapsed sheet: ~10% of the screen when inactive. */
-export const SHEET_PEEK = Math.max(72, Math.round(SCREEN_H * 0.1));
+export const SHEET_PEEK = Math.max(72, Math.round(SCREEN_H * 0.2));
 export const SHEET_EXPANDED = Math.round(SCREEN_H * 0.62);
 export const SHOP_CARD_W = SCREEN_W - 32;
 
