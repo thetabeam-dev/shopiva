@@ -9,6 +9,7 @@ import "./styles/s.css";
 import "../styles/xxl.css";
 import CustomerHeader from "@/components/customers/Header";
 import PageH1 from "@/components/PageH1";
+import ProcessLoader from "@/components/ProcessLoader";
 import { SITE_VISION } from "@/lib/siteNavigation";
 import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 import { notifyCartUpdated } from "@/reusables/cartEvents";
