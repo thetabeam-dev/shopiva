@@ -1,4 +1,5 @@
 import { db } from "../config/database.js";
+import { chatMessagePreview } from "../utils/chatMessagePreview.js";
 import { withErrorHandling } from "../utils/errHandler.js";
 
 export type ChatRoomRecord = {
@@ -407,25 +408,7 @@ export class chatModel {
       if (!msg) {
         throw new Error("Failed to create message");
       }
-      let preview = (input.content ?? "").slice(0, 500);
-      try {
-        const parsed = JSON.parse(String(input.content ?? ""));
-        const kind = parsed && typeof parsed === "object" ? String(parsed.kind ?? parsed.type ?? "") : "";
-        const title = String(parsed?.itemTitle ?? "").trim();
-        const labels: Record<string, string> = {
-          invoice: "Checkout invoice",
-          invoice_request: "Checkout invoice requested",
-          invoice_paid: "Order placed · Paid",
-          invoice_cancelled: "Checkout invoice cancelled",
-          shipping: "Shipping details",
-          inquiry: "Product enquiry",
-        };
-        if (labels[kind]) {
-          preview = title && kind !== "shipping" && kind !== "invoice_cancelled" ? `${labels[kind]}: ${title}` : labels[kind];
-        }
-      } catch {
-        /* keep preview */
-      }
+      const preview = chatMessagePreview(input.content, 500);
       await pool.query(
         `UPDATE chat_rooms SET last_message = $2, updated_at = now() WHERE id = $1`,
         [input.room_id, preview]

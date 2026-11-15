@@ -985,7 +985,7 @@ export default function ProductScreen({ route, navigation }) {
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollInner,
-          { paddingBottom: insets.bottom + 88 },
+          { paddingBottom: insets.bottom + 120 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1360,6 +1360,24 @@ export default function ProductScreen({ route, navigation }) {
           loading={detailLoading}
         />
       </ScrollView>
+      <View
+        style={[
+          styles.startPurchaseBar,
+          { paddingBottom: Math.max(insets.bottom, 10) },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.startPurchaseBarBtn}
+          activeOpacity={0.88}
+          onPress={() => {
+            void handleChatWithVendor();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Start Purchase"
+        >
+          <Text style={styles.addCartText}>Start Purchase</Text>
+        </TouchableOpacity>
+      </View>
       <ShopPolicyViewerModal
         visible={deliveryPolicyModalVisible}
         onClose={() => setDeliveryPolicyModalVisible(false)}
@@ -1782,6 +1800,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '700',
+  },
+  startPurchaseBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  startPurchaseBarBtn: {
+    backgroundColor: PURPLE,
+    paddingVertical: 16,
+    borderRadius: 10,
+    alignItems: 'center',
   },
   addCartBusy: {
     opacity: 0.75,

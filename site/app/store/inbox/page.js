@@ -667,12 +667,39 @@ function InboxInner() {
                   key={item.id}
                   className={`buyer-inbox__bubble ${item.outgoing ? "is-out" : "is-in"}`}
                 >
-                  <p className="buyer-inbox__strong">{formatNgn(total)} is your checkout total.</p>
-                  {invoice.variantLabel ? <p>Variant {String(invoice.variantLabel)}</p> : null}
+                  <p className="buyer-inbox__kicker">Checkout invoice</p>
                   <p>
-                    Items {invoiceQty} × {formatNgn(Number(invoice.amount) || 0)}. Shipping{" "}
-                    {formatNgn(shippingFee)}.
+                    <span className="buyer-inbox__muted">Total</span>
+                    <br />
+                    <strong>{formatNgn(total)}</strong>
                   </p>
+                  {invoice.destination || formatShipping(invoice.shippingAddress) ? (
+                    <p>
+                      <span className="buyer-inbox__muted">Ship to</span>
+                      <br />
+                      {String(invoice.destination || formatShipping(invoice.shippingAddress))}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="buyer-inbox__muted">Items</span>
+                    <br />
+                    {invoiceQty > 1
+                      ? `${invoiceQty} × ${formatNgn(Number(invoice.amount) || 0)} = ${formatNgn(amount)}`
+                      : formatNgn(amount)}
+                  </p>
+                  <p>
+                    <span className="buyer-inbox__muted">Shipping</span>
+                    <br />
+                    {formatNgn(shippingFee)}
+                  </p>
+                  {invoice.deliveryTime || invoice.delivery_time ? (
+                    <p>
+                      <span className="buyer-inbox__muted">Delivery</span>
+                      <br />
+                      {String(invoice.deliveryTime || invoice.delivery_time)}
+                    </p>
+                  ) : null}
+                  {invoice.variantLabel ? <p>Variant {String(invoice.variantLabel)}</p> : null}
                   <button
                     type="button"
                     className="buyer-inbox__pay"
@@ -846,6 +873,31 @@ function InboxInner() {
             </label>
             {unitPrice > 0 && qty > 0 ? (
               <p>Items subtotal: {formatNgn(unitPrice * qty)}</p>
+            ) : null}
+            {formatShipping(latestBuyerShipping) ? (
+              <div className="buyer-inbox__ship-block">
+                <span className="buyer-inbox__muted">Ship to</span>
+                <p>{formatShipping(latestBuyerShipping)}</p>
+                <button
+                  type="button"
+                  className="buyer-inbox__edit-ship"
+                  onClick={() => {
+                    const ship = latestBuyerShipping || {};
+                    setShippingDraft({
+                      street: String(ship.street ?? "").trim(),
+                      area1: String(ship.area1 ?? "").trim(),
+                      area2: String(ship.area2 ?? "").trim(),
+                      state: String(ship.state ?? "").trim(),
+                      city: String(ship.city ?? "").trim(),
+                      zip: String(ship.zip ?? "").trim(),
+                    });
+                    setQtyOpen(false);
+                    setShippingOpen(true);
+                  }}
+                >
+                  Edit shipping address
+                </button>
+              </div>
             ) : null}
             <div className="buyer-inbox__sheet-actions">
               <button type="button" onClick={() => setQtyOpen(false)}>

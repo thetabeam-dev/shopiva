@@ -1,9 +1,40 @@
 import messaging from '@react-native-firebase/messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import notifee, { AndroidImportance, EventType } from 'react-native-notify-kit';
-import { navigateToActivitiesScreen, navigateToCartTab, navigationRef } from '../navigation/root';
+import {
+  navigateToActivitiesScreen,
+  navigateToCartTab,
+  navigateToChatScreen,
+  navigationRef,
+} from '../navigation/root';
 import store from '../../redux/store';
 import { setActiveRoleThunk } from '../../redux/authSlice';
+import { chatPreviewText } from './chatPreview';
+
+/**
+ * Turn raw JSON / [object Object] chat payloads into readable notification copy.
+ * @param {string} body
+ * @returns {string}
+ */
+function humanizeFcmBody(body) {
+  const text = String(body ?? '').trim();
+  if (!text || text === '[object Object]') return 'New chat message';
+  if (text.startsWith('{') || text.startsWith('[')) {
+    return chatPreviewText(text) || 'New chat message';
+  }
+  const jsonIdx = text.search(/:\s*[\[{]/);
+  if (jsonIdx > 0) {
+    const prefix = text.slice(0, jsonIdx).trim();
+    const rest = text.slice(jsonIdx + 1).trim();
+    if (rest.startsWith('{') || rest.startsWith('[')) {
+      return `${prefix}: ${chatPreviewText(rest) || 'Chat update'}`;
+    }
+  }
+  if (text.includes('[object Object]')) {
+    return text.replace(/\[object Object\]/g, 'Chat update');
+  }
+  return text;
+}
 
 /**
  * Wait until APNs has handed iOS a device token (required before a usable FCM token).
@@ -33,15 +64,27 @@ function asString(value) {
  * @param {Record<string, unknown>} meta
  * @param {Record<string, unknown>} data
  */
+function chatTarget(roomId, roomName, role) {
+  return {
+    screen: 'Inbox',
+    tab: 'Chat',
+    role: asString(role),
+    params: { chat: { roomId, name: roomName || 'Chat' } },
+  };
+}
+
 function resolveNotificationTarget(meta, data) {
   const merged = { ...data, ...meta };
   const type = asString(
     merged.type || merged.entity || merged.kind || merged.activity_type,
   ).toLowerCase();
 
-  const orderId = asString(
+  const orderIdRaw = asString(
     merged.order_id ?? merged.orderId ?? merged.order?.id ?? merged.order?.order_id,
   );
+  const orderIdNum = Number(orderIdRaw);
+  const orderId =
+    orderIdRaw && Number.isFinite(orderIdNum) && orderIdNum > 0 ? orderIdRaw : '';
   const disputeId = asString(
     merged.dispute_id ?? merged.disputeId ?? merged.dispute?.id,
   );
@@ -54,33 +97,37 @@ function resolveNotificationTarget(meta, data) {
   const roomName = asString(
     merged.room_name ?? merged.roomName ?? merged.chat?.name ?? merged.name,
   );
+  const role = asString(merged.role);
 
   if (
     type === 'message' ||
     type === 'chat' ||
     type === 'new_message' ||
-    type === 'mssg'
+    type === 'mssg' ||
+    type === 'invoice' ||
+    type === 'invoice_request'
   ) {
-    return roomId
-      ? { screen: 'Inbox', params: { chat: { roomId, name: roomName || 'Chat' } } }
-      : null;
+    return roomId ? chatTarget(roomId, roomName, role) : null;
   }
 
-  // if (type === 'cart' || type === 'checkout' || type === 'abandoned_cart') {
-  //   return { screen: 'Cart', role: 'customer' };
-  // }
+  // Unpaid invoice chats: backend may still send type=order without a real orders row.
+  // Prefer the chat room whenever room_id is present and there is no valid paid order id.
+  if ((type === 'order' || type === 'orders') && roomId && !orderId) {
+    return chatTarget(roomId, roomName, role);
+  }
 
   if (type === 'order' || type === 'orders') {
-    return orderId
-      ? {
+    if (orderId) {
+      return {
         screen: 'Order-detail',
-        role: asString(merged.role),
+        role,
         params: {
           orderId,
           order: { id: Number(orderId) || orderId, order_id: Number(orderId) || orderId },
         },
-      }
-      : null;
+      };
+    }
+    return roomId ? chatTarget(roomId, roomName, role) : null;
   }
 
   if (type === 'dispute' || type === 'disputes') {
@@ -106,10 +153,7 @@ function resolveNotificationTarget(meta, data) {
 
   // Infer from which id is present when type is omitted.
   if (roomId && !orderId && !disputeId && !returnId) {
-    return {
-      screen: 'Inbox',
-      params: { chat: { roomId, name: roomName || 'Chat' } },
-    };
+    return chatTarget(roomId, roomName, role);
   }
   if (disputeId) {
     return {
@@ -129,12 +173,15 @@ function resolveNotificationTarget(meta, data) {
   if (orderId) {
     return {
       screen: 'Order-detail',
-      role: asString(merged.role),
+      role,
       params: {
         orderId,
         order: { id: Number(orderId) || orderId, order_id: Number(orderId) || orderId },
       },
     };
+  }
+  if (roomId) {
+    return chatTarget(roomId, roomName, role);
   }
 
   // Explicit screen override (legacy)
@@ -185,10 +232,11 @@ export function parseFcmMessage(remoteMessage) {
     remoteMessage?.notification?.title ||
     (typeof data.title === 'string' ? data.title : '') ||
     'Deedyte';
-  const body =
+  const rawBody =
     remoteMessage?.notification?.body ||
     (typeof data.body === 'string' ? data.body : '') ||
     '';
+  const body = humanizeFcmBody(rawBody);
 
   return { title, body, data, meta, media };
 }
@@ -213,6 +261,12 @@ async function alignRole(rawRole) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 
+function isChatNavigationTarget(target) {
+  if (String(target?.tab ?? '').toLowerCase() === 'chat') return true;
+  const screen = String(target?.screen ?? '').toLowerCase();
+  return screen === 'inbox' || screen === 'chat-room' || screen === 'chat-list';
+}
+
 function navigateWhenReady(target) {
   const tryNavigate = async (attempt = 0) => {
     try {
@@ -225,7 +279,9 @@ function navigateWhenReady(target) {
       const ok =
         screenName.toLowerCase() === 'cart'
           ? false // navigateToCartTab()
-          : navigateToActivitiesScreen(screenName, target.params);
+          : isChatNavigationTarget(target)
+            ? navigateToChatScreen(screenName, target.params)
+            : navigateToActivitiesScreen(screenName, target.params);
       if (!ok && attempt < 20) {
         setTimeout(() => tryNavigate(attempt + 1), 250);
       }
