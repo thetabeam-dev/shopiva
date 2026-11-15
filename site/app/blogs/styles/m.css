@@ -1,4 +1,4 @@
-@media screen and (min-width: 481px) and (max-width: 768px) {
+@media screen and (min-width: 481px) and (max-width: 620px) {
   .blog-page__hero {
     padding: 40px 20px 32px;
   }
@@ -12,7 +12,7 @@
   }
 
   .blog-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 16px;
   }
 
@@ -21,6 +21,6 @@
   }
 
   .blog-post__content {
-    padding: 22px 18px 0;
+    padding: 22px 18px 24px;
   }
 }

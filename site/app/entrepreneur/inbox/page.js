@@ -16,7 +16,7 @@ function InboxInner() {
       <p className="entrepreneur-inbox-back">
         <Link href="/entrepreneur/orders">← Back to orders</Link>
       </p>
-      <h1 className="entrepreneur-inbox-title">Messages</h1>
+      <h1 className="entrepreneur-inbox-title">Vendor messages — Making Commerce Safe For Everyone</h1>
       {customerId ? (
         <p className="entrepreneur-inbox-sub">
           Conversation with customer <strong>#{customerId}</strong>

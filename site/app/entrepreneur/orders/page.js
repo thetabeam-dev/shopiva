@@ -143,7 +143,7 @@ export default function ManageOrders() {
   return (
     <div className="orders-page">
       <div className="orders-header">
-        <h5>Orders</h5>
+        <h1 className="page-h1 page-h1--compact">Vendor orders — Making Commerce Safe For Everyone</h1>
         {shops.length > 0 ? (
           <div className="orders-shop-select">
             <select aria-label="Shop" value={selectedShopId} onChange={onShopSelect}>

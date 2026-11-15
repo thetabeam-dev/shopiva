@@ -109,11 +109,11 @@ export default function OrdersPage() {
         <Link href="/" className="ord-mheader__back" aria-label="Back">
           <img src={backSvg.src} alt="" width={20} height={20} />
         </Link>
-        <h1 className="ord-mheader__title">Orders</h1>
+        <h1 className="ord-mheader__title">Protected orders — Making Commerce Safe For Everyone</h1>
       </header>
 
       <div className="ord-main">
-        <h1 className="ord-title ord-title--desktop">Orders</h1>
+        <h1 className="ord-title ord-title--desktop">Protected orders — Making Commerce Safe For Everyone</h1>
 
         <div className="ord-tabs" role="tablist" aria-label="Order filters">
           <button

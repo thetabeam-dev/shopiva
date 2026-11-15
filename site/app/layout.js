@@ -63,15 +63,6 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        <title>
-          DeeDyte Nigeria | Making Commerce Safe For Everyone
-        </title>
-        <meta
-          name="description"
-          content="DeeDyte is revolutionising e-commerce by making buying and selling safe for everyone. Discover products, connect with trusted vendors, and enjoy a more secure shopping experience."
-        />
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#fff" />
 
         <link

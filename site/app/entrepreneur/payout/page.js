@@ -256,7 +256,7 @@ export default function PayoutPage() {
   return (
     <div className="payout-page">
       <div className="payout-header">
-        <h5>Payout Details</h5>
+        <h1 className="page-h1 page-h1--compact">Payout details — Making Commerce Safe For Everyone</h1>
         <p>Add the bank details used to settle your earnings after successful orders.</p>
       </div>
 

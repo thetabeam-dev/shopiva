@@ -75,15 +75,59 @@ export async function buildSearchAppearanceSchema() {
     sameAs: SOCIAL_PROFILE_URLS,
   };
 
-  if (rating) {
-    organization.aggregateRating = {
-      "@type": "AggregateRating",
-      ratingValue: rating.rating,
-      bestRating: 5,
-      worstRating: 1,
-      reviewCount: rating.count,
-    };
+  const aggregateRating = rating
+    ? {
+        "@type": "AggregateRating",
+        ratingValue: rating.rating,
+        bestRating: 5,
+        worstRating: 1,
+        ratingCount: rating.count,
+        reviewCount: rating.count,
+      }
+    : null;
+
+  if (aggregateRating) {
+    organization.aggregateRating = aggregateRating;
   }
+
+  // Google SoftwareApplication rich results require offers + aggregateRating|review.
+  // Only emit app nodes when we have a real marketplace rating.
+  const softwareApplications = aggregateRating
+    ? [
+        {
+          "@type": "SoftwareApplication",
+          name: "DeeDyte",
+          operatingSystem: "iOS",
+          applicationCategory: "ShoppingApplication",
+          url: APP_STORE_URL,
+          installUrl: APP_STORE_URL,
+          downloadUrl: APP_STORE_URL,
+          publisher: { "@id": organizationId },
+          offers: {
+            "@type": "Offer",
+            price: 0,
+            priceCurrency: "NGN",
+          },
+          aggregateRating,
+        },
+        {
+          "@type": "SoftwareApplication",
+          name: "DeeDyte",
+          operatingSystem: "ANDROID",
+          applicationCategory: "ShoppingApplication",
+          url: PLAY_STORE_URL,
+          installUrl: PLAY_STORE_URL,
+          downloadUrl: PLAY_STORE_URL,
+          publisher: { "@id": organizationId },
+          offers: {
+            "@type": "Offer",
+            price: 0,
+            priceCurrency: "NGN",
+          },
+          aggregateRating,
+        },
+      ]
+    : [];
 
   return {
     "@context": "https://schema.org",
@@ -99,36 +143,7 @@ export async function buildSearchAppearanceSchema() {
         description:
           "Shop fashion, electronics, home, and more from nearby vendors on DeeDyte.",
       },
-      {
-        "@type": "SoftwareApplication",
-        name: "DeeDyte",
-        operatingSystem: "iOS",
-        applicationCategory: "https://schema.org/ShoppingApplication",
-        url: APP_STORE_URL,
-        installUrl: APP_STORE_URL,
-        downloadUrl: APP_STORE_URL,
-        publisher: { "@id": organizationId },
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: "NGN",
-        },
-      },
-      {
-        "@type": "SoftwareApplication",
-        name: "DeeDyte",
-        operatingSystem: "ANDROID",
-        applicationCategory: "https://schema.org/ShoppingApplication",
-        url: PLAY_STORE_URL,
-        installUrl: PLAY_STORE_URL,
-        downloadUrl: PLAY_STORE_URL,
-        publisher: { "@id": organizationId },
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: "NGN",
-        },
-      },
+      ...softwareApplications,
       {
         "@type": "ItemList",
         name: "DeeDyte sitelinks",

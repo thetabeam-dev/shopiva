@@ -127,7 +127,7 @@ export default function AccountDeletePage() {
 
     return (
         <main style={{ padding: 20, maxWidth: 900, margin: "0 auto" }}>
-            <h1>Delete your account</h1>
+            <h1>Delete your DeeDyte account — Making Commerce Safe For Everyone</h1>
             <section style={{ marginTop: 16, padding: 16, borderRadius: 8, background: "#feecec", border: "1px solid #f3bbbb" }} aria-label="Account deletion warning">
                 <p style={{ fontWeight: 700 }}>Deleting your account is permanent and cannot be undone.</p>
                 <p>This will permanently remove: profile information, addresses, saved payment methods, wishlist, notifications, and shopping history where legally allowed.</p>

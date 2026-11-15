@@ -736,6 +736,9 @@ export default function ProductDetail({ product }) {
                     <h1 className="pdp-buybox__title">
                         {product?.name || (loadError ? "" : "…")}
                     </h1>
+                    <p className="pdp-buybox__vision" style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#00926e", fontWeight: 600 }}>
+                        Making Commerce Safe For Everyone
+                    </p>
 
                     <div className="pdp-buybox__price-row">
                         <div className="pdp-buybox__prices">

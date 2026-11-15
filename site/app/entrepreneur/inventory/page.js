@@ -113,7 +113,7 @@ export default function InventoryPage() {
   return (
     <div className="inventory-page">
       <div className="inventory-header">
-        <h5>Inventory</h5>
+        <h1 className="page-h1 page-h1--compact">Inventory — Making Commerce Safe For Everyone</h1>
         {shops.length > 0 ? (
           <div className="inventory-shop-select">
             <select aria-label="Shop" value={selectedShopId} onChange={onShopSelect}>

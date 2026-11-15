@@ -32,7 +32,7 @@ const STEPS = [
 export default function HowItWorksPage() {
   return (
     <LegalPageShell
-      title="How DeeDyte Works"
+      title="How DeeDyte Makes Commerce Safe For Everyone"
       subtitle="From discovery to protected checkout — a safer way to buy and sell locally."
     >
       <article className="legal-page__article">

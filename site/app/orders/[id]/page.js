@@ -530,7 +530,7 @@ export default function OrderDetailPage() {
         <div className="od-top-card__head">
           <div className="od-top-card__intro">
             <h1 id="od-order-heading" className="od-order-id">
-              Order ID #{detail.orderDisplayId}
+              Protected order #{detail.orderDisplayId} — Making Commerce Safe For Everyone
             </h1>
             <nav className="od-breadcrumb" aria-label="Breadcrumb">
               <Link href="/store/orders">Orders</Link>

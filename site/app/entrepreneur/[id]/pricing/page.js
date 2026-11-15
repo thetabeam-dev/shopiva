@@ -34,9 +34,9 @@ export default function Pricing() {
         <section>
             <h5>Plans & pricing</h5>
 
-            <h1>Start for free, then enjoy
+            <h1>DeeDyte pricing — Making Commerce Safe For Everyone
             <br />
-            your first month for 1500</h1>
+            Start for free, then enjoy your first month for 1500</h1>
 
             <h5>Choose the best plan for your business. Change plans as you grow.</h5>
 

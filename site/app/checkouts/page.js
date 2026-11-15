@@ -7,6 +7,8 @@ import "./styles/xxl.css";
 import "./styles/s.css";
 import "../styles/xxl.css";
 import CustomerHeader from "@/components/customers/Header";
+import PageH1 from "@/components/PageH1";
+import { SITE_VISION } from "@/lib/siteNavigation";
 import { API_BACKEND, buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 import {
   estimateLocationShipping,
@@ -416,6 +418,10 @@ export default function CheckoutPage() {
           <span>›</span>
           <span>Checkout</span>
         </nav>
+
+        <PageH1 className="page-h1--compact">
+          Secure checkout — {SITE_VISION}
+        </PageH1>
 
         {cartLoading || profileLoading ? (
           <div className="co-status co-status--loader" role="status" aria-label="Loading">

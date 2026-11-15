@@ -594,7 +594,9 @@ function InboxInner() {
           ← Back
         </Link>
         <div>
-          <h1 className="buyer-inbox__title">{shopName}</h1>
+          <h1 className="buyer-inbox__title">
+            Chat with {shopName} — Making Commerce Safe For Everyone
+          </h1>
           <p className="buyer-inbox__sub">{itemTitle}</p>
         </div>
       </header>

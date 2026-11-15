@@ -278,7 +278,7 @@ export default function Dashboard() {
               fontWeight: "100",
             }}
           >
-            <h2
+            <h1
               id="headline"
               style={{
                 fontWeight: "400",
@@ -288,10 +288,10 @@ export default function Dashboard() {
                 textTransform: "capitalize",
               }}
             >
-              For everyone from
+              Making Commerce Safe For Everyone
               <br />
-              entrepreneurs to enterprise
-            </h2>
+              for entrepreneurs to enterprise
+            </h1>
           </section>
 
           {/* Feature Cards */}
@@ -323,7 +323,9 @@ export default function Dashboard() {
 
         {/* Global Sales Section */}
         <section id="about">
-          <h1>Sell To Buyers From Anywhere</h1>
+          <h2 style={{ color: "#00926E", fontSize: "6vh", textAlign: "center", fontWeight: 500, margin: 0, border: "none" }}>
+            Sell To Buyers From Anywhere
+          </h2>
           {/* How It Works Section */}
           <div className="about-card-cnt">
             {HOW_IT_WORKS_STEPS.map(renderHowItWorksStep)}

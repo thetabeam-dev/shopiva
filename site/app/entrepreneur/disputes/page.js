@@ -147,7 +147,7 @@ export default function DisputesPage() {
 
       <div className="disputes-page">
         <header className="disputes-header" style={{background: "unset"}}>
-          <h1 className="disputes-title">Disputes</h1>
+          <h1 className="disputes-title">Vendor disputes — Making Commerce Safe For Everyone</h1>
           <div className="disputes-header-actions">
             <button type="button" className="disputes-btn disputes-btn--muted">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>

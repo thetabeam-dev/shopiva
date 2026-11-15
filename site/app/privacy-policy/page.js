@@ -9,8 +9,8 @@ import PrivacyPolicyContent, {
 export default function PrivacyPolicyPage() {
   return (
     <LegalPageShell
-      title="Privacy Policy"
-      subtitle="How DeeDyte handles your data"
+      title="Privacy Policy — Making Commerce Safe For Everyone"
+      subtitle="How DeeDyte protects your data while you buy and sell"
       toc={PRIVACY_TOC}
     >
       <PrivacyPolicyContent />

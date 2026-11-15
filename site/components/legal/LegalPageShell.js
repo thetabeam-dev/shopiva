@@ -19,21 +19,37 @@ import "./legal-pages.css";
 export default function LegalPageShell({ title, subtitle, toc = [], children }) {
   useEffect(() => {
     const previousBodyBg = document.body.style.background;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousHtmlHeight = document.documentElement.style.height;
+    const previousBodyHeight = document.body.style.height;
     const main = document.body.querySelector("main");
     const previousMainBg = main?.style.background;
 
     document.body.style.background = "#ffffff";
+    document.body.style.overflow = "auto";
+    document.body.style.height = "auto";
+    document.documentElement.style.overflow = "auto";
+    document.documentElement.style.height = "auto";
     document.body.classList.add("legal-route");
     if (main) {
       main.style.background = "#ffffff";
+      main.style.height = "auto";
+      main.style.overflow = "visible";
       main.classList.add("legal-route-main");
     }
 
     return () => {
       document.body.style.background = previousBodyBg;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.height = previousBodyHeight;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.documentElement.style.height = previousHtmlHeight;
       document.body.classList.remove("legal-route");
       if (main) {
         main.style.background = previousMainBg || "";
+        main.style.height = "";
+        main.style.overflow = "";
         main.classList.remove("legal-route-main");
       }
     };

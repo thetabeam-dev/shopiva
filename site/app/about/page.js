@@ -247,7 +247,10 @@ export default function Dashboard() {
         {/* Hero Content */}
         <div className="hero-left">
           <div className="hero-info">
-            <h2>Delivery straight to your doorstep — within minutes.</h2>
+            <h1 className="page-h1 page-h1--hero">Making Commerce Safe For Everyone</h1>
+            <p style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 600, margin: "12px 0 0" }}>
+              Delivery straight to your doorstep — within minutes.
+            </p>
 
             <div>
               <p className="theme">
@@ -268,6 +271,8 @@ export default function Dashboard() {
                 >
                   <img
                     src={APP_STORE_LINKS.ios}
+                    width={32}
+                    height={32}
                     alt="Download DeeDyte on the App Store"
                   />
                   <b>App Store</b>
@@ -279,6 +284,8 @@ export default function Dashboard() {
                 >
                   <img
                     src={APP_STORE_LINKS.android}
+                    width={32}
+                    height={32}
                     alt="Download DeeDyte on Google Play"
                   />
                   <b>Play Store</b>
@@ -291,7 +298,7 @@ export default function Dashboard() {
 
       {/* How It Works Section */}
       <section id="about">
-        <h1>How Deedyte Works</h1>
+        <h2 style={{ color: "#00926E", fontSize: "3.5vh", fontWeight: 700, textAlign: "center", margin: "20px 0" }}>How DeeDyte Works</h2>
         <div className="about-card-cnt">
           {HOW_IT_WORKS_STEPS.map(renderHowItWorksStep)}
         </div>
@@ -299,7 +306,7 @@ export default function Dashboard() {
 
       {/* Why DeeDyte Section */}
       <section id="why-section">
-        <h1>Why DeeDyte?</h1>
+        <h2 style={{ color: "#fff", fontSize: "3.5vh", fontWeight: 700, textAlign: "center", margin: "20px 0" }}>Why DeeDyte?</h2>
         <div className="why-cnt">
           {WHY_DEEDYTE_FEATURES.map(renderWhyFeature)}
         </div>

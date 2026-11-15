@@ -154,6 +154,9 @@ export default function PublicShopPage() {
           )}
           <div>
             <h1>{name}</h1>
+            <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: "#00926e", fontWeight: 600 }}>
+              Making Commerce Safe For Everyone
+            </p>
             <div className="vendor-store__meta">
               {starSeller ? (
                 <span className="vendor-store__badge">

@@ -1,0 +1,19 @@
+{
+  "name": "google-merchant-oauth",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Human-user OAuth 2.0 access tokens for Google Merchant API (Desktop app)",
+  "main": "generate-user-token.js",
+  "scripts": {
+    "token": "node generate-user-token.js",
+    "start": "node generate-user-token.js",
+    "revoke": "node generate-user-token.js --revoke"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "google-auth-library": "^9.15.1",
+    "open": "^8.4.2"
+  }
+}

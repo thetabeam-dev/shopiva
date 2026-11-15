@@ -282,6 +282,7 @@ export default function ProductListPage() {
       height: "calc(100vh - 60px)",
       overflow: "auto"
     }}>
+      <h1 className="page-h1 page-h1--compact">Your products — Making Commerce Safe For Everyone</h1>
       <div className="product-list-header">
         <span>
           {shops.length > 0 ? (

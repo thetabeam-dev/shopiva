@@ -1,0 +1,8 @@
+node_modules/
+oauth-client.json
+token-store.json
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.DS_Store

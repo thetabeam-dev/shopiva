@@ -18,10 +18,31 @@ function offerPrice(product) {
   return amount.toFixed(2);
 }
 
+function productAggregateRating(product) {
+  const metrics = product?.reviewMetrics ?? product?.reviews ?? null;
+  const ratingValue = Number(
+    metrics?.average_rating ?? metrics?.averageRating ?? product?.averageRating ?? 0,
+  );
+  const reviewCount = Number(
+    metrics?.review_count ?? metrics?.reviewCount ?? product?.reviewCount ?? 0,
+  );
+  if (!Number.isFinite(ratingValue) || ratingValue <= 0) return null;
+  if (!Number.isFinite(reviewCount) || reviewCount < 1) return null;
+  return {
+    "@type": "AggregateRating",
+    ratingValue: Math.round(ratingValue * 10) / 10,
+    bestRating: 5,
+    worstRating: 1,
+    ratingCount: reviewCount,
+    reviewCount,
+  };
+}
+
 export function productJsonLd(product) {
   const url = productUrl(product?.id);
   const images = firstImages(product);
   const shopName = String(product?.shopName ?? "").trim() || "DeeDyte";
+  const aggregateRating = productAggregateRating(product);
 
   return {
     "@context": "https://schema.org",
@@ -47,5 +68,6 @@ export function productJsonLd(product) {
         name: shopName,
       },
     },
+    ...(aggregateRating ? { aggregateRating } : {}),
   };
 }

@@ -7,11 +7,12 @@ import { productJsonLd } from "@/lib/productStructuredData";
 import { getStorefrontProductById } from "@/lib/storefrontProducts";
 import CustomerHeader from "@/components/customers/Header";
 import CustomerHeaderHead from "@/components/customers/HeaderHead";
+import ProcessLoader from "@/components/ProcessLoader";
 import "@/app/styles/xxl.css";
 
 const ProductDetail = nextDynamic(() => import("./product"), {
   ssr: false,
-  loading: () => <div>Loading product…</div>,
+  loading: () => <ProcessLoader minHeight="60vh" />,
 });
 
 /** JPEG 1200×630 so WhatsApp can preview the link. Facebook accepts WebP; WhatsApp does not. */

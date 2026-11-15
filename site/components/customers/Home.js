@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { IoStar, IoStarHalf, IoStarOutline } from "react-icons/io5";
 import ProductCard from "./ProductCard";
+import PageH1 from "../PageH1";
+import { SITE_VISION } from "../../lib/siteNavigation";
 import { buyerAuthHeaders } from "../../reusables/shopBackendAuth";
 import { CART_UPDATED_EVENT, notifyCartUpdated } from "../../reusables/cartEvents";
 
@@ -189,6 +191,7 @@ export default function CustomerHome() {
 
     return (
         <section className="deedyte-home" id="deedyte-home">
+            <PageH1>{SITE_VISION}</PageH1>
             <div className="deedyte-home-toolbar">
                 <div className="deedyte-home-chips">
                     <button

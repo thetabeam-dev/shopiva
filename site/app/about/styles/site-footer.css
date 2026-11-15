@@ -17,12 +17,12 @@
 
 
 
-ul {
+/* Keep list resets scoped — unscoped ul/li break legal docs on mobile */
+.site-footer ul {
   position: relative;
-
 }
 
-ul li{
+.site-footer ul li {
   width: fit-content;
 }
 

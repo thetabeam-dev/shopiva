@@ -26,6 +26,9 @@ export async function recordProductView(userId: number, productId: number): Prom
   if (!Number.isFinite(uid) || uid <= 0 || !Number.isFinite(pid) || pid <= 0) return;
 
   const pool = await db();
+  const { rowCount } = await pool.query(`SELECT 1 FROM products WHERE id = $1 LIMIT 1`, [pid]);
+  if (!rowCount) return;
+
   await pool.query(
     `INSERT INTO product_view_history (user_id, product_id, viewed_at)
      VALUES ($1, $2, CURRENT_TIMESTAMP)
@@ -53,8 +56,17 @@ export async function listRecentlyViewedProducts(
   const uid = Number(userId);
   if (!Number.isFinite(uid) || uid <= 0) return [];
   const take = Math.min(Math.max(Number(limit) || 12, 1), HISTORY_KEEP);
+  const pool = await db();
 
-  const { rows } = await (await db()).query<{
+  // Drop history rows whose product was hard-deleted (covers DBs without FK cascade).
+  await pool.query(
+    `DELETE FROM product_view_history h
+     WHERE h.user_id = $1
+       AND NOT EXISTS (SELECT 1 FROM products p WHERE p.id = h.product_id)`,
+    [uid],
+  );
+
+  const { rows } = await pool.query<{
     product_id: number;
     name: string;
     thumbnail: string | null;
@@ -99,6 +111,7 @@ export async function listRecentlyViewedProducts(
      ) inv ON true
      WHERE h.user_id = $1
        AND p.is_published = true
+       AND EXISTS (SELECT 1 FROM products px WHERE px.id = h.product_id)
      ORDER BY h.viewed_at DESC
      LIMIT $2`,
     [uid, take],

@@ -8,6 +8,9 @@ import "./styles/xxl.css";
 import "./styles/s.css";
 import "../styles/xxl.css";
 import CustomerHeader from "@/components/customers/Header";
+import PageH1 from "@/components/PageH1";
+import ProcessLoader from "@/components/ProcessLoader";
+import { SITE_VISION } from "@/lib/siteNavigation";
 import { buyerAuthHeaders } from "@/reusables/shopBackendAuth";
 import { notifyCartUpdated } from "@/reusables/cartEvents";
 
@@ -257,11 +260,11 @@ export default function CartPage() {
           <span>Cart</span>
         </nav>
 
-        {loading ? (
-          <div className="crt-status crt-status--loader" role="status" aria-label="Loading">
-            <span className="site-process-loader__spinner" style={{ borderColor: "#ededed", borderTopColor: "#00926e" }} />
-          </div>
-        ) : null}
+        <PageH1 className="page-h1--compact">
+          Your cart — {SITE_VISION}
+        </PageH1>
+
+        {loading ? <ProcessLoader className="crt-status crt-status--loader" minHeight="40vh" /> : null}
 
         {loadError ? (
           <p className="crt-status" role="alert">

@@ -120,12 +120,14 @@
     
     
     main{
-        height: calc(100vh - 60px);
+        height: auto;
+        min-height: calc(100vh - 60px);
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         align-items: center;
         background-color: #f8f8f8;
+        overflow: visible;
     }
     
     main section{
@@ -346,7 +348,9 @@
 
     
     
-    #about{
+    #about,
+    #entrepreneur-sell-global,
+    .entrepreneur-sell-global{
         display: flex;
         height: fit-content;
         width: 100%;
@@ -359,9 +363,13 @@
         cursor: pointer;
         background-color: #fff;
         border-radius: 15px;
+        position: relative;
+        overflow: visible;
     }
 
-    #about h1{
+    #about h1,
+    #entrepreneur-sell-global h1,
+    .entrepreneur-sell-global h1{
         color: #00926E;
         font-size: 6vh;
         text-align: center;
@@ -501,29 +509,64 @@
     }
     
     .payment-cnt{
-        height: 100%;
+        height: auto;
         background-color: #fff;
         /* background-color: rgb(0, 0, 0, .5); */
         padding: 20px;
         display: flex;
         align-items: flex-start;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: flex-start;
+        position: relative;
+        overflow: visible;
+        width: 100%;
     }
 
-    .payment-cnt ul{
-        /* overflow: auto; */
-        flex-direction: column;
-        padding: 0;
-        margin: 0;
-        height: fit-content;
-        width: 100%;
+    /* Override .dashboard-body ul / ul li carousel rules — those are for feature cards */
+    .dashboard-body .payment-cnt ul,
+    .dashboard-body ul.payment-list-cnt,
+    .payment-cnt ul.payment-list-cnt {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        list-style-type: none;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        width: 100% !important;
+        overflow: visible !important;
+        background: transparent !important;
+        position: relative !important;
+        float: none !important;
     }
-    .payment-cnt ul li{
-        width: 100%;
-        padding: 25px 25px;
-        color: #00926e;
-        height: fit-content;
+
+    .dashboard-body .payment-cnt ul li,
+    .dashboard-body ul.payment-list-cnt > li,
+    .payment-cnt ul.payment-list-cnt > li,
+    .dashboard-body .crypto-list,
+    .dashboard-body #crypto-list {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        flex-shrink: 0 !important;
+        overflow: visible !important;
+        position: relative !important;
+        float: none !important;
+        padding: 25px 16px !important;
+        color: #00926e !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        font-size: inherit !important;
     }
 
     .conclude-list{

@@ -130,11 +130,11 @@ export default function BuyerDisputesPage() {
         <Link href="/" className="ord-mheader__back" aria-label="Back">
           <img src={backSvg.src} alt="" width={20} height={20} />
         </Link>
-        <h1 className="ord-mheader__title">Disputes</h1>
+        <h1 className="ord-mheader__title">Safe dispute resolution — Making Commerce Safe For Everyone</h1>
       </header>
 
       <div className="ord-main">
-        <h1 className="ord-title ord-title--desktop">Disputes</h1>
+        <h1 className="ord-title ord-title--desktop">Safe dispute resolution — Making Commerce Safe For Everyone</h1>
         <p className="dsp-subtitle">Open disputes tied to your customer account.</p>
 
         {loadError ? (

@@ -151,7 +151,9 @@ export default function UserProfile() {
 
         <div className="up-content">
           <div className="up-content__inner">
-            {/* <h1 className="up-content__heading">{active_panel ? "General" : "Security"}</h1> */}
+            <h1 className="up-content__heading">
+              {active_panel ? "Account settings" : "Security settings"} — Making Commerce Safe For Everyone
+            </h1>
             {profileError ? <p className="up-alert up-alert--error">{profileError}</p> : null}
             {active_panel ? (
               <Genenral

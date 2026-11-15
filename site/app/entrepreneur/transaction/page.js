@@ -111,7 +111,7 @@ export default function TransactionsPage() {
   return (
     <div className="transactions-page">
       <div className="transactions-header">
-        <h5>Transactions</h5>
+        <h1 className="page-h1 page-h1--compact">Transactions — Making Commerce Safe For Everyone</h1>
         <p>Track your sales, payouts and refunds in one place.</p>
       </div>
       {shops.length > 0 ? (
