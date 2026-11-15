@@ -15,6 +15,7 @@ import type {
 } from "../../models/business/product.js";
 import { ordersTransformer } from "../../transformers/business/orders.js";
 import { orderTransformer } from "../../transformers/business/order.js";
+import { notifyGoogleMerchantProductChange } from "../integrations/googleMerchantSync.js";
 
 /**
  * Create a new product.
@@ -28,11 +29,13 @@ export async function CreateProductService(payload: CreateProductPayload) {
   const shopRows = await shopModel.getShopById(payload.shop_id);
   if (!shopRows?.length) throw new Error("Shop not found. Create a shop first or use a valid shop ID.");
 
-  return productModel.create({
+  const created = await productModel.create({
     ...payload,
     category: payload.category ?? null,
     category_id: payload.category_id ?? null,
   });
+  notifyGoogleMerchantProductChange(created?.id, "sync");
+  return created;
 }
 
 /**
@@ -70,6 +73,7 @@ export async function UpdateProductService(payload: Partial<UpdateProductPayload
 
   const result = await productModel.update(merged);
   if (!result) throw new Error("Failed to update product");
+  notifyGoogleMerchantProductChange(result.id, "sync");
   return result;
 }
 
@@ -112,6 +116,9 @@ export async function DeleteProductService(productId: number) {
     }
 
     await client.query("COMMIT");
+    notifyGoogleMerchantProductChange(productId, "delete", {
+      shopId: existing.shop_id,
+    });
     return { deleted: true };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -132,7 +139,9 @@ export async function CreateInventoryService(payload: CreateInventoryPayload) {
   const product = await productModel.getById(payload.product_id);
   if (!product) throw new Error("Product not found");
 
-  return inventoryModel.create(payload);
+  const created = await inventoryModel.create(payload);
+  notifyGoogleMerchantProductChange(payload.product_id, "sync");
+  return created;
 }
 
 /**
@@ -163,6 +172,7 @@ export async function UpdateInventoryService(
 
   const result = await inventoryModel.update(merged);
   if (!result) throw new Error("Failed to update inventory");
+  notifyGoogleMerchantProductChange(result.product_id ?? existing.product_id, "sync");
   return result;
 }
 
@@ -175,6 +185,7 @@ export async function DeleteInventoryService(inventoryId: number) {
 
   const rowCount = await inventoryModel.delete(inventoryId);
   if (rowCount === 0) throw new Error("Failed to delete inventory");
+  notifyGoogleMerchantProductChange(existing.product_id, "sync");
   return { deleted: true };
 }
 
