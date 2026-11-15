@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { getVendorsOnMapByCategory } from "../../lib/productApi";
 import CustomerHeader from "@/components/customers/Header";
 import CustomerHeaderHead from "@/components/customers/HeaderHead";
+import PageH1 from "@/components/PageH1";
+import { SITE_VISION } from "@/lib/siteNavigation";
 import "../styles/xxl.css";
 import "./styles/s.css";
 import "./styles/xxl.css";
@@ -270,6 +272,7 @@ function VendorsDiscoverContent() {
         <CustomerHeader />
       </div>
       <div className="customer-vendors-page">
+      <PageH1>Trusted local vendors — {SITE_VISION}</PageH1>
       <div className="vendor-card-cnt">
         {loading ? (
           <div

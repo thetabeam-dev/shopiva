@@ -19,6 +19,10 @@ import { useSelector } from "react-redux";
 
 // Styles
 import "../../app/entrepreneur/[id]/global.css";
+import "../../app/entrepreneur/[id]/styles/s.css";
+import "../../app/entrepreneur/[id]/styles/m.css";
+import "../../app/entrepreneur/[id]/styles/l.css";
+import "../../app/entrepreneur/[id]/styles/xl.css";
 import "../../app/entrepreneur/[id]/styles/xxl.css";
 
 // Assets
@@ -127,14 +131,45 @@ export default function EntrepreneurFreeLayout({ children }) {
     setScreenWidth(window.innerWidth);
   }, []);
 
-  // Set body styles on mount
+  // Unlock document scroll (globals.css locks html/body to 100vh + overflow hidden)
   useEffect(() => {
-    document.body.style.background = "#fff";
-
+    const html = document.documentElement;
     const mainElement = document.body.querySelector("main");
+
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlHeight: html.style.height,
+      bodyOverflow: document.body.style.overflow,
+      bodyHeight: document.body.style.height,
+      bodyBg: document.body.style.background,
+      mainBg: mainElement?.style.background,
+      mainOverflow: mainElement?.style.overflow,
+      mainHeight: mainElement?.style.height,
+    };
+
+    html.style.overflow = "auto";
+    html.style.height = "auto";
+    document.body.style.overflow = "auto";
+    document.body.style.height = "auto";
+    document.body.style.background = "#fff";
     if (mainElement) {
       mainElement.style.background = "#fff";
+      mainElement.style.overflow = "visible";
+      mainElement.style.height = "auto";
     }
+
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      html.style.height = prev.htmlHeight;
+      document.body.style.overflow = prev.bodyOverflow;
+      document.body.style.height = prev.bodyHeight;
+      document.body.style.background = prev.bodyBg;
+      if (mainElement) {
+        mainElement.style.background = prev.mainBg || "";
+        mainElement.style.overflow = prev.mainOverflow || "";
+        mainElement.style.height = prev.mainHeight || "";
+      }
+    };
   }, []);
 
   // ============================================================================
@@ -426,7 +461,14 @@ export default function EntrepreneurFreeLayout({ children }) {
       {menuActive && <MenuComp logged_in={loggedIn} updateClickOpt={updateClickOpt} />}
 
       {/* Main Content */}
-      <main style={{ overflow: "auto", height: "auto", position: "relative" }}>
+      <main
+        style={{
+          overflow: "visible",
+          height: "auto",
+          minHeight: "auto",
+          position: "relative",
+        }}
+      >
         {children}
       </main>
 
@@ -461,18 +503,6 @@ export default function EntrepreneurFreeLayout({ children }) {
                 onClick={() => (window.location.href = "/contact")}
               >
                 Contact
-              </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/entrepreneur/ng/investors")}
-              >
-                Investors
-              </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/entrepreneur/ng/affiliates")}
-              >
-                Affiliates
               </li>
             </ul>
           </div>
@@ -521,35 +551,16 @@ export default function EntrepreneurFreeLayout({ children }) {
             </ul>
           </div> */}
 
-          {/* Product Links */}
-          <div className="footer-column">
-            <h6 className="footer-heading">Products</h6>
-            <ul className="footer-links">
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/entrepreneur/ng/shop")}
-              >
-                Shop
-              </li>
-              <li
-                className="footer-link"
-                onClick={() => (window.location.href = "/entrepreneur/ng/deedyte-plus")}
-              >
-                Deedyte Plus
-              </li>
-            </ul>
-          </div>
-
           {/* Other Links */}
           <div className="footer-column">
             <h6 className="footer-heading">Others</h6>
             <ul className="footer-links">
-              <li
+              {/* <li
                 className="footer-link"
                 onClick={() => (window.location.href = "/entrepreneur/ng/sitemap")}
               >
                 Sitemap
-              </li>
+              </li> */}
               <li
                 className="footer-link"
                 onClick={() => (window.location.href = "/terms-of-use")}

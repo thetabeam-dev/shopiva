@@ -119,12 +119,14 @@
     
     
     main{
-        height: calc(100vh - 60px);
+        height: auto;
+        min-height: calc(100vh - 60px);
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         align-items: center;
         background-color: #f8f8f8;
+        overflow: visible;
     }
     
     main section{

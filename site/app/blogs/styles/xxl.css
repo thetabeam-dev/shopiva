@@ -49,22 +49,27 @@ main.blog-route-main {
   background: #111111;
   color: #ffffff;
   padding: 48px 24px 40px;
+  text-align: center;
 }
 
-.blog-page__hero h1 {
-  margin: 0;
+.blog-page__hero h1,
+.blog-page__hero .page-h1 {
+  margin: 0 auto;
+  padding: 0;
   font-size: 2rem;
   font-weight: 600;
   color: #ffffff;
   line-height: 1.2;
+  text-align: center;
 }
 
 .blog-page__hero p {
-  margin: 12px 0 0;
+  margin: 12px auto 0;
   max-width: 640px;
   font-size: 1rem;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.88);
+  text-align: center;
 }
 
 .blog-page__body {
@@ -102,9 +107,25 @@ main.blog-route-main {
 
 .blog-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 16px;
   width: 100%;
+}
+
+/* 2 cols: 481px–620px */
+@media screen and (min-width: 481px) and (max-width: 620px) {
+  .blog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+/* 3 cols: 621px and up */
+@media screen and (min-width: 621px) {
+  .blog-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+  }
 }
 
 .blog-card {
@@ -194,7 +215,9 @@ main.blog-route-main {
   margin: 0 auto;
   background: #ffffff;
   border: 1px solid #e8e8e8;
-  padding: 0 0 40px;
+  padding: 0 0 24px;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 .blog-post__media {
@@ -212,7 +235,7 @@ main.blog-route-main {
 }
 
 .blog-post__content {
-  padding: 28px 28px 0;
+  padding: 28px 28px 28px;
 }
 
 .blog-post__back {
@@ -242,9 +265,36 @@ main.blog-route-main {
 }
 
 .blog-post__links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  list-style: disc;
   margin: 28px 0 0;
-  padding: 0 0 0 1.2rem;
+  padding: 0 0 8px 1.2rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   color: #333333;
+  background: transparent;
+  overflow: visible;
+}
+
+.blog-post__links li {
+  display: list-item;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  flex-shrink: 1;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
 }
 
 .blog-post__links a {

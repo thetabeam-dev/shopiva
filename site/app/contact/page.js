@@ -7,7 +7,7 @@ import ContactContent from "../../components/legal/ContactContent";
 export default function ContactPage() {
   return (
     <LegalPageShell
-      title="Contact Us"
+      title="Contact Us — Making Commerce Safe For Everyone"
       subtitle="Get in touch with Thetabeam about DeeDyte"
     >
       <ContactContent />

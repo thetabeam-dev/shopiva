@@ -8,6 +8,7 @@ import {
   blogPostJsonLd,
   buildBlogPostMetadata,
 } from "../../../lib/blogSeo";
+import { SITE_VISION } from "../../../lib/siteNavigation";
 
 async function readSlug(params) {
   const resolved = params && typeof params.then === "function" ? await params : params;
@@ -46,7 +47,10 @@ export default async function BlogPostPage({ params }) {
   return (
     <>
       <StructuredData data={blogPostJsonLd(post)} />
-      <BlogPageShell title={post.title} subtitle={post.excerpt}>
+      <BlogPageShell
+        title={`${post.title} — ${SITE_VISION}`}
+        subtitle={post.excerpt}
+      >
         <BlogPostContent post={post} />
       </BlogPageShell>
     </>

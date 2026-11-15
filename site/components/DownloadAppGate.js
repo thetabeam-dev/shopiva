@@ -21,7 +21,7 @@ const INFO_PAGES = [
   "privacy-policy",
   "terms-of-use",
   "contact",
-  "sitemap",
+  // "sitemap",
   "pricing",
   "blogs",
   "how-it-works",

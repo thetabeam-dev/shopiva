@@ -14,8 +14,8 @@ export default function BlogsPage() {
     <>
       <StructuredData data={blogIndexJsonLd()} />
       <BlogPageShell
-        title="DeeDyte Blog"
-        subtitle="Buyer safety, escrow education, and vendor growth — making commerce safe for everyone."
+        title="DeeDyte Blog — Making Commerce Safe For Everyone"
+        subtitle="Buyer safety, escrow education, and vendor growth guides."
       >
         <BlogsContent />
       </BlogPageShell>

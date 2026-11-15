@@ -29,17 +29,6 @@ export default function BlogPostContent({ post }) {
         {post.body.map((paragraph, index) => (
           <p key={`${post.slug}-${index}`}>{paragraph}</p>
         ))}
-        <ul className="blog-post__links">
-          <li>
-            <Link href="/blogs">More DeeDyte blogs</Link>
-          </li>
-          <li>
-            <Link href="/about">About DeeDyte</Link>
-          </li>
-          <li>
-            <Link href="/contact">Contact us</Link>
-          </li>
-        </ul>
       </div>
     </article>
   );
