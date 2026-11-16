@@ -165,7 +165,8 @@ function newBulkTier(minQty = 2) {
   return {
     id: `tier_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     minQty: String(minQty),
-    totalPrice: '',
+    // Discounted price per item — pack total is computed as unitPrice × minQty on save.
+    unitPrice: '',
   };
 }
 
@@ -174,17 +175,46 @@ function tierQtyTooLow(tier) {
   return digits !== '' && Number(digits) < 2;
 }
 
+/** Form tiers use unitPrice; older drafts may still have totalPrice. */
+function resolveBulkUnitPrice(tier) {
+  const qty = Number(String(tier?.minQty ?? '').replace(/[^\d]/g, ''));
+  const unit = Number(String(tier?.unitPrice ?? '').replace(/[^\d.]/g, ''));
+  if (Number.isFinite(unit) && unit > 0) return unit;
+  const total = Number(String(tier?.totalPrice ?? '').replace(/[^\d.]/g, ''));
+  if (Number.isFinite(total) && total > 0 && Number.isFinite(qty) && qty > 0) {
+    return total / qty;
+  }
+  return NaN;
+}
+
+function normalizeBulkFormTier(tier, index = 0) {
+  const minQty = String(tier?.minQty ?? tier?.minQuantity ?? '');
+  const qty = Number(String(minQty).replace(/[^\d]/g, ''));
+  let unitPrice = String(tier?.unitPrice ?? '').trim();
+  if (!unitPrice && tier?.totalPrice != null && qty > 0) {
+    const total = Number(String(tier.totalPrice).replace(/[^\d.]/g, ''));
+    if (Number.isFinite(total) && total > 0) {
+      unitPrice = String(Math.round((total / qty) * 100) / 100);
+    }
+  }
+  return {
+    id: tier?.id || `tier_${Date.now()}_${index}`,
+    minQty,
+    unitPrice,
+  };
+}
+
 function bulkDiscountIssue(enabled, tiers) {
   if (!enabled) return '';
   const parsed = tiers.map(tier => ({
     minQty: Number(String(tier.minQty).replace(/[^\d]/g, '')),
-    totalPrice: Number(String(tier.totalPrice).replace(/[^\d.]/g, '')),
+    unitPrice: resolveBulkUnitPrice(tier),
   }));
   if (parsed.some(tier => !Number.isFinite(tier.minQty) || tier.minQty < 2)) {
     return 'Bulk purchase must start from 2.';
   }
-  if (parsed.some(tier => !Number.isFinite(tier.totalPrice) || tier.totalPrice <= 0)) {
-    return 'Each bulk tier needs a total price greater than 0.';
+  if (parsed.some(tier => !Number.isFinite(tier.unitPrice) || tier.unitPrice <= 0)) {
+    return 'Each bulk tier needs a discounted price per item greater than 0.';
   }
   const quantities = parsed.map(tier => tier.minQty);
   if (new Set(quantities).size !== quantities.length) {
@@ -192,9 +222,7 @@ function bulkDiscountIssue(enabled, tiers) {
   }
   const ordered = [...parsed].sort((a, b) => a.minQty - b.minQty);
   for (let i = 1; i < ordered.length; i += 1) {
-    const previous = ordered[i - 1].totalPrice / ordered[i - 1].minQty;
-    const current = ordered[i].totalPrice / ordered[i].minQty;
-    if (current >= previous) {
+    if (ordered[i].unitPrice >= ordered[i - 1].unitPrice) {
       return 'A higher quantity tier must cost less per item than the tier below it.';
     }
   }
@@ -402,7 +430,9 @@ export default function VendorCreateProductScreen() {
         if (typeof draft.allowPickup === 'boolean') setAllowPickup(draft.allowPickup);
         if (typeof draft.allowDelivery === 'boolean') setAllowDelivery(draft.allowDelivery);
         if (typeof draft.bulkEnabled === 'boolean') setBulkEnabled(draft.bulkEnabled);
-        if (Array.isArray(draft.bulkTiers) && draft.bulkTiers.length) setBulkTiers(draft.bulkTiers);
+        if (Array.isArray(draft.bulkTiers) && draft.bulkTiers.length) {
+          setBulkTiers(draft.bulkTiers.map((tier, index) => normalizeBulkFormTier(tier, index)));
+        }
         if (Array.isArray(draft.uploadedMedia)) setUploadedMedia(draft.uploadedMedia);
         if (typeof draft.thumbnailUrl === 'string') setThumbnailUrl(draft.thumbnailUrl);
       } catch {
@@ -564,11 +594,17 @@ export default function VendorCreateProductScreen() {
           const tiers = Array.isArray(storedBulk.tiers) ? storedBulk.tiers : [];
           if (tiers.length) {
             setBulkTiers(
-              tiers.map((tier, index) => ({
-                id: `tier_${editProductId}_${index}`,
-                minQty: String(tier.minQuantity ?? tier.minQty ?? ''),
-                totalPrice: String(tier.totalPrice ?? ''),
-              })),
+              tiers.map((tier, index) =>
+                normalizeBulkFormTier(
+                  {
+                    id: `tier_${editProductId}_${index}`,
+                    minQty: String(tier.minQuantity ?? tier.minQty ?? ''),
+                    totalPrice: tier.totalPrice,
+                    unitPrice: tier.unitPrice,
+                  },
+                  index,
+                ),
+              ),
             );
           }
         }
@@ -1352,10 +1388,15 @@ export default function VendorCreateProductScreen() {
         bulk_discount: bulkEnabled
           ? {
               enabled: true,
-              tiers: bulkTiers.map(tier => ({
-                minQuantity: Number(String(tier.minQty).replace(/[^\d]/g, '')),
-                totalPrice: Number(String(tier.totalPrice).replace(/[^\d.]/g, '')),
-              })),
+              tiers: bulkTiers.map(tier => {
+                const minQuantity = Number(String(tier.minQty).replace(/[^\d]/g, ''));
+                const unitPrice = resolveBulkUnitPrice(tier);
+                return {
+                  minQuantity,
+                  // Store pack total for checkout/PDP; vendors enter per-item price in the form.
+                  totalPrice: Math.round(unitPrice * minQuantity * 100) / 100,
+                };
+              }),
             }
           : { enabled: false, tiers: [] },
       };
@@ -1899,7 +1940,8 @@ export default function VendorCreateProductScreen() {
             <View style={styles.bulkHeaderCopy}>
               <Text style={styles.sectionTitle}>Bulk discounts</Text>
               <Text style={styles.bulkHint}>
-                Encourage customers to buy more by offering a lower total price. Minimum quantity starts at 2.
+                Enter the discounted price per item for that quantity. We calculate the pack total for
+                you. Minimum quantity starts at 2.
               </Text>
             </View>
             <CheckRow
@@ -1912,8 +1954,8 @@ export default function VendorCreateProductScreen() {
             <>
               {bulkTiers.map((tier, index) => {
                 const qty = Number(String(tier.minQty).replace(/[^\d]/g, ''));
-                const total = Number(String(tier.totalPrice).replace(/[^\d.]/g, ''));
-                const each = qty > 0 && total > 0 ? total / qty : 0;
+                const each = resolveBulkUnitPrice(tier);
+                const total = qty > 0 && Number.isFinite(each) && each > 0 ? each * qty : 0;
                 return (
                   <View key={tier.id} style={styles.bulkTier}>
                     <View style={styles.bulkTierHeader}>
@@ -1954,28 +1996,29 @@ export default function VendorCreateProductScreen() {
                         ) : null}
                       </View>
                       <View style={styles.half}>
-                        <Text style={styles.dimLabel}>Total price (₦)</Text>
+                        <Text style={styles.dimLabel}>Price per item (₦)</Text>
                         <TextInput
                           style={styles.input}
                           keyboardType="decimal-pad"
-                          value={tier.totalPrice}
+                          value={tier.unitPrice}
                           onChangeText={text =>
                             setBulkTiers(current =>
                               current.map(item =>
                                 item.id === tier.id
-                                  ? { ...item, totalPrice: text.replace(/[^\d.]/g, '') }
+                                  ? { ...item, unitPrice: text.replace(/[^\d.]/g, '') }
                                   : item,
                               ),
                             )
                           }
-                          placeholder="5000"
+                          placeholder="1800"
                           placeholderTextColor="#9CA3AF"
                         />
                       </View>
                     </View>
-                    {each > 0 ? (
+                    {total > 0 ? (
                       <Text style={styles.bulkEach}>
-                        Effective price per item: {formatBulkNaira(each)}
+                        Customers pay {formatBulkNaira(total)} total for {qty}{' '}
+                        {qty === 1 ? 'item' : 'items'}
                       </Text>
                     ) : null}
                   </View>

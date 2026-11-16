@@ -24,14 +24,16 @@ export default function SignUpScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { enterGuestMode } = useAuth();
   const allowSkip = route?.params?.allowSkip !== false;
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [oauthBusy, setOauthBusy] = useState(false);
-  const nameOk = name.trim().length >= 2;
+  const firstNameOk = firstName.trim().length >= 2;
+  const lastNameOk = lastName.trim().length >= 2;
   const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const goLogin = useCallback(
@@ -61,14 +63,19 @@ export default function SignUpScreen({ navigation, route }) {
   );
 
   const onCreateAccount = useCallback(async () => {
-    const n = name.trim();
+    const fname = firstName.trim();
+    const lname = lastName.trim();
     const em = email.trim().toLowerCase();
     const pwd = password;
     let phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.startsWith('234')) phoneDigits = phoneDigits.slice(3);
     phoneDigits = phoneDigits.replace(/^0+/, '');
-    if (!n || !em || !pwd) {
-      Alert.alert('Missing fields', 'Fill in name, email, phone, and password.');
+    if (!fname || !lname || !em || !pwd) {
+      Alert.alert('Missing fields', 'Fill in first name, last name, email, phone, and password.');
+      return;
+    }
+    if (fname.length < 2 || lname.length < 2) {
+      Alert.alert('Name', 'First and last name must be at least 2 characters.');
       return;
     }
     if (!/^[789]\d{9}$/.test(phoneDigits)) {
@@ -87,7 +94,8 @@ export default function SignUpScreen({ navigation, route }) {
     setSubmitting(true);
     try {
       const result = await registerAccount({
-        name: n,
+        fname,
+        lname,
         email: em,
         password: pwd,
         phone: `+234${phoneDigits}`,
@@ -103,14 +111,14 @@ export default function SignUpScreen({ navigation, route }) {
       navigation.navigate('VerifyCode', {
         email: em,
         flow: 'signup',
-        name: n,
+        name: `${fname} ${lname}`.trim(),
       });
     } catch (e) {
       Alert.alert('Network error', e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
     }
-  }, [navigation, name, email, phone, password]);
+  }, [navigation, firstName, lastName, email, phone, password]);
 
   const onSkipAuth = useCallback(async () => {
     try {
@@ -169,21 +177,45 @@ export default function SignUpScreen({ navigation, route }) {
           <Text style={styles.socialBtnText}>Continue with Apple</Text>
         </TouchableOpacity> */}
 
-        <Text style={styles.label}>Name</Text>
-        <View style={styles.inputWrap}>
-          <TextInput
-            style={styles.input}
-            placeholder="Full name"
-            placeholderTextColor={AUTH.textMuted}
-            value={name}
-            onChangeText={setName}
-            editable={!submitting && !oauthBusy}
-          />
-          {nameOk ? (
-            <View style={styles.checkCircle}>
-              <Icon name="checkmark" size={18} color="#000000" />
+        <View style={styles.nameRow}>
+          <View style={styles.nameCol}>
+            <Text style={[styles.label, styles.nameLabel]}>First name</Text>
+            <View style={styles.inputWrap}>
+              <TextInput
+                style={styles.input}
+                placeholder="First name"
+                placeholderTextColor={AUTH.textMuted}
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+                editable={!submitting && !oauthBusy}
+              />
+              {firstNameOk ? (
+                <View style={styles.checkCircle}>
+                  <Icon name="checkmark" size={18} color="#000000" />
+                </View>
+              ) : null}
             </View>
-          ) : null}
+          </View>
+          <View style={styles.nameCol}>
+            <Text style={[styles.label, styles.nameLabel]}>Last name</Text>
+            <View style={styles.inputWrap}>
+              <TextInput
+                style={styles.input}
+                placeholder="Last name"
+                placeholderTextColor={AUTH.textMuted}
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+                editable={!submitting && !oauthBusy}
+              />
+              {lastNameOk ? (
+                <View style={styles.checkCircle}>
+                  <Icon name="checkmark" size={18} color="#000000" />
+                </View>
+              ) : null}
+            </View>
+          </View>
         </View>
 
         <Text style={styles.label}>Phone number</Text>
@@ -337,6 +369,18 @@ const styles = StyleSheet.create({
     color: AUTH.text,
     marginBottom: 8,
     marginTop: 18,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 18,
+  },
+  nameCol: {
+    flex: 1,
+  },
+  nameLabel: {
+    marginTop: 0,
   },
   phoneRow: {
     flexDirection: 'row',

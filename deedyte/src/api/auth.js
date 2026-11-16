@@ -168,17 +168,29 @@ export async function loginWithPassword(emailOrUsername, password) {
 }
 
 /**
- * @param {{ name: string; email: string; password: string; phone: string }} fields
+ * @param {{
+ *   fname?: string;
+ *   lname?: string;
+ *   name?: string;
+ *   email: string;
+ *   password: string;
+ *   phone: string;
+ * }} fields
  */
-export async function registerAccount({ name, email, password, phone }) {
+export async function registerAccount({ fname, lname, name, email, password, phone }) {
   const em = String(email).trim().toLowerCase();
-  const { fname, lname } = splitFullName(name);
+  const first = String(fname ?? '').trim();
+  const last = String(lname ?? '').trim();
+  const names =
+    first && last
+      ? { fname: first, lname: last }
+      : splitFullName(name ?? `${first} ${last}`.trim());
 
   const res = await apiFetchSafe('/user/signup', {
     method: 'POST',
     body: JSON.stringify({
-      fname,
-      lname,
+      fname: names.fname,
+      lname: names.lname,
       email: em,
       phone: String(phone ?? '').trim(),
       password: String(password),
