@@ -6,15 +6,14 @@
 type MerchantSyncAction = "sync" | "delete";
 
 function siteBaseUrl(): string {
-  return String(
+  const raw = String(
     process.env.SITE_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       process.env.CORS_ORIGIN ||
       "http://localhost:3001"
-  )
-    .split(",")[0]
-    .trim()
-    .replace(/\/$/, "");
+  );
+  const first = raw.split(",")[0] ?? raw;
+  return first.trim().replace(/\/$/, "");
 }
 
 function merchantSecret(): string {
