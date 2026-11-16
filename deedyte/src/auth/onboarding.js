@@ -1,8 +1,9 @@
 import { fetchOwnerShops, hasVendorShop } from '../api/shop';
 
 /**
- * Post-signup onboarding: “Almost there” profile (phone, gender, location).
- * Shown only after creating an account (not after login). Guests never see it (`isGuest`).
+ * Post-signup onboarding: “Almost there” profile (gender, location).
+ * Phone is collected on signup for both roles. Shown only after creating an
+ * account (not after login). Guests never see it (`isGuest`).
  */
 
 /**
@@ -11,6 +12,7 @@ import { fetchOwnerShops, hasVendorShop } from '../api/shop';
  */
 export function isProfileOnboardingDone(user) {
   if (!user || typeof user !== 'object') return false;
+  // Phone comes from signup; still require it so incomplete accounts stay gated.
   const digits = String(
     /** @type {{ phone?: unknown }} */ (user).phone ?? '',
   ).replace(/\D/g, '');

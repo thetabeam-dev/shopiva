@@ -11,29 +11,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { CommonActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   fetchCurrentUserOrStatus,
-  updateUserPhone,
   updateUserProfileFields,
 } from '../../api/user';
 import { getStoredAccessToken, getStoredPreAuthChoice, getStoredUser, saveSession } from '../../auth/session';
 import { openPendingDeferredProduct, setOnboardingInProgress } from '../../auth/deferredLink';
-import { reverseGeocodeToPlace } from '../../utils/deviceLocation';
-import { useLocationLookup } from '../../hooks/useLocationLookup';
 import { AUTH } from './theme';
 import NigerianStatePickerModal, { matchNigerianState } from '../../components/NigerianStatePickerModal';
 import PlaceLocationField from '../../components/PlaceLocationField';
-
-function nigerianMobilePayload(value) {
-  let digits = String(value ?? '').replace(/\D/g, '');
-  if (digits.startsWith('234')) digits = digits.slice(3);
-  digits = digits.replace(/^0+/, '');
-  if (!/^[789]\d{9}$/.test(digits)) return null;
-  return `+234${digits}`;
-}
 
 const GENDERS = [
   { key: 'male', label: 'Male' },
@@ -43,7 +31,8 @@ const GENDERS = [
 ];
 
 /**
- * WhatsApp number, gender, city / region / country.
+ * Post-signup profile: gender and location.
+ * Phone is collected on the signup screen for both customer and vendor.
  */
 export default function OnboardingProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -52,7 +41,6 @@ export default function OnboardingProfileScreen({ navigation }) {
     setOnboardingInProgress(true);
     return () => setOnboardingInProgress(false);
   }, []);
-  const [whatsapp, setWhatsapp] = useState('');
   const [gender, setGender] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -63,62 +51,18 @@ export default function OnboardingProfileScreen({ navigation }) {
   const [deviceCoords, setDeviceCoords] = useState(
     /** @type {{ latitude: number; longitude: number } | null} */ (null),
   );
-  const [locLoading, setLocLoading] = useState(false);
-  const [phoneError, setPhoneError] = useState('');
-  const { locate, locationOverlay } = useLocationLookup();
 
   const clearDeviceCoords = useCallback(() => {
     setDeviceCoords(null);
   }, []);
 
-  const useDeviceLocation = useCallback(async () => {
-    if (locLoading) return;
-    setLocLoading(true);
-    try {
-      const coords = await locate();
-      if (!coords) return;
-      const { latitude, longitude } = coords;
-      const place = await reverseGeocodeToPlace(latitude, longitude);
-      const hasAny = place.city || place.state || place.country;
-      if (!hasAny) {
-        Alert.alert(
-          'Could not detect place',
-          'Enter your city, state, and country manually below.',
-        );
-        return;
-      }
-      if (place.city) setCity(place.city);
-      if (place.state) setState(matchNigerianState(place.state));
-      if (place.country) setCountry(place.country);
-      setDeviceCoords({ latitude, longitude });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const denied = /denied|permission|authorized|disabled|unavailable/i.test(msg);
-      Alert.alert(
-        denied ? 'Location unavailable' : 'Location',
-        denied
-          ? 'You can enter your city, state, and country manually below.'
-          : `${msg}\n\nYou can still fill the fields manually.`,
-      );
-    } finally {
-      setLocLoading(false);
-    }
-  }, [locLoading, locate]);
-
   const onContinue = useCallback(async () => {
-    const phonePayload = nigerianMobilePayload(whatsapp);
-    if (!phonePayload) {
-      setPhoneError('Enter a valid Nigerian mobile number, for example 8012345678.');
-      return;
-    }
-    setPhoneError('');
     if (!gender) {
       Alert.alert('Gender', 'Please select an option.');
       return;
     }
     const cityOk = city.trim().length >= 2;
     const regionOk = state.trim().length >= 2;
-    const countryOk = country.trim().length >= 2;
     if (!deviceCoords || !cityOk || !regionOk) {
       Alert.alert('Location', 'Use your current location or choose a suggested place so we can save coordinates.');
       return;
@@ -157,12 +101,6 @@ export default function OnboardingProfileScreen({ navigation }) {
 
     setSubmitting(true);
     try {
-      const phoneRes = await updateUserPhone(Number(id), phonePayload);
-      if (!phoneRes.ok) {
-        Alert.alert('Could not save phone', phoneRes.message || 'Try again.');
-        return;
-      }
-
       const profileRes = await updateUserProfileFields(Number(id), {
         gender,
         location: {
@@ -181,7 +119,7 @@ export default function OnboardingProfileScreen({ navigation }) {
       }
 
       const updatedProfile = (await fetchCurrentUserOrStatus()).user;
-      await saveSession(token, updatedProfile ?? profileRes.user ?? phoneRes.user ?? null);
+      await saveSession(token, updatedProfile ?? profileRes.user ?? null);
 
       const preAuthChoice = await getStoredPreAuthChoice();
       const isVendorIntent = preAuthChoice === 'vendor';
@@ -217,41 +155,20 @@ export default function OnboardingProfileScreen({ navigation }) {
     } finally {
       setSubmitting(false);
     }
-  }, [whatsapp, gender, city, state, country, navigation, deviceCoords]);
+  }, [gender, city, state, country, navigation, deviceCoords]);
 
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { paddingTop: insets.top + 16 }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {locationOverlay}
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Almost there</Text>
-        <Text style={styles.sub}>WhatsApp, gender, and where you&apos;re based.</Text>
-
-        <Text style={styles.label}>Phone number</Text>
-        <View style={styles.phoneRow}>
-          <View style={styles.dialCode}>
-            <Text style={styles.dialCodeText}>+234</Text>
-          </View>
-          <TextInput
-            style={[styles.input, styles.phoneInput]}
-            placeholder="8012345678"
-            placeholderTextColor={AUTH.textMuted}
-            keyboardType="phone-pad"
-            value={whatsapp}
-            onChangeText={(value) => {
-              setWhatsapp(value);
-              if (phoneError) setPhoneError('');
-            }}
-            editable={!submitting}
-          />
-        </View>
-        {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
+        <Text style={styles.sub}>Gender and where you&apos;re based.</Text>
 
         <Text style={styles.label}>Gender</Text>
         <View style={styles.genderRow}>
@@ -286,7 +203,7 @@ export default function OnboardingProfileScreen({ navigation }) {
         <TouchableOpacity
           style={styles.input}
           onPress={() => setStatePickerOpen(true)}
-          disabled={submitting || locLoading}
+          disabled={submitting}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Select state"
@@ -316,7 +233,7 @@ export default function OnboardingProfileScreen({ navigation }) {
             clearDeviceCoords();
             setCountry(t);
           }}
-          editable={!submitting && !locLoading}
+          editable={!submitting}
         />
 
         <TouchableOpacity
@@ -353,8 +270,9 @@ const styles = StyleSheet.create({
   },
   sub: {
     fontSize: 15,
+    fontWeight: '700',
     color: AUTH.textMuted,
-    marginBottom: 24,
+    marginBottom: 8,
     lineHeight: 22,
   },
   label: {
@@ -363,34 +281,6 @@ const styles = StyleSheet.create({
     color: AUTH.text,
     marginBottom: 8,
     marginTop: 14,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dialCode: {
-    height: 52,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: AUTH.border,
-    backgroundColor: AUTH.inputBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dialCodeText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: AUTH.text,
-  },
-  phoneInput: {
-    flex: 1,
-  },
-  fieldError: {
-    marginTop: 6,
-    color: '#B42318',
-    fontSize: 13,
   },
   input: {
     height: 52,
@@ -435,27 +325,6 @@ const styles = StyleSheet.create({
     color: AUTH.textMuted,
     marginBottom: 12,
     lineHeight: 18,
-  },
-  locBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: AUTH.primary,
-    backgroundColor: '#F0FAF7',
-    marginBottom: 8,
-  },
-  locBtnDisabled: {
-    opacity: 0.55,
-  },
-  locBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: AUTH.primary,
   },
   primaryBtn: {
     marginTop: 28,
