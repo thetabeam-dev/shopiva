@@ -11,13 +11,13 @@ const SHOWN_TO_BUYERS_SQL = `(${HAS_PRODUCTS_SQL}) AND (${HAS_SHIPPING_SQL})`;
 export async function GET(request) {
   try {
     const url = new URL(request.url);
-    const shownToBuyers = url.searchParams.get('shownToBuyers') || undefined;
+    const hasProducts = url.searchParams.get('hasProducts') || undefined;
 
     const where = [];
-    if (shownToBuyers === 'true') {
-      where.push(`(${SHOWN_TO_BUYERS_SQL})`);
-    } else if (shownToBuyers === 'false') {
-      where.push(`NOT (${SHOWN_TO_BUYERS_SQL})`);
+    if (hasProducts === 'true') {
+      where.push(`(${HAS_PRODUCTS_SQL})`);
+    } else if (hasProducts === 'false') {
+      where.push(`NOT (${HAS_PRODUCTS_SQL})`);
     }
 
     const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
