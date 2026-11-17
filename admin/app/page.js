@@ -38,12 +38,12 @@ const pages = {
   },
   Shops: {
     title: "Shops",
-    description: "Manage storefronts, approval status, and shop performance. Shown to buyers means the shop has more than zero products and shipping zones with prices.",
+    description: "Manage storefronts, approval status, and shop performance. Filter true for shops with at least one product, false for shops with none.",
     endpoint: "shops",
     filters: [
       {
-        name: "shownToBuyers",
-        label: "Shown to buyers",
+        name: "hasProducts",
+        label: "Has products uploaded",
         type: "select",
         options: ["All", "true", "false"],
       },
