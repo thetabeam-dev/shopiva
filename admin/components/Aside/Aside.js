@@ -14,7 +14,7 @@ const menuItems = [
     { label: "Orders", svg: "", countKey: "orders" },
     { label: "Returns", svg: "", countKey: "returns" },
     { label: "Disputes", svg: "", countKey: "disputes" },
-    { label: "Cart", svg: "", countKey: "cart" },
+    { label: "Chats", svg: "", countKey: "chats" },
     { label: "Transactions", svg: "", countKey: "transactions" },
 ];
 

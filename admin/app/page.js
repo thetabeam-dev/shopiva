@@ -56,7 +56,19 @@ const pages = {
       { accessor: "status", header: "Status" },
       { accessor: "isActive", header: "Active" },
       { accessor: "hasProducts", header: "Has products" },
-      { accessor: "hasShippingZones", header: "Shipping zones & prices" },
+      {
+        accessor: "chat",
+        header: "Chat",
+        render: (row) => {
+          const href = whatsappHref(row.phone);
+          if (!href) return "—";
+          return (
+            <a className="shop-chat-btn" href={href} target="_blank" rel="noreferrer">
+              Chat
+            </a>
+          );
+        },
+      },
       { accessor: "shownToBuyers", header: "Shown to buyers" },
       { accessor: "category", header: "Category" },
       { accessor: "createdAt", header: "Created" },
@@ -194,16 +206,17 @@ const pages = {
       },
     ],
   },
-  Cart: {
-    title: "Cart Items",
-    description: "View active cart items and quantity reservations.",
-    endpoint: "cart",
+  Chats: {
+    title: "Active chats",
+    description: "Open buyer–vendor chat rooms. Click a row to read the conversation from both sides.",
+    endpoint: "chats",
+    rowHref: (row) => `/chats/${row.id}`,
     columns: [
-      { accessor: "id", header: "ID" },
-      { accessor: "userId", header: "User" },
-      { accessor: "inventoryId", header: "Inventory" },
-      { accessor: "quantity", header: "Quantity" },
-      { accessor: "createdAt", header: "Created" },
+      { accessor: "buyer", header: "Customer" },
+      { accessor: "vendor", header: "Vendor" },
+      { accessor: "lastMessage", header: "Last message" },
+      { accessor: "messageCount", header: "Messages" },
+      { accessor: "updatedAt", header: "Updated" },
     ],
   },
   Transactions: {
@@ -237,7 +250,7 @@ export default function Dashboard() {
     Returns: <ResourcePage {...pages.Returns} />,
     Disputes: <ResourcePage {...pages.Disputes} />,
     "Shop KYC": <ResourcePage {...pages['Shop KYC']} />,
-    Cart: <ResourcePage {...pages.Cart} />,
+    Chats: <ResourcePage {...pages.Chats} />,
     Transactions: <ResourcePage {...pages.Transactions} />,
   };
 
@@ -261,6 +274,18 @@ export default function Dashboard() {
       </main>
     </div>
   );
+}
+
+function whatsappHref(phone) {
+  const digits = String(phone ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  let intl = digits;
+  if (digits.startsWith('0') && digits.length === 11) {
+    intl = `234${digits.slice(1)}`;
+  } else if (digits.length === 10) {
+    intl = `234${digits}`;
+  }
+  return `https://wa.me/${intl}`;
 }
 
 function ResourcePage({ title, description, endpoint, columns, filters, rowActions, rowHref }) {

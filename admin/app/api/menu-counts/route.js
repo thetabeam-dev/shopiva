@@ -15,7 +15,9 @@ export async function GET() {
         (SELECT COUNT(*)::int FROM orders) AS orders,
         (SELECT COUNT(*)::int FROM returns) AS returns,
         (SELECT COUNT(*)::int FROM disputes) AS disputes,
-        (SELECT COUNT(*)::int FROM cart_items) AS cart,
+        (SELECT COUNT(*)::int FROM chat_rooms cr WHERE EXISTS (
+          SELECT 1 FROM chat_messages m WHERE m.room_id = cr.id
+        )) AS chats,
         (SELECT COUNT(*)::int FROM paystack_transactions) AS transactions
     `);
     const counts = rows[0] ?? {};
@@ -29,7 +31,7 @@ export async function GET() {
       orders: counts.orders ?? 0,
       returns: counts.returns ?? 0,
       disputes: counts.disputes ?? 0,
-      cart: counts.cart ?? 0,
+      chats: counts.chats ?? 0,
       transactions: counts.transactions ?? 0,
     });
   } catch (err) {
