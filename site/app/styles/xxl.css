@@ -318,6 +318,7 @@ button.deedyte-ups-item--action:hover h3 {
   font-family: inherit;
 }
 
+.deedyte-categories a.is-active,
 .deedyte-categories a:hover,
 .deedyte-categories-more button:hover,
 .deedyte-categories-more.is-open button {
@@ -429,8 +430,8 @@ button.deedyte-ups-item--action:hover h3 {
 }
 
 .deedyte-home-toolbar-right {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  align-items: center;
   gap: 10px;
   font-size: 13px;
   color: #555;

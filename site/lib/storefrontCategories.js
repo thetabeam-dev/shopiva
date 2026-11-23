@@ -1,7 +1,7 @@
 import { query } from "../app/api/lib/database";
-import { categoryHref, formatCategoryLabel } from "./categoryLabel";
+import { categoryHref, formatCategoryLabel, isProductIdParam } from "./categoryLabel";
 
-export { categoryHref, formatCategoryLabel };
+export { categoryHref, formatCategoryLabel, isProductIdParam };
 
 function mapCategoryRows(rows) {
   return rows
@@ -52,4 +52,11 @@ export async function listCategoriesWithProducts() {
     console.error("Categories products fallback lookup failed:", error);
     return [];
   }
+}
+
+export async function getCategoryBySlug(slug) {
+  const key = decodeURIComponent(String(slug ?? "")).trim().toLowerCase();
+  if (!key || isProductIdParam(key)) return null;
+  const categories = await listCategoriesWithProducts();
+  return categories.find((row) => row.key === key) ?? null;
 }

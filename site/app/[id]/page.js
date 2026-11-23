@@ -2,11 +2,19 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import nextDynamic from "next/dynamic";
+import { notFound } from "next/navigation";
 import StructuredData from "@/app/StructuredData";
 import { productJsonLd } from "@/lib/productStructuredData";
-import { getStorefrontProductById } from "@/lib/storefrontProducts";
+import { getStorefrontProductById, listHomeProducts } from "@/lib/storefrontProducts";
+import {
+  formatCategoryLabel,
+  getCategoryBySlug,
+  isProductIdParam,
+} from "@/lib/storefrontCategories";
 import CustomerHeader from "@/components/customers/Header";
 import CustomerHeaderHead from "@/components/customers/HeaderHead";
+import HeaderCategories from "@/components/customers/HeaderCategories";
+import CustomerHome from "@/components/customers/Home";
 import ProcessLoader from "@/components/ProcessLoader";
 import "@/app/styles/xxl.css";
 
@@ -40,11 +48,35 @@ async function loadStorefrontProduct(id) {
   }
 }
 
+async function resolveCategory(slug) {
+  const key = decodeURIComponent(String(slug ?? "")).trim().toLowerCase();
+  if (!key || isProductIdParam(key)) return null;
+  const listed = await getCategoryBySlug(key);
+  if (listed) return listed;
+  const { products } = await listHomeProducts({ category: key, limit: 1, offset: 0 });
+  if (!products.length) return null;
+  return {
+    key,
+    title: formatCategoryLabel(key),
+    path: `/${encodeURIComponent(key)}`,
+  };
+}
+
 export async function generateMetadata({ params }) {
   const { id } = await readRouteParams(params);
 
   if (!id) {
     return { title: "Default Product" };
+  }
+
+  if (!isProductIdParam(id)) {
+    const category = await resolveCategory(id);
+    if (!category) return { title: "Category Not Found" };
+    return {
+      title: `${category.title} | DeeDyte Nigeria`,
+      description: `Shop ${category.title} from nearby vendors on DeeDyte with buyer protection.`,
+      alternates: { canonical: `https://www.deedyte.com/${encodeURIComponent(category.key)}` },
+    };
   }
 
   try {
@@ -131,6 +163,21 @@ export default async function ProductPage({ params }) {
 
   if (!id) {
     return <div>Error: No product provided.</div>;
+  }
+
+  if (!isProductIdParam(id)) {
+    const category = await resolveCategory(id);
+    if (!category) notFound();
+    return (
+      <>
+        <div className="buyer-head">
+          <CustomerHeaderHead />
+          <CustomerHeader />
+          <HeaderCategories />
+        </div>
+        <CustomerHome categoryKey={category.key} categoryTitle={category.title} />
+      </>
+    );
   }
 
   try {

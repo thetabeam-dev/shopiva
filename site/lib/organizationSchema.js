@@ -54,7 +54,7 @@ export async function buildSearchAppearanceSchema() {
     },
     image: ORGANIZATION_LOGO,
     description:
-      "DeeDyte is a local on-demand marketplace for ordering products from nearby vendors in Nigeria.",
+      "DeeDyte is a Nigerian online marketplace designed to make buying and selling safer, more secure, and more trustworthy for everyone.",
     email: "admin@deedyte.com",
     areaServed: {
       "@type": "Country",
@@ -141,7 +141,7 @@ export async function buildSearchAppearanceSchema() {
         publisher: { "@id": organizationId },
         inLanguage: "en-NG",
         description:
-          "Shop fashion, electronics, home, and more from nearby vendors on DeeDyte.",
+          "Shop with buyer's protection from nearby vendors on DeeDyte.",
       },
       ...softwareApplications,
       {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { IoChevronDown } from "react-icons/io5";
 
 const VISIBLE_COUNT = 5;
@@ -10,6 +11,7 @@ export default function Categories() {
     const [categories, setCategories] = useState([]);
     const [moreOpen, setMoreOpen] = useState(false);
     const moreRef = useRef(null);
+    const pathname = usePathname();
 
     useEffect(() => {
         let active = true;
@@ -56,7 +58,11 @@ export default function Categories() {
     return (
         <nav className="deedyte-categories" aria-label="Shop categories">
             {visible.map((category) => (
-                <Link key={category.path} href={category.path}>
+                <Link
+                    key={category.path}
+                    href={category.path}
+                    className={pathname === category.path ? "is-active" : undefined}
+                >
                     {category.title}
                 </Link>
             ))}
@@ -83,6 +89,7 @@ export default function Categories() {
                                     key={category.path}
                                     href={category.path}
                                     role="menuitem"
+                                    className={pathname === category.path ? "is-active" : undefined}
                                     onClick={() => setMoreOpen(false)}
                                 >
                                     {category.title}

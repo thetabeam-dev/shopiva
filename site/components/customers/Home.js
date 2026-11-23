@@ -37,7 +37,16 @@ function StarRow({ rating, count }) {
 
 const PAGE_SIZE = 40;
 
-export default function CustomerHome() {
+function productsUrl(offset, categoryKey) {
+    const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+    });
+    if (categoryKey) params.set("category", categoryKey);
+    return `/api/storefront/products?${params.toString()}`;
+}
+
+export default function CustomerHome({ categoryKey = "", categoryTitle = "" }) {
     const [products, setProducts] = useState([]);
     const [nextOffset, setNextOffset] = useState(0);
     const [hasMore, setHasMore] = useState(false);
@@ -45,14 +54,13 @@ export default function CustomerHome() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [windowDays, setWindowDays] = useState(null);
     const [sort, setSort] = useState("sold");
-    const [categoryKey, setCategoryKey] = useState("");
     const [cartBusyId, setCartBusyId] = useState("");
     const [addedIds, setAddedIds] = useState(() => new Set());
 
     useEffect(() => {
         let active = true;
         setLoading(true);
-        fetch(`/api/storefront/products?limit=${PAGE_SIZE}&offset=0`)
+        fetch(productsUrl(0, categoryKey))
             .then((response) => response.json())
             .then((payload) => {
                 if (!active) return;
@@ -77,15 +85,13 @@ export default function CustomerHome() {
         return () => {
             active = false;
         };
-    }, []);
+    }, [categoryKey]);
 
     async function loadMore() {
         if (loadingMore || !hasMore) return;
         setLoadingMore(true);
         try {
-            const response = await fetch(
-                `/api/storefront/products?limit=${PAGE_SIZE}&offset=${nextOffset}`
-            );
+            const response = await fetch(productsUrl(nextOffset, categoryKey));
             const payload = await response.json().catch(() => ({}));
             const rows = Array.isArray(payload?.products) ? payload.products : [];
             setProducts((prev) => {
@@ -130,22 +136,10 @@ export default function CustomerHome() {
         };
     }, []);
 
-    const categories = useMemo(() => {
-        const seen = new Set();
-        const rows = [];
-        products.forEach((product) => {
-            if (!product.categoryKey || seen.has(product.categoryKey)) return;
-            seen.add(product.categoryKey);
-            rows.push({ key: product.categoryKey, title: product.category });
-        });
-        return rows;
-    }, [products]);
-
     const visible = useMemo(() => {
         const now = Date.now();
         const cutoff = windowDays ? now - windowDays * 24 * 60 * 60 * 1000 : 0;
         let list = products.filter((product) => {
-            if (categoryKey && product.categoryKey !== categoryKey) return false;
             if (!cutoff) return true;
             const created = Date.parse(product.createdAt);
             return Number.isFinite(created) && created >= cutoff;
@@ -162,7 +156,7 @@ export default function CustomerHome() {
             list = [...list].sort((a, b) => b.price - a.price);
         }
         return list;
-    }, [products, windowDays, sort, categoryKey]);
+    }, [products, windowDays, sort]);
 
     async function addToCart(event, product) {
         event.preventDefault();
@@ -191,7 +185,7 @@ export default function CustomerHome() {
 
     return (
         <section className="deedyte-home" id="deedyte-home">
-            <PageH1>{SITE_VISION}</PageH1>
+            {/* <PageH1>{categoryTitle || SITE_VISION}</PageH1> */}
             <div className="deedyte-home-toolbar">
                 <div className="deedyte-home-chips">
                     <button
@@ -223,17 +217,6 @@ export default function CustomerHome() {
                     ))}
                 </div>
                 <div className="deedyte-home-toolbar-right">
-                    <label>
-                        {/* Filter by category */}
-                        <select value={categoryKey} onChange={(event) => setCategoryKey(event.target.value)}>
-                            <option value="">All</option>
-                            {categories.map((category) => (
-                                <option key={category.key} value={category.key}>
-                                    {category.title}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
                     <label>
                         <select
                             value={sort === "sold" || sort === "recommended" ? "recommended" : sort}
