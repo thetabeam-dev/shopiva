@@ -51,11 +51,13 @@ export function unitPriceForBulkQuantity(
   quantity: number
 ): number {
   const specs = coerceSpecifications(specifications);
-  const bulkRaw = specs.bulk_discount;
-  const tiers = bulkRaw && typeof bulkRaw === "object" && !Array.isArray(bulkRaw)
-    && Boolean((bulkRaw as { enabled?: unknown }).enabled)
-    && Array.isArray((bulkRaw as { tiers?: unknown }).tiers)
-    ? ((bulkRaw as { tiers: unknown[] }).tiers)
+  const bulkRaw = specs.bulk_discount ?? specs.bulkDiscount;
+  const bulkObj = bulkRaw && typeof bulkRaw === "object" && !Array.isArray(bulkRaw)
+    ? (bulkRaw as { enabled?: unknown; tiers?: unknown })
+    : null;
+  const enabled = bulkObj != null && bulkObj.enabled !== false;
+  const tiers = enabled && Array.isArray(bulkObj?.tiers)
+    ? bulkObj.tiers
         .map((tier) => {
           if (!tier || typeof tier !== "object") return null;
           const row = tier as { minQuantity?: unknown; minQty?: unknown; totalPrice?: unknown };
@@ -73,7 +75,7 @@ export function unitPriceForBulkQuantity(
   for (const tier of tiers) {
     if (tier.minQuantity <= qty) chosen = tier;
   }
-  if (!chosen) return baseUnit;
+  if (!chosen || qty < chosen.minQuantity) return baseUnit;
   const unit = chosen.totalPrice / chosen.minQuantity;
   return Number.isFinite(unit) && unit > 0 ? unit : baseUnit;
 }

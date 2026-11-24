@@ -9,6 +9,8 @@ export type CartLineJoined = {
   shop_id: number;
   quantity: number;
   unit_price: number;
+  catalog_price?: number;
+  specifications?: unknown;
   currency: string;
   sku: string | null;
   product_id: number;
@@ -71,6 +73,8 @@ export async function listCartLinesForUser(userId: number): Promise<CartLineJoin
       p.shop_id AS shop_id,
       c.quantity,
       COALESCE(c.unit_price_snapshot, i.price) AS unit_price,
+      i.price AS catalog_price,
+      p.specifications,
       i.currency AS currency,
       i.sku,
       p.id AS product_id,
@@ -83,7 +87,14 @@ export async function listCartLinesForUser(userId: number): Promise<CartLineJoin
     ORDER BY c.updated_at DESC`,
     [userId]
   );
-  return rows;
+  return rows.map((row) => {
+    const catalog = Number(row.catalog_price);
+    const base = Number.isFinite(catalog) && catalog >= 0 ? catalog : Number(row.unit_price) || 0;
+    return {
+      ...row,
+      unit_price: unitPriceForBulkQuantity(row.specifications, base, row.quantity),
+    };
+  });
 }
 
 export async function addOrIncrementCartLine(
@@ -102,10 +113,7 @@ export async function addOrIncrementCartLine(
   const invRows = await inventory.getByProductId(invRow.product_id);
   const allowed = collectAllowedCartUnitPrices(prod, invRows, inventoryId);
   const catalogPrice = Number(invRow.price);
-  let baseUnit = Number.isFinite(catalogPrice) && catalogPrice >= 0 ? catalogPrice : 0;
-  if (clientUnitPrice != null && Number.isFinite(Number(clientUnitPrice)) && clientUnitPriceAllowed(Number(clientUnitPrice), allowed)) {
-    baseUnit = Number(clientUnitPrice);
-  }
+  const baseUnit = Number.isFinite(catalogPrice) && catalogPrice >= 0 ? catalogPrice : 0;
 
   const existing = await (await db()).query<{ quantity: number }>(
     `SELECT quantity FROM cart_items WHERE user_id = $1 AND inventory_id = $2`,
@@ -151,16 +159,9 @@ export async function setCartLineQuantity(
   const invRow = await inventory.getById(line.inventory_id);
   const prod = invRow ? await product.getById(invRow.product_id) : null;
   const catalogPrice = Number(invRow?.price);
-  let baseUnit = Number.isFinite(catalogPrice) && catalogPrice >= 0 ? catalogPrice : Number(line.unit_price_snapshot) || 0;
-  if (prod && invRow) {
-    const invRows = await inventory.getByProductId(invRow.product_id);
-    const allowed = collectAllowedCartUnitPrices(prod, invRows, line.inventory_id);
-    const snap = Number(line.unit_price_snapshot);
-    const matched = allowed.find((price) =>
-      priceNear(snap, price) || priceNear(snap, unitPriceForBulkQuantity(prod.specifications, price, line.quantity))
-    );
-    if (matched != null) baseUnit = matched;
-  }
+  const baseUnit = Number.isFinite(catalogPrice) && catalogPrice >= 0
+    ? catalogPrice
+    : Number(line.unit_price_snapshot) || 0;
   const snapshotPrice = prod
     ? unitPriceForBulkQuantity(prod.specifications, baseUnit, q)
     : baseUnit;

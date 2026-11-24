@@ -147,6 +147,7 @@ function normalizeCheckoutLine(row, index = 0) {
     title,
     image,
     unitPrice,
+    baseUnitPrice: Number(r.listPrice ?? r.baseUnitPrice) || undefined,
     qty,
     shop_id,
     variantLabel,
@@ -244,9 +245,12 @@ export default function CartCheckoutScreen({ navigation }) {
     /** @type {Array<{ key: string; title: string; image: string; unitPrice: number; qty: number; variantLabel: string; shop_id?: number | null; cartItemId?: number; inventoryId?: number; productId?: number }>} */([]),
   );
 
-  /** productId -> bulk tiers; invoice price is the base, a tier only applies when it is cheaper per item. */
+  /** productId -> bulk tiers; catalog list price is the base, a tier only applies at its min quantity. */
   const [bulkTiersByProduct, setBulkTiersByProduct] = useState(
     /** @type {Record<string, Array<{ minQuantity: number; totalPrice: number }>>} */ ({}),
+  );
+  const [listPriceByProduct, setListPriceByProduct] = useState(
+    /** @type {Record<string, number>} */ ({}),
   );
   const invoiceProductIds = useMemo(
     () => (isChatInvoice
@@ -263,13 +267,18 @@ export default function CartCheckoutScreen({ navigation }) {
           try {
             const data = await getStorefrontProduct(Number(id));
             const detail = normalizeStorefrontProductDetail(data) ?? data;
-            return [id, parseBulkTiers(detail?.bulkDiscount ?? data?.bulkDiscount ?? data?.product?.bulkDiscount)];
+            const tiers = parseBulkTiers(detail?.bulkDiscount ?? data?.bulkDiscount ?? data?.product?.bulkDiscount);
+            const list = Number(detail?.price ?? data?.price);
+            return [id, { tiers, list: Number.isFinite(list) && list > 0 ? list : 0 }];
           } catch {
-            return [id, []];
+            return [id, { tiers: [], list: 0 }];
           }
         }),
       );
-      if (!cancelled) setBulkTiersByProduct(Object.fromEntries(entries));
+      if (!cancelled) {
+        setBulkTiersByProduct(Object.fromEntries(entries.map(([id, v]) => [id, v.tiers])));
+        setListPriceByProduct(Object.fromEntries(entries.map(([id, v]) => [id, v.list])));
+      }
     })();
     return () => {
       cancelled = true;
@@ -277,16 +286,23 @@ export default function CartCheckoutScreen({ navigation }) {
   }, [invoiceProductIds]);
 
   const priceLine = useCallback((line, qty) => {
-    const base = Number(line.baseUnitPrice ?? line.unitPrice) || 0;
-    const tiers = bulkTiersByProduct[String(line.productId ?? '')] ?? [];
+    const pid = String(line.productId ?? '');
+    const catalog = Number(listPriceByProduct[pid]);
+    const listed = Number(line.baseUnitPrice);
+    const base = Number.isFinite(catalog) && catalog > 0
+      ? catalog
+      : Number.isFinite(listed) && listed > 0
+        ? listed
+        : Number(line.unitPrice) || 0;
+    const tiers = bulkTiersByProduct[pid] ?? [];
     const bulkUnit = unitPriceForBulk(base, tiers, qty);
-    return { ...line, qty, baseUnitPrice: base, unitPrice: Math.min(base, bulkUnit) };
-  }, [bulkTiersByProduct]);
+    return { ...line, qty, baseUnitPrice: base, unitPrice: bulkUnit };
+  }, [bulkTiersByProduct, listPriceByProduct]);
 
   useEffect(() => {
-    if (!isChatInvoice || !Object.keys(bulkTiersByProduct).length) return;
+    if (!isChatInvoice || (!Object.keys(bulkTiersByProduct).length && !Object.keys(listPriceByProduct).length)) return;
     setCheckoutLines((prev) => prev.map((line) => priceLine(line, line.qty)));
-  }, [isChatInvoice, bulkTiersByProduct, priceLine]);
+  }, [isChatInvoice, bulkTiersByProduct, listPriceByProduct, priceLine]);
 
   const onChangeLineQty = useCallback((key, nextQty) => {
     const qty = Math.max(1, Math.min(99, Math.round(Number(nextQty) || 1)));

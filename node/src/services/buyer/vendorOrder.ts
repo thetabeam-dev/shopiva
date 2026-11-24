@@ -1,5 +1,15 @@
 import { db } from "../../config/database.js";
 import { inventory, product } from "../../models/business/product.js";
+import { unitPriceForBulkQuantity } from "../business/storefrontProductDto.js";
+
+function pricedUnit(
+  specifications: unknown,
+  catalogPrice: number,
+  quantity: number,
+): number {
+  const base = Number.isFinite(catalogPrice) && catalogPrice >= 0 ? catalogPrice : 0;
+  return unitPriceForBulkQuantity(specifications, base, quantity);
+}
 
 export type VendorOrderLineRow = {
   id: number;
@@ -9,6 +19,8 @@ export type VendorOrderLineRow = {
   inventory_id: number;
   quantity: number;
   unit_price: number;
+  catalog_price?: number;
+  specifications?: unknown;
   product_name: string;
   images: unknown;
   variant_label: string | null;
@@ -25,6 +37,9 @@ function firstMediaUrl(images: unknown): string {
 
 export function mapVendorOrderLine(row: VendorOrderLineRow) {
   const variantLabel = String(row.variant_label ?? "").trim() || String(row.sku ?? "").trim();
+  const catalog = Number(row.catalog_price);
+  const base = Number.isFinite(catalog) && catalog >= 0 ? catalog : Number(row.unit_price) || 0;
+  const unitPrice = pricedUnit(row.specifications, base, row.quantity);
   return {
     key: String(row.id),
     cartItemId: row.id,
@@ -36,7 +51,8 @@ export function mapVendorOrderLine(row: VendorOrderLineRow) {
     variantLabel,
     title: row.product_name,
     image: firstMediaUrl(row.images),
-    unitPrice: Number(row.unit_price) || 0,
+    unitPrice,
+    listPrice: base,
     qty: row.quantity,
   };
 }
@@ -50,6 +66,8 @@ const SELECT_LINES = `
     v.inventory_id,
     v.quantity,
     v.unit_price_snapshot AS unit_price,
+    i.price AS catalog_price,
+    p.specifications,
     p.name AS product_name,
     p.images,
     v.variant_label,
@@ -101,13 +119,12 @@ export async function upsertVendorOrderLine(
   const prod = await product.getById(invRow.product_id);
   if (!prod) throw new Error("Product not found");
   if (Number(prod.shop_id) !== shopId) throw new Error("Product does not belong to this shop.");
-  const catalogPrice = Number(invRow.price);
-  const unitPrice =
-    input.unitPrice != null && Number.isFinite(Number(input.unitPrice)) && Number(input.unitPrice) >= 0
-      ? Number(input.unitPrice)
-      : Number.isFinite(catalogPrice) && catalogPrice >= 0
-        ? catalogPrice
-        : 0;
+  const catalogPrice = Number(invRow.price) || 0;
+  const unitPrice = pricedUnit(
+    (prod as { specifications?: unknown }).specifications,
+    catalogPrice,
+    qty,
+  );
   const variantLabel = String(input.variantLabel ?? "").trim() || null;
 
   await (await db()).query(
@@ -132,12 +149,30 @@ export async function setVendorOrderLineQuantity(
   quantity: number
 ): Promise<VendorOrderLineRow[] | null> {
   const q = Math.min(99, Math.max(1, Math.trunc(Number(quantity) || 1)));
-  const { rows } = await (await db()).query<{ shop_id: number }>(
+  const pool = await db();
+  const { rows: existing } = await pool.query<{
+    shop_id: number;
+    inventory_id: number;
+    product_id: number;
+  }>(
+    `SELECT shop_id, inventory_id, product_id
+     FROM vendor_order_items
+     WHERE id = $1 AND user_id = $2
+     LIMIT 1`,
+    [lineId, userId]
+  );
+  const current = existing[0];
+  if (!current) return null;
+  const invRow = await inventory.getById(Number(current.inventory_id));
+  const prod = invRow ? await product.getById(Number(invRow.product_id)) : null;
+  const catalogPrice = Number(invRow?.price) || 0;
+  const unitPrice = pricedUnit(prod?.specifications, catalogPrice, q);
+  const { rows } = await pool.query<{ shop_id: number }>(
     `UPDATE vendor_order_items
-     SET quantity = $3, updated_at = now()
+     SET quantity = $3, unit_price_snapshot = $4, updated_at = now()
      WHERE id = $1 AND user_id = $2
      RETURNING shop_id`,
-    [lineId, userId, q]
+    [lineId, userId, q, unitPrice]
   );
   const shopId = Number(rows[0]?.shop_id);
   if (!(shopId > 0)) return null;

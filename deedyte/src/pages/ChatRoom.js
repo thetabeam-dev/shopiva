@@ -138,6 +138,7 @@ function pickOrderItems(list) {
       itemTitle: String(row?.itemTitle || row?.title || '').trim(),
       itemImage: String(row?.itemImage || row?.image || '').trim(),
       itemAmount: Number(row?.itemAmount ?? row?.unitPrice ?? row?.unit) || 0,
+      listPrice: Number(row?.listPrice ?? row?.baseUnitPrice) || undefined,
       qty: Math.max(1, Number(row?.qty) || 1),
       inventoryId: Number(row?.inventoryId) || undefined,
       variantLabel: String(row?.variantLabel || '').trim(),
@@ -328,6 +329,7 @@ function Bubble({
               const rowImage = String(row.itemImage ?? (idx === 0 ? image : '') ?? '').trim();
               const unit = Number(row.itemAmount ?? row.unitPrice) || 0;
               const rowQty = Math.max(1, Number(row.qty) || 1);
+              const rowVariant = String(row.variantLabel || (idx === 0 ? request.variantLabel : '') || '').trim();
               return (
                 <View key={`${row.productId ?? row.itemTitle ?? 'item'}-${idx}`} style={styles.paidProductRow}>
                   {rowImage ? <ProductCardMedia uri={rowImage} style={styles.paidProductImage} /> : null}
@@ -335,6 +337,9 @@ function Bubble({
                     <Text style={styles.paidProductTitle} numberOfLines={2}>
                       {String(row.itemTitle || request.itemTitle || 'Product')}
                     </Text>
+                    {rowVariant ? (
+                      <Text style={styles.paidProductMeta} numberOfLines={2}>{rowVariant}</Text>
+                    ) : null}
                     <Text style={styles.paidProductMeta}>
                       Qty {rowQty}
                       {unit > 0 ? ` · ${formatInvoiceMoney(unit)} each` : ''}
@@ -343,7 +348,9 @@ function Bubble({
                 </View>
               );
             })}
-            <VariantDetails source={request} />
+            {(Array.isArray(request.items) && request.items.length > 1) ? null : (
+              <VariantDetails source={request} />
+            )}
             <ShipToBanner address={destination} />
             {declined ? (
               <View style={styles.invoiceOutdated}>
@@ -454,6 +461,7 @@ function Bubble({
           image: String(row.itemImage || row.image || ''),
           unit: Number(row.itemAmount ?? row.unitPrice ?? row.unit) || 0,
           qty: Math.max(1, Number(row.qty) || 1),
+          variantLabel: String(row.variantLabel || '').trim(),
         }))
       : [];
     const unitAmount = Number(invoice.amount) || 0;
@@ -489,6 +497,9 @@ function Bubble({
                 {row.image ? <ProductCardMedia uri={row.image} style={styles.paidProductImage} /> : null}
                 <View style={styles.paidProductCopy}>
                   <Text style={styles.paidProductTitle} numberOfLines={2}>{row.title}</Text>
+                  {row.variantLabel ? (
+                    <Text style={styles.paidProductMeta} numberOfLines={2}>{row.variantLabel}</Text>
+                  ) : null}
                   <Text style={styles.paidProductMeta}>
                     Qty {row.qty}
                     {row.unit > 0 ? ` · ${formatInvoiceMoney(row.unit)} each` : ''}
@@ -513,7 +524,7 @@ function Bubble({
                 </View>
               ),
             )}
-            <VariantDetails source={invoice} />
+            {invoiceLines.length > 1 ? null : <VariantDetails source={invoice} />}
             <Text style={[styles.bubbleMeta, styles.waTplTime]}>{item.timeLabel}</Text>
           </View>
           {paid ? (
@@ -1458,6 +1469,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       title: String(row.itemTitle || row.title || itemTitle || 'Product').trim() || 'Product',
       image: String(row.itemImage || row.image || itemImage || '').trim(),
       unitPrice: Number(row.itemAmount ?? row.unitPrice ?? row.unit) || 0,
+      listPrice: Number(row.listPrice ?? row.baseUnitPrice) || undefined,
       qty: Math.max(1, Number(row.qty) || 1),
       shop_id: sid || undefined,
       productId: Number(row.productId || productId) || undefined,
