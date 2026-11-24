@@ -1088,7 +1088,7 @@ export default function CartCheckoutScreen({ navigation }) {
             </View>
           ) : (
             <>
-              <View style={styles.card}>
+              {/* <View style={styles.card}>
                 <Text style={styles.cardTitle}>
                   {checkoutLines.length > 1 ? `Your order (${checkoutLines.length} items)` : 'Your order'}
                 </Text>
@@ -1097,7 +1097,7 @@ export default function CartCheckoutScreen({ navigation }) {
                   styles={styles}
                   onChangeQty={isChatInvoice ? onChangeLineQty : undefined}
                 />
-              </View>
+              </View> */}
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Contact information</Text>
                 {formBanner ? (
