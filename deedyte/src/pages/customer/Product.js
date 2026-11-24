@@ -56,6 +56,8 @@ import {
   getVendorOrder,
   mergeCurrentLine,
   orderSubtotal,
+  removeVendorOrderLine,
+  setVendorOrderQty,
   upsertVendorOrderLine,
 } from '../../utils/vendorOrderCart';
 
@@ -131,6 +133,10 @@ export default function ProductScreen({ route, navigation }) {
   const [pickedVariantId, setPickedVariantId] = useState(/** @type {string | null} */ (null));
   /** Cart line for the currently selected inventory row (if any). */
   const [cartLineForSelection, setCartLineForSelection] = useState(
+    /** @type {{ cartItemId: number; qty: number } | null} */(null),
+  );
+  /** Vendor-order line for the currently selected inventory row (if any). */
+  const [vendorOrderLineForSelection, setVendorOrderLineForSelection] = useState(
     /** @type {{ cartItemId: number; qty: number } | null} */(null),
   );
   const [cartToggleBusy, setCartToggleBusy] = useState(false);
@@ -518,8 +524,30 @@ export default function ProductScreen({ route, navigation }) {
   }, [gallery.length, productIdParam]);
 
   const bumpQty = useCallback(delta => {
-    setQty(q => Math.min(99, Math.max(1, q + delta)));
-  }, []);
+    setQty(q => {
+      const next = Math.min(99, Math.max(1, q + delta));
+      const line = vendorOrderLineForSelection;
+      const sid = resolvedShopId ?? parseShopId(shopId);
+      if (line?.cartItemId && sid > 0 && next !== q) {
+        void setVendorOrderQty(sid, line.cartItemId, next)
+          .then((lines) => {
+            const match = (Array.isArray(lines) ? lines : []).find(
+              (row) => Number(row?.cartItemId) === Number(line.cartItemId),
+            );
+            if (match) {
+              const synced = Math.min(99, Math.max(1, Number(match.qty) || next));
+              setVendorOrderLineForSelection({
+                cartItemId: Number(match.cartItemId),
+                qty: synced,
+              });
+              setQty(synced);
+            }
+          })
+          .catch(() => {});
+      }
+      return next;
+    });
+  }, [vendorOrderLineForSelection, resolvedShopId, shopId]);
 
   const showCartToast = useCallback(
     message => {
@@ -600,6 +628,42 @@ export default function ProductScreen({ route, navigation }) {
     }
   }, [loggedIn, selectedInventoryId, productIdParam, hasVariants, variantsForUi, applyVariantPick]);
 
+  const syncVendorOrderMembership = useCallback(async () => {
+    const sid = resolvedShopId ?? parseShopId(shopId);
+    if (!loggedIn || !(sid > 0)) {
+      setVendorOrderLineForSelection(null);
+      return;
+    }
+    try {
+      const lines = await getVendorOrder(sid);
+      const productId = Number(productIdParam);
+      const forProduct = (Array.isArray(lines) ? lines : []).filter((row) => {
+        const pid = Number(row?.productId);
+        return Number.isFinite(productId) && productId > 0 && pid === productId;
+      });
+      const hit =
+        forProduct.find((row) => {
+          const iid = Number(row?.inventoryId ?? row?.variantId);
+          return selectedInventoryId != null && iid === selectedInventoryId;
+        }) ?? (selectedInventoryId == null ? forProduct[0] : null);
+      if (!hit) {
+        setVendorOrderLineForSelection(null);
+        return;
+      }
+      const cartItemId = Number(hit.cartItemId ?? hit.key);
+      const q = Number(hit.qty ?? 1);
+      const syncedQty = Number.isFinite(q) && q > 0 ? q : 1;
+      if (Number.isFinite(cartItemId) && cartItemId > 0) {
+        setVendorOrderLineForSelection({ cartItemId, qty: syncedQty });
+        setQty(syncedQty);
+      } else {
+        setVendorOrderLineForSelection(null);
+      }
+    } catch {
+      setVendorOrderLineForSelection(null);
+    }
+  }, [loggedIn, resolvedShopId, shopId, productIdParam, selectedInventoryId]);
+
   const refreshProductOrderState = useCallback(() => {
     const productId = productIdParam != null ? String(productIdParam).trim() : '';
     if (!loggedIn || !productId) {
@@ -621,12 +685,13 @@ export default function ProductScreen({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       void syncCartMembership();
+      void syncVendorOrderMembership();
       refreshProductOrderState();
       return () => {
         setOverflowMenuOpen(false);
         setDeliveryPolicyModalVisible(false);
       };
-    }, [syncCartMembership, refreshProductOrderState]),
+    }, [syncCartMembership, syncVendorOrderMembership, refreshProductOrderState]),
   );
 
   useEffect(() => {
@@ -751,6 +816,7 @@ export default function ProductScreen({ route, navigation }) {
     !Boolean(d.allowBackorder ?? d.allow_backorder);
 
   const selectedLineInCart = cartLineForSelection != null;
+  const selectedLineInVendorOrder = vendorOrderLineForSelection != null;
 
   const ensureReadyForCartOrCheckout = useCallback(() => {
     if (cartToggleBusy) return false;
@@ -845,6 +911,19 @@ export default function ProductScreen({ route, navigation }) {
       ]);
       return;
     }
+    if (selectedLineInVendorOrder) {
+      const sid = resolvedShopId ?? parseShopId(shopId);
+      const lineId = vendorOrderLineForSelection?.cartItemId;
+      if (!(sid > 0) || !(lineId > 0)) return;
+      try {
+        await removeVendorOrderLine(sid, lineId);
+        setVendorOrderLineForSelection(null);
+        showCartToast('Removed from this vendor’s order.');
+      } catch {
+        Alert.alert('Could not remove item', 'Try again in a moment.');
+      }
+      return;
+    }
     if (!ensureReadyForCartOrCheckout()) return;
     const line = buildCurrentVendorLine();
     if (!(line.shopId > 0) || !(line.productId > 0)) {
@@ -852,7 +931,17 @@ export default function ProductScreen({ route, navigation }) {
       return;
     }
     try {
-      await upsertVendorOrderLine(line.shopId, line);
+      const lines = await upsertVendorOrderLine(line.shopId, line);
+      const match = (Array.isArray(lines) ? lines : []).find((row) => {
+        const iid = Number(row?.inventoryId ?? row?.variantId);
+        return line.inventoryId && iid === Number(line.inventoryId);
+      });
+      if (match?.cartItemId) {
+        setVendorOrderLineForSelection({
+          cartItemId: Number(match.cartItemId),
+          qty: Math.min(99, Math.max(1, Number(match.qty) || line.qty)),
+        });
+      }
       showCartToast('Added to this vendor’s order.');
       navigation.navigate('Vendor-order', {
         shopId: line.shopId,
@@ -865,6 +954,10 @@ export default function ProductScreen({ route, navigation }) {
   }, [
     loggedIn,
     signOut,
+    selectedLineInVendorOrder,
+    vendorOrderLineForSelection,
+    resolvedShopId,
+    shopId,
     ensureReadyForCartOrCheckout,
     buildCurrentVendorLine,
     showCartToast,
@@ -1481,15 +1574,27 @@ export default function ProductScreen({ route, navigation }) {
           </View>
         </View>
         <TouchableOpacity
-          style={styles.vendorOrderBarBtn}
+          style={[
+            styles.vendorOrderBarBtn,
+            selectedLineInVendorOrder && styles.vendorOrderBarBtnRemove,
+          ]}
           activeOpacity={0.88}
           onPress={() => {
             void handleAddToVendorOrder();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Add to vendor order"
+          accessibilityLabel={
+            selectedLineInVendorOrder ? 'Remove from vendor order' : 'Add to vendor order'
+          }
         >
-          <Text style={styles.vendorOrderBarText}>Add to vendor order</Text>
+          <Text
+            style={[
+              styles.vendorOrderBarText,
+              selectedLineInVendorOrder && styles.vendorOrderBarTextRemove,
+            ]}
+          >
+            {selectedLineInVendorOrder ? 'Remove from vendor order' : 'Add to vendor order'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.startPurchaseBarBtn}
@@ -2036,10 +2141,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  vendorOrderBarBtnRemove: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#9e4039',
+  },
   vendorOrderBarText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  vendorOrderBarTextRemove: {
+    color: '#9e4039',
   },
   startPurchaseBarBtn: {
     backgroundColor: '#FFFFFF',
