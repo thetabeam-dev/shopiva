@@ -57,11 +57,14 @@ react {
 
     /* Autolinking */
     autolinkLibrariesWithApp()
-    //
-    // Added by install-expo-modules
-    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", rootDir.getAbsoluteFile().getParentFile().getAbsolutePath(), "android", "absolute"].execute(null, rootDir).text.trim())
-    cliFile = new File(["node", "--print", "require.resolve('@expo/cli')"].execute(null, rootDir).text.trim())
-    bundleCommand = "export:embed"
+
+    // JS lives in deedyte/ (two levels above android/app). Do not resolve @expo/cli
+    // via .execute() here: on Windows that often returns empty, so cliFile becomes
+    // android/app (a directory) and createBundleReleaseJsAndAssets fails.
+    root = file("../../")
+    reactNativeDir = file("../../node_modules/react-native")
+    entryFile = file("../../index.js")
+    cliFile = file("../../node_modules/react-native/cli.js")
 }
 
 /**
