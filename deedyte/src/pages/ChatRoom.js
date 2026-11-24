@@ -107,6 +107,17 @@ function formatShippingAddress(shipping) {
     .join(', ');
 }
 
+function ShipToBanner({ address, children }) {
+  const text = String(address ?? '').trim();
+  if (!text && !children) return null;
+  return (
+    <View style={styles.shipToBanner} accessibilityLabel={text ? `Ship to ${text}` : 'Ship to'}>
+      <Text style={styles.shipToLabel}>Ship to</Text>
+      {children || <Text style={styles.shipToValue}>{text}</Text>}
+    </View>
+  );
+}
+
 function shippingDetailLines(shipping) {
   if (!shipping || typeof shipping !== 'object') return [];
   const area1 = String(shipping.area1 ?? shipping.junction ?? '').trim();
@@ -333,7 +344,7 @@ function Bubble({
               );
             })}
             <VariantDetails source={request} />
-            {destination ? <Text style={styles.invoiceLine}>{`Ship to: ${destination}`}</Text> : null}
+            <ShipToBanner address={destination} />
             {declined ? (
               <View style={styles.invoiceOutdated}>
                 <Icon name="close-circle" size={16} color="#B91C1C" />
@@ -421,11 +432,15 @@ function Bubble({
       <View style={[styles.bubbleRow, out ? styles.bubbleRowOut : styles.bubbleRowIn]}>
         <View style={[styles.invoiceBubble, out && styles.invoiceBubbleOut]}>
           <Text style={styles.invoiceKicker}>{out ? 'Shipping details sent' : 'Buyer shipping details'}</Text>
-          {lines.map(([label, value]) => (
-            <Text key={label} style={styles.invoiceLine}>
-              {`${label}: ${value}`}
-            </Text>
-          ))}
+          {lines.length ? (
+            <ShipToBanner>
+              {lines.map(([label, value]) => (
+                <Text key={label} style={styles.shipToDetailLine}>
+                  {`${label}: ${value}`}
+                </Text>
+              ))}
+            </ShipToBanner>
+          ) : null}
           <Text style={[styles.bubbleMeta, styles.invoiceMeta]}>{item.timeLabel}</Text>
         </View>
       </View>
@@ -481,19 +496,23 @@ function Bubble({
                 </View>
               </View>
             ))}
-            {invoiceRows.map(([label, value]) => (
-              <View key={label} style={styles.invoiceFieldRow}>
-                <Text style={styles.invoiceFieldLabel}>{label}</Text>
-                <Text
-                  style={[
-                    styles.invoiceFieldValue,
-                    label === 'Total' && styles.invoiceFieldValueStrong,
-                  ]}
-                >
-                  {value}
-                </Text>
-              </View>
-            ))}
+            {invoiceRows.map(([label, value]) =>
+              label === 'Ship to' ? (
+                <ShipToBanner key={label} address={value} />
+              ) : (
+                <View key={label} style={styles.invoiceFieldRow}>
+                  <Text style={styles.invoiceFieldLabel}>{label}</Text>
+                  <Text
+                    style={[
+                      styles.invoiceFieldValue,
+                      label === 'Total' && styles.invoiceFieldValueStrong,
+                    ]}
+                  >
+                    {value}
+                  </Text>
+                </View>
+              ),
+            )}
             <VariantDetails source={invoice} />
             <Text style={[styles.bubbleMeta, styles.waTplTime]}>{item.timeLabel}</Text>
           </View>
@@ -2449,7 +2468,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   paidBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
-  paidProductRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  paidProductRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 4,
+  },
   paidProductImage: { width: 52, height: 52, borderRadius: 8 },
   paidProductCopy: { flex: 1, minWidth: 0 },
   paidProductTitle: { fontSize: 15, fontWeight: '700', color: '#111' },
@@ -2497,6 +2522,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     lineHeight: 24,
+  },
+  shipToBanner: {
+    marginTop: 10,
+    marginBottom: 4,
+    backgroundColor: '#FFF6D8',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E8D48A',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  shipToLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8A5A00',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  shipToValue: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  shipToDetailLine: {
+    marginTop: 2,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: '#111111',
   },
   invoiceMeta: {
     marginTop: 8,
