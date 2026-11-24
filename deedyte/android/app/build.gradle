@@ -101,11 +101,11 @@ android {
         applicationId "com.thetabeam.shopiva"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 38
-        versionName "1.8.4"
+        versionCode 40
+        versionName "1.8.6"
         manifestPlaceholders = [MAPS_API_KEY: localProperties.getProperty("MAPS_API_KEY", "")]
     } 
-    // signingConfigs {
+    // signingConfigs { 
     //     debug {
     //         storeFile file('debug.keystore')
     //         storePassword 'android'
