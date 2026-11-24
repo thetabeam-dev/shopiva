@@ -54,12 +54,46 @@ function openDeviceLocationSettings() {
   );
 }
 
+if (Platform.OS === 'android') {
+  Geolocation.setRNConfiguration({
+    skipPermissionRequests: true,
+    locationProvider: 'auto',
+  });
+}
+
+function androidPermissionGranted(result) {
+  return result === PermissionsAndroid.RESULTS.GRANTED;
+}
+
 async function androidLocationGranted(interactive) {
   const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-  if (await PermissionsAndroid.check(fine)) return 'granted';
-  const result = await PermissionsAndroid.request(fine, PERMISSION_RATIONALE);
-  if (result === PermissionsAndroid.RESULTS.GRANTED) return 'granted';
-  if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+  const coarse = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
+  try {
+    if (
+      (await PermissionsAndroid.check(fine)) ||
+      (await PermissionsAndroid.check(coarse))
+    ) {
+      return 'granted';
+    }
+  } catch {
+    /* continue to request */
+  }
+  let result;
+  try {
+    result = await PermissionsAndroid.requestMultiple([fine, coarse]);
+  } catch {
+    const single = await PermissionsAndroid.request(fine, PERMISSION_RATIONALE);
+    result = { [fine]: single };
+  }
+  const fineStatus = result[fine];
+  const coarseStatus = result[coarse];
+  if (androidPermissionGranted(fineStatus) || androidPermissionGranted(coarseStatus)) {
+    return 'granted';
+  }
+  if (
+    fineStatus === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ||
+    coarseStatus === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN
+  ) {
     if (interactive) openAppLocationSettings();
     return 'blocked';
   }
@@ -114,7 +148,7 @@ export async function requestLocationPermission(options = {}) {
     const servicesOn = await Promise.race([
       DeviceInfo.isLocationEnabled(),
       new Promise((resolve) => {
-        setTimeout(() => resolve(null), 4000);
+        setTimeout(() => resolve(null), 2500);
       }),
     ]);
     if (servicesOn === false) {
@@ -140,11 +174,11 @@ export async function deviceLocationServicesOn() {
     return await Promise.race([
       DeviceInfo.isLocationEnabled(),
       new Promise((resolve) => {
-        setTimeout(() => resolve(false), 4000);
+        setTimeout(() => resolve(null), 2500);
       }),
     ]);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -161,7 +195,7 @@ export async function readExactLocation(options = {}) {
   if (options.isCancelled?.()) {
     throw new LocationError('cancelled', 'Location lookup was cancelled.');
   }
-  if (!servicesOn) {
+  if (servicesOn === false) {
     throw new LocationError(
       'services_off',
       'Turn on location on this device, then try again. You can also enter the address manually.',
@@ -193,10 +227,15 @@ export async function readExactLocation(options = {}) {
 }
 
 /**
- * @param {{ exact?: boolean }} [options]
+ * @param {{
+ *   enableHighAccuracy: boolean;
+ *   timeout: number;
+ *   maximumAge: number;
+ *   isCancelled?: () => boolean;
+ * }} geoOptions
  * @returns {Promise<{ latitude: number; longitude: number }>}
  */
-export function getCurrentCoordinates(options = {}) {
+function getPositionOnce(geoOptions) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (handler, value) => {
@@ -206,41 +245,107 @@ export function getCurrentCoordinates(options = {}) {
       handler(value);
     };
     const timer = setTimeout(() => {
-      finish(reject, new LocationError('timeout', 'We could not get your location in time. Enter your city and state manually.'));
-    }, 10000);
+      finish(
+        reject,
+        new LocationError(
+          'timeout',
+          'We could not get your location in time. Enter your city and state manually.',
+        ),
+      );
+    }, geoOptions.timeout + 1500);
     Geolocation.getCurrentPosition(
       (pos) => {
-        if (options.isCancelled?.()) {
+        if (geoOptions.isCancelled?.()) {
           finish(reject, new LocationError('cancelled', 'Location lookup was cancelled.'));
           return;
         }
-        finish(resolve, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
+        const latitude = Number(pos?.coords?.latitude);
+        const longitude = Number(pos?.coords?.longitude);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          finish(
+            reject,
+            new LocationError('unavailable', 'We could not get your location. Enter your city and state manually.'),
+          );
+          return;
+        }
+        finish(resolve, { latitude, longitude });
       },
       (err) => {
-        if (options.isCancelled?.()) {
+        if (geoOptions.isCancelled?.()) {
           finish(reject, new LocationError('cancelled', 'Location lookup was cancelled.'));
           return;
         }
         const code = Number(err?.code);
         if (code === 1) {
-          finish(reject, new LocationError('denied', 'Location permission was denied. You can enter the address manually.'));
+          finish(
+            reject,
+            new LocationError('denied', 'Location permission was denied. You can enter the address manually.'),
+          );
           return;
         }
         if (code === 3) {
-          finish(reject, new LocationError('timeout', 'We could not get your location in time. Enter your city and state manually.'));
+          finish(
+            reject,
+            new LocationError(
+              'timeout',
+              'We could not get your location in time. Enter your city and state manually.',
+            ),
+          );
           return;
         }
-        finish(reject, new LocationError('unavailable', 'We could not get your location. Enter your city and state manually.'));
+        finish(
+          reject,
+          new LocationError('unavailable', 'We could not get your location. Enter your city and state manually.'),
+        );
       },
       {
-        enableHighAccuracy: Boolean(options.exact),
-        timeout: 10000,
-        maximumAge: options.exact ? 5000 : 60000,
+        enableHighAccuracy: geoOptions.enableHighAccuracy,
+        timeout: geoOptions.timeout,
+        maximumAge: geoOptions.maximumAge,
       },
     );
+  });
+}
+
+/**
+ * Android GPS-only fixes are often slow or timeout indoors. Use last-known / network
+ * first, then a longer fused high-accuracy attempt.
+ * @param {{ exact?: boolean; isCancelled?: () => boolean }} options
+ */
+async function getAndroidCoordinates(options) {
+  try {
+    return await getPositionOnce({
+      enableHighAccuracy: false,
+      timeout: 8000,
+      maximumAge: 5 * 60 * 1000,
+      isCancelled: options.isCancelled,
+    });
+  } catch (error) {
+    if (error instanceof LocationError && (error.code === 'denied' || error.code === 'cancelled')) {
+      throw error;
+    }
+  }
+  return getPositionOnce({
+    enableHighAccuracy: Boolean(options.exact),
+    timeout: options.exact ? 20000 : 12000,
+    maximumAge: options.exact ? 30000 : 120000,
+    isCancelled: options.isCancelled,
+  });
+}
+
+/**
+ * @param {{ exact?: boolean; isCancelled?: () => boolean }} [options]
+ * @returns {Promise<{ latitude: number; longitude: number }>}
+ */
+export function getCurrentCoordinates(options = {}) {
+  if (Platform.OS === 'android') {
+    return getAndroidCoordinates(options);
+  }
+  return getPositionOnce({
+    enableHighAccuracy: Boolean(options.exact),
+    timeout: options.exact ? 15000 : 10000,
+    maximumAge: options.exact ? 15000 : 120000,
+    isCancelled: options.isCancelled,
   });
 }
 
