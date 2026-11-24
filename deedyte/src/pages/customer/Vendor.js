@@ -691,6 +691,32 @@ export default function VendorShopScreen({ route, navigation }) {
           <TouchableOpacity style={[styles.backBtn, { top: 8 }]} onPress={() => navigation.goBack()} activeOpacity={0.85}>
             <Icon name="arrow-back" size={22} color="#111111" />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.vendorCartBtn, { top: 8 }]}
+            onPress={() =>
+              navigation.navigate('Vendor-order', {
+                shopId: resolvedShopId,
+                shopName: displayName,
+                vendor,
+              })
+            }
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={
+              vendorOrderCount > 0
+                ? `Vendor cart, ${vendorOrderCount} item${vendorOrderCount === 1 ? '' : 's'}`
+                : 'Vendor cart'
+            }
+          >
+            <Icon name="cart-outline" size={22} color="#111111" />
+            {vendorOrderCount > 0 ? (
+              <View style={styles.vendorCartBadge}>
+                <Text style={styles.vendorCartBadgeText}>
+                  {vendorOrderCount > 99 ? '99+' : String(vendorOrderCount)}
+                </Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.profileBody}>
@@ -737,24 +763,6 @@ export default function VendorShopScreen({ route, navigation }) {
             {'    '}
             {/* <Text style={styles.profileCountStrong}>{followerCount} followers</Text> */}
           </Text>
-          {vendorOrderCount > 0 ? (
-            <TouchableOpacity
-              style={styles.vendorOrderBanner}
-              onPress={() =>
-                navigation.navigate('Vendor-order', {
-                  shopId: resolvedShopId,
-                  shopName: displayName,
-                  vendor,
-                })
-              }
-            >
-              <Text style={styles.vendorOrderBannerText}>
-                {vendorOrderCount} item{vendorOrderCount === 1 ? '' : 's'} in vendor cart · {formatNaira(vendorOrderSubtotal)}
-              </Text>
-              <Text style={styles.vendorOrderBannerCta}>Review</Text>
-            </TouchableOpacity>
-          ) : null}
-
           <View style={styles.profileTabs}>
             <TouchableOpacity style={styles.profileTab} onPress={() => setProfileTab('products')}>
               <Text style={[styles.profileTabText, profileTab === 'products' && styles.profileTabTextOn]}>Products</Text>
@@ -1068,6 +1076,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  vendorCartBtn: {
+    position: 'absolute',
+    right: 12,
+    zIndex: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  vendorCartBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: '#00926e',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  vendorCartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   profileBody: {
     paddingHorizontal: 16,
@@ -1645,28 +1684,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: 'rgba(255,255,255,0.85)',
     fontSize: 14,
-  },
-  vendorOrderBanner: {
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 7,
-    backgroundColor: '#111111',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  vendorOrderBannerText: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  vendorOrderBannerCta: {
-    color: '#00926e',
-    fontWeight: '800',
-    fontSize: 13,
   },
   variantModalFill: { flex: 1, justifyContent: 'flex-end' },
   variantBackdrop: {
