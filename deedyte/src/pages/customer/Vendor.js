@@ -2,9 +2,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   Modal,
+  Pressable,
   ScrollView,
   Share,
   StatusBar,
@@ -20,13 +22,21 @@ import RatingRow from '../../components/RatingRow';
 import ShopPolicyViewerModal from '../../components/ShopPolicyViewerModal';
 import { buildMvpCategoryFilters, formatMvpCategoryLabel } from '../../utils/mvpCategory';
 import { selectCategoryTree } from '../../../redux/categoriesSlice';
-import { getStorefrontProducts, getStorefrontShop, getStorefrontShopDelivery } from '../../api/storefront';
+import { getStorefrontProduct, getStorefrontProducts, getStorefrontShop, getStorefrontShopDelivery } from '../../api/storefront';
 import { recordShopView } from '../../api/buyer';
+import { useAuth } from '../../hooks/useAuth';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
+import { normalizeStorefrontProductDetail } from '../../utils/storefrontProductNormalize';
+import { formatAttributeLabel } from '../../utils/storefrontProductDetail';
 import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
-import { getVendorOrder, orderSubtotal } from '../../utils/vendorOrderCart';
+import {
+  getVendorOrder,
+  orderSubtotal,
+  removeVendorOrderLine,
+  upsertVendorOrderLine,
+} from '../../utils/vendorOrderCart';
 
 const { width: WINDOW_W, height: WINDOW_H } = Dimensions.get('window');
 const BROWN = '#00926e';
@@ -164,7 +174,17 @@ function FilterChipSection({ title, options, value, onChange, embedded }) {
   );
 }
 
-function ProductTile({ product, width, shop, navigation, vendor, category, inVendorCart }) {
+function ProductTile({
+  product,
+  width,
+  shop,
+  navigation,
+  vendor,
+  category,
+  inVendorCart,
+  cartBusy,
+  onToggleVendorCart,
+}) {
   return (
     <TouchableOpacity
       style={[styles.tile, { width }]}
@@ -197,16 +217,25 @@ function ProductTile({ product, width, shop, navigation, vendor, category, inVen
             <Icon name="image-outline" size={32} color="#9CA3AF" />
           </View>
         )}
-        <View
+        <TouchableOpacity
           style={[styles.tileCartBadge, inVendorCart && styles.tileCartBadgeOn]}
-          accessibilityLabel={inVendorCart ? 'In vendor cart' : 'Not in vendor cart'}
+          activeOpacity={0.85}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          onPress={() => onToggleVendorCart(product)}
+          disabled={cartBusy}
+          accessibilityRole="button"
+          accessibilityLabel={inVendorCart ? 'Remove from vendor cart' : 'Add to vendor cart'}
         >
-          <Icon
-            name={inVendorCart ? 'cart' : 'cart-outline'}
-            size={17}
-            color={inVendorCart ? '#FFFFFF' : '#111111'}
-          />
-        </View>
+          {cartBusy ? (
+            <ActivityIndicator size="small" color={inVendorCart ? '#FFFFFF' : '#00926e'} />
+          ) : (
+            <Icon
+              name={inVendorCart ? 'cart' : 'cart-outline'}
+              size={17}
+              color={inVendorCart ? '#FFFFFF' : '#111111'}
+            />
+          )}
+        </TouchableOpacity>
       </View>
       <Text style={styles.tileTitle} numberOfLines={2}>
         {product.title}
@@ -220,6 +249,7 @@ function ProductTile({ product, width, shop, navigation, vendor, category, inVen
  * @param {{ route: { params?: { vendor?: { id: number; name?: string; slug?: string }; category?: string } }; navigation: import('@react-navigation/native').NavigationProp<Record<string, object | undefined>> }} props
  */
 export default function VendorShopScreen({ route, navigation }) {
+  const { isAuthenticated, signOut } = useAuth();
   const vendor = route.params?.vendor;
   const category = vendor?.category ?? 'fashion';
   const shopName = vendor?.name?.trim() || 'Shop';
@@ -244,6 +274,13 @@ export default function VendorShopScreen({ route, navigation }) {
   const [vendorOrderCount, setVendorOrderCount] = useState(0);
   const [vendorOrderSubtotal, setVendorOrderSubtotal] = useState(0);
   const [vendorCartProductIds, setVendorCartProductIds] = useState(() => new Set());
+  const [vendorCartLineIdsByProduct, setVendorCartLineIdsByProduct] = useState(() => new Map());
+  const [vendorCartBusyId, setVendorCartBusyId] = useState('');
+  const [variantSheet, setVariantSheet] = useState(
+    /** @type {{ product: ReturnType<typeof mapStorefrontProductToTile>; variants: Record<string, unknown>[]; selected: number | null } | null} */ (
+      null
+    ),
+  );
   const slug = String(vendor?.slug ?? '').trim();
   const storefrontKey =
     slug ||
@@ -349,30 +386,39 @@ export default function VendorShopScreen({ route, navigation }) {
     };
   }, [storefrontKey]);
 
+  const applyVendorCartRows = useCallback((rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    setVendorOrderCount(list.length);
+    setVendorOrderSubtotal(orderSubtotal(list));
+    const ids = new Set();
+    const byProduct = new Map();
+    list.forEach((row) => {
+      const pid = String(row?.productId ?? '').trim();
+      if (!pid) return;
+      ids.add(pid);
+      const cid = Number(row?.cartItemId ?? row?.key);
+      const next = byProduct.get(pid) ?? [];
+      if (Number.isFinite(cid) && cid > 0) next.push(cid);
+      byProduct.set(pid, next);
+    });
+    setVendorCartProductIds(ids);
+    setVendorCartLineIdsByProduct(byProduct);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const sid = resolvedShopId;
       if (sid) {
-        void getVendorOrder(sid).then((rows) => {
-          setVendorOrderCount(rows.length);
-          setVendorOrderSubtotal(orderSubtotal(rows));
-          setVendorCartProductIds(
-            new Set(
-              (Array.isArray(rows) ? rows : [])
-                .map((row) => String(row?.productId ?? '').trim())
-                .filter(Boolean),
-            ),
-          );
-        });
+        void getVendorOrder(sid)
+          .then(applyVendorCartRows)
+          .catch(() => applyVendorCartRows([]));
       } else {
-        setVendorOrderCount(0);
-        setVendorOrderSubtotal(0);
-        setVendorCartProductIds(new Set());
+        applyVendorCartRows([]);
       }
       return () => {
         setFilterOpen(false);
       };
-    }, [resolvedShopId]),
+    }, [resolvedShopId, applyVendorCartRows]),
   );
 
   const products = apiProducts;
@@ -388,6 +434,133 @@ export default function VendorShopScreen({ route, navigation }) {
   }, [shopMeta]);
   const followerCount = Number(shopMeta.follower_count ?? shopMeta.followers ?? 0) || 0;
   const displayName = String(shopMeta.name ?? shopName).trim() || shopName;
+
+  const addProductToVendorCart = useCallback(
+    async (product, inventoryId, unitPrice, variantLabel) => {
+      const sid = resolvedShopId;
+      const productId = Number(product?.key);
+      const invId = Number(inventoryId);
+      if (!(sid > 0) || !(productId > 0) || !(invId > 0)) {
+        Alert.alert('Vendor cart', 'This product cannot be added yet.');
+        return false;
+      }
+      const rows = await upsertVendorOrderLine(sid, {
+        shopId: sid,
+        shopName: displayName,
+        productId,
+        inventoryId: invId,
+        variantId: invId,
+        variantLabel,
+        title: String(product?.title ?? '').trim(),
+        image: String(product?.uri ?? '').trim(),
+        unitPrice: Number(unitPrice) || Number(product?.minPrice) || 0,
+        qty: 1,
+      });
+      applyVendorCartRows(rows);
+      return true;
+    },
+    [resolvedShopId, displayName, applyVendorCartRows],
+  );
+
+  const onToggleVendorCart = useCallback(
+    async (product) => {
+      const productId = String(product?.key ?? '').trim();
+      if (!productId || vendorCartBusyId) return;
+      if (!isAuthenticated) {
+        Alert.alert('Sign in required', 'Please sign in to manage your vendor cart.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign in', onPress: () => void signOut() },
+        ]);
+        return;
+      }
+      const sid = resolvedShopId;
+      if (!(sid > 0)) {
+        Alert.alert('Vendor cart', 'This shop could not be identified.');
+        return;
+      }
+      setVendorCartBusyId(productId);
+      try {
+        const existing = vendorCartLineIdsByProduct.get(productId);
+        if (existing?.length) {
+          let rows = [];
+          for (const lineId of existing) {
+            rows = await removeVendorOrderLine(sid, lineId);
+          }
+          applyVendorCartRows(rows);
+          return;
+        }
+        const data = await getStorefrontProduct(productId);
+        const detail = normalizeStorefrontProductDetail(data);
+        const rawVariants = Array.isArray(detail?.variants) ? detail.variants : [];
+        const variants = rawVariants.filter((row) => row && typeof row === 'object');
+        if (detail?.hasVariants && variants.length > 1) {
+          setVariantSheet({ product, variants, selected: null });
+          return;
+        }
+        if (detail?.hasVariants && variants.length === 1) {
+          const row = variants[0];
+          const attrs =
+            row.attributes && typeof row.attributes === 'object' ? row.attributes : {};
+          const variantLabel = Object.entries(attrs)
+            .map(([key, value]) => `${formatAttributeLabel(key)}: ${String(value ?? '').trim()}`)
+            .filter((part) => !part.endsWith(': '))
+            .join(' · ');
+          await addProductToVendorCart(product, row.id, row.price, variantLabel);
+          return;
+        }
+        await addProductToVendorCart(
+          product,
+          detail?.inventoryId,
+          detail?.price ?? product.minPrice,
+          '',
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        Alert.alert(
+          /unauthorized|401/i.test(msg) ? 'Sign in required' : 'Vendor cart',
+          /unauthorized|401/i.test(msg) ? 'Please sign in to manage your vendor cart.' : msg,
+        );
+      } finally {
+        setVendorCartBusyId('');
+      }
+    },
+    [
+      vendorCartBusyId,
+      isAuthenticated,
+      signOut,
+      resolvedShopId,
+      vendorCartLineIdsByProduct,
+      applyVendorCartRows,
+      addProductToVendorCart,
+    ],
+  );
+
+  const confirmVariant = useCallback(async () => {
+    if (!variantSheet || variantSheet.selected == null) return;
+    const row = variantSheet.variants[variantSheet.selected];
+    if (!row) return;
+    const productId = String(variantSheet.product?.key ?? '').trim();
+    setVendorCartBusyId(productId);
+    try {
+      const attrs = row.attributes && typeof row.attributes === 'object' ? row.attributes : {};
+      const variantLabel = Object.entries(attrs)
+        .map(([key, value]) => `${formatAttributeLabel(key)}: ${String(value ?? '').trim()}`)
+        .filter((part) => !part.endsWith(': '))
+        .join(' · ');
+      const ok = await addProductToVendorCart(
+        variantSheet.product,
+        row.id,
+        row.price,
+        variantLabel,
+      );
+      if (ok) setVariantSheet(null);
+    } catch (e) {
+      Alert.alert('Vendor cart', e instanceof Error ? e.message : String(e));
+    } finally {
+      setVendorCartBusyId('');
+    }
+  }, [variantSheet, addProductToVendorCart]);
+
   const deliveryStates = useMemo(
     () => (deliveryInfo?.locations ?? []).map((loc) => loc.name).filter(Boolean),
     [deliveryInfo],
@@ -669,6 +842,8 @@ export default function VendorShopScreen({ route, navigation }) {
                   category={category}
                   shop={shopMeta}
                   inVendorCart={vendorCartProductIds.has(String(p.key))}
+                  cartBusy={vendorCartBusyId === String(p.key)}
+                  onToggleVendorCart={onToggleVendorCart}
                 />
               ))}
             </View>
@@ -749,6 +924,110 @@ export default function VendorShopScreen({ route, navigation }) {
             </View>
             <TouchableOpacity style={styles.filterSheetBtn} onPress={applyModalFilters} activeOpacity={0.9}>
               <Text style={styles.filterSheetBtnText}>Apply filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={variantSheet != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setVariantSheet(null)}
+      >
+        <View style={styles.variantModalFill}>
+          <Pressable style={styles.variantBackdrop} onPress={() => setVariantSheet(null)} />
+          <View style={[styles.variantSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.variantHandle} />
+            <View style={styles.variantHead}>
+              <ProductCardMedia uri={variantSheet?.product?.uri} style={styles.variantThumb} />
+              <View style={styles.variantHeadText}>
+                <Text style={styles.variantName} numberOfLines={2}>
+                  {variantSheet?.product?.title}
+                </Text>
+                <Text style={styles.variantPrice}>
+                  {variantSheet?.selected != null
+                    ? formatNaira(Number(variantSheet.variants[variantSheet.selected]?.price) || 0)
+                    : formatProductTilePrice(variantSheet?.product ?? {})}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setVariantSheet(null)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Icon name="close" size={24} color="#111111" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.variantSection}>Options</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.variantGrid}>
+              {(variantSheet?.variants ?? []).map((row, index) => {
+                const attrs = row.attributes && typeof row.attributes === 'object' ? row.attributes : {};
+                const features = Object.entries(attrs)
+                  .map(([key, value]) => ({
+                    name: formatAttributeLabel(key),
+                    value: String(value ?? '').trim(),
+                  }))
+                  .filter((feature) => feature.value);
+                const selected = variantSheet?.selected === index;
+                const stock = Number(row.stock);
+                const out = Number.isFinite(stock) && stock <= 0;
+                return (
+                  <TouchableOpacity
+                    key={`${row.id}-${index}`}
+                    style={[
+                      styles.variantTile,
+                      selected && styles.variantTileOn,
+                      out && styles.variantTileOff,
+                    ]}
+                    disabled={out}
+                    onPress={() =>
+                      setVariantSheet((current) =>
+                        current ? { ...current, selected: index } : current,
+                      )
+                    }
+                  >
+                    <ProductCardMedia
+                      uri={variantSheet?.product?.uri}
+                      style={styles.variantTileImage}
+                    />
+                    <View style={styles.variantFeatures}>
+                      {features.length ? (
+                        features.map((feature) => (
+                          <Text
+                            key={`${feature.name}-${feature.value}`}
+                            style={styles.variantFeature}
+                          >
+                            <Text style={styles.variantFeatureName}>{feature.name}: </Text>
+                            {feature.value}
+                          </Text>
+                        ))
+                      ) : (
+                        <Text style={styles.variantFeature}>{`Option ${index + 1}`}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={[
+                styles.variantApplyBtn,
+                (variantSheet?.selected == null || Boolean(vendorCartBusyId)) &&
+                  styles.variantApplyBtnOff,
+              ]}
+              disabled={variantSheet?.selected == null || Boolean(vendorCartBusyId)}
+              onPress={() => {
+                void confirmVariant();
+              }}
+            >
+              {vendorCartBusyId ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.variantApplyText}>
+                  {variantSheet?.selected == null ? 'Select an option' : 'Add to vendor cart'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -1389,4 +1668,56 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
   },
+  variantModalFill: { flex: 1, justifyContent: 'flex-end' },
+  variantBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  variantSheet: {
+    maxHeight: '88%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  variantHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0E0E0',
+    marginBottom: 8,
+  },
+  variantHead: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+  variantThumb: { width: 40, height: 40, borderRadius: 8, backgroundColor: '#F3F3F3' },
+  variantHeadText: { flex: 1, justifyContent: 'center' },
+  variantName: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  variantPrice: { marginTop: 6, fontSize: 16, fontWeight: '800', color: '#00926E' },
+  variantSection: { fontSize: 16, fontWeight: '700', color: '#111111', marginBottom: 16 },
+  variantGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 8 },
+  variantTile: {
+    width: '48%',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    backgroundColor: '#FFFFFF',
+    padding: 8,
+  },
+  variantTileOn: { borderColor: '#00926E', borderWidth: 2 },
+  variantTileOff: { opacity: 0.45 },
+  variantTileImage: { width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: '#F3F3F3' },
+  variantFeatures: { marginTop: 12, gap: 4 },
+  variantFeature: { fontSize: 12, lineHeight: 16, color: '#222222' },
+  variantFeatureName: { fontWeight: '700', textTransform: 'capitalize' },
+  variantApplyBtnOff: { opacity: 0.55 },
+  variantApplyBtn: {
+    marginTop: 12,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#00926E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  variantApplyText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
