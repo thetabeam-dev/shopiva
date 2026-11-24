@@ -33,3 +33,14 @@ allprojects {
     }
 }
 apply plugin: "expo-root-project"
+
+// expo-updates CMake otherwise picks a default NDK (e.g. 27.0.12077973).
+// A partial install of that folder (no source.properties) fails the whole :expo config.
+subprojects { proj ->
+    proj.afterEvaluate {
+        def androidExt = proj.extensions.findByName("android")
+        if (androidExt != null && rootProject.ext.has("ndkVersion")) {
+            androidExt.ndkVersion = rootProject.ext.ndkVersion
+        }
+    }
+}
