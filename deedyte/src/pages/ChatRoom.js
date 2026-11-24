@@ -1184,10 +1184,12 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   }, [roomId, pendingShopId, appRolePayload, navigation, chat, headerTitle, storageScope]);
 
   const [requestSending, setRequestSending] = useState(false);
-  const postInvoiceRequest = useCallback(async (shippingAddress, qty, variant) => {
+  const postInvoiceRequest = useCallback(async (shippingAddress, qty, variant, linesOverride) => {
     const activeRoomId = await ensureRoomId();
     if (!activeRoomId) return false;
-    const lines = inquiryOrderLines;
+    const lines = Array.isArray(linesOverride) && linesOverride.length
+      ? linesOverride
+      : inquiryOrderLines;
     const firstLine = lines[0];
     const unitPrice =
       Number(variant?.price) ||
@@ -1274,27 +1276,32 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       return;
     }
     requestShippingRef.current = latestBuyerShipping;
-    if (inquiryOrderLines.length) {
-      void postInvoiceRequest(
-        latestBuyerShipping,
-        inquiryOrderLines.reduce((sum, row) => sum + Math.max(1, Number(row.qty) || 1), 0),
-        null,
-      );
-      return;
-    }
     setQtyOpen(true);
-  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip, inquiryOrderLines, postInvoiceRequest]);
+  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip]);
 
-  const onSubmitQty = useCallback(async (qty, variant) => {
+  const onSubmitQty = useCallback(async (qty, variant, lines) => {
     if (requestSending) return;
     setRequestSending(true);
     try {
-      const sent = await postInvoiceRequest(requestShippingRef.current || latestBuyerShipping, qty, variant);
+      if (Array.isArray(lines) && lines.length) {
+        navigation.setParams({
+          chat: {
+            ...(chat && typeof chat === 'object' ? chat : {}),
+            orderLines: lines,
+          },
+        });
+      }
+      const sent = await postInvoiceRequest(
+        requestShippingRef.current || latestBuyerShipping,
+        qty,
+        variant,
+        lines,
+      );
       if (sent) setQtyOpen(false);
     } finally {
       setRequestSending(false);
     }
-  }, [requestSending, postInvoiceRequest, latestBuyerShipping]);
+  }, [requestSending, postInvoiceRequest, latestBuyerShipping, navigation, chat]);
 
   const onSubmitShipping = useCallback(async (payload) => {
     if (shippingSending) return;
@@ -1329,19 +1336,11 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       }
       setShippingEditOpen(false);
       requestShippingRef.current = { kind: 'shipping', ...payload };
-      if (inquiryOrderLines.length) {
-        await postInvoiceRequest(
-          { kind: 'shipping', ...payload },
-          inquiryOrderLines.reduce((sum, row) => sum + Math.max(1, Number(row.qty) || 1), 0),
-          null,
-        );
-        return;
-      }
       setTimeout(() => setQtyOpen(true), Platform.OS === 'ios' ? 400 : 0);
     } finally {
       setShippingSending(false);
     }
-  }, [shippingSending, ensureRoomId, mapMessage, inquiryItemAmount, inquiryItemTitle, inquiryItemImage, inquiryProductId, inquiryOrderLines, postInvoiceRequest]);
+  }, [shippingSending, ensureRoomId, mapMessage, inquiryItemAmount, inquiryItemTitle, inquiryItemImage, inquiryProductId]);
 
   const onSubmitInvoice = useCallback(async (payload) => {
     if (invoiceSending) return;
@@ -2046,6 +2045,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         itemImage={itemImage}
         itemAmount={itemAmount}
         productId={productId}
+        items={inquiryOrderLines}
         initialVariantId={Number(productId) === Number(chat?.productId) ? Number(chat?.variantId) || 0 : 0}
         shippingDestination={hasBuyerShipping ? buyerDestination : ''}
         onEditShipping={() => {

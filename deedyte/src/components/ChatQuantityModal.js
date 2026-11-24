@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -40,10 +41,27 @@ const MAX_QTY = 9999;
  *   itemAmount?: number;
  *   productId?: number;
  *   initialVariantId?: number;
+ *   items?: Array<{
+ *     productId?: number;
+ *     title?: string;
+ *     itemTitle?: string;
+ *     image?: string;
+ *     itemImage?: string;
+ *     unitPrice?: number;
+ *     itemAmount?: number;
+ *     qty?: number;
+ *     variantLabel?: string;
+ *     inventoryId?: number;
+ *     variantId?: number;
+ *   }>;
  *   shippingDestination?: string;
  *   onEditShipping?: () => void;
  *   onCancel: () => void;
- *   onSubmit: (qty: number, variant: { inventoryId?: number; label: string; price?: number } | null) => void | Promise<void>;
+ *   onSubmit: (
+ *     qty: number,
+ *     variant: { inventoryId?: number; label: string; price?: number } | null,
+ *     lines?: Array<Record<string, unknown>>,
+ *   ) => void | Promise<void>;
  * }} props
  */
 export default function ChatQuantityModal({
@@ -54,6 +72,7 @@ export default function ChatQuantityModal({
   itemAmount = 0,
   productId = 0,
   initialVariantId = 0,
+  items = [],
   shippingDestination = '',
   onEditShipping,
   onCancel,
@@ -61,6 +80,7 @@ export default function ChatQuantityModal({
 }) {
   const insets = useSafeAreaInsets();
   const [qtyText, setQtyText] = useState('1');
+  const [lineQty, setLineQty] = useState(/** @type {number[]} */ ([]));
 
   const [variants, setVariants] = useState(/** @type {Record<string, unknown>[]} */ ([]));
   const [productPrice, setProductPrice] = useState(0);
@@ -68,12 +88,21 @@ export default function ChatQuantityModal({
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(/** @type {Record<string, unknown> | null} */ (null));
 
+  const orderLines = Array.isArray(items) ? items : [];
+  const multiItems = orderLines.length > 0;
+
   useEffect(() => {
-    if (visible) setQtyText('1');
+    if (!visible) return;
+    setQtyText('1');
+    setLineQty(
+      orderLines.map((row) => Math.min(MAX_QTY, Math.max(1, Number(row.qty) || 1))),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed qtys when the sheet opens
   }, [visible]);
 
   useEffect(() => {
     if (!visible) return undefined;
+    if (Array.isArray(items) && items.length > 0) return undefined;
     setSelectedVariant(null);
     setVariants([]);
     setProductPrice(0);
@@ -124,6 +153,13 @@ export default function ChatQuantityModal({
 
   const qty = Math.min(MAX_QTY, Math.max(0, parseInt(qtyText, 10) || 0));
   const setQty = (next) => setQtyText(String(Math.min(MAX_QTY, Math.max(1, next))));
+  const bumpLineQty = (index, delta) => {
+    setLineQty((prev) =>
+      prev.map((value, i) =>
+        i === index ? Math.min(MAX_QTY, Math.max(1, value + delta)) : value,
+      ),
+    );
+  };
   const variantPrice = selectedVariant ? getVariantRowPrice(selectedVariant) : NaN;
   const basePrice = Number.isFinite(variantPrice) && variantPrice > 0
     ? variantPrice
@@ -131,10 +167,32 @@ export default function ChatQuantityModal({
       ? 0
       : productPrice || Number(itemAmount) || 0;
   const price = basePrice > 0 ? unitPriceForBulk(basePrice, bulkTiers, Math.max(1, qty)) : 0;
-  const canSubmit = qty > 0 && !sending && !variantsLoading && !variantMissing;
+  const lineSubtotal = orderLines.reduce((sum, row, i) => {
+    const unit = Number(row.unitPrice ?? row.itemAmount) || 0;
+    const q = lineQty[i] ?? Math.max(1, Number(row.qty) || 1);
+    return sum + unit * q;
+  }, 0);
+  const canSubmit = multiItems
+    ? !sending && lineQty.every((q) => q > 0)
+    : qty > 0 && !sending && !variantsLoading && !variantMissing;
 
   const submit = () => {
     if (!canSubmit) return;
+    if (multiItems) {
+      const nextLines = orderLines.map((row, i) => ({
+        ...row,
+        qty: lineQty[i] ?? Math.max(1, Number(row.qty) || 1),
+        title: row.title || row.itemTitle,
+        itemTitle: row.itemTitle || row.title,
+        image: row.image || row.itemImage,
+        itemImage: row.itemImage || row.image,
+        unitPrice: Number(row.unitPrice ?? row.itemAmount) || 0,
+        itemAmount: Number(row.itemAmount ?? row.unitPrice) || 0,
+      }));
+      const totalQty = nextLines.reduce((sum, row) => sum + row.qty, 0);
+      onSubmit(totalQty, null, nextLines);
+      return;
+    }
     let variant = null;
     if (selectedVariant) {
       const a = selectedVariant.attributes && typeof selectedVariant.attributes === 'object' ? selectedVariant.attributes : {};
@@ -166,57 +224,119 @@ export default function ChatQuantityModal({
         <Pressable style={styles.backdrop} onPress={onCancel} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.handle} />
-          <Text style={styles.title}>How many do you need?</Text>
+          <Text style={styles.title}>
+            {multiItems && orderLines.length > 1 ? 'Confirm your items' : 'How many do you need?'}
+          </Text>
           <Text style={styles.hint}>The vendor uses this to prepare your checkout invoice.</Text>
-          {itemTitle || itemImage ? (
-            <View style={styles.productCard}>
-              <ProductCardMedia uri={itemImage} style={styles.productThumb} />
-              <View style={styles.productCopy}>
-                <Text style={styles.productTitle} numberOfLines={2}>{itemTitle || 'Product'}</Text>
-                {price > 0 ? <Text style={styles.productPrice}>{formatNaira(price)}</Text> : null}
+          {multiItems ? (
+            <ScrollView
+              style={styles.linesScroll}
+              contentContainerStyle={styles.linesScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {orderLines.map((row, idx) => {
+                const q = lineQty[idx] ?? Math.max(1, Number(row.qty) || 1);
+                const unit = Number(row.unitPrice ?? row.itemAmount) || 0;
+                const title = String(row.title || row.itemTitle || itemTitle || 'Product');
+                const image = String(row.image || row.itemImage || itemImage || '');
+                const variantLabel = String(row.variantLabel || '').trim();
+                return (
+                  <View key={`${row.productId || title}-${idx}`} style={styles.productCard}>
+                    <ProductCardMedia uri={image} style={styles.productThumb} />
+                    <View style={styles.productCopy}>
+                      <Text style={styles.productTitle} numberOfLines={2}>{title}</Text>
+                      {variantLabel ? (
+                        <Text style={styles.variantMeta} numberOfLines={1}>{variantLabel}</Text>
+                      ) : null}
+                      {unit > 0 ? (
+                        <Text style={styles.productPrice}>
+                          {formatNaira(unit)}
+                          {q > 1 ? ` · ${formatNaira(unit * q)}` : ''}
+                        </Text>
+                      ) : null}
+                      <View style={styles.lineStepper}>
+                        <Pressable
+                          onPress={() => bumpLineQty(idx, -1)}
+                          disabled={q <= 1}
+                          style={({ pressed }) => [
+                            styles.lineStepBtn,
+                            q <= 1 && styles.stepBtnDisabled,
+                            pressed && styles.pressed,
+                          ]}
+                          accessibilityLabel={`Decrease quantity for ${title}`}
+                        >
+                          <Icon name="remove" size={18} color={BRAND} />
+                        </Pressable>
+                        <Text style={styles.lineQtyValue}>{q}</Text>
+                        <Pressable
+                          onPress={() => bumpLineQty(idx, 1)}
+                          disabled={q >= MAX_QTY}
+                          style={({ pressed }) => [styles.lineStepBtn, pressed && styles.pressed]}
+                          accessibilityLabel={`Increase quantity for ${title}`}
+                        >
+                          <Icon name="add" size={18} color={BRAND} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <>
+              {itemTitle || itemImage ? (
+                <View style={styles.productCard}>
+                  <ProductCardMedia uri={itemImage} style={styles.productThumb} />
+                  <View style={styles.productCopy}>
+                    <Text style={styles.productTitle} numberOfLines={2}>{itemTitle || 'Product'}</Text>
+                    {price > 0 ? <Text style={styles.productPrice}>{formatNaira(price)}</Text> : null}
+                  </View>
+                </View>
+              ) : null}
+              {variantsLoading ? (
+                <ActivityIndicator style={styles.variantLoading} color={BRAND} />
+              ) : hasVariants ? (
+                <View style={styles.variantBlock}>
+                  <Text style={styles.variantTitle}>{variants.length === 1 ? 'Features' : 'Select a variant'}</Text>
+                  <ProductVariantCardPicker
+                    attrKeys={attrKeys}
+                    variants={variants}
+                    selectedVariant={selectedVariant}
+                    onSelect={setSelectedVariant}
+                  />
+                </View>
+              ) : null}
+              <View style={styles.stepper}>
+                <Pressable
+                  onPress={() => setQty(qty - 1)}
+                  disabled={qty <= 1}
+                  style={({ pressed }) => [styles.stepBtn, qty <= 1 && styles.stepBtnDisabled, pressed && styles.pressed]}
+                  accessibilityLabel="Decrease quantity"
+                >
+                  <Icon name="remove" size={22} color={BRAND} />
+                </Pressable>
+                <TextInput
+                  style={styles.qtyInput}
+                  value={qtyText}
+                  onChangeText={(t) => setQtyText(t.replace(/[^0-9]/g, '').slice(0, 4))}
+                  keyboardType="number-pad"
+                  textAlign="center"
+                  accessibilityLabel="Quantity"
+                />
+                <Pressable
+                  onPress={() => setQty(qty + 1)}
+                  disabled={qty >= MAX_QTY}
+                  style={({ pressed }) => [styles.stepBtn, pressed && styles.pressed]}
+                  accessibilityLabel="Increase quantity"
+                >
+                  <Icon name="add" size={22} color={BRAND} />
+                </Pressable>
               </View>
-            </View>
-          ) : null}
-          {variantsLoading ? (
-            <ActivityIndicator style={styles.variantLoading} color={BRAND} />
-          ) : hasVariants ? (
-            <View style={styles.variantBlock}>
-              <Text style={styles.variantTitle}>{variants.length === 1 ? 'Features' : 'Select a variant'}</Text>
-              <ProductVariantCardPicker
-                attrKeys={attrKeys}
-                variants={variants}
-                selectedVariant={selectedVariant}
-                onSelect={setSelectedVariant}
-              />
-            </View>
-          ) : null}
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => setQty(qty - 1)}
-              disabled={qty <= 1}
-              style={({ pressed }) => [styles.stepBtn, qty <= 1 && styles.stepBtnDisabled, pressed && styles.pressed]}
-              accessibilityLabel="Decrease quantity"
-            >
-              <Icon name="remove" size={22} color={BRAND} />
-            </Pressable>
-            <TextInput
-              style={styles.qtyInput}
-              value={qtyText}
-              onChangeText={(t) => setQtyText(t.replace(/[^0-9]/g, '').slice(0, 4))}
-              keyboardType="number-pad"
-              textAlign="center"
-              accessibilityLabel="Quantity"
-            />
-            <Pressable
-              onPress={() => setQty(qty + 1)}
-              disabled={qty >= MAX_QTY}
-              style={({ pressed }) => [styles.stepBtn, pressed && styles.pressed]}
-              accessibilityLabel="Increase quantity"
-            >
-              <Icon name="add" size={22} color={BRAND} />
-            </Pressable>
-          </View>
-          {price > 0 && qty > 0 ? (
+            </>
+          )}
+          {multiItems && lineSubtotal > 0 ? (
+            <Text style={styles.subtotal}>Items subtotal: {formatNaira(lineSubtotal)}</Text>
+          ) : !multiItems && price > 0 && qty > 0 ? (
             <Text style={styles.subtotal}>Items subtotal: {formatNaira(price * qty)}</Text>
           ) : null}
           {shippingDestination ? (
@@ -275,9 +395,11 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: '800', color: BRAND },
   hint: { marginTop: 6, marginBottom: 10, fontSize: 14, lineHeight: 20, color: BLACK },
+  linesScroll: { maxHeight: 320 },
+  linesScrollContent: { gap: 8, paddingBottom: 4 },
   productCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
     backgroundColor: '#F3F8F6',
     borderRadius: CARD_RADIUS,
@@ -289,6 +411,29 @@ const styles = StyleSheet.create({
   productCopy: { flex: 1, minWidth: 0 },
   productTitle: { fontSize: 15, fontWeight: '700', color: BLACK },
   productPrice: { marginTop: 4, fontSize: 14, fontWeight: '700', color: BRAND },
+  variantMeta: { marginTop: 2, fontSize: 12, fontWeight: '600', color: '#667781' },
+  lineStepper: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  lineStepBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lineQtyValue: {
+    minWidth: 28,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '800',
+    color: BLACK,
+  },
   variantLoading: { marginTop: 16 },
   variantBlock: { marginTop: 14 },
   variantTitle: { marginBottom: 8, fontSize: 14, fontWeight: '700', color: BLACK },
