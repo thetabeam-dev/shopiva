@@ -15,6 +15,13 @@ import {
   PatchBuyerCartLineController,
   PostBuyerCartController,
 } from "../controllers/buyer/cart.js";
+import {
+  ClearVendorOrderController,
+  DeleteVendorOrderLineController,
+  GetVendorOrderController,
+  PatchVendorOrderLineController,
+  PostVendorOrderController,
+} from "../controllers/buyer/vendorOrder.js";
 import { PostBuyerCheckoutConfirmPaymentController, PostBuyerUnpaidOrderController } from "../controllers/buyer/checkout.js";
 import { CompleteCheckoutController } from "../controllers/webhooks/paystack.js";
 import {
@@ -42,6 +49,12 @@ BuyerRouter.get("/buyer/cart/:productId", verifyToken, GetBuyerCartProductShopId
 BuyerRouter.post("/buyer/cart", verifyToken, PostBuyerCartController);
 BuyerRouter.patch("/buyer/cart/:cartItemId", verifyToken, PatchBuyerCartLineController);
 BuyerRouter.delete("/buyer/cart/:cartItemId", verifyToken, DeleteBuyerCartLineController);
+
+BuyerRouter.get("/buyer/vendor-order", verifyToken, GetVendorOrderController);
+BuyerRouter.post("/buyer/vendor-order", verifyToken, PostVendorOrderController);
+BuyerRouter.patch("/buyer/vendor-order/:lineId", verifyToken, PatchVendorOrderLineController);
+BuyerRouter.delete("/buyer/vendor-order/shop/:shopId", verifyToken, ClearVendorOrderController);
+BuyerRouter.delete("/buyer/vendor-order/:lineId", verifyToken, DeleteVendorOrderLineController);
 
 BuyerRouter.post("/buyer/checkout/unpaid-order", verifyToken, PostBuyerUnpaidOrderController);
 BuyerRouter.post("/buyer/checkout/confirm-payment", verifyToken, PostBuyerCheckoutConfirmPaymentController);

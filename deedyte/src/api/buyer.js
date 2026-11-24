@@ -238,6 +238,59 @@ export async function deleteBuyerCartLine(cartItemId) {
   return readJson(res);
 }
 
+/** @param {number} shopId */
+export async function fetchVendorOrder(shopId) {
+  const res = await apiFetchAuth(`/buyer/vendor-order?shopId=${encodeURIComponent(String(shopId))}`);
+  return readJson(res);
+}
+
+/**
+ * @param {{
+ *   shopId: number;
+ *   productId: number;
+ *   inventoryId?: number;
+ *   qty?: number;
+ *   unitPrice?: number;
+ *   variantLabel?: string;
+ * }} line
+ */
+export async function postVendorOrderLine(line) {
+  const res = await apiFetchAuth('/buyer/vendor-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      shop_id: line.shopId,
+      product_id: line.productId,
+      inventory_id: line.inventoryId,
+      quantity: line.qty ?? 1,
+      unit_price: line.unitPrice,
+      variant_label: line.variantLabel,
+    }),
+  });
+  return readJson(res);
+}
+
+export async function patchVendorOrderLine(lineId, quantity) {
+  const res = await apiFetchAuth(`/buyer/vendor-order/${encodeURIComponent(String(lineId))}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ quantity }),
+  });
+  return readJson(res);
+}
+
+export async function deleteVendorOrderLine(lineId) {
+  const res = await apiFetchAuth(`/buyer/vendor-order/${encodeURIComponent(String(lineId))}`, {
+    method: 'DELETE',
+  });
+  return readJson(res);
+}
+
+export async function deleteVendorOrderShop(shopId) {
+  const res = await apiFetchAuth(`/buyer/vendor-order/shop/${encodeURIComponent(String(shopId))}`, {
+    method: 'DELETE',
+  });
+  return readJson(res);
+}
+
 
 /** @returns {Promise<Array<Record<string, unknown>>>} */
 export async function fetchRecentlyViewedProducts() {

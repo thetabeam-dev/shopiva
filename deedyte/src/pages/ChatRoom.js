@@ -38,7 +38,6 @@ import { useSelector } from 'react-redux';
 import { fetchOrderIdByReference } from '../api/buyer';
 import { ProductCardMedia } from '../components/ProductCardMedia';
 import { isGibberishMessage } from '../utils/gibberish';
-import { clearVendorOrder, getVendorOrder } from '../utils/vendorOrderCart';
 
 const BG = '#ECE5DD';
 const INCOMING = '#FFFFFF';
@@ -1049,37 +1048,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   const inquiryItemTitle = String(chat?.itemTitle ?? chat?.productTitle ?? '').trim();
   const inquiryItemImage = String(chat?.itemImage ?? chat?.productImage ?? '').trim();
   const inquiryProductId = Number(chat?.productId) || 0;
-  const [storedVendorLines, setStoredVendorLines] = useState(/** @type {unknown[]} */ ([]));
-  useFocusEffect(
-    useCallback(() => {
-      const sid = Number(chat?.shopId ?? chat?.shop_id ?? pendingShopId) || 0;
-      if (!(sid > 0)) return undefined;
-      let cancelled = false;
-      void getVendorOrder(sid).then((rows) => {
-        if (!cancelled) setStoredVendorLines(Array.isArray(rows) ? rows : []);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [chat?.shopId, chat?.shop_id, pendingShopId]),
-  );
-  const inquiryOrderLines = useMemo(() => {
-    const fromNav = pickOrderItems(chat?.orderLines);
-    const fromStore = pickOrderItems(storedVendorLines);
-    let best = fromNav.length >= fromStore.length ? fromNav : fromStore;
-    if (best.length > 1) return best;
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const row = messages[i];
-      const candidates = [
-        pickOrderItems(row?.invoiceRequest?.items),
-        pickOrderItems(row?.inquiry?.items),
-      ];
-      for (const list of candidates) {
-        if (list.length > best.length) best = list;
-      }
-    }
-    return best;
-  }, [chat?.orderLines, storedVendorLines, messages]);
+  const inquiryOrderLines = Array.isArray(chat?.orderLines) ? chat.orderLines : [];
   const latestProduct = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const row = messages[i];
@@ -1215,12 +1184,10 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   }, [roomId, pendingShopId, appRolePayload, navigation, chat, headerTitle, storageScope]);
 
   const [requestSending, setRequestSending] = useState(false);
-  const postInvoiceRequest = useCallback(async (shippingAddress, qty, variant, linesOverride) => {
+  const postInvoiceRequest = useCallback(async (shippingAddress, qty, variant) => {
     const activeRoomId = await ensureRoomId();
     if (!activeRoomId) return false;
-    const lines = Array.isArray(linesOverride) && linesOverride.length
-      ? linesOverride
-      : inquiryOrderLines;
+    const lines = inquiryOrderLines;
     const firstLine = lines[0];
     const unitPrice =
       Number(variant?.price) ||
@@ -1307,36 +1274,27 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       return;
     }
     requestShippingRef.current = latestBuyerShipping;
+    if (inquiryOrderLines.length) {
+      void postInvoiceRequest(
+        latestBuyerShipping,
+        inquiryOrderLines.reduce((sum, row) => sum + Math.max(1, Number(row.qty) || 1), 0),
+        null,
+      );
+      return;
+    }
     setQtyOpen(true);
-  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip]);
+  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip, inquiryOrderLines, postInvoiceRequest]);
 
-  const onSubmitQty = useCallback(async (qty, variant, lines) => {
+  const onSubmitQty = useCallback(async (qty, variant) => {
     if (requestSending) return;
     setRequestSending(true);
     try {
-      if (Array.isArray(lines) && lines.length) {
-        navigation.setParams({
-          chat: {
-            ...(chat && typeof chat === 'object' ? chat : {}),
-            orderLines: lines,
-          },
-        });
-      }
-      const sent = await postInvoiceRequest(
-        requestShippingRef.current || latestBuyerShipping,
-        qty,
-        variant,
-        lines,
-      );
-      if (sent) {
-        setQtyOpen(false);
-        const sid = Number(chat?.shopId ?? chat?.shop_id ?? shopId) || 0;
-        if (sid > 0) void clearVendorOrder(sid);
-      }
+      const sent = await postInvoiceRequest(requestShippingRef.current || latestBuyerShipping, qty, variant);
+      if (sent) setQtyOpen(false);
     } finally {
       setRequestSending(false);
     }
-  }, [requestSending, postInvoiceRequest, latestBuyerShipping, navigation, chat, shopId]);
+  }, [requestSending, postInvoiceRequest, latestBuyerShipping]);
 
   const onSubmitShipping = useCallback(async (payload) => {
     if (shippingSending) return;
@@ -1371,11 +1329,19 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       }
       setShippingEditOpen(false);
       requestShippingRef.current = { kind: 'shipping', ...payload };
+      if (inquiryOrderLines.length) {
+        await postInvoiceRequest(
+          { kind: 'shipping', ...payload },
+          inquiryOrderLines.reduce((sum, row) => sum + Math.max(1, Number(row.qty) || 1), 0),
+          null,
+        );
+        return;
+      }
       setTimeout(() => setQtyOpen(true), Platform.OS === 'ios' ? 400 : 0);
     } finally {
       setShippingSending(false);
     }
-  }, [shippingSending, ensureRoomId, mapMessage, inquiryItemAmount, inquiryItemTitle, inquiryItemImage, inquiryProductId]);
+  }, [shippingSending, ensureRoomId, mapMessage, inquiryItemAmount, inquiryItemTitle, inquiryItemImage, inquiryProductId, inquiryOrderLines, postInvoiceRequest]);
 
   const onSubmitInvoice = useCallback(async (payload) => {
     if (invoiceSending) return;
@@ -2080,7 +2046,6 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         itemImage={itemImage}
         itemAmount={itemAmount}
         productId={productId}
-        items={inquiryOrderLines}
         initialVariantId={Number(productId) === Number(chat?.productId) ? Number(chat?.variantId) || 0 : 0}
         shippingDestination={hasBuyerShipping ? buyerDestination : ''}
         onEditShipping={() => {

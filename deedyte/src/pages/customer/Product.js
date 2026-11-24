@@ -52,6 +52,7 @@ import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import {
   MIN_VENDOR_ORDER_AMOUNT,
+  clearVendorOrder,
   getVendorOrder,
   mergeCurrentLine,
   orderSubtotal,
@@ -909,6 +910,7 @@ export default function ProductScreen({ route, navigation }) {
         variantId: first?.variantId,
       },
     });
+    void clearVendorOrder(sid);
   }, [
     loggedIn,
     signOut,

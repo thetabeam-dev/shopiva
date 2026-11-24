@@ -1,12 +1,17 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  deleteVendorOrderLine as apiDeleteLine,
+  deleteVendorOrderShop,
+  fetchVendorOrder,
+  patchVendorOrderLine,
+  postVendorOrderLine,
+} from '../api/buyer';
 
 export const MIN_VENDOR_ORDER_AMOUNT = 2000;
-
-const STORAGE_KEY = 'deedyte.vendorOrderCart.v1';
 
 /**
  * @typedef {{
  *   key: string;
+ *   cartItemId?: number;
  *   shopId: number;
  *   shopName: string;
  *   productId: number;
@@ -20,23 +25,15 @@ const STORAGE_KEY = 'deedyte.vendorOrderCart.v1';
  * }} VendorOrderLine
  */
 
-async function readAll() {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return /** @type {Record<string, VendorOrderLine[]>} */ (parsed);
-  } catch {
-    return {};
+function linesFromResponse(data) {
+  return Array.isArray(data?.lines) ? data.lines : [];
+}
+
+function lineId(lineOrKey) {
+  if (lineOrKey && typeof lineOrKey === 'object') {
+    return Number(lineOrKey.cartItemId ?? lineOrKey.key) || 0;
   }
-}
-
-async function writeAll(data) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function shopKey(shopId) {
-  return String(Number(shopId) || 0);
+  return Number(lineOrKey) || 0;
 }
 
 export function lineTotal(line) {
@@ -48,6 +45,9 @@ export function orderSubtotal(lines) {
 }
 
 export function lineKey(line) {
+  if (line?.cartItemId || (line?.key && /^\d+$/.test(String(line.key)))) {
+    return String(line.cartItemId ?? line.key);
+  }
   const productId = Number(line?.productId) || 0;
   const inventoryId = Number(line?.inventoryId) || 0;
   const variantId = Number(line?.variantId) || 0;
@@ -59,9 +59,10 @@ export function lineKey(line) {
  * @returns {Promise<VendorOrderLine[]>}
  */
 export async function getVendorOrder(shopId) {
-  const all = await readAll();
-  const rows = all[shopKey(shopId)];
-  return Array.isArray(rows) ? rows : [];
+  const sid = Number(shopId) || 0;
+  if (!(sid > 0)) return [];
+  const data = await fetchVendorOrder(sid);
+  return linesFromResponse(data);
 }
 
 /**
@@ -71,24 +72,18 @@ export async function getVendorOrder(shopId) {
 export async function upsertVendorOrderLine(shopId, line) {
   const sid = Number(shopId) || 0;
   if (sid < 1) throw new Error('Missing shop');
-  const nextLine = {
-    ...line,
+  const data = await postVendorOrderLine({
     shopId: sid,
-    key: lineKey(line),
+    productId: Number(line.productId) || 0,
+    inventoryId: Number(line.inventoryId) || undefined,
     qty: Math.min(99, Math.max(1, Number(line.qty) || 1)),
     unitPrice: Math.max(0, Number(line.unitPrice) || 0),
-  };
-  const all = await readAll();
-  const current = Array.isArray(all[shopKey(sid)]) ? all[shopKey(sid)] : [];
-  const idx = current.findIndex((row) => lineKey(row) === nextLine.key);
-  if (idx >= 0) {
-    current[idx] = { ...current[idx], ...nextLine, qty: nextLine.qty };
-  } else {
-    current.push(nextLine);
+    variantLabel: line.variantLabel,
+  });
+  if (data && data.ok === false) {
+    throw new Error(String(data.error || data.message || 'Could not save vendor order'));
   }
-  all[shopKey(sid)] = current;
-  await writeAll(all);
-  return current;
+  return linesFromResponse(data);
 }
 
 /**
@@ -97,13 +92,13 @@ export async function upsertVendorOrderLine(shopId, line) {
  * @param {number} qty
  */
 export async function setVendorOrderQty(shopId, key, qty) {
-  const all = await readAll();
-  const sid = shopKey(shopId);
-  const current = Array.isArray(all[sid]) ? all[sid] : [];
+  const id = lineId(key);
+  if (!(id > 0)) {
+    return getVendorOrder(shopId);
+  }
   const nextQty = Math.min(99, Math.max(1, Number(qty) || 1));
-  all[sid] = current.map((row) => (lineKey(row) === key ? { ...row, qty: nextQty } : row));
-  await writeAll(all);
-  return all[sid];
+  const data = await patchVendorOrderLine(id, nextQty);
+  return linesFromResponse(data);
 }
 
 /**
@@ -111,19 +106,19 @@ export async function setVendorOrderQty(shopId, key, qty) {
  * @param {string} key
  */
 export async function removeVendorOrderLine(shopId, key) {
-  const all = await readAll();
-  const sid = shopKey(shopId);
-  const current = Array.isArray(all[sid]) ? all[sid] : [];
-  all[sid] = current.filter((row) => lineKey(row) !== key);
-  if (!all[sid].length) delete all[sid];
-  await writeAll(all);
-  return all[sid] ?? [];
+  const id = lineId(key);
+  if (!(id > 0)) {
+    return getVendorOrder(shopId);
+  }
+  const data = await apiDeleteLine(id);
+  return linesFromResponse(data);
 }
 
 export async function clearVendorOrder(shopId) {
-  const all = await readAll();
-  delete all[shopKey(shopId)];
-  await writeAll(all);
+  const sid = Number(shopId) || 0;
+  if (!(sid > 0)) return [];
+  const data = await deleteVendorOrderShop(sid);
+  return linesFromResponse(data);
 }
 
 /**
@@ -133,11 +128,13 @@ export async function clearVendorOrder(shopId) {
  */
 export function mergeCurrentLine(existing, line) {
   const rows = Array.isArray(existing) ? existing.map((row) => ({ ...row })) : [];
-  const key = lineKey(line);
-  const idx = rows.findIndex((row) => lineKey(row) === key);
+  const key = `${Number(line?.productId) || 0}:${Number(line?.inventoryId) || 0}:${Number(line?.variantId) || 0}`;
+  const idx = rows.findIndex(
+    (row) =>
+      `${Number(row?.productId) || 0}:${Number(row?.inventoryId) || 0}:${Number(row?.variantId) || 0}` === key,
+  );
   const next = {
     ...line,
-    key,
     qty: Math.min(99, Math.max(1, Number(line.qty) || 1)),
     unitPrice: Math.max(0, Number(line.unitPrice) || 0),
   };
