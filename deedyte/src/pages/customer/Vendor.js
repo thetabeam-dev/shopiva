@@ -164,7 +164,7 @@ function FilterChipSection({ title, options, value, onChange, embedded }) {
   );
 }
 
-function ProductTile({ product, width, shop, navigation, vendor, category }) {
+function ProductTile({ product, width, shop, navigation, vendor, category, inVendorCart }) {
   return (
     <TouchableOpacity
       style={[styles.tile, { width }]}
@@ -197,16 +197,16 @@ function ProductTile({ product, width, shop, navigation, vendor, category }) {
             <Icon name="image-outline" size={32} color="#9CA3AF" />
           </View>
         )}
-        {/* MVP: wishlist heart on grid tile — disabled
-        <TouchableOpacity
-          style={styles.tileHeart}
-          activeOpacity={0.85}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          onPress={() => {}}
+        <View
+          style={[styles.tileCartBadge, inVendorCart && styles.tileCartBadgeOn]}
+          accessibilityLabel={inVendorCart ? 'In vendor cart' : 'Not in vendor cart'}
         >
-          <Icon name="heart-outline" size={17} color="#000000" />
-        </TouchableOpacity>
-        */}
+          <Icon
+            name={inVendorCart ? 'cart' : 'cart-outline'}
+            size={17}
+            color={inVendorCart ? '#FFFFFF' : '#111111'}
+          />
+        </View>
       </View>
       <Text style={styles.tileTitle} numberOfLines={2}>
         {product.title}
@@ -243,6 +243,7 @@ export default function VendorShopScreen({ route, navigation }) {
   const [deliveryError, setDeliveryError] = useState('');
   const [vendorOrderCount, setVendorOrderCount] = useState(0);
   const [vendorOrderSubtotal, setVendorOrderSubtotal] = useState(0);
+  const [vendorCartProductIds, setVendorCartProductIds] = useState(() => new Set());
   const slug = String(vendor?.slug ?? '').trim();
   const storefrontKey =
     slug ||
@@ -355,10 +356,18 @@ export default function VendorShopScreen({ route, navigation }) {
         void getVendorOrder(sid).then((rows) => {
           setVendorOrderCount(rows.length);
           setVendorOrderSubtotal(orderSubtotal(rows));
+          setVendorCartProductIds(
+            new Set(
+              (Array.isArray(rows) ? rows : [])
+                .map((row) => String(row?.productId ?? '').trim())
+                .filter(Boolean),
+            ),
+          );
         });
       } else {
         setVendorOrderCount(0);
         setVendorOrderSubtotal(0);
+        setVendorCartProductIds(new Set());
       }
       return () => {
         setFilterOpen(false);
@@ -567,7 +576,7 @@ export default function VendorShopScreen({ route, navigation }) {
               }
             >
               <Text style={styles.vendorOrderBannerText}>
-                {vendorOrderCount} item{vendorOrderCount === 1 ? '' : 's'} in this vendor’s order · {formatNaira(vendorOrderSubtotal)}
+                {vendorOrderCount} item{vendorOrderCount === 1 ? '' : 's'} in vendor cart · {formatNaira(vendorOrderSubtotal)}
               </Text>
               <Text style={styles.vendorOrderBannerCta}>Review</Text>
             </TouchableOpacity>
@@ -659,6 +668,7 @@ export default function VendorShopScreen({ route, navigation }) {
                   }}
                   category={category}
                   shop={shopMeta}
+                  inVendorCart={vendorCartProductIds.has(String(p.key))}
                 />
               ))}
             </View>
@@ -1149,19 +1159,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
   },
-  /* MVP: wishlist overlay on product tile — disabled (see commented TouchableOpacity above)
-  tileHeart: {
+  tileCartBadge: {
     position: 'absolute',
     bottom: 8,
     right: 8,
     width: 34,
     height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.38)',
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  */
+  tileCartBadgeOn: {
+    backgroundColor: '#00926e',
+  },
   tileTitle: {
     color: '#111111',
     fontSize: 14,

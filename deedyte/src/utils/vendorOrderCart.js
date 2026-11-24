@@ -99,7 +99,7 @@ export async function upsertVendorOrderLine(shopId, line) {
     variantLabel: line.variantLabel,
   });
   if (data && data.ok === false) {
-    throw new Error(String(data.error || data.message || 'Could not save vendor order'));
+    throw new Error(String(data.error || data.message || 'Could not save vendor cart'));
   }
   return linesFromResponse(data);
 }

@@ -904,7 +904,7 @@ export default function ProductScreen({ route, navigation }) {
 
   const handleAddToVendorOrder = useCallback(async () => {
     if (!loggedIn) {
-      Alert.alert('Sign in required', 'Please sign in to add items to a vendor order.', [
+      Alert.alert('Sign in required', 'Please sign in to add items to a vendor cart.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign in', onPress: () => void signOut() },
       ]);
@@ -917,7 +917,7 @@ export default function ProductScreen({ route, navigation }) {
       try {
         await removeVendorOrderLine(sid, lineId);
         setVendorOrderLineForSelection(null);
-        showCartToast('Removed from this vendor’s order.');
+        showCartToast('Removed from vendor cart.');
       } catch {
         Alert.alert('Could not remove item', 'Try again in a moment.');
       }
@@ -941,7 +941,7 @@ export default function ProductScreen({ route, navigation }) {
           qty: Math.min(99, Math.max(1, Number(match.qty) || line.qty)),
         });
       }
-      showCartToast('Added to this vendor’s order.');
+      showCartToast('Added to vendor cart.');
       navigation.navigate('Vendor-order', {
         shopId: line.shopId,
         shopName,
@@ -1438,9 +1438,9 @@ export default function ProductScreen({ route, navigation }) {
             void handleAddToVendorOrder();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Add to vendor order"
+          accessibilityLabel="Add to vendor cart"
         >
-          <Text style={styles.addCartText}>Add to vendor order</Text>
+          <Text style={styles.addCartText}>Add to vendor cart</Text>
         </TouchableOpacity> */}
         {/* Add to cart
           onPress={() => {
@@ -1582,7 +1582,7 @@ export default function ProductScreen({ route, navigation }) {
           }}
           accessibilityRole="button"
           accessibilityLabel={
-            selectedLineInVendorOrder ? 'Remove from vendor order' : 'Add to vendor order'
+            selectedLineInVendorOrder ? 'Remove from vendor cart' : 'Add to vendor cart'
           }
         >
           <Text
@@ -1591,7 +1591,7 @@ export default function ProductScreen({ route, navigation }) {
               selectedLineInVendorOrder && styles.vendorOrderBarTextRemove,
             ]}
           >
-            {selectedLineInVendorOrder ? 'Remove from vendor order' : 'Add to vendor order'}
+            {selectedLineInVendorOrder ? 'Remove from vendor cart' : 'Add to vendor cart'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1634,7 +1634,7 @@ export default function ProductScreen({ route, navigation }) {
                 void handleAddToVendorOrder();
               }}
             >
-              <Text style={styles.minOrderPrimaryText}>Add to vendor order</Text>
+              <Text style={styles.minOrderPrimaryText}>Add to vendor cart</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.minOrderSecondary}

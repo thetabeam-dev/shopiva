@@ -65,7 +65,7 @@ export default function VendorOrderScreen({ route, navigation }) {
       fromDb = await getVendorOrder(shopId);
       setLines(fromDb);
     } catch {
-      Alert.alert('Could not load this vendor’s order', 'Try again in a moment.');
+      Alert.alert('Could not load this vendor cart', 'Try again in a moment.');
       return;
     }
     if (!fromDb.length || orderSubtotal(fromDb) < MIN_VENDOR_ORDER_AMOUNT) {

@@ -123,7 +123,7 @@ export function HomeStackScreen() {
         name="Vendor-order"
         component={VendorOrderScreen}
         options={{
-          title: 'Vendor order',
+          title: 'Vendor cart',
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#FFFFFF' },
           headerTitleStyle: { fontWeight: '700' },
