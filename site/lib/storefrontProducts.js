@@ -133,17 +133,29 @@ const FULL_SQL = `
   LIMIT $1 OFFSET $2
 `;
 
+function withCategoryFilter(sql, categoryKey) {
+  if (!categoryKey) return sql;
+  return sql.replace(
+    "WHERE p.is_published = true",
+    "WHERE p.is_published = true\n    AND LOWER(BTRIM(p.category)) = $3",
+  );
+}
+
 /**
- * @param {{ limit?: number, offset?: number }} [options]
+ * @param {{ limit?: number, offset?: number, category?: string }} [options]
  * @returns {Promise<{ products: ReturnType<typeof mapProductRows>, hasMore: boolean, nextOffset: number }>}
  */
-export async function listHomeProducts({ limit = 40, offset = 0 } = {}) {
+export async function listHomeProducts({ limit = 40, offset = 0, category = "" } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
   const fetchLimit = safeLimit + 1;
+  const categoryKey = String(category ?? "").trim().toLowerCase();
+  const params = categoryKey
+    ? [fetchLimit, safeOffset, categoryKey]
+    : [fetchLimit, safeOffset];
 
   async function run(sql) {
-    const result = await query(sql, [fetchLimit, safeOffset]);
+    const result = await query(withCategoryFilter(sql, categoryKey), params);
     const mapped = mapProductRows(result.rows);
     const hasMore = mapped.length > safeLimit;
     const products = hasMore ? mapped.slice(0, safeLimit) : mapped;

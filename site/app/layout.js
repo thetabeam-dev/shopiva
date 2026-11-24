@@ -24,7 +24,7 @@ export async function generateMetadata() {
   const title =
     "DeeDyte Nigeria | Making Commerce Safe For Everyone";
   const description =
-    "DeeDyte is revolutionising e-commerce by making buying and selling safe for everyone. Discover products, connect with trusted vendors, and enjoy a more secure shopping experience.";
+    "DeeDyte is revolutionising e-commerce in Nigeria by making buying and selling safe for everyone. Discover products, connect with trusted vendors, and enjoy a more secure shopping experience.";
 
   return {
     metadataBase: new URL("https://www.deedyte.com"),

@@ -5,6 +5,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
@@ -49,6 +50,14 @@ import {
 } from '../../api/buyer';
 import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
+import {
+  MIN_VENDOR_ORDER_AMOUNT,
+  clearVendorOrder,
+  getVendorOrder,
+  mergeCurrentLine,
+  orderSubtotal,
+  upsertVendorOrderLine,
+} from '../../utils/vendorOrderCart';
 
 const VIDEO_FILE = /\.(mp4|webm|mov|m4v|ogv|ogg|avi|mkv)(\?|#|$)/i;
 
@@ -103,6 +112,9 @@ export default function ProductScreen({ route, navigation }) {
   /** Vendors publish delivery policy only; opened from the ⋮ menu. */
   const [deliveryPolicyModalVisible, setDeliveryPolicyModalVisible] =
     useState(false);
+  const [minOrderSheet, setMinOrderSheet] = useState(
+    /** @type {{ subtotal: number; shopId: number } | null} */ (null),
+  );
   const [deliveryInfo, setDeliveryInfo] = useState(
     /** @type {ReturnType<typeof normalizeShopDelivery>} */(null),
   );
@@ -795,38 +807,124 @@ export default function ProductScreen({ route, navigation }) {
     signOut,
   ]);
 
-  const handleChatWithVendor = useCallback(() => {
+  const buildCurrentVendorLine = useCallback(() => {
+    const sid = resolvedShopId ?? parseShopId(shopId);
+    const variantId = hasVariants && selectedVariant ? Number(selectedVariant.id) || 0 : 0;
+    const productId = Number(d?.id ?? routeProduct?.id ?? routeProductId) || 0;
+    return {
+      shopId: sid,
+      shopName,
+      productId,
+      inventoryId: selectedInventoryId || undefined,
+      variantId: variantId || undefined,
+      variantLabel: variantSummaryText || undefined,
+      title: String(product?.title ?? '').trim(),
+      image: String(product?.uri ?? getProductImageUri(d) ?? getProductImageUri(routeProduct) ?? '').trim(),
+      unitPrice: checkoutUnitPrice,
+      qty,
+    };
+  }, [
+    resolvedShopId,
+    shopId,
+    hasVariants,
+    selectedVariant,
+    d,
+    routeProduct,
+    routeProductId,
+    shopName,
+    selectedInventoryId,
+    variantSummaryText,
+    product,
+    checkoutUnitPrice,
+    qty,
+  ]);
+
+  const handleAddToVendorOrder = useCallback(async () => {
     if (!loggedIn) {
-      Alert.alert('Sign in required', 'Please sign in to chat with this vendor.', [
+      Alert.alert('Sign in required', 'Please sign in to add items to a vendor order.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign in', onPress: () => void signOut() },
       ]);
       return;
     }
-    const sid = resolvedShopId ?? parseShopId(shopId);
-    if (!sid) {
+    if (!ensureReadyForCartOrCheckout()) return;
+    const line = buildCurrentVendorLine();
+    if (!(line.shopId > 0) || !(line.productId > 0)) {
+      Alert.alert('Unavailable', 'This shop or product could not be identified.');
+      return;
+    }
+    try {
+      await upsertVendorOrderLine(line.shopId, line);
+      showCartToast('Added to this vendor’s order.');
+      navigation.navigate('Vendor-order', {
+        shopId: line.shopId,
+        shopName,
+        vendor,
+      });
+    } catch {
+      Alert.alert('Could not add item', 'Try again in a moment.');
+    }
+  }, [
+    loggedIn,
+    signOut,
+    ensureReadyForCartOrCheckout,
+    buildCurrentVendorLine,
+    showCartToast,
+    navigation,
+    shopName,
+    vendor,
+  ]);
+
+  const handleStartPurchase = useCallback(async () => {
+    if (!loggedIn) {
+      Alert.alert('Sign in required', 'Please sign in to start purchase.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => void signOut() },
+      ]);
+      return;
+    }
+    if (!ensureReadyForCartOrCheckout()) return;
+    const line = buildCurrentVendorLine();
+    const sid = Number(line.shopId) || 0;
+    if (sid < 1) {
       Alert.alert('Chat unavailable', 'This shop could not be identified.');
       return;
     }
-    const recipient = String(shopName || '').trim();
-    const variantId = hasVariants && selectedVariant ? Number(selectedVariant.id) || 0 : 0;
-    const variantPrice = variantId ? getVariantRowPrice(/** @type {Record<string, unknown>} */ (selectedVariant)) : NaN;
-    const itemAmount = Number.isFinite(variantPrice) && variantPrice > 0 ? variantPrice : Number(product?.priceUsd) || 0;
-    const itemTitle = String(product?.title ?? '').trim();
-    const productId = Number(d?.id ?? routeProduct?.id ?? routeProductId) || 0;
-    const itemImage = String(product?.uri ?? getProductImageUri(d) ?? getProductImageUri(routeProduct) ?? '').trim();
+    const existing = await getVendorOrder(sid);
+    const lines = mergeCurrentLine(existing, line);
+    const subtotal = orderSubtotal(lines);
+    if (subtotal < MIN_VENDOR_ORDER_AMOUNT) {
+      setMinOrderSheet({ subtotal, shopId: sid });
+      return;
+    }
+    const first = lines[0];
     navigation.navigate('Inbox', {
       chat: {
         shopId: sid,
-        name: recipient,
-        itemAmount,
-        itemTitle,
-        itemImage,
-        productId,
-        variantId: variantId || undefined,
+        name: shopName,
+        orderLines: lines,
+        productId: first?.productId,
+        itemTitle: lines.length === 1 ? first.title : `${lines.length} items from ${shopName}`,
+        itemImage: first?.image,
+        itemAmount: first?.unitPrice,
+        variantId: first?.variantId,
       },
     });
-  }, [loggedIn, signOut, shopName, resolvedShopId, shopId, navigation, product, d, routeProduct, routeProductId, hasVariants, selectedVariant]);
+    void clearVendorOrder(sid);
+  }, [
+    loggedIn,
+    signOut,
+    ensureReadyForCartOrCheckout,
+    buildCurrentVendorLine,
+    shopName,
+    handleAddToVendorOrder,
+    navigation,
+    vendor,
+  ]);
+
+  const handleChatWithVendor = useCallback(() => {
+    void handleStartPurchase();
+  }, [handleStartPurchase]);
 
   const handleBuyNow = useCallback(async () => {
     if (!ensureReadyForCartOrCheckout()) return;
@@ -985,7 +1083,7 @@ export default function ProductScreen({ route, navigation }) {
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollInner,
-          { paddingBottom: insets.bottom + 120 },
+          { paddingBottom: insets.bottom + 220 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1209,11 +1307,9 @@ export default function ProductScreen({ route, navigation }) {
               ))}
             </View>
           ) : null}
-          {hasVariants && attrKeys.length ? (
+          {hasVariants && attrKeys.length && variantsForUi.length > 1 ? (
             <View style={styles.variantPickersBlock}>
-              <Text style={styles.variantPickersTitle}>
-                {variantsForUi.length === 1 ? 'Features' : 'Options (variant)'}
-              </Text>
+              <Text style={styles.variantPickersTitle}>Options (variant)</Text>
               <ProductVariantCardPicker
                 attrKeys={attrKeys}
                 variants={variantsForUi}
@@ -1246,17 +1342,17 @@ export default function ProductScreen({ route, navigation }) {
             <Icon name="add" size={22} color="#000000" />
           </TouchableOpacity>
         </View> */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.addCart}
           activeOpacity={0.88}
           onPress={() => {
-            void handleChatWithVendor();
+            void handleAddToVendorOrder();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Chat with vendor"
+          accessibilityLabel="Add to vendor order"
         >
-          <Text style={styles.addCartText}>Start Purchase</Text>
-        </TouchableOpacity>
+          <Text style={styles.addCartText}>Add to vendor order</Text>
+        </TouchableOpacity> */}
         {/* Add to cart
           onPress={() => {
             if (readyToPayOrderId) {
@@ -1363,9 +1459,40 @@ export default function ProductScreen({ route, navigation }) {
       <View
         style={[
           styles.startPurchaseBar,
-          { paddingBottom: Math.max(insets.bottom, 10) },
+          { paddingBottom: Math.max(insets.bottom, 8) },
         ]}
       >
+        <View style={styles.barQtyRow}>
+          <Text style={styles.barQtyLabel}>Quantity</Text>
+          <View style={styles.barQtyPill}>
+            <TouchableOpacity
+              style={styles.barQtyBtn}
+              onPress={() => bumpQty(-1)}
+              hitSlop={{ top: 8, bottom: 8 }}
+            >
+              <Icon name="remove" size={18} color="#111111" />
+            </TouchableOpacity>
+            <Text style={styles.barQtyValue}>{qty}</Text>
+            <TouchableOpacity
+              style={styles.barQtyBtn}
+              onPress={() => bumpQty(1)}
+              hitSlop={{ top: 8, bottom: 8 }}
+            >
+              <Icon name="add" size={18} color="#111111" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.vendorOrderBarBtn}
+          activeOpacity={0.88}
+          onPress={() => {
+            void handleAddToVendorOrder();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Add to vendor order"
+        >
+          <Text style={styles.vendorOrderBarText}>Add to vendor order</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.startPurchaseBarBtn}
           activeOpacity={0.88}
@@ -1375,9 +1502,58 @@ export default function ProductScreen({ route, navigation }) {
           accessibilityRole="button"
           accessibilityLabel="Start Purchase"
         >
-          <Text style={styles.addCartText}>Start Purchase</Text>
+          <Text style={styles.startPurchaseBarText}>Start Purchase</Text>
         </TouchableOpacity>
       </View>
+      <Modal
+        visible={Boolean(minOrderSheet)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMinOrderSheet(null)}
+      >
+        <View style={styles.minOrderRoot}>
+          <TouchableOpacity
+            style={styles.minOrderBackdrop}
+            activeOpacity={1}
+            onPress={() => setMinOrderSheet(null)}
+          />
+          <View style={[styles.minOrderSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.minOrderHandle} />
+            <Text style={styles.minOrderTitle}>Add more to this order</Text>
+            <Text style={styles.minOrderBody}>
+              This order is {formatNaira(minOrderSheet?.subtotal ?? 0)} before shipping. The
+              minimum is {formatNaira(MIN_VENDOR_ORDER_AMOUNT)}. Add more quantity or more items
+              from {shopName}'s catalog. Each vendor sets their own shipping fee, so this cart
+              stays with {shopName} only.
+            </Text>
+            <TouchableOpacity
+              style={styles.minOrderPrimary}
+              onPress={() => {
+                setMinOrderSheet(null);
+                void handleAddToVendorOrder();
+              }}
+            >
+              <Text style={styles.minOrderPrimaryText}>Add to vendor order</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.minOrderSecondary}
+              onPress={() => {
+                const sid = minOrderSheet?.shopId;
+                setMinOrderSheet(null);
+                navigation.navigate('Vendor', { vendor, shop_id: sid });
+              }}
+            >
+              <Text style={styles.minOrderSecondaryText}>Browse shop</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.minOrderGhost}
+              onPress={() => setMinOrderSheet(null)}
+            >
+              <Text style={styles.minOrderGhostText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <ShopPolicyViewerModal
         visible={deliveryPolicyModalVisible}
         onClose={() => setDeliveryPolicyModalVisible(false)}
@@ -1811,7 +1987,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1824,11 +2000,130 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  startPurchaseBarBtn: {
-    backgroundColor: PURPLE,
-    paddingVertical: 16,
-    borderRadius: 10,
+  barQtyRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 32,
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  barQtyLabel: {
+    color: '#111111',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  barQtyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  barQtyBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barQtyValue: {
+    color: '#111111',
+    fontSize: 16,
+    fontWeight: '700',
+    minWidth: 22,
+    textAlign: 'center',
+  },
+  vendorOrderBarBtn: {
+    backgroundColor: '#00926e',
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  vendorOrderBarText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  startPurchaseBarBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#111111',
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+  },
+  startPurchaseBarText: {
+    color: '#111111',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  minOrderRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  minOrderBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  minOrderSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  minOrderHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#D0D0D0',
+    marginBottom: 14,
+  },
+  minOrderTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111111',
+    marginBottom: 8,
+  },
+  minOrderBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#555555',
+    marginBottom: 16,
+  },
+  minOrderPrimary: {
+    backgroundColor: '#00926e',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  minOrderPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  minOrderSecondary: {
+    borderWidth: 1,
+    borderColor: '#111111',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  minOrderSecondaryText: {
+    color: '#111111',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  minOrderGhost: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  minOrderGhostText: {
+    color: '#667781',
+    fontSize: 15,
+    fontWeight: '600',
   },
   addCartBusy: {
     opacity: 0.75,

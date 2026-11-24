@@ -127,14 +127,14 @@ function App() {
 
   return (
     <>
-      {!versionCheck.isUpdating && !versionCheck.isLatest ? (
+      {!versionCheck.isUpdating && !versionCheck.isLatest ? ( 
         <SafeAreaView
           style={{
             flex: 1,
             backgroundColor: '#FFFFFF',
             justifyContent: 'center',
             paddingHorizontal: 28,
-          }}
+          }} 
         >
           <TouchableOpacity style={{ alignItems: 'center' }} onPress={openStore}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#111111', textAlign: 'center', marginBottom: 10 }}>

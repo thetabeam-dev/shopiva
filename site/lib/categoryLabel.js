@@ -8,5 +8,10 @@ export function formatCategoryLabel(value) {
 }
 
 export function categoryHref(key) {
-  return `/vendors?category=${encodeURIComponent(key)}`;
+  const slug = String(key ?? "").trim().toLowerCase();
+  return `/${encodeURIComponent(slug)}`;
+}
+
+export function isProductIdParam(value) {
+  return /^\d+$/.test(String(value ?? "").trim());
 }

@@ -278,16 +278,33 @@ function Bubble({
                 Next step: create an invoice for this buyer, or decline the request.
               </Text>
             ) : null}
-            <View style={styles.paidProductRow}>
-              {image ? <ProductCardMedia uri={image} style={styles.paidProductImage} /> : null}
-              <View style={styles.paidProductCopy}>
-                <Text style={styles.paidProductTitle} numberOfLines={2}>{String(request.itemTitle || 'Product')}</Text>
-                <Text style={styles.paidProductMeta}>
-                  Qty {Math.max(1, Number(request.qty) || 1)}
-                  {Number(request.itemAmount) > 0 ? ` · ${formatInvoiceMoney(request.itemAmount)} each` : ''}
-                </Text>
-              </View>
-            </View>
+            {(Array.isArray(request.items) && request.items.length
+              ? request.items
+              : [{
+                  itemTitle: request.itemTitle,
+                  itemImage: request.itemImage,
+                  itemAmount: request.itemAmount,
+                  qty: request.qty,
+                }]
+            ).map((row, idx) => {
+              const rowImage = String(row.itemImage ?? (idx === 0 ? image : '') ?? '').trim();
+              const unit = Number(row.itemAmount ?? row.unitPrice) || 0;
+              const rowQty = Math.max(1, Number(row.qty) || 1);
+              return (
+                <View key={`${row.productId ?? row.itemTitle ?? 'item'}-${idx}`} style={styles.paidProductRow}>
+                  {rowImage ? <ProductCardMedia uri={rowImage} style={styles.paidProductImage} /> : null}
+                  <View style={styles.paidProductCopy}>
+                    <Text style={styles.paidProductTitle} numberOfLines={2}>
+                      {String(row.itemTitle || request.itemTitle || 'Product')}
+                    </Text>
+                    <Text style={styles.paidProductMeta}>
+                      Qty {rowQty}
+                      {unit > 0 ? ` · ${formatInvoiceMoney(unit)} each` : ''}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
             <VariantDetails source={request} />
             {destination ? <Text style={styles.invoiceLine}>{`Ship to: ${destination}`}</Text> : null}
             {declined ? (
@@ -952,6 +969,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   const inquiryItemTitle = String(chat?.itemTitle ?? chat?.productTitle ?? '').trim();
   const inquiryItemImage = String(chat?.itemImage ?? chat?.productImage ?? '').trim();
   const inquiryProductId = Number(chat?.productId) || 0;
+  const inquiryOrderLines = Array.isArray(chat?.orderLines) ? chat.orderLines : [];
   const latestProduct = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const row = messages[i];
@@ -987,7 +1005,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     if (appRolePayload !== 'customer') return;
     if (inquiryPostedRef.current) return;
     if (!roomId || loading) return;
-    if (!(inquiryProductId > 0) && !(inquiryItemAmount > 0)) return;
+    if (!(inquiryProductId > 0) && !(inquiryItemAmount > 0) && !inquiryOrderLines.length) return;
     let lastPaidIdx = -1;
     messages.forEach((row, idx) => {
       if (row?.invoicePaid) lastPaidIdx = idx;
@@ -1012,6 +1030,17 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         itemTitle: inquiryItemTitle,
         itemImage: inquiryItemImage || undefined,
         productId: inquiryProductId || undefined,
+        items: inquiryOrderLines.length
+          ? inquiryOrderLines.map((row) => ({
+              productId: Number(row.productId) || undefined,
+              itemTitle: row.title || row.itemTitle,
+              itemImage: row.image || row.itemImage,
+              itemAmount: Number(row.unitPrice ?? row.itemAmount) || 0,
+              qty: Math.max(1, Number(row.qty) || 1),
+              variantId: Number(row.variantId) || undefined,
+              variantLabel: row.variantLabel || undefined,
+            }))
+          : undefined,
       }),
       app_role: 'customer',
     }).then((out) => {
@@ -1038,6 +1067,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
     inquiryItemTitle,
     inquiryItemImage,
     inquiryProductId,
+    inquiryOrderLines,
     messages,
     mapMessage,
   ]);
@@ -1078,21 +1108,44 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   const postInvoiceRequest = useCallback(async (shippingAddress, qty, variant) => {
     const activeRoomId = await ensureRoomId();
     if (!activeRoomId) return false;
+    const lines = inquiryOrderLines;
+    const firstLine = lines[0];
+    const unitPrice =
+      Number(variant?.price) ||
+      Number(firstLine?.unitPrice ?? firstLine?.itemAmount) ||
+      Number(itemAmount) ||
+      0;
+    const requestQty =
+      lines.length === 1
+        ? Math.max(1, Number(firstLine?.qty) || 1)
+        : lines.length > 1
+          ? 1
+          : Math.max(1, Number(qty) || 1);
     const out = await emitChatSocketAck('create_message', {
       room_id: activeRoomId,
       type: 'system',
       content: JSON.stringify({
         kind: 'invoice_request',
-        qty: Math.max(1, Number(qty) || 1),
+        qty: requestQty,
         shippingAddress: shippingAddress || undefined,
-        inventoryId: variant?.inventoryId || undefined,
-        variantLabel: variant?.label || undefined,
+        inventoryId: variant?.inventoryId || firstLine?.inventoryId || undefined,
+        variantLabel: variant?.label || firstLine?.variantLabel || undefined,
         variantName: variant?.name || undefined,
         variantDetails: variant?.details?.length ? variant.details : undefined,
-        itemAmount: variant?.price || itemAmount || undefined,
+        itemAmount: unitPrice || undefined,
         itemTitle: itemTitle || undefined,
         itemImage: itemImage || undefined,
         productId: productId || undefined,
+        items: lines.length
+          ? lines.map((row) => ({
+              productId: Number(row.productId) || undefined,
+              itemTitle: row.title || row.itemTitle,
+              itemImage: row.image || row.itemImage,
+              itemAmount: Number(row.unitPrice ?? row.itemAmount) || 0,
+              qty: Math.max(1, Number(row.qty) || 1),
+              variantLabel: row.variantLabel || undefined,
+            }))
+          : undefined,
       }),
       app_role: 'customer',
     });
@@ -1109,7 +1162,7 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       setMessages((prev) => (prev.some((p) => p.id === mapped.id) ? prev : [...prev, mapped]));
     }
     return true;
-  }, [ensureRoomId, mapMessage, itemAmount, itemTitle, itemImage, productId]);
+  }, [ensureRoomId, mapMessage, itemAmount, itemTitle, itemImage, productId, inquiryOrderLines]);
 
   const [qtyOpen, setQtyOpen] = useState(false);
   const requestShippingRef = useRef(null);
@@ -1142,8 +1195,16 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       return;
     }
     requestShippingRef.current = latestBuyerShipping;
+    if (inquiryOrderLines.length) {
+      void postInvoiceRequest(
+        latestBuyerShipping,
+        inquiryOrderLines.reduce((sum, row) => sum + Math.max(1, Number(row.qty) || 1), 0),
+        null,
+      );
+      return;
+    }
     setQtyOpen(true);
-  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip]);
+  }, [requestSending, latestBuyerShipping, dismissBuyerInvoiceTip, inquiryOrderLines, postInvoiceRequest]);
 
   const onSubmitQty = useCallback(async (qty, variant) => {
     if (requestSending) return;
@@ -1189,11 +1250,19 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
       }
       setShippingEditOpen(false);
       requestShippingRef.current = { kind: 'shipping', ...payload };
+      if (inquiryOrderLines.length) {
+        await postInvoiceRequest(
+          { kind: 'shipping', ...payload },
+          inquiryOrderLines.reduce((sum, row) => sum + Math.max(1, Number(row.qty) || 1), 0),
+          null,
+        );
+        return;
+      }
       setTimeout(() => setQtyOpen(true), Platform.OS === 'ios' ? 400 : 0);
     } finally {
       setShippingSending(false);
     }
-  }, [shippingSending, ensureRoomId, mapMessage, inquiryItemAmount, inquiryItemTitle, inquiryItemImage, inquiryProductId]);
+  }, [shippingSending, ensureRoomId, mapMessage, inquiryItemAmount, inquiryItemTitle, inquiryItemImage, inquiryProductId, inquiryOrderLines, postInvoiceRequest]);
 
   const onSubmitInvoice = useCallback(async (payload) => {
     if (invoiceSending) return;
@@ -1886,12 +1955,36 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         visible={invoiceOpen}
         sending={invoiceSending}
         destination={buyerDestination}
-        itemAmount={Number(pendingRequest?.itemAmount) || itemAmount}
-        lockedPrice={Number(pendingRequest?.itemAmount) > 0}
+        itemAmount={
+          Array.isArray(pendingRequest?.items) && pendingRequest.items.length > 1
+            ? pendingRequest.items.reduce(
+                (sum, row) =>
+                  sum +
+                  (Number(row.itemAmount ?? row.unitPrice) || 0) *
+                    Math.max(1, Number(row.qty) || 1),
+                0,
+              )
+            : Number(
+                pendingRequest?.items?.[0]?.itemAmount ??
+                  pendingRequest?.items?.[0]?.unitPrice ??
+                  pendingRequest?.itemAmount,
+              ) || itemAmount
+        }
+        lockedPrice={
+          (Array.isArray(pendingRequest?.items) && pendingRequest.items.length > 0) ||
+          Number(pendingRequest?.itemAmount) > 0
+        }
         itemTitle={itemTitle}
         itemImage={itemImage}
         productId={productId}
-        quantity={requestedQty}
+        quantity={
+          Array.isArray(pendingRequest?.items) && pendingRequest.items.length > 1
+            ? 1
+            : Math.max(
+                1,
+                Number(pendingRequest?.items?.[0]?.qty ?? pendingRequest?.qty) || 1,
+              )
+        }
         onCancel={() => setInvoiceOpen(false)}
         onSubmit={onSubmitInvoice}
       />

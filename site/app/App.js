@@ -229,8 +229,8 @@ function usesBuyerShoppingShell(pathname) {
   const parts = path.split("/").filter(Boolean);
   if (path === "/") return true;
   if (parts[0] === "vendors") return true;
-  // Product detail: /{numericId}
-  if (parts.length === 1 && /^\d+$/.test(parts[0])) return true;
+  // Product detail /{id} and category listing /{category}
+  if (parts.length === 1) return true;
   // Public shop storefront: /store/{slug} (not /store/cart etc.)
   if (
     parts[0] === "store" &&
