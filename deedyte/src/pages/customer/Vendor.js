@@ -6,6 +6,7 @@ import {
   Dimensions,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -421,6 +422,16 @@ export default function VendorShopScreen({ route, navigation }) {
     }, [resolvedShopId, applyVendorCartRows]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return undefined;
+      StatusBar.setHidden(true, 'fade');
+      return () => {
+        StatusBar.setHidden(false, 'fade');
+      };
+    }, []),
+  );
+
   const products = apiProducts;
   const displayedProducts = useMemo(() => applyProductFilters(products, filters), [products, filters]);
   const coverUri = typeof shopMeta.banner === 'string' ? shopMeta.banner.trim() : '';
@@ -680,7 +691,12 @@ export default function VendorShopScreen({ route, navigation }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#E7F6EF" translucent />
+      <StatusBar
+        hidden={Platform.OS === 'android'}
+        barStyle="dark-content"
+        backgroundColor="#E7F6EF"
+        translucent={Platform.OS !== 'android'}
+      />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 88 }]}
@@ -688,11 +704,15 @@ export default function VendorShopScreen({ route, navigation }) {
       >
         <View style={styles.cover}>
           {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
-          <TouchableOpacity style={[styles.backBtn, { top: 8 }]} onPress={() => navigation.goBack()} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.backBtn, { top: Platform.OS === 'android' ? 8 : insets.top + 8 }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
             <Icon name="arrow-back" size={22} color="#111111" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.vendorCartBtn, { top: 8 }]}
+            style={[styles.vendorCartBtn, { top: Platform.OS === 'android' ? 8 : insets.top + 8 }]}
             onPress={() =>
               navigation.navigate('Vendor-order', {
                 shopId: resolvedShopId,
