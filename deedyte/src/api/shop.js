@@ -1,4 +1,4 @@
-import { apiFetchAuth, apiFetchAuthMultipart } from './client';
+import { apiFetchAuth, apiFetchAuthMultipart, toRnFilePart } from './client';
 import { updateUserProfileFields } from './user';
 
 /**
@@ -263,7 +263,7 @@ export async function verifyShopBvn(shopId, bvnDigits) {
  */
 export async function uploadShopVerificationDocument(shopId, file) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toRnFilePart(file));
   const res = await apiFetchAuthMultipart(`/shop/${encodeURIComponent(String(shopId))}/verification-upload`, {
     method: 'POST',
     body: form,
@@ -281,7 +281,7 @@ export async function deleteProductImage(shopId, url, type) {
 
 export async function uploadProductImage(shopId, file, productId) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toRnFilePart(file));
   form.append('productId', String(productId ?? '').trim());
   const res = await apiFetchAuthMultipart(`/shop/${encodeURIComponent(String(shopId))}/product/upload`, {
     method: 'POST',
@@ -299,7 +299,7 @@ export async function uploadProductImage(shopId, file, productId) {
  */
 export async function uploadShopMedia(shopId, kind, file, previousUrl) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toRnFilePart(file));
   form.append('kind', kind);
   if (previousUrl) form.append('previousUrl', previousUrl);
   const res = await apiFetchAuthMultipart(`/shop/${encodeURIComponent(String(shopId))}/media/upload`, {
@@ -317,7 +317,7 @@ export async function uploadShopMedia(shopId, kind, file, previousUrl) {
  */
 export async function uploadDeliveryEvidence(file) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toRnFilePart(file));
   const res = await apiFetchAuthMultipart('/shop/delivery-evidence-upload', {
     method: 'POST',
     body: form,

@@ -9,6 +9,7 @@ import { shopRowToUpdatePayload } from "../../utils/shopRowToUpdatePayload.js";
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
   "application/pdf",

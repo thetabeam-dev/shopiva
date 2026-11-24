@@ -130,8 +130,8 @@ function normalizeCheckoutLine(row, index = 0) {
   const r = /** @type {Record<string, unknown>} */ (row);
   const keyRaw = r.key ?? r.id;
   const key = (typeof keyRaw === 'string' || typeof keyRaw === 'number' ? String(keyRaw) : '').trim() || `line-${index}`;
-  const title = String(r.title ?? 'Item').trim() || 'Item';
-  const unitPrice = Number(r.unitPrice) || 0;
+  const title = String(r.title ?? r.itemTitle ?? 'Item').trim() || 'Item';
+  const unitPrice = Number(r.unitPrice ?? r.itemAmount ?? r.unit) || 0;
   const qty = Math.max(1, Math.min(99, Number(r.qty) || 1));
   const image = typeof r.image === 'string' ? r.image.trim() : '';
   const cartItemId = Number(r.cartItemId);
@@ -164,7 +164,7 @@ function OrderLinesList({ lines, styles: S, onChangeQty }) {
         const lineTotal = line.unitPrice * line.qty;
         const last = idx === lines.length - 1;
         return (
-          <View key={line.key} style={[S.orderLine, last ? S.orderLineLast : null]}>
+          <View key={`${line.key}-${idx}`} style={[S.orderLine, last ? S.orderLineLast : null]}>
             <ProductCardMedia uri={line.image} style={S.orderThumb} />
             <View style={S.orderLineBody}>
               <Text style={S.orderTitle} numberOfLines={2}>
@@ -1088,6 +1088,16 @@ export default function CartCheckoutScreen({ navigation }) {
             </View>
           ) : (
             <>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>
+                  {checkoutLines.length > 1 ? `Your order (${checkoutLines.length} items)` : 'Your order'}
+                </Text>
+                <OrderLinesList
+                  lines={checkoutLines}
+                  styles={styles}
+                  onChangeQty={isChatInvoice ? onChangeLineQty : undefined}
+                />
+              </View>
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Contact information</Text>
                 {formBanner ? (

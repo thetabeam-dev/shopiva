@@ -1,5 +1,5 @@
 import DeviceInfo from 'react-native-device-info';
-import { apiFetchAuth, apiFetchAuthMultipart } from './client';
+import { apiFetchAuth, apiFetchAuthMultipart, toRnFilePart } from './client';
 import { getApiBaseUrl } from './config';
 import { Platform } from 'react-native';
 import axios from 'axios';
@@ -166,7 +166,7 @@ export async function updateUserPhone(userId, phone) {
  */
 export async function uploadUserPhoto(file, previousUrl) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toRnFilePart(file));
   if (previousUrl) form.append('previousUrl', previousUrl);
   const res = await apiFetchAuthMultipart('/user/photo/upload', {
     method: 'POST',

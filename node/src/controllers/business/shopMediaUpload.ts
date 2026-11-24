@@ -12,6 +12,7 @@ const upload = multer({
 
 const ALLOWED_MIMES = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",

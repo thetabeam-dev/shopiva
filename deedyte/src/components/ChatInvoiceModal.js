@@ -37,6 +37,17 @@ const CARD_RADIUS = 7;
  *   itemImage?: string;
  *   productId?: number;
  *   quantity?: number;
+ *   items?: Array<{
+ *     productId?: number;
+ *     title?: string;
+ *     itemTitle?: string;
+ *     image?: string;
+ *     itemImage?: string;
+ *     unit?: number;
+ *     itemAmount?: number;
+ *     qty?: number;
+ *     variantLabel?: string;
+ *   }>;
  *   onCancel: () => void;
  *   onSubmit: (payload: {
  *     amount: number;
@@ -58,6 +69,7 @@ export default function ChatInvoiceModal({
   itemImage = '',
   productId = 0,
   quantity = 1,
+  items = [],
   lockedPrice = false,
   onCancel,
   onSubmit,
@@ -75,6 +87,35 @@ export default function ChatInvoiceModal({
     }),
   );
   const dest = String(destination ?? '').trim();
+  const lineItems = (Array.isArray(items) ? items : [])
+    .map((row) => ({
+      productId: Number(row.productId) || 0,
+      title: String(row.title ?? row.itemTitle ?? '').trim(),
+      image: String(row.image ?? row.itemImage ?? '').trim(),
+      unit: Number(row.unit ?? row.itemAmount ?? row.unitPrice) || 0,
+      qty: Math.max(1, Number(row.qty) || 1),
+      variantLabel: String(row.variantLabel ?? '').trim(),
+    }))
+    .filter((row) => row.title || row.image || row.unit > 0);
+  const displayLines =
+    lineItems.length > 0
+      ? lineItems
+      : productSnap.title || productSnap.image || productSnap.price > 0
+        ? [
+            {
+              productId: productSnap.productId,
+              title: productSnap.title,
+              image: productSnap.image,
+              unit: productSnap.price,
+              qty: Math.max(1, Number(quantity) || 1),
+              variantLabel: '',
+            },
+          ]
+        : [];
+  const merchandiseTotal = displayLines.reduce(
+    (sum, row) => sum + row.unit * row.qty,
+    0,
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -87,15 +128,29 @@ export default function ChatInvoiceModal({
       productId: Number(productId) || 0,
     };
     setProductSnap(fallback);
-    setAmount(fallback.price > 0 ? String(fallback.price) : '');
+    const listed = (Array.isArray(items) ? items : []).map((row) => ({
+      unit: Number(row.unit ?? row.itemAmount ?? row.unitPrice) || 0,
+      qty: Math.max(1, Number(row.qty) || 1),
+    }));
+    const listedTotal = listed.reduce((sum, row) => sum + row.unit * row.qty, 0);
+    const multi = listed.length > 1;
+    setAmount(
+      String(
+        multi
+          ? listedTotal
+          : listed.length === 1
+            ? listed[0].unit
+            : fallback.price || '',
+      ),
+    );
     const pid = fallback.productId;
-    if (!(pid > 0)) return undefined;
+    if (multi || lockedPrice || !(pid > 0)) return undefined;
     let cancelled = false;
     void getStorefrontProduct(pid)
       .then((data) => {
         const detail = normalizeStorefrontProductDetail(data);
         if (!detail || cancelled) return;
-        const price = lockedPrice && fallback.price > 0 ? fallback.price : Number(detail.price) || fallback.price;
+        const price = Number(detail.price) || fallback.price;
         const title = String(detail.name ?? fallback.title).trim() || fallback.title;
         const image = String(getProductImageUri(detail) ?? fallback.image).trim();
         const next = { title, image, price, productId: pid };
@@ -106,7 +161,7 @@ export default function ChatInvoiceModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, itemAmount, itemTitle, itemImage, productId, lockedPrice]);
+  }, [visible, itemAmount, itemTitle, itemImage, productId, lockedPrice, items]);
 
   const submit = () => {
     if (sending) return;
@@ -131,9 +186,18 @@ export default function ChatInvoiceModal({
       deliveryTime: deliveryTimeLabel(nextDelivery) || nextDelivery,
       deliveryTimeKey: nextDelivery,
       destination: dest,
-      productId: productSnap.productId || undefined,
-      itemTitle: productSnap.title || undefined,
-      itemImage: productSnap.image || undefined,
+      productId: displayLines[0]?.productId || productSnap.productId || undefined,
+      itemTitle: displayLines[0]?.title || productSnap.title || undefined,
+      itemImage: displayLines[0]?.image || productSnap.image || undefined,
+      items: displayLines.map((row) => ({
+        productId: row.productId || undefined,
+        itemTitle: row.title || undefined,
+        itemImage: row.image || undefined,
+        itemAmount: row.unit,
+        qty: row.qty,
+        variantLabel: row.variantLabel || undefined,
+      })),
+      merchandiseTotal,
     });
   };
 
@@ -156,23 +220,33 @@ export default function ChatInvoiceModal({
             ) : 'Buyer has not shared a shipping address yet.'}
           </Text>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
-            {productSnap.title || productSnap.image ? (
-              <View style={styles.productCard}>
-                <ProductCardMedia uri={productSnap.image} style={styles.productThumb} />
+            {displayLines.map((row, idx) => (
+              <View
+                key={`${row.productId || row.title || 'item'}-${idx}`}
+                style={styles.productCard}
+              >
+                <ProductCardMedia uri={row.image} style={styles.productThumb} />
                 <View style={styles.productCopy}>
                   <Text style={styles.productTitle} numberOfLines={2}>
-                    {productSnap.title || 'Product'}
+                    {row.title || 'Product'}
                   </Text>
-                  {productSnap.price > 0 ? (
-                    <Text style={styles.productPrice}>
-                      {quantity > 1
-                        ? `${quantity} × ${formatNaira(productSnap.price)} = ${formatNaira(productSnap.price * quantity)}`
-                        : formatNaira(productSnap.price)}
-                    </Text>
+                  {row.variantLabel ? (
+                    <Text style={styles.productQty}>{row.variantLabel}</Text>
                   ) : null}
-                  {quantity > 1 ? <Text style={styles.productQty}>Buyer wants {quantity} units</Text> : null}
+                  {row.unit > 0 ? (
+                    <Text style={styles.productPrice}>
+                      {row.qty > 1
+                        ? `Qty ${row.qty} · ${formatNaira(row.unit)} each`
+                        : formatNaira(row.unit)}
+                    </Text>
+                  ) : (
+                    <Text style={styles.productQty}>Qty {row.qty}</Text>
+                  )}
                 </View>
               </View>
+            ))}
+            {displayLines.length > 1 && merchandiseTotal > 0 ? (
+              <Text style={styles.subtotal}>Items {formatNaira(merchandiseTotal)}</Text>
             ) : null}
             <Text style={styles.label}>Shipping (₦)</Text>
             <TextInput
@@ -269,6 +343,13 @@ const styles = StyleSheet.create({
   productTitle: { fontSize: 15, fontWeight: '700', color: BLACK },
   productPrice: { marginTop: 4, fontSize: 14, fontWeight: '700', color: BRAND },
   productQty: { marginTop: 2, fontSize: 12, fontWeight: '600', color: MUTED },
+  subtotal: {
+    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '800',
+    color: BLACK,
+    textAlign: 'right',
+  },
   label: { marginTop: 8, marginBottom: 6, fontSize: 12, fontWeight: '700', color: BRAND },
   input: {
     height: 44,

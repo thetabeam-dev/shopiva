@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { apiFetch, apiFetchAuth, apiFetchAuthMultipart } from './client';
+import { apiFetch, apiFetchAuth, apiFetchAuthMultipart, toRnFilePart } from './client';
 
 /**
  * @param {Response} res
@@ -59,7 +59,7 @@ export async function fetchBuyerOrder(orderId) {
  */
 export async function uploadDisputeEvidence(file) {
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toRnFilePart(file));
   const res = await apiFetchAuthMultipart('/buyer/disputes/evidence-upload', {
     method: 'POST',
     body: form,

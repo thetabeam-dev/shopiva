@@ -922,12 +922,14 @@ export default function VendorCreateProductScreen() {
         throw new Error('No photo was selected.');
       }
 
+      const name =
+        asset.fileName ||
+        `upload.${String(asset.uri).split('.').pop() || 'jpg'}`;
       const formFile = {
         uri: asset.uri,
-        type: asset.type ?? 'image/jpeg',
-        name:
-          asset.fileName ||
-          `upload.${String(asset.uri).split('.').pop() || 'jpg'}`,
+        type: asset.type ?? asset.mimeType ?? 'image/jpeg',
+        name,
+        fileName: name,
       };
 
       const uploadResponse = await uploadProductImage(
