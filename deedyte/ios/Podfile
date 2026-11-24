@@ -70,6 +70,11 @@ target 'deedyte' do
       target.build_configurations.each do |cfg|
         cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         cfg.build_settings['CLANG_WARN_NON_MODULAR_INCLUDE_IN_FRAMEWORK_MODULE'] = 'NO'
+        # Xcode 27.2: supported simulator targets start at iOS 15.0.
+        current = cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_s
+        if current.empty? || current.to_f < 15.0
+          cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.4'
+        end
       end
     end
   end

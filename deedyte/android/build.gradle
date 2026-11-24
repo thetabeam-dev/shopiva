@@ -42,6 +42,12 @@ def pinNdk = { proj ->
     }
 }
 subprojects { proj ->
+    // Windows cannot reliably delete classes.jar under node_modules/*/android/build
+    // while a daemon still has it open. Keep Expo/RN library outputs in android/build/nm/.
+    def inNodeModules = proj.projectDir.absolutePath.replace('\\', '/').contains('/node_modules/')
+    if (inNodeModules) {
+        proj.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("nm/${proj.name}"))
+    }
     proj.pluginManager.withPlugin("com.android.library") { pinNdk(proj) }
     proj.pluginManager.withPlugin("com.android.application") { pinNdk(proj) }
 }
