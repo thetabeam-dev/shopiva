@@ -79,15 +79,21 @@ export async function apiFetch(path, options = {}) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   const url = `${base}${normalized}`;
   const { headers: optionHeaders, ...rest } = options;
+  const method = String(rest.method || 'GET').toUpperCase();
+  const hasBody = rest.body != null && rest.body !== '';
   const headers = {
     Accept: 'application/json',
-    'Content-Type': 'application/json',
     ...(optionHeaders && typeof optionHeaders === 'object' && !(optionHeaders instanceof Headers)
       ? optionHeaders
       : {}),
   };
+  if (hasBody && !headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = 'application/json';
+  }
   return fetch(url, {
+    cache: 'no-store',
     ...rest,
+    method,
     headers,
   });
 }

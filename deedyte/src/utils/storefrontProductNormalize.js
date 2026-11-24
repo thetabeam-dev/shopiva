@@ -97,22 +97,41 @@ function normalizeFromProductAndInventory(product, inv) {
  * @returns {Record<string, unknown> | null}
  */
 export function normalizeStorefrontProductDetail(data) {
-  if (!data || typeof data !== 'object') return null;
-  const root = /** @type {Record<string, unknown>} */ (data);
+  let incoming = data;
+  if (typeof incoming === 'string') {
+    try {
+      incoming = JSON.parse(incoming);
+    } catch {
+      return null;
+    }
+  }
+  if (!incoming || typeof incoming !== 'object') return null;
+  let root = /** @type {Record<string, unknown>} */ (incoming);
+  if (root.product == null) {
+    const nested = [root.data, root.result, root.payload].find(
+      (item) => item && typeof item === 'object' && !Array.isArray(item),
+    );
+    if (nested) root = /** @type {Record<string, unknown>} */ (nested);
+  }
   let product =
-    root.product && typeof root.product === 'object'
+    root.product && typeof root.product === 'object' && !Array.isArray(root.product)
       ? /** @type {Record<string, unknown>} */ (root.product)
       : null;
+  if (Array.isArray(root.product) && root.product[0] && typeof root.product[0] === 'object') {
+    product = /** @type {Record<string, unknown>} */ (root.product[0]);
+  }
   /** Some gateways return the product fields on the root object instead of `product`. */
   if (!product) {
     const hasName = typeof root.name === 'string' || typeof root.title === 'string';
+    const hasId = root.id != null && String(root.id).trim() !== '';
     const looksLikeProduct =
-      hasName &&
+      (hasName || hasId) &&
       (Array.isArray(root.variants) ||
         typeof root.hasVariants === 'boolean' ||
         root.inventoryId != null ||
         'stock' in root ||
-        'price' in root);
+        'price' in root ||
+        hasName);
     if (looksLikeProduct) product = root;
   }
   if (!product || typeof product !== 'object') return null;

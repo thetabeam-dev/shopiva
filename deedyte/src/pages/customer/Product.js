@@ -180,11 +180,10 @@ export default function ProductScreen({ route, navigation }) {
       setDetailLoading(true);
       setDetailError('');
       try {
-        const data = await getStorefrontProduct(parseInt(pid, 10));
+        const data = await getStorefrontProduct(pid);
         if (cancelled) return;
         const normalized = normalizeStorefrontProductDetail(data);
         if (!normalized) {
-          setDetailProduct(null);
           setDetailError(
             'The server returned product data we could not read. Try again in a moment.',
           );
@@ -194,7 +193,7 @@ export default function ProductScreen({ route, navigation }) {
         } else {
           setDetailProduct(normalized);
           setDetailError('');
-          void recordProductView(parseInt(pid, 10)).catch(() => {});
+          void recordProductView(Number(pid)).catch(() => {});
           const sp = data.shopPolicies;
           setShopPolicies(
             sp && typeof sp === 'object'
@@ -214,7 +213,6 @@ export default function ProductScreen({ route, navigation }) {
       } catch (e) {
         if (!cancelled) {
           setDetailError(e instanceof Error ? e.message : String(e));
-          setDetailProduct(null);
           setShopPolicies(null);
           setProductReviews([]);
           setReviewMetrics(null);
@@ -226,7 +224,7 @@ export default function ProductScreen({ route, navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [productIdParam, detailRetryToken, loggedIn]);
+  }, [productIdParam, detailRetryToken]);
 
   const d = detailProduct;
   const bulkTiers = useMemo(() => parseBulkTiers(d?.bulkDiscount), [d?.bulkDiscount]);

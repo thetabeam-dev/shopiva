@@ -5,7 +5,16 @@ import { apiFetch, apiFetchAuth } from './client';
  * @returns {Promise<Record<string, unknown>>}
  */
 async function readJson(res) {
-  const data = await res.json().catch(() => ({}));
+  const text = await res.text().catch(() => '');
+  let data = {};
+  const trimmed = String(text || '').trim();
+  if (trimmed) {
+    try {
+      data = JSON.parse(trimmed);
+    } catch {
+      data = {};
+    }
+  }
   if (!res.ok) {
     const hint =
       data?.error ||
@@ -13,6 +22,12 @@ async function readJson(res) {
       (typeof data?.details === 'string' ? data.details : null) ||
       `Request failed (HTTP ${res.status})`;
     throw new Error(hint);
+  }
+  if (!trimmed) {
+    throw new Error('The server returned an empty product response. Try again.');
+  }
+  if (typeof data !== 'object' || data == null) {
+    throw new Error('The server returned product data we could not read. Try again in a moment.');
   }
   return data;
 }
