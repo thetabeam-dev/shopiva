@@ -1674,7 +1674,19 @@ export default function ProductScreen({ route, navigation }) {
         subtitle={`${priceDisplayLabel} · ${shopName}`}
         headerImageUri={String(vendor?.logo ?? '').trim()}
         fallbackLetter={shopName.charAt(0).toUpperCase() || 'S'}
-        onDeliveryPolicy={openDeliveryPolicyModal}
+        onVendorCart={() => {
+          setOverflowMenuOpen(false);
+          const sid = resolvedShopId ?? parseShopId(shopId);
+          if (!(sid > 0)) {
+            Alert.alert('Vendor cart', 'This shop cannot open a vendor cart yet.');
+            return;
+          }
+          navigation.navigate('Vendor-order', {
+            shopId: sid,
+            shopName,
+            vendor,
+          });
+        }}
         onVisitShop={() => {
           setOverflowMenuOpen(false);
           navigation.navigate('vendor', { vendor, category });

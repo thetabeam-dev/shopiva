@@ -27,7 +27,7 @@ const WINDOW_H = Dimensions.get('window').height;
  *   onNotInterested: () => void;
  *   onReport: () => void;
  *   reportLabel?: string;
- *   onDeliveryPolicy?: () => void;
+ *   onVendorCart?: () => void;
  *   onViewShopPolicy?: () => void;
  * }} props
  */
@@ -43,7 +43,7 @@ export function ShopOverflowMenu({
   onNotInterested,
   onReport,
   reportLabel = 'Report shop',
-  onDeliveryPolicy,
+  onVendorCart,
   onViewShopPolicy,
 }) {
   const insets = useSafeAreaInsets();
@@ -143,24 +143,26 @@ export function ShopOverflowMenu({
                 </TouchableOpacity>
               </>
             ) : null} */}
-            {typeof onDeliveryPolicy === 'function' ? (
+            {typeof onVendorCart === 'function' ? (
               <>
                 <View style={styles.rowSep} />
                 <TouchableOpacity
                   style={styles.row}
-                  onPress={onDeliveryPolicy}
+                  onPress={onVendorCart}
                   activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Vendor cart"
                 >
                   <Icon
-                    name="car-outline"
+                    name="cart-outline"
                     size={22}
                     color="#202124"
                     style={styles.rowIcon}
                   />
-                  <Text style={styles.rowLabel}>Delivery</Text>
+                  <Text style={styles.rowLabel}>Vendor cart</Text>
                 </TouchableOpacity>
               </>
-            ) : null}}
+            ) : null}
             {/* <TouchableOpacity
               style={styles.row}
               onPress={onNotInterested}

@@ -929,7 +929,23 @@ export default function VendorScreen({ route, navigation }) {
       //   Alert.alert('Report shop', 'Thanks for the report. Our team will review it.');
       // }}
       onViewShopPolicy={openVendorShopPolicy}
-      onDeliveryPolicy={openVendorDeliveryPolicy}
+      onVendorCart={() => {
+        const v = menuVendor;
+        closeVendorMenu();
+        if (!v || typeof v !== 'object') return;
+        const row = /** @type {Record<string, unknown>} */ (v);
+        const sid = parseShopId(row.id ?? row.shop_id ?? row.shopId);
+        const name = String(row.name ?? 'Vendor').trim() || 'Vendor';
+        if (!(sid > 0)) {
+          Alert.alert('Vendor cart', 'This shop cannot open a vendor cart yet.');
+          return;
+        }
+        navigation.navigate('Vendor-order', {
+          shopId: sid,
+          shopName: name,
+          vendor: v,
+        });
+      }}
     />
   );
 
