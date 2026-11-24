@@ -705,14 +705,14 @@ export default function VendorShopScreen({ route, navigation }) {
         <View style={styles.cover}>
           {coverUri ? <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
           <TouchableOpacity
-            style={[styles.backBtn, { top: Platform.OS === 'android' ? 8 : insets.top + 8 }]}
+            style={styles.backBtn}
             onPress={() => navigation.goBack()}
             activeOpacity={0.85}
           >
             <Icon name="arrow-back" size={22} color="#111111" />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.vendorCartBtn, { top: Platform.OS === 'android' ? 8 : insets.top + 8 }]}
+            style={styles.vendorCartBtn}
             onPress={() =>
               navigation.navigate('Vendor-order', {
                 shopId: resolvedShopId,
@@ -1088,6 +1088,7 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: 'absolute',
+    top: 8,
     left: 12,
     zIndex: 2,
     width: 40,
@@ -1099,6 +1100,7 @@ const styles = StyleSheet.create({
   },
   vendorCartBtn: {
     position: 'absolute',
+    top: 8,
     right: 12,
     zIndex: 2,
     width: 40,

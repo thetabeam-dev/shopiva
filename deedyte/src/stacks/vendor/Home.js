@@ -88,9 +88,7 @@ export function VendorHomeStackScreen() {
             name="vendor"
             component={VendorScreen}
             options={{
-            header: () => (
-                <View style={styles.hiddenHeader} />
-            ),
+            headerShown: false,
             }}
         />
 

@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -40,6 +41,22 @@ export default function VendorOrderScreen({ route, navigation }) {
   const vendor = route.params?.vendor;
   const [lines, setLines] = useState(/** @type {import('../../utils/vendorOrderCart').VendorOrderLine[]} */ ([]));
   const [minOrderOpen, setMinOrderOpen] = useState(false);
+  const vendorLogo = String(vendor?.logo ?? vendor?.logo_url ?? vendor?.image ?? '').trim();
+  const vendorLetter = shopName.charAt(0).toUpperCase() || 'V';
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerAvatar} accessibilityLabel={shopName}>
+          {vendorLogo ? (
+            <Image source={{ uri: vendorLogo }} style={styles.headerAvatarImage} />
+          ) : (
+            <Text style={styles.headerAvatarLetter}>{vendorLetter}</Text>
+          )}
+        </View>
+      ),
+    });
+  }, [navigation, shopName, vendorLogo, vendorLetter]);
 
   const reload = useCallback(async () => {
     setLines(await getVendorOrder(shopId));
@@ -91,8 +108,10 @@ export default function VendorOrderScreen({ route, navigation }) {
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <ScrollView contentContainerStyle={styles.list}>
-        <Text style={styles.kicker}>{shopName}</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.list, !lines.length && styles.listEmpty]}
+      >
         <Text style={styles.lead}>
           Items from this vendor only. Shipping is set once, after you start the purchase.
         </Text>
@@ -124,20 +143,27 @@ export default function VendorOrderScreen({ route, navigation }) {
                   >
                     <Icon name="add" size={18} color="#111" />
                   </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      void removeVendorOrderLine(shopId, lineKey(line)).then(setLines);
-                    }}
-                    hitSlop={10}
-                  >
-                    <Icon name="trash-outline" size={18} color="#9e4039" />
-                  </Pressable>
                 </View>
               </View>
+              <Pressable
+                style={styles.deleteBtn}
+                onPress={() => {
+                  void removeVendorOrderLine(shopId, lineKey(line)).then(setLines);
+                }}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Remove from vendor cart"
+              >
+                <Icon name="trash-outline" size={18} color="#9e4039" />
+              </Pressable>
             </View>
           ))
         ) : (
-          <Text style={styles.empty}>No items yet. Add products from this vendor.</Text>
+          <View style={styles.emptyWrap}>
+            <Icon name="cart-outline" size={56} color="#C5C5C5" />
+            <Text style={styles.empty}>No items yet</Text>
+            <Text style={styles.emptyHint}>Add products from this vendor.</Text>
+          </View>
         )}
       </ScrollView>
       <View style={styles.footer}>
@@ -201,8 +227,36 @@ export default function VendorOrderScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8F8F8' },
+  scroll: { flex: 1 },
   list: { padding: 16, paddingBottom: 24 },
-  kicker: { fontSize: 13, fontWeight: '700', color: TEAL, marginBottom: 4 },
+  listEmpty: { flexGrow: 1 },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E7F6EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+    overflow: 'hidden',
+  },
+  headerAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  headerAvatarLetter: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEAL,
+  },
   lead: { fontSize: 14, color: '#555', marginBottom: 16, lineHeight: 20 },
   card: {
     flexDirection: 'row',
@@ -228,7 +282,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   qtyVal: { minWidth: 20, textAlign: 'center', fontWeight: '700' },
-  empty: { color: '#757575', fontSize: 15, paddingVertical: 24 },
+  deleteBtn: {
+    alignSelf: 'center',
+    padding: 4,
+  },
+  empty: {
+    marginTop: 14,
+    color: '#111111',
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyHint: {
+    marginTop: 6,
+    color: '#757575',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   footer: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,

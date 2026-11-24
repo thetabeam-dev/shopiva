@@ -43,7 +43,7 @@ const exploreOpt = (navigation) => ({
 });
 
 const vendorOpt = {
-  header: () => <View style={styles.hiddenHeader} />,
+  headerShown: false,
 };
 
 const cartOpt = {

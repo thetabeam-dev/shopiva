@@ -56,9 +56,7 @@ const homeOpt = (styles) => ({
   
 });
 const vendorOpt={
-  header: () => (
-    <View style={styles.hiddenHeader} />
-  ),
+  headerShown: false,
 }
 const cartOpt = {
   title: 'Cart',
