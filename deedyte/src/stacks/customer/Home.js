@@ -15,6 +15,7 @@ import RecentlyViewedProductsScreen from '../../pages/customer/RecentlyViewedPro
 import ProductSearchScreen from "../../pages/customer/ProductSearch";
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
+import VendorOrderScreen from '../../pages/customer/VendorOrderScreen';
 import CartScreen from '../../pages/customer/Cart';
 import CartCheckoutScreen from '../../pages/customer/CartCheckoutScreen';
 import CheckoutWalletTopUpScreen from '../../pages/customer/CheckoutWalletTopUp';
@@ -118,6 +119,16 @@ export function HomeStackScreen() {
       />
       <HomeStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <HomeStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />
+      <HomeStack.Screen
+        name="Vendor-order"
+        component={VendorOrderScreen}
+        options={{
+          title: 'Vendor order',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTitleStyle: { fontWeight: '700' },
+        }}
+      />
       {/* <HomeStack.Screen name="Cart" component={CartScreen} options={cartOpt} /> */}
       <HomeStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt} />
       <HomeStack.Screen name="Checkout-wallet-topup" component={CheckoutWalletTopUpScreen} options={{ ...cartCheckoutOpt, title: 'Top up to pay' }} />

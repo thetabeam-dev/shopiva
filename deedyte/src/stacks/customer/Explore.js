@@ -6,6 +6,7 @@ import ExploreBrowse from '../../pages/customer/ExploreBrowse';
 import ExploreMap from '../../pages/customer/ExploreMap';
 import VendorScreen from '../../pages/customer/Vendor';
 import ProductScreen from '../../pages/customer/Product';
+import VendorOrderScreen from '../../pages/customer/VendorOrderScreen';
 import CartScreen from '../../pages/customer/Cart';
 import CartCheckoutScreen from '../../pages/customer/CartCheckoutScreen';
 import CheckoutWalletTopUpScreen from '../../pages/customer/CheckoutWalletTopUp';
@@ -124,6 +125,16 @@ export function ExploreStackScreen() {
       />
       <ExploreStack.Screen name="Vendor" component={VendorScreen} options={vendorOpt} />
       <ExploreStack.Screen name="Product" component={ProductScreen} options={{ headerShown: false }} />
+      <ExploreStack.Screen
+        name="Vendor-order"
+        component={VendorOrderScreen}
+        options={{
+          title: 'Vendor order',
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#FFFFFF' },
+          headerTitleStyle: { fontWeight: '700' },
+        }}
+      />
       {/* <ExploreStack.Screen name="Cart" component={CartScreen} options={cartOpt} /> */}
       <ExploreStack.Screen name="Cart-checkout" component={CartCheckoutScreen} options={cartCheckoutOpt} />
       <ExploreStack.Screen name="Checkout-wallet-topup" component={CheckoutWalletTopUpScreen} options={{ ...cartCheckoutOpt, title: 'Top up to pay' }} />

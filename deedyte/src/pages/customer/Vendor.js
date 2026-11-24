@@ -26,6 +26,7 @@ import { formatNaira } from '../../utils/formatNaira';
 import { getProductImageUri } from '../../utils/productImageUtils';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
+import { getVendorOrder, orderSubtotal } from '../../utils/vendorOrderCart';
 
 const { width: WINDOW_W, height: WINDOW_H } = Dimensions.get('window');
 const BROWN = '#00926e';
@@ -240,6 +241,8 @@ export default function VendorShopScreen({ route, navigation }) {
     /** @type {ReturnType<typeof normalizeShopDelivery>} */ (null),
   );
   const [deliveryError, setDeliveryError] = useState('');
+  const [vendorOrderCount, setVendorOrderCount] = useState(0);
+  const [vendorOrderSubtotal, setVendorOrderSubtotal] = useState(0);
   const slug = String(vendor?.slug ?? '').trim();
   const storefrontKey =
     slug ||
@@ -347,10 +350,20 @@ export default function VendorShopScreen({ route, navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      const sid = resolvedShopId;
+      if (sid) {
+        void getVendorOrder(sid).then((rows) => {
+          setVendorOrderCount(rows.length);
+          setVendorOrderSubtotal(orderSubtotal(rows));
+        });
+      } else {
+        setVendorOrderCount(0);
+        setVendorOrderSubtotal(0);
+      }
       return () => {
         setFilterOpen(false);
       };
-    }, []),
+    }, [resolvedShopId]),
   );
 
   const products = apiProducts;
@@ -542,6 +555,23 @@ export default function VendorShopScreen({ route, navigation }) {
             {'    '}
             {/* <Text style={styles.profileCountStrong}>{followerCount} followers</Text> */}
           </Text>
+          {vendorOrderCount > 0 ? (
+            <TouchableOpacity
+              style={styles.vendorOrderBanner}
+              onPress={() =>
+                navigation.navigate('Vendor-order', {
+                  shopId: resolvedShopId,
+                  shopName: displayName,
+                  vendor,
+                })
+              }
+            >
+              <Text style={styles.vendorOrderBannerText}>
+                {vendorOrderCount} item{vendorOrderCount === 1 ? '' : 's'} in this vendor’s order · {formatNaira(vendorOrderSubtotal)}
+              </Text>
+              <Text style={styles.vendorOrderBannerCta}>Review</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.profileTabs}>
             <TouchableOpacity style={styles.profileTab} onPress={() => setProfileTab('products')}>
@@ -1325,5 +1355,27 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: 'rgba(255,255,255,0.85)',
     fontSize: 14,
+  },
+  vendorOrderBanner: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 7,
+    backgroundColor: '#111111',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  vendorOrderBannerText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  vendorOrderBannerCta: {
+    color: '#00926e',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });
