@@ -38,6 +38,7 @@ import { useSelector } from 'react-redux';
 import { fetchOrderIdByReference } from '../api/buyer';
 import { ProductCardMedia } from '../components/ProductCardMedia';
 import { isGibberishMessage } from '../utils/gibberish';
+import { clearVendorOrder, getVendorOrder } from '../utils/vendorOrderCart';
 
 const BG = '#ECE5DD';
 const INCOMING = '#FFFFFF';
@@ -1048,7 +1049,37 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
   const inquiryItemTitle = String(chat?.itemTitle ?? chat?.productTitle ?? '').trim();
   const inquiryItemImage = String(chat?.itemImage ?? chat?.productImage ?? '').trim();
   const inquiryProductId = Number(chat?.productId) || 0;
-  const inquiryOrderLines = Array.isArray(chat?.orderLines) ? chat.orderLines : [];
+  const [storedVendorLines, setStoredVendorLines] = useState(/** @type {unknown[]} */ ([]));
+  useFocusEffect(
+    useCallback(() => {
+      const sid = Number(chat?.shopId ?? chat?.shop_id ?? pendingShopId) || 0;
+      if (!(sid > 0)) return undefined;
+      let cancelled = false;
+      void getVendorOrder(sid).then((rows) => {
+        if (!cancelled) setStoredVendorLines(Array.isArray(rows) ? rows : []);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [chat?.shopId, chat?.shop_id, pendingShopId]),
+  );
+  const inquiryOrderLines = useMemo(() => {
+    const fromNav = pickOrderItems(chat?.orderLines);
+    const fromStore = pickOrderItems(storedVendorLines);
+    let best = fromNav.length >= fromStore.length ? fromNav : fromStore;
+    if (best.length > 1) return best;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const row = messages[i];
+      const candidates = [
+        pickOrderItems(row?.invoiceRequest?.items),
+        pickOrderItems(row?.inquiry?.items),
+      ];
+      for (const list of candidates) {
+        if (list.length > best.length) best = list;
+      }
+    }
+    return best;
+  }, [chat?.orderLines, storedVendorLines, messages]);
   const latestProduct = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       const row = messages[i];
@@ -1297,11 +1328,15 @@ export default function ChatRoomScreen({ chatRoleVariant = 'customer' }) {
         variant,
         lines,
       );
-      if (sent) setQtyOpen(false);
+      if (sent) {
+        setQtyOpen(false);
+        const sid = Number(chat?.shopId ?? chat?.shop_id ?? shopId) || 0;
+        if (sid > 0) void clearVendorOrder(sid);
+      }
     } finally {
       setRequestSending(false);
     }
-  }, [requestSending, postInvoiceRequest, latestBuyerShipping, navigation, chat]);
+  }, [requestSending, postInvoiceRequest, latestBuyerShipping, navigation, chat, shopId]);
 
   const onSubmitShipping = useCallback(async (payload) => {
     if (shippingSending) return;

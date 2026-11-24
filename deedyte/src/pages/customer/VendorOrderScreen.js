@@ -15,7 +15,6 @@ import { formatNaira } from '../../utils/formatNaira';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
 import {
   MIN_VENDOR_ORDER_AMOUNT,
-  clearVendorOrder,
   getVendorOrder,
   lineKey,
   lineTotal,
@@ -72,7 +71,6 @@ export default function VendorOrderScreen({ route, navigation }) {
         variantId: first?.variantId,
       },
     });
-    void clearVendorOrder(shopId);
   };
 
   return (
