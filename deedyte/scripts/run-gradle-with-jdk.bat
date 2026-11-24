@@ -22,5 +22,6 @@ if exist "%APP_BUILD_DIR%" (
 )
 
 echo Using JAVA_HOME=%JAVA_HOME%
-call ".\android\gradlew.bat" %*
+cd /d "%APP_ROOT%\android"
+call ".\gradlew.bat" %*
 endlocal
