@@ -54,7 +54,6 @@ import {
   MIN_VENDOR_ORDER_AMOUNT,
   clearVendorOrder,
   getVendorOrder,
-  mergeCurrentLine,
   orderSubtotal,
   removeVendorOrderLine,
   setVendorOrderQty,
@@ -981,8 +980,7 @@ export default function ProductScreen({ route, navigation }) {
       Alert.alert('Chat unavailable', 'This shop could not be identified.');
       return;
     }
-    const existing = await getVendorOrder(sid);
-    const lines = mergeCurrentLine(existing, line);
+    const lines = await upsertVendorOrderLine(sid, line);
     const subtotal = orderSubtotal(lines);
     if (subtotal < MIN_VENDOR_ORDER_AMOUNT) {
       setMinOrderSheet({ subtotal, shopId: sid });

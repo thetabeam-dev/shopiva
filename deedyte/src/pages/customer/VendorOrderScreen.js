@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -54,19 +55,31 @@ export default function VendorOrderScreen({ route, navigation }) {
   const shortfall = Math.max(0, MIN_VENDOR_ORDER_AMOUNT - subtotal);
   const canStart = subtotal >= MIN_VENDOR_ORDER_AMOUNT && lines.length > 0;
 
-  const startPurchase = () => {
+  const startPurchase = async () => {
     if (!canStart) {
       setMinOrderOpen(true);
       return;
     }
-    const first = lines[0];
+    let fromDb = lines;
+    try {
+      fromDb = await getVendorOrder(shopId);
+      setLines(fromDb);
+    } catch {
+      Alert.alert('Could not load this vendor’s order', 'Try again in a moment.');
+      return;
+    }
+    if (!fromDb.length || orderSubtotal(fromDb) < MIN_VENDOR_ORDER_AMOUNT) {
+      setMinOrderOpen(true);
+      return;
+    }
+    const first = fromDb[0];
     navigation.navigate('Inbox', {
       chat: {
         shopId,
         name: shopName,
-        orderLines: lines,
+        orderLines: fromDb,
         productId: first?.productId,
-        itemTitle: lines.length === 1 ? first.title : `${lines.length} items from ${shopName}`,
+        itemTitle: fromDb.length === 1 ? first.title : `${fromDb.length} items from ${shopName}`,
         itemImage: first?.image,
         itemAmount: first?.unitPrice,
         variantId: first?.variantId,

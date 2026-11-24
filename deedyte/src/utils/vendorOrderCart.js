@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   deleteVendorOrderLine as apiDeleteLine,
   deleteVendorOrderShop,
@@ -7,6 +8,21 @@ import {
 } from '../api/buyer';
 
 export const MIN_VENDOR_ORDER_AMOUNT = 2000;
+
+/** Previous on-device cart. Never read; removed so only the database is used. */
+const LEGACY_LOCAL_CART_KEY = 'deedyte.vendorOrderCart.v1';
+
+let legacyLocalCartCleared = false;
+
+async function discardLegacyLocalCart() {
+  if (legacyLocalCartCleared) return;
+  legacyLocalCartCleared = true;
+  try {
+    await AsyncStorage.removeItem(LEGACY_LOCAL_CART_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * @typedef {{
@@ -59,6 +75,7 @@ export function lineKey(line) {
  * @returns {Promise<VendorOrderLine[]>}
  */
 export async function getVendorOrder(shopId) {
+  await discardLegacyLocalCart();
   const sid = Number(shopId) || 0;
   if (!(sid > 0)) return [];
   const data = await fetchVendorOrder(sid);
@@ -70,6 +87,7 @@ export async function getVendorOrder(shopId) {
  * @param {VendorOrderLine} line
  */
 export async function upsertVendorOrderLine(shopId, line) {
+  await discardLegacyLocalCart();
   const sid = Number(shopId) || 0;
   if (sid < 1) throw new Error('Missing shop');
   const data = await postVendorOrderLine({
@@ -92,6 +110,7 @@ export async function upsertVendorOrderLine(shopId, line) {
  * @param {number} qty
  */
 export async function setVendorOrderQty(shopId, key, qty) {
+  await discardLegacyLocalCart();
   const id = lineId(key);
   if (!(id > 0)) {
     return getVendorOrder(shopId);
@@ -106,6 +125,7 @@ export async function setVendorOrderQty(shopId, key, qty) {
  * @param {string} key
  */
 export async function removeVendorOrderLine(shopId, key) {
+  await discardLegacyLocalCart();
   const id = lineId(key);
   if (!(id > 0)) {
     return getVendorOrder(shopId);
@@ -115,30 +135,9 @@ export async function removeVendorOrderLine(shopId, key) {
 }
 
 export async function clearVendorOrder(shopId) {
+  await discardLegacyLocalCart();
   const sid = Number(shopId) || 0;
   if (!(sid > 0)) return [];
   const data = await deleteVendorOrderShop(sid);
   return linesFromResponse(data);
-}
-
-/**
- * Merge the product currently on screen into this vendor's order without writing it.
- * @param {VendorOrderLine[]} existing
- * @param {VendorOrderLine} line
- */
-export function mergeCurrentLine(existing, line) {
-  const rows = Array.isArray(existing) ? existing.map((row) => ({ ...row })) : [];
-  const key = `${Number(line?.productId) || 0}:${Number(line?.inventoryId) || 0}:${Number(line?.variantId) || 0}`;
-  const idx = rows.findIndex(
-    (row) =>
-      `${Number(row?.productId) || 0}:${Number(row?.inventoryId) || 0}:${Number(row?.variantId) || 0}` === key,
-  );
-  const next = {
-    ...line,
-    qty: Math.min(99, Math.max(1, Number(line.qty) || 1)),
-    unitPrice: Math.max(0, Number(line.unitPrice) || 0),
-  };
-  if (idx >= 0) rows[idx] = { ...rows[idx], ...next };
-  else rows.push(next);
-  return rows;
 }
