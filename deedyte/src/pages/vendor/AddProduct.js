@@ -67,6 +67,8 @@ import {
 
 const GENDER_OPTIONS = ['male', 'female', 'unisex'];
 
+const MAX_PRODUCT_MEDIA = 6;
+
 /** @template T @param {T[]} arr @param {number} size @returns {T[][]} */
 function chunkArray(arr, size) {
   const chunks = [];
@@ -903,6 +905,13 @@ export default function VendorCreateProductScreen() {
       );
       return;
     }
+    if (uploadedMedia.length >= MAX_PRODUCT_MEDIA) {
+      Alert.alert(
+        'Media limit',
+        `You can add up to ${MAX_PRODUCT_MEDIA} photos or videos.`,
+      );
+      return;
+    }
 
     try {
       setMediaUploadError('');
@@ -943,14 +952,17 @@ export default function VendorCreateProductScreen() {
         throw new Error('Upload response missing image URL.');
       }
 
-      setUploadedMedia(prev => [
-        ...prev,
-        {
-          id: `${Date.now()}-${prev.length}`,
-          url,
-          type: String(image?.format || formFile.type),
-        },
-      ]);
+      setUploadedMedia(prev => {
+        if (prev.length >= MAX_PRODUCT_MEDIA) return prev;
+        return [
+          ...prev,
+          {
+            id: `${Date.now()}-${prev.length}`,
+            url,
+            type: String(image?.format || formFile.type),
+          },
+        ];
+      });
       setThumbnailUrl(prev => prev || url);
     } catch (err) {
       setMediaUploadError(
@@ -959,7 +971,7 @@ export default function VendorCreateProductScreen() {
     } finally {
       setMediaUploading(false);
     }
-  }, [productId, resolvedShopId]);
+  }, [productId, resolvedShopId, uploadedMedia.length]);
 
   const onSave = useCallback(() => {
     if (canAddVariant) {
@@ -1579,11 +1591,16 @@ export default function VendorCreateProductScreen() {
               <TouchableOpacity
                 style={[
                   styles.mediaBtnActive,
-                  mediaUploading && styles.mediaBtnDisabled,
+                  (mediaUploading || uploadedMedia.length >= MAX_PRODUCT_MEDIA) &&
+                    styles.mediaBtnDisabled,
                 ]}
                 activeOpacity={0.88}
-                onPress={mediaUploading ? undefined : handlePickMedia}
-                disabled={mediaUploading}
+                onPress={
+                  mediaUploading || uploadedMedia.length >= MAX_PRODUCT_MEDIA
+                    ? undefined
+                    : handlePickMedia
+                }
+                disabled={mediaUploading || uploadedMedia.length >= MAX_PRODUCT_MEDIA}
               >
                 <Text style={styles.mediaBtnActiveText}>
                   {mediaUploading ? 'Uploading…' : 'Upload new'}
@@ -1592,16 +1609,23 @@ export default function VendorCreateProductScreen() {
               <TouchableOpacity
                 style={[
                   styles.mediaBtnGhost,
-                  mediaUploading && styles.mediaBtnDisabled,
+                  (mediaUploading || uploadedMedia.length >= MAX_PRODUCT_MEDIA) &&
+                    styles.mediaBtnDisabled,
                 ]}
                 activeOpacity={0.88}
-                onPress={mediaUploading ? undefined : handlePickMedia}
-                disabled={mediaUploading}
+                onPress={
+                  mediaUploading || uploadedMedia.length >= MAX_PRODUCT_MEDIA
+                    ? undefined
+                    : handlePickMedia
+                }
+                disabled={mediaUploading || uploadedMedia.length >= MAX_PRODUCT_MEDIA}
               >
                 <Text style={styles.mediaBtnGhostText}>Select existing</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.mediaHint}>Accepts video and images</Text>
+            <Text style={styles.mediaHint}>
+              Up to {MAX_PRODUCT_MEDIA} photos or videos
+            </Text>
             {mediaUploadError ? (
               <Text style={styles.errorText}>{mediaUploadError}</Text>
             ) : null}

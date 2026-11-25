@@ -1062,6 +1062,18 @@ export default function ProductScreen({ route, navigation }) {
     variantSummaryText,
   ]);
 
+  const openVendorShop = useCallback(() => {
+    const sid = resolvedShopId ?? parseShopId(shopId) ?? parseShopId(vendor?.id);
+    navigation.navigate('Vendor', {
+      vendor: {
+        ...(vendor && typeof vendor === 'object' ? vendor : {}),
+        id: sid || vendor?.id,
+        name: shopName,
+      },
+      shop_id: sid || undefined,
+    });
+  }, [navigation, resolvedShopId, shopId, vendor, shopName]);
+
   if (!vendor) {
     return (
       <View style={[styles.fallback, { paddingTop: insets.top + 24 }]}>
@@ -1116,7 +1128,13 @@ export default function ProductScreen({ route, navigation }) {
         >
           <Icon name="chevron-back" size={26} color="#000000" />
         </TouchableOpacity>
-        <View style={styles.vendorLeft}>
+        <TouchableOpacity
+          style={styles.vendorLeft}
+          activeOpacity={0.75}
+          onPress={openVendorShop}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${shopName} shop`}
+        >
           <View style={styles.vendorAvatar}>
             {String(vendor?.logo ?? '').trim() ? (
               <Image
@@ -1135,7 +1153,7 @@ export default function ProductScreen({ route, navigation }) {
               {shopName}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
         {!loggedIn ? (
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1533,9 +1551,7 @@ export default function ProductScreen({ route, navigation }) {
             ? product.description.trim()
             : 'No description provided for this product.'}
         </Text>
-        <TouchableOpacity style={styles.visitPill} activeOpacity={0.88} onPress={e => navigation.navigate("Vendor", {
-          vendor: vendor
-        })}>
+        <TouchableOpacity style={styles.visitPill} activeOpacity={0.88} onPress={openVendorShop}>
           <Icon name="link-outline" size={18} color="#000000" />
           <Text style={styles.visitPillText}>{`Visit ${shopName}`}</Text>
         </TouchableOpacity>
@@ -1689,7 +1705,7 @@ export default function ProductScreen({ route, navigation }) {
         }}
         onVisitShop={() => {
           setOverflowMenuOpen(false);
-          navigation.navigate('vendor', { vendor, category });
+          openVendorShop();
         }}
         onFollow={() => {
           setOverflowMenuOpen(false);

@@ -20,10 +20,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import RatingRow from '../../components/RatingRow';
-import ShopPolicyViewerModal from '../../components/ShopPolicyViewerModal';
 import { buildMvpCategoryFilters, formatMvpCategoryLabel } from '../../utils/mvpCategory';
 import { selectCategoryTree } from '../../../redux/categoriesSlice';
-import { getStorefrontProduct, getStorefrontProducts, getStorefrontShop, getStorefrontShopDelivery } from '../../api/storefront';
+import { getStorefrontProduct, getStorefrontProducts, getStorefrontShop } from '../../api/storefront';
 import { recordShopView } from '../../api/buyer';
 import { useAuth } from '../../hooks/useAuth';
 import { formatNaira } from '../../utils/formatNaira';
@@ -31,7 +30,7 @@ import { getProductImageUri } from '../../utils/productImageUtils';
 import { ProductCardMedia } from '../../components/ProductCardMedia';
 import { normalizeStorefrontProductDetail } from '../../utils/storefrontProductNormalize';
 import { formatAttributeLabel } from '../../utils/storefrontProductDetail';
-import { normalizeShopDelivery, parseShopId } from '../../utils/vendorDelivery';
+import { parseShopId } from '../../utils/vendorDelivery';
 import {
   getVendorOrder,
   orderSubtotal,
@@ -266,12 +265,6 @@ export default function VendorShopScreen({ route, navigation }) {
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState('');
   const [shopReviews, setShopReviews] = useState(/** @type {Record<string, unknown>[]} */ ([]));
-  const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
-  const [deliveryLoading, setDeliveryLoading] = useState(false);
-  const [deliveryInfo, setDeliveryInfo] = useState(
-    /** @type {ReturnType<typeof normalizeShopDelivery>} */ (null),
-  );
-  const [deliveryError, setDeliveryError] = useState('');
   const [vendorOrderCount, setVendorOrderCount] = useState(0);
   const [vendorOrderSubtotal, setVendorOrderSubtotal] = useState(0);
   const [vendorCartProductIds, setVendorCartProductIds] = useState(() => new Set());
@@ -572,24 +565,6 @@ export default function VendorShopScreen({ route, navigation }) {
     }
   }, [variantSheet, addProductToVendorCart]);
 
-  const deliveryStates = useMemo(
-    () => (deliveryInfo?.locations ?? []).map((loc) => loc.name).filter(Boolean),
-    [deliveryInfo],
-  );
-
-  useEffect(() => {
-    if (!resolvedShopId) return;
-    let active = true;
-    getStorefrontShopDelivery(resolvedShopId)
-      .then((raw) => {
-        if (active) setDeliveryInfo(normalizeShopDelivery(raw));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [resolvedShopId]);
-
   const colW = (WINDOW_W - PAD * 2 - GRID_GAP) / 2;
 
   const topPad = insets.top + 8;
@@ -597,54 +572,6 @@ export default function VendorShopScreen({ route, navigation }) {
   const onFollow = useCallback(() => {
     setFollowing((f) => !f);
   }, []);
-
-  const openDeliveryDetails = useCallback(async () => {
-    setDeliveryModalVisible(true);
-    if (!resolvedShopId) {
-      setDeliveryInfo(null);
-      setDeliveryError('This shop cannot load delivery details (missing id).');
-      return;
-    }
-    if (deliveryInfo?.shopId === resolvedShopId && !deliveryError) {
-      return;
-    }
-    setDeliveryLoading(true);
-    setDeliveryError('');
-    try {
-      const raw = await getStorefrontShopDelivery(resolvedShopId);
-      setDeliveryInfo(normalizeShopDelivery(raw));
-    } catch (e) {
-      setDeliveryInfo(null);
-      setDeliveryError(
-        e instanceof Error ? e.message : 'Could not load delivery details.',
-      );
-    } finally {
-      setDeliveryLoading(false);
-    }
-  }, [resolvedShopId, deliveryInfo, deliveryError]);
-
-  const deliveryHeaderActions = (
-    <>
-      {/* <TouchableOpacity
-        style={[styles.circleBrown, styles.heroIconGap]}
-        onPress={() => navigation.navigate('Cart')}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Open cart"
-      >
-        <Icon name="cart-outline" size={20} color="#000000" />
-      </TouchableOpacity> */}
-      {/* <TouchableOpacity
-        style={[styles.circleBrown, styles.heroIconGap]}
-        onPress={openDeliveryDetails}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Delivery details"
-      >
-        <Icon name="car-outline" size={20} color="#000000" />
-      </TouchableOpacity> */}
-    </>
-  );
 
   const openFilterModal = useCallback(() => {
     const m = { ...filters };
@@ -770,13 +697,6 @@ export default function VendorShopScreen({ route, navigation }) {
 
           <Text style={styles.profileName}>{displayName}</Text>
           {about ? <Text style={styles.profileAbout}>{about}</Text> : null}
-
-          <TouchableOpacity style={styles.shipBlock} onPress={openDeliveryDetails} activeOpacity={0.85}>
-            <Text style={styles.shipStates}>
-              <Text style={styles.shipLabel}>Ships To: </Text>
-              {deliveryStates.length ? deliveryStates.join(', ') : 'Delivery locations are not set yet.'}
-            </Text>
-          </TouchableOpacity>
           {joinedLabel ? <Text style={styles.profileMeta}>Joined {joinedLabel}</Text> : null}
           <Text style={styles.profileCounts}>
             <Text style={styles.profileCountStrong}>{apiProducts.length} products</Text>
@@ -1060,19 +980,6 @@ export default function VendorShopScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-      <ShopPolicyViewerModal
-        visible={deliveryModalVisible}
-        onClose={() => setDeliveryModalVisible(false)}
-        title="Delivery details"
-        clauses={[]}
-        locations={deliveryInfo?.locations}
-        deliveryMethod={deliveryInfo?.method}
-        loading={deliveryLoading}
-        emptyMessage={
-          deliveryError ||
-          'This vendor has not set delivery locations on DeeDyte yet.'
-        }
-      />
     </View>
   );
 }
@@ -1193,28 +1100,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#374151',
-  },
-  shipBlock: {
-    marginTop: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    borderRadius: 7,
-    backgroundColor: '#E7F6EF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  shipLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#00926E',
-  },
-  shipStates: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111111',
   },
   profileCounts: {
     marginTop: 14,

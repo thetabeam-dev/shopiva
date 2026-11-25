@@ -8,7 +8,10 @@
   },
   "runtimeVersion": "1.0.0",
   "updates": {
-    "url": "https://u.expo.dev/d2dbd5bc-7d29-4519-ba81-761a75eb0aa6"
+    "url": "https://u.expo.dev/d2dbd5bc-7d29-4519-ba81-761a75eb0aa6",
+    "requestHeaders": {
+      "expo-channel-name": "production"
+    }
   },
   "android": {},
   "ios": {}
