@@ -34,9 +34,21 @@ import { autoReleaseConfirmedOrders, expireUnacceptedOrders, remindVendorsOfUnac
 import { calculateEscrowFee, policy } from "./utils/escrow.js";
 import { sendShopSetupReminders } from "./services/shopSetupReminders.js";
 import { sendAbandonedCartReminders } from "./services/cartAbandonedReminders.js";
+import { sendTelegramDemoMessages } from "./utils/telegramNotify.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from node project root so it matches Next (same secret regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+/**
+ * Send a demo Telegram message to each ops group
+ * (chat room / invoice request / paid order).
+ * Hit GET /ops/telegram-demo while the API is running.
+ */
+async function sendTelegramGroupDemo() {
+  const results = await sendTelegramDemoMessages();
+  console.log("[telegram] demo results:", results);
+  return results;
+}
 
 let io;
 
@@ -95,6 +107,20 @@ app.use(passport.initialize());
 /** Quick check that the RN app can reach this host (same base URL as API + OAuth). */
 app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true, service: "deedyte-api" });
+});
+
+/** Demo: push one test message to each Telegram ops group. */
+app.get("/ops/telegram-demo", async (_req, res) => {
+  try {
+    const results = await sendTelegramGroupDemo();
+    const ok = results.every((r) => r.ok);
+    res.status(ok ? 200 : 502).json({ ok, results });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 });
 
 app.get("/config/shipping-tutorial", (_req, res) => {

@@ -39,45 +39,208 @@ function truncate(value: string, max = 280): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
+type TelegramSendResult = {
+  channel: TelegramAlertChannel;
+  chatId: string;
+  ok: boolean;
+  status?: number;
+  error?: string;
+};
+
+/** Candidate Bot API ids for a Telegram Web `#-NNNN` group peer. */
+function chatIdCandidates(raw: string): string[] {
+  const id = String(raw ?? "").trim();
+  if (!id) return [];
+  const out = [id];
+  // Supergroups / channels often need -100XXXXXXXXXX while Web shows -XXXXXXXXXX
+  if (/^-\d+$/.test(id) && !id.startsWith("-100")) {
+    out.push(`-100${id.slice(1)}`);
+  }
+  return out;
+}
+
+async function postTelegramMessage(
+  token: string,
+  chatId: string,
+  text: string,
+): Promise<{ ok: boolean; status: number; error?: string }> {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      disable_web_page_preview: true,
+    }),
+  });
+  if (res.ok) return { ok: true, status: res.status };
+  const detail = await res.text().catch(() => "");
+  return {
+    ok: false,
+    status: res.status,
+    error: detail.slice(0, 300) || `HTTP ${res.status}`,
+  };
+}
+
 /**
- * Send a plain-text Telegram message to a channel group. Never throws to callers.
+ * Send a plain-text Telegram message to a channel group.
+ * Returns delivery status; never throws.
  */
 export async function sendTelegramAlert(
   channel: TelegramAlertChannel,
   text: string,
-): Promise<void> {
+): Promise<TelegramSendResult> {
   const token = telegramToken();
-  const chatId = chatIdFor(channel);
-  if (!token || !chatId) return;
+  const configuredId = chatIdFor(channel);
+  if (!token) {
+    return {
+      channel,
+      chatId: configuredId,
+      ok: false,
+      error: "TELEGRAM_BOT_TOKEN is not set",
+    };
+  }
+  if (!configuredId) {
+    return {
+      channel,
+      chatId: configuredId,
+      ok: false,
+      error: `No chat id configured for ${channel}`,
+    };
+  }
 
   const body = truncate(String(text ?? "").trim(), 3500);
-  if (!body) return;
+  if (!body) {
+    return { channel, chatId: configuredId, ok: false, error: "Empty message" };
+  }
 
   try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: body,
-        disable_web_page_preview: true,
-      }),
-    });
-    if (!res.ok && process.env.NODE_ENV !== "production") {
-      const detail = await res.text().catch(() => "");
+    let last: { ok: boolean; status: number; error?: string; chatId: string } | null =
+      null;
+    for (const chatId of chatIdCandidates(configuredId)) {
+      const result = await postTelegramMessage(token, chatId, body);
+      last = { ...result, chatId };
+      if (result.ok) {
+        return { channel, chatId, ok: true, status: result.status };
+      }
+      // Only fall through to -100… when Telegram says the peer is unknown.
+      if (!String(result.error ?? "").includes("chat not found")) {
+        break;
+      }
+    }
+    if (process.env.NODE_ENV !== "production" && last?.error) {
       console.warn(
-        `[telegram] sendMessage(${channel}) failed HTTP ${res.status}: ${detail.slice(0, 200)}`,
+        `[telegram] sendMessage(${channel}) failed HTTP ${last.status}: ${last.error.slice(0, 200)}`,
       );
     }
+    const failed: TelegramSendResult = {
+      channel,
+      chatId: last?.chatId ?? configuredId,
+      ok: false,
+      error:
+        last?.error ||
+        "chat not found — add the bot to the group, then copy chat.id from GET /ops/telegram-chats",
+    };
+    if (typeof last?.status === "number") failed.status = last.status;
+    return failed;
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        `[telegram] sendMessage(${channel}) error:`,
-        err instanceof Error ? err.message : err,
-      );
+      console.warn(`[telegram] sendMessage(${channel}) error:`, message);
     }
+    return { channel, chatId: configuredId, ok: false, error: message };
   }
+}
+
+/**
+ * List chats Telegram has delivered to this bot (after the bot is added
+ * to a group and someone posts there, or the bot is @mentioned).
+ */
+export async function listTelegramVisibleChats(): Promise<{
+  ok: boolean;
+  chats: Array<{ id: number | string; type: string; title: string }>;
+  error?: string;
+  hint?: string;
+}> {
+  const token = telegramToken();
+  if (!token) {
+    return { ok: false, chats: [], error: "TELEGRAM_BOT_TOKEN is not set" };
+  }
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/getUpdates?limit=100`,
+    );
+    type TgChat = {
+      id?: number;
+      type?: string;
+      title?: string;
+      username?: string;
+    };
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      description?: string;
+      result?: Array<{
+        message?: { chat?: TgChat };
+        my_chat_member?: { chat?: TgChat };
+        channel_post?: { chat?: TgChat };
+      }>;
+    };
+    if (!res.ok || !data.ok) {
+      return {
+        ok: false,
+        chats: [],
+        error: data.description || `HTTP ${res.status}`,
+      };
+    }
+    const byId = new Map<string, { id: number | string; type: string; title: string }>();
+    for (const update of data.result ?? []) {
+      const chat =
+        update.message?.chat ||
+        update.my_chat_member?.chat ||
+        update.channel_post?.chat;
+      if (!chat?.id) continue;
+      const key = String(chat.id);
+      byId.set(key, {
+        id: chat.id,
+        type: String(chat.type ?? "unknown"),
+        title: String(chat.title || chat.username || key),
+      });
+    }
+    return {
+      ok: true,
+      chats: [...byId.values()],
+      hint:
+        byId.size === 0
+          ? "No chats yet. Add the bot to each group, send any message in the group, then reload this endpoint and copy the numeric id (keep the leading -)."
+          : "Use these id values in TELEGRAM_CHAT_ID_* (keep the leading - for groups).",
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      chats: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/** Send one demo message to each configured ops group. */
+export async function sendTelegramDemoMessages(): Promise<TelegramSendResult[]> {
+  const stamp = new Date().toISOString();
+  return Promise.all([
+    sendTelegramAlert(
+      "chat_room",
+      `DeeDyte · Demo\nChannel: new chat room\nTime: ${stamp}`,
+    ),
+    sendTelegramAlert(
+      "invoice_request",
+      `DeeDyte · Demo\nChannel: invoice request\nTime: ${stamp}`,
+    ),
+    sendTelegramAlert(
+      "paid_order",
+      `DeeDyte · Demo\nChannel: paid order\nTime: ${stamp}`,
+    ),
+  ]);
 }
 
 export function notifyTelegramChatRoomCreated(input: {
