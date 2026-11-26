@@ -3,7 +3,11 @@
  * Returns path + shop payload so callers can dispatch Redux then router.replace (state survives).
  */
 
-import { pickDefaultShopFromList } from "../lib/entrepreneurDefaultShop";
+import {
+  parseShopsList,
+  pickDefaultShopFromList,
+} from "../lib/entrepreneurDefaultShop";
+import { getShopsByOwner } from "../lib/productApi";
 
 const AUTH_URL = "/api/user/authorization";
 
@@ -32,9 +36,21 @@ export async function resolvePostLoginNavigation(role) {
 
     if (res.ok && data.bool && data.hasShop === true) {
       try {
-        const sres = await fetch("/api/shop/my-shops", { credentials: "include" });
-        const sjson = await sres.json().catch(() => ({}));
-        const shops = Array.isArray(sjson?.shops) ? sjson.shops : [];
+        const ownerId = data.id ?? data.data?.id;
+        let shops = [];
+        if (ownerId != null) {
+          try {
+            const ownerRes = await getShopsByOwner(ownerId);
+            shops = parseShopsList(ownerRes);
+          } catch {
+            shops = [];
+          }
+        }
+        if (shops.length === 0) {
+          const sres = await fetch("/api/shop/my-shops", { credentials: "include" });
+          const sjson = await sres.json().catch(() => ({}));
+          shops = parseShopsList(sjson);
+        }
         let shop = pickDefaultShopFromList(shops);
         if (!shop) {
           const dres = await fetch("/api/shop/details", { credentials: "include" });

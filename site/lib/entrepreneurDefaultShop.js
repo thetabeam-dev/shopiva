@@ -38,16 +38,45 @@ export function shopRowId(s) {
 }
 
 /**
+ * Normalize shop-list payloads from Node / Next proxies.
+ * Accepts `{ shops }`, raw arrays, and legacy `{ data }` / `{ result }` shapes.
+ * @param {unknown} payload
+ * @returns {object[]}
+ */
+export function parseShopsList(payload) {
+  if (Array.isArray(payload)) return payload.filter((row) => row && typeof row === "object");
+  if (!payload || typeof payload !== "object") return [];
+  const obj = /** @type {Record<string, unknown>} */ (payload);
+  if (Array.isArray(obj.shops)) {
+    return obj.shops.filter((row) => row && typeof row === "object");
+  }
+  if (Array.isArray(obj.data)) {
+    return obj.data.filter((row) => row && typeof row === "object");
+  }
+  if (obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)) {
+    const nested = /** @type {Record<string, unknown>} */ (obj.data);
+    if (Array.isArray(nested.shops)) {
+      return nested.shops.filter((row) => row && typeof row === "object");
+    }
+  }
+  if (Array.isArray(obj.result)) {
+    return obj.result.filter((row) => row && typeof row === "object");
+  }
+  return [];
+}
+
+/**
  * Prefer last-used shop if it still exists in the list; otherwise first shop.
  * @param {unknown[]} shops
  * @returns {unknown | null}
  */
 export function pickDefaultShopFromList(shops) {
-  if (!Array.isArray(shops) || shops.length === 0) return null;
+  const list = parseShopsList(shops);
+  if (list.length === 0) return null;
   const lastId = getStoredEntrepreneurShopId();
   if (lastId != null) {
-    const match = shops.find((s) => String(shopRowId(s)) === String(lastId));
+    const match = list.find((s) => String(shopRowId(s)) === String(lastId));
     if (match) return match;
   }
-  return shops[0];
+  return list[0];
 }

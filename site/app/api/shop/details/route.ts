@@ -63,13 +63,17 @@ export async function GET(request: NextRequest) {
         { status: shopsRes.status === 401 ? 401 : 502 }
       );
     }
-    const shopsRaw = shopsBody.shops;
+    const shopsRaw = shopsBody.shops ?? shopsBody.data ?? shopsBody.result ?? shopsBody;
     const shops = Array.isArray(shopsRaw) ? shopsRaw : [];
     if (shops.length === 0) {
       return NextResponse.json({ shop: null });
     }
 
-    const shopId = shops[0].id;
+    const first = shops[0] as Record<string, unknown>;
+    const shopId = first?.id ?? first?.shop_id ?? first?.shopId;
+    if (shopId == null) {
+      return NextResponse.json({ shop: null });
+    }
     const shopRes = await fetch(`${BACKEND_URL}/shop/${shopId}/${ownerId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });

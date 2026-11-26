@@ -32,7 +32,11 @@ import {
   set_entrepreneur_has_shop,
   set_entrepreneur_shop_details,
 } from "../../redux/entrepreneur/entrepreneur_shop";
-import { pickDefaultShopFromList } from "../../lib/entrepreneurDefaultShop";
+import {
+  parseShopsList,
+  pickDefaultShopFromList,
+} from "../../lib/entrepreneurDefaultShop";
+import { getShopsByOwner } from "../../lib/productApi";
 
 // ============================================================================
 // CONSTANTS
@@ -125,27 +129,37 @@ export default function EntrepreneurRestrictedLayout({ children }) {
   const { entrepreneur_id } = useSelector((state) => state.entrepreneur_id);
   const shopDetails = useSelector((state) => state.entrepreneur_shop.shop);
 
-  /** After hard refresh, Redux is empty — hydrate shop using last-used id from localStorage when possible */
+  /** After hard refresh, Redux is empty — hydrate shop via GET /shop/owner/:id */
   useEffect(() => {
     if (!isAuthenticated || isLoading) return;
     if (shopDetails != null) return;
+    if (entrepreneur_id == null) return;
     let cancelled = false;
     (async () => {
       try {
-        const sres = await fetch("/api/shop/my-shops", { credentials: "include" });
-        const sjson = await sres.json().catch(() => ({}));
-        const shops = Array.isArray(sjson?.shops) ? sjson.shops : [];
+        const ownerRes = await getShopsByOwner(entrepreneur_id);
         if (cancelled) return;
+        let shops = parseShopsList(ownerRes);
+
+        // Fallback Next proxies if owner route is empty/unavailable
+        if (shops.length === 0) {
+          const sres = await fetch("/api/shop/my-shops", { credentials: "include" });
+          const sjson = await sres.json().catch(() => ({}));
+          if (cancelled) return;
+          shops = parseShopsList(sjson);
+        }
+
         if (shops.length > 0) {
           const shop = pickDefaultShopFromList(shops);
           dispatch(set_entrepreneur_has_shop(true));
           dispatch(set_entrepreneur_shop_details(shop));
           return;
         }
+
         const dres = await fetch("/api/shop/details", { credentials: "include" });
         const d = await dres.json().catch(() => ({}));
         if (cancelled) return;
-        if (d.shop) {
+        if (d?.shop) {
           dispatch(set_entrepreneur_has_shop(true));
           dispatch(set_entrepreneur_shop_details(d.shop));
         } else {
@@ -159,8 +173,10 @@ export default function EntrepreneurRestrictedLayout({ children }) {
         }
       }
     })();
-    return () => { cancelled = true };
-  }, [isAuthenticated, isLoading, shopDetails, dispatch]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isLoading, shopDetails, entrepreneur_id, dispatch]);
 
   // ============================================================================
   // CALLBACKS

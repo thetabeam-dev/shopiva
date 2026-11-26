@@ -184,9 +184,6 @@ export default function AuthSignupPage() {
           <section style={{ marginLeft: "0px", marginBottom: "10px", flexDirection: "row", display: "flex", alignItems: "flex-start" }}>
             <img src={logo_img.src} style={{ height: "40px", width: "40px", borderRadius: "10px" }} alt="DeeDyte" />
           </section>
-          <h1 className="page-h1 page-h1--auth">
-            Join DeeDyte — Making Commerce Safe For Everyone
-          </h1>
           <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#666" }}>
             Sign up as {role === ROLES.entrepreneur ? "Entrepreneur" : "Customer"}
           </p>

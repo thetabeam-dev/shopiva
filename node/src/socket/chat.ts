@@ -14,6 +14,11 @@ import {
   scanMessage,
 } from "../utils/messageModeration.js";
 import { chatMessagePreview, normalizeChatContent } from "../utils/chatMessagePreview.js";
+import {
+  chatCardKind,
+  notifyTelegramChatRoomCreated,
+  notifyTelegramInvoiceRequested,
+} from "../utils/telegramNotify.js";
 
 type AckFn = (response: Record<string, unknown>) => void;
 
@@ -177,6 +182,15 @@ export async function handleCreateRoom(
     message: "Room created",
   });
 
+  notifyTelegramChatRoomCreated({
+    roomId: room.id,
+    initiatorId: userId,
+    recipientId: recipient_id,
+    shopId: shop_id,
+    orderId: order_id,
+    source: "socket:create_room",
+  });
+
   nsp.to(`user:${recipient_id}`).emit("room_created", { room, existing: false });
   const recipientAppRole = appRoleToNotificationRole(recipient_role) ?? "vendor";
   void (async () => {
@@ -328,6 +342,15 @@ export async function handleCreateMessage(
     result: { message },
     message: "Message sent",
   });
+
+  if (type === "system" && chatCardKind(content) === "invoice_request") {
+    notifyTelegramInvoiceRequested({
+      roomId: room_id,
+      senderId: userId,
+      messageId: String(message.id ?? ""),
+      preview: chatMessagePreview(content),
+    });
+  }
 
   const others = await chatModel.otherParticipantIds(room_id, userId);
   const room = await chatModel.getRoomById(room_id);

@@ -14,6 +14,7 @@ import { emitBuyerPaymentToVendor, emitUnpaidOrderToVendor } from "../../socket/
 import { persistShippingAddress } from "../../utils/shippingAddress.js";
 import { createEscrowForOrder } from "../../models/escrow.js";
 import { calculateEscrowFee, policy } from "../../utils/escrow.js";
+import { notifyTelegramChatRoomCreated } from "../../utils/telegramNotify.js";
 
 function pickNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -375,6 +376,14 @@ async function createCheckoutRoomsForOrderRows(
     const payload = { room, existing: false };
     notifyUser(buyerUserId, "room_created", payload);
     notifyUser(vid as any, "room_created", payload);
+    notifyTelegramChatRoomCreated({
+      roomId: room.id,
+      initiatorId: buyerUserId,
+      recipientId: Number(vid) || null,
+      shopId: Number(shopId) > 0 ? Number(shopId) : null,
+      orderId: roomOrderId,
+      source: "checkout:paid_order_room",
+    });
     void notifyChatRecipient(vid, roomOrderId, "vendor");
   }
 

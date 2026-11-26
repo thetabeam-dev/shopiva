@@ -67,10 +67,9 @@ export async function GET(request: NextRequest) {
         { status: shopsRes.status === 401 ? 401 : 502 }
       );
     }
-    const shops = data.shops;
-    return NextResponse.json({
-      shops: Array.isArray(shops) ? shops : [],
-    });
+    const shopsRaw = data.shops ?? data.data ?? data.result ?? data;
+    const shops = Array.isArray(shopsRaw) ? shopsRaw : [];
+    return NextResponse.json({ shops });
   } catch (err) {
     if (err instanceof Error && err.name === "JsonWebTokenError") {
       return NextResponse.json(

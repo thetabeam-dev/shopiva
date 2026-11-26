@@ -18,8 +18,12 @@ async function proxy(request: NextRequest, { params }: Ctx) {
   }
 
   const url = `${BACKEND_URL}/${path}${request.nextUrl.search || ""}`;
+  // Role cookies used by the site (legacy `user_secret` kept as fallback).
   const token =
-    request.cookies.get("user_secret")?.value;
+    request.cookies.get("entrepreneur_secret")?.value ||
+    request.cookies.get("customer_secret")?.value ||
+    request.cookies.get("user_secret")?.value ||
+    null;
 
   const headers = new Headers();
   const incomingAuth = request.headers.get("authorization");

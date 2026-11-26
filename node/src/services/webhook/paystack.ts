@@ -1,12 +1,28 @@
 import { db } from "../../config/database.js";
 import type { NewOrder, OrderEvents, OrderItem } from "../../types/paystack.js";
+import { notifyTelegramOrderPaid } from "../../utils/telegramNotify.js";
 
 
 export class OrderHandler{
 
     static async newOrder(new_order_payload: NewOrder){
-        return await upsertNewOrder(new_order_payload);
-        // return orderResult;
+        const orderId = await upsertNewOrder(new_order_payload);
+        const paid =
+          String(new_order_payload.payment_status ?? "").toLowerCase() === "success" ||
+          String(new_order_payload.fulfillment_status ?? "").toLowerCase() === "payment_received";
+        if (paid) {
+          notifyTelegramOrderPaid({
+            orderId,
+            customerId: new_order_payload.customer_id,
+            shopId: new_order_payload.shop_id,
+            amountPaid: new_order_payload.amount_paid,
+            totalPaid: new_order_payload.total_paid,
+            currency: new_order_payload.currency,
+            paymentReference: new_order_payload.payment_reference,
+            source: "orders:new_paid",
+          });
+        }
+        return orderId;
     }
 
     static async orderEvent(order_events_payload: OrderEvents){

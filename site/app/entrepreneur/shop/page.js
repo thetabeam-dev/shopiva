@@ -9,10 +9,44 @@ import "./styles/s.css";
 // import "./styles/l.css";
 import "./styles/xxl.css";
 import logo_img from "../../../images/Deedyte.png";
+import {
+  getTopLevelCategoryOptions,
+  humanizeCategoryKey,
+} from "../../../reusables/getCategoryOptions";
 
 const NAME_MAX = 255;
 const SLUG_MAX = 255;
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MAX_SHOP_CATEGORIES = 3;
+
+function toCategoryLabel(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return "";
+  return text
+    .split(/[\s_]+/)
+    .map((word) => (word ? `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}` : word))
+    .join(" ");
+}
+
+/** Normalize GET /categories rows or static JSON into { value, label }[]. */
+function normalizeCategoryOptions(rows) {
+  if (!Array.isArray(rows) || !rows.length) return getTopLevelCategoryOptions();
+  const out = [];
+  const seen = new Set();
+  for (const row of rows) {
+    const value = String(row?.category ?? row?.value ?? row?.key ?? "")
+      .trim()
+      .toLowerCase();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push({
+      value,
+      label: toCategoryLabel(row?.label ?? value) || humanizeCategoryKey(value),
+    });
+  }
+  out.sort((a, b) => a.label.localeCompare(b.label));
+  return out.length ? out : getTopLevelCategoryOptions();
+}
 
 /** Default location shape matching DB schema */
 const DEFAULT_LOCATION = {
@@ -73,10 +107,14 @@ export default function ShopCreate() {
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState(() => getTopLevelCategoryOptions());
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState("");
   const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
-  const [errors, setErrors] = useState({ name: "", slug: "", location: "" });
+  const [errors, setErrors] = useState({ name: "", slug: "", location: "", categories: "" });
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
@@ -94,6 +132,30 @@ export default function ShopCreate() {
     const token = getCookie("entrepreneur_secret");
     setIsLoggedIn(!!token);
     setIsAuthChecked(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCategoriesLoading(true);
+      setCategoriesError("");
+      try {
+        const res = await fetch("/api/backend/categories", { credentials: "include" });
+        if (!res.ok) throw new Error(`Could not load categories (${res.status}).`);
+        const data = await res.json();
+        if (cancelled) return;
+        setCategoryOptions(normalizeCategoryOptions(data));
+      } catch {
+        if (cancelled) return;
+        setCategoryOptions(getTopLevelCategoryOptions());
+        setCategoriesError("Using built-in categories. Live list could not be loaded.");
+      } finally {
+        if (!cancelled) setCategoriesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const deriveSlug = useCallback((shopName) => {
@@ -199,8 +261,25 @@ export default function ShopCreate() {
     }, WATCH_TIMEOUT_MS);
   }, []);
 
+  const toggleCategory = useCallback((value) => {
+    setCategories((current) => {
+      if (current.includes(value)) {
+        return current.filter((item) => item !== value);
+      }
+      if (current.length >= MAX_SHOP_CATEGORIES) {
+        setErrors((prev) => ({
+          ...prev,
+          categories: `A shop can have at most ${MAX_SHOP_CATEGORIES} categories.`,
+        }));
+        return current;
+      }
+      return [...current, value];
+    });
+    setErrors((prev) => ({ ...prev, categories: "" }));
+  }, []);
+
   const validateForm = useCallback(() => {
-    const next = { name: "", slug: "", location: "" };
+    const next = { name: "", slug: "", location: "", categories: "" };
     if (!name.trim()) next.name = "Shop name is required.";
     else if (name.length > NAME_MAX) next.name = `Name must be ${NAME_MAX} characters or less.`;
     const s = slug.trim().toLowerCase();
@@ -208,9 +287,13 @@ export default function ShopCreate() {
     else if (s.length > SLUG_MAX) next.slug = `URL must be ${SLUG_MAX} characters or less.`;
     else if (!SLUG_REGEX.test(s)) next.slug = "Use only lowercase letters, numbers, and hyphens.";
     if (!hasLocation) next.location = "Please set your shop location using your device.";
+    if (!categories.length) next.categories = "Select at least one category.";
+    else if (categories.length > MAX_SHOP_CATEGORIES) {
+      next.categories = `A shop can have at most ${MAX_SHOP_CATEGORIES} categories.`;
+    }
     setErrors(next);
-    return !next.name && !next.slug && !next.location;
-  }, [name, slug, hasLocation]);
+    return !next.name && !next.slug && !next.location && !next.categories;
+  }, [name, slug, hasLocation, categories]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -232,6 +315,7 @@ export default function ShopCreate() {
           name: name.trim(),
           slug: slug.trim().toLowerCase(),
           description: description.trim() || undefined,
+          category: categories,
           location,
         }),
       });
@@ -407,6 +491,49 @@ export default function ShopCreate() {
               </div>
             )}
           </div>
+          <div className="input-cnt" style={{ marginBottom: 16 }}>
+            <label id="shop-categories-label">Categories</label>
+            <p className="shop-hint" style={{ marginBottom: 8 }}>
+              Select up to {MAX_SHOP_CATEGORIES} categories this shop sells.
+            </p>
+            {categoriesLoading ? (
+              <p className="shop-hint">Loading categories…</p>
+            ) : (
+              <div
+                className="shop-category-list"
+                role="group"
+                aria-labelledby="shop-categories-label"
+              >
+                {categoryOptions.map((opt) => {
+                  const selected = categories.includes(opt.value);
+                  return (
+                    <label
+                      key={opt.value}
+                      className={`shop-category-option${selected ? " is-selected" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleCategory(opt.value)}
+                        disabled={submitting}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {categoriesError && !errors.categories && (
+              <span className="shop-hint" style={{ marginTop: 8 }}>
+                {categoriesError}
+              </span>
+            )}
+            {errors.categories && (
+              <span className="shop-err" role="alert">
+                {errors.categories}
+              </span>
+            )}
+          </div>
           <div className="input-cnt" style={{ marginBottom: 20 }}>
             <label htmlFor="shop-description">Description (optional)</label>
             <textarea
@@ -423,7 +550,7 @@ export default function ShopCreate() {
                 {submitError}
               </span>
             )}
-            <button type="submit" disabled={submitting}>
+            <button type="submit" disabled={submitting || categoriesLoading}>
               {submitting ? "Creating…" : "Create shop"}
             </button>
           </div>

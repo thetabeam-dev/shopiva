@@ -279,7 +279,7 @@ class Tools {
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
         {
           headers: {
-            'User-Agent': 'deedyte/1.0 (admin@thetabeam.com)', // <-- Important
+            'User-Agent': 'deedyte/1.0 (admin@deedyte.com)', // <-- Important
           },
         },
       );
@@ -365,3 +365,5 @@ class Tools {
 }
 
 export default Tools;
+
+

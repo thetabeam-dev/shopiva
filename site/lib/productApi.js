@@ -1,11 +1,46 @@
 /**
  * Product & inventory API client for the Node backend.
  * Client requests go to Next.js API proxy (/api/backend/*).
- * The proxy adds Authorization from the `entrepreneur_secret` cookie server-side.
+ * The proxy adds Authorization from entrepreneur/customer cookies server-side;
+ * we also send Bearer when the cookie is readable in the browser.
  * Set NEXT_PUBLIC_BACKEND_URL in .env for the server proxy.
  */
 
+import { parseShopsList } from "./entrepreneurDefaultShop";
+
 const API_PROXY_BASE = "/api/backend";
+
+function readAuthCookie() {
+  if (typeof document === "undefined") return null;
+  const names = ["entrepreneur_secret", "customer_secret", "user_secret"];
+  const cookies = document.cookie.split(";");
+  for (const name of names) {
+    const prefix = `${name}=`;
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.indexOf(prefix) === 0) {
+        return cookie.substring(prefix.length);
+      }
+    }
+  }
+  return null;
+}
+
+async function readJsonSafe(res) {
+  const text = await res.text();
+  const trimmed = text?.trim() ?? "";
+  if (!trimmed) return {};
+  if (trimmed.startsWith("<")) {
+    throw new Error(
+      `Backend returned HTML instead of JSON (HTTP ${res.status}). Check NEXT_PUBLIC_BACKEND_URL.`
+    );
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    throw new Error(`Backend returned a non-JSON response (HTTP ${res.status}).`);
+  }
+}
 
 /**
  * @param {string} path - Path without leading slash (e.g. "shop/1/product/create/42")
@@ -15,13 +50,16 @@ const API_PROXY_BASE = "/api/backend";
 async function backendFetch(path, options = {}) {
   const url = `${API_PROXY_BASE}/${path.replace(/^\//, "")}`;
   const { headers: optionHeaders, ...rest } = options;
+  const baseHeaders = { "Content-Type": "application/json" };
+  const token = readAuthCookie();
+  if (token) baseHeaders.Authorization = `Bearer ${token}`;
   const res = await fetch(url, {
     credentials: "include",
     ...rest,
     headers:
       optionHeaders && typeof optionHeaders === "object" && !(optionHeaders instanceof Headers)
-        ? { "Content-Type": "application/json", ...optionHeaders }
-        : { "Content-Type": "application/json" },
+        ? { ...baseHeaders, ...optionHeaders }
+        : baseHeaders,
   });
   return res;
 }
@@ -34,9 +72,11 @@ async function backendFetch(path, options = {}) {
  */
 export async function getShopsByOwner(id) {
   const res = await backendFetch(`shop/owner/${id}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error || "Failed to fetch shops");
-  return data;
+  const data = await readJsonSafe(res);
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || "Failed to fetch shops");
+  }
+  return { shops: parseShopsList(data) };
 }
 
 /**
