@@ -54,17 +54,45 @@ export async function getStorefrontProducts(slug) {
   return readJson(res);
 }
 
+function normalizeHomeFilterKey(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[_-]+/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Paginated buyer home catalog across shops.
- * @param {{ limit?: number, offset?: number }} [options]
+ * @param {{ limit?: number, offset?: number, category?: string, subcategory?: string }} [options]
  * @returns {Promise<{ products: unknown[], hasMore: boolean, nextOffset: number }>}
  */
-export async function getStorefrontHomeProducts({ limit = 40, offset = 0 } = {}) {
-  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+export async function getStorefrontHomeProducts({
+  limit = 20,
+  offset = 0,
+  category = '',
+  subcategory = '',
+} = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
-  const res = await apiFetch(
-    `/storefront/products?limit=${encodeURIComponent(String(safeLimit))}&offset=${encodeURIComponent(String(safeOffset))}`,
-  );
+  const params = new URLSearchParams({
+    limit: String(safeLimit),
+    offset: String(safeOffset),
+  });
+  const rawCategory = String(category ?? '').trim().toLowerCase();
+  if (rawCategory && rawCategory !== 'all') {
+    const normalized = normalizeHomeFilterKey(rawCategory);
+    if (normalized) params.set('category', normalized);
+  }
+  const rawSub = String(subcategory ?? '').trim().toLowerCase();
+  if (rawSub && rawSub !== 'all') {
+    const normalizedSub = normalizeHomeFilterKey(rawSub);
+    if (normalizedSub) params.set('subcategory', normalizedSub);
+  }
+  const res = await apiFetch(`/storefront/products?${params.toString()}`);
   return readJson(res);
 }
 

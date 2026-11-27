@@ -202,8 +202,63 @@ app.get("/config/app-version", (req, res) => {
 app.get("/categories", async (req, res) => {
   const pool = await db();
 
+  // Only categories that currently have ≥1 published product in an active shop.
+  // existing_product_count + subcategories are computed live from products.
   const { rows } = await pool.query(
-    `SELECT * FROM categories ORDER BY category ASC`,
+    `WITH product_cats AS (
+       SELECT
+         LOWER(BTRIM(p.category)) AS cat_key,
+         COUNT(*)::int AS product_count
+       FROM products p
+       INNER JOIN shops s ON s.id = p.shop_id
+       WHERE p.is_published = true
+         AND s.isactive = true
+         AND p.category IS NOT NULL
+         AND BTRIM(p.category) <> ''
+       GROUP BY LOWER(BTRIM(p.category))
+     ),
+     product_subs AS (
+       SELECT
+         LOWER(BTRIM(p.category)) AS cat_key,
+         MIN(TRIM(p.subcategory)) AS subcategory,
+         COUNT(*)::int AS product_count
+       FROM products p
+       INNER JOIN shops s ON s.id = p.shop_id
+       WHERE p.is_published = true
+         AND s.isactive = true
+         AND p.category IS NOT NULL
+         AND BTRIM(p.category) <> ''
+         AND p.subcategory IS NOT NULL
+         AND BTRIM(p.subcategory) <> ''
+       GROUP BY LOWER(BTRIM(p.category)), LOWER(BTRIM(p.subcategory))
+     )
+     SELECT
+       c.id,
+       c.category,
+       c.variants,
+       c."product-type",
+       c.types,
+       pc.product_count AS existing_product_count,
+       COALESCE(
+         (
+           SELECT json_agg(
+             json_build_object(
+               'subcategory', ps.subcategory,
+               'existing_product_count', ps.product_count
+             )
+             ORDER BY ps.subcategory ASC
+           )
+           FROM product_subs ps
+           WHERE ps.cat_key = LOWER(BTRIM(c.category))
+             AND ps.product_count > 0
+         ),
+         '[]'::json
+       ) AS subcategories
+     FROM categories c
+     INNER JOIN product_cats pc
+       ON LOWER(BTRIM(c.category)) = pc.cat_key
+     WHERE pc.product_count > 0
+     ORDER BY c.category ASC`,
   );
   res.json(rows);
 });

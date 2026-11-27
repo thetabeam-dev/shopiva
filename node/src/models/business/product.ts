@@ -8,6 +8,10 @@
 
 import { db } from "../../config/database.js";
 import { ordersTransformer } from "../../transformers/buyer/orders.js";
+import {
+  normalizeCategoryKey,
+  sqlNormalizeCategoryKey,
+} from "../../utils/categoryKey.js";
 import { withErrorHandling } from "../../utils/errHandler.js";
 
 export type ProductStatus = "draft" | "active" | "archived";
@@ -350,9 +354,18 @@ export class product {
    * Extra shop/sold columns ride on each row for the listing DTO.
    */
   static listPublishedHomeFeed = withErrorHandling(
-    async (limit: number, offset: number): Promise<Array<ProductRow & Record<string, unknown>>> => {
-      const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+    async (
+      limit: number,
+      offset: number,
+      category = "",
+      subcategory = "",
+    ): Promise<Array<ProductRow & Record<string, unknown>>> => {
+      const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
       const safeOffset = Math.max(Number(offset) || 0, 0);
+      const categoryKey = normalizeCategoryKey(category);
+      const subcategoryKey = normalizeCategoryKey(subcategory);
+      const categoryExpr = sqlNormalizeCategoryKey("p.category");
+      const subcategoryExpr = sqlNormalizeCategoryKey("p.subcategory");
       const { rows } = await (await db()).query<ProductRow & Record<string, unknown>>(
         `SELECT
            p.*,
@@ -374,9 +387,11 @@ export class product {
            AND s.isactive = true
            AND s.slug IS NOT NULL
            AND btrim(s.slug) <> ''
+           AND ($3::text = '' OR ${categoryExpr} = $3)
+           AND ($4::text = '' OR ${subcategoryExpr} = $4)
          ORDER BY p.is_featured DESC, p.created_at DESC
          LIMIT $1 OFFSET $2`,
-        [safeLimit, safeOffset]
+        [safeLimit, safeOffset, categoryKey, subcategoryKey]
       );
       return rows;
     }

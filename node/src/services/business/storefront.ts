@@ -75,10 +75,20 @@ type HomeFeedRow = ProductRow & {
 /**
  * Paginated buyer home catalog (cross-shop).
  */
-export async function GetStorefrontHomeProductsService(limit = 40, offset = 0) {
-  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+export async function GetStorefrontHomeProductsService(
+  limit = 20,
+  offset = 0,
+  category = "",
+  subcategory = "",
+) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
-  const rows = (await productModel.listPublishedHomeFeed(safeLimit + 1, safeOffset)) as HomeFeedRow[];
+  const rows = (await productModel.listPublishedHomeFeed(
+    safeLimit + 1,
+    safeOffset,
+    category,
+    subcategory,
+  )) as HomeFeedRow[];
   const hasMore = rows.length > safeLimit;
   const page = hasMore ? rows.slice(0, safeLimit) : rows;
   const ids = page

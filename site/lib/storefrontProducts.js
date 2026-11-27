@@ -133,11 +133,36 @@ const FULL_SQL = `
   LIMIT $1 OFFSET $2
 `;
 
+function normalizeCategoryKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[_-]+/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Same normalization as mobile Home / Node storefront category filter. */
+function sqlNormalizeCategoryKey(columnSql) {
+  return `TRIM(BOTH FROM regexp_replace(
+    regexp_replace(
+      regexp_replace(
+        regexp_replace(LOWER(BTRIM(COALESCE(${columnSql}, ''))), '&', ' and ', 'g'),
+        '[_-]+', ' ', 'g'
+      ),
+      '[^a-z0-9]+', ' ', 'g'
+    ),
+    '\\s+', ' ', 'g'
+  ))`;
+}
+
 function withCategoryFilter(sql, categoryKey) {
   if (!categoryKey) return sql;
   return sql.replace(
     "WHERE p.is_published = true",
-    "WHERE p.is_published = true\n    AND LOWER(BTRIM(p.category)) = $3",
+    `WHERE p.is_published = true\n    AND ${sqlNormalizeCategoryKey("p.category")} = $3`,
   );
 }
 
@@ -145,11 +170,11 @@ function withCategoryFilter(sql, categoryKey) {
  * @param {{ limit?: number, offset?: number, category?: string }} [options]
  * @returns {Promise<{ products: ReturnType<typeof mapProductRows>, hasMore: boolean, nextOffset: number }>}
  */
-export async function listHomeProducts({ limit = 40, offset = 0, category = "" } = {}) {
-  const safeLimit = Math.min(Math.max(Number(limit) || 40, 1), 100);
+export async function listHomeProducts({ limit = 20, offset = 0, category = "" } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
   const fetchLimit = safeLimit + 1;
-  const categoryKey = String(category ?? "").trim().toLowerCase();
+  const categoryKey = normalizeCategoryKey(category);
   const params = categoryKey
     ? [fetchLimit, safeOffset, categoryKey]
     : [fetchLimit, safeOffset];

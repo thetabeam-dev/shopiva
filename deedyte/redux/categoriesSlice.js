@@ -39,8 +39,25 @@ function parseObject(raw) {
   return {};
 }
 
+function normalizeSubcategoryRows(raw) {
+  /** @type {{ subcategory: string; existingProductCount: number }[]} */
+  const out = [];
+  const list = Array.isArray(raw) ? raw : [];
+  const seen = new Set();
+  for (const entry of list) {
+    const subcategory = String(entry?.subcategory ?? entry?.name ?? '').trim().toLowerCase();
+    if (!subcategory || seen.has(subcategory)) continue;
+    const count = Number(entry?.existing_product_count ?? entry?.existingProductCount ?? 0) || 0;
+    if (count <= 0) continue;
+    seen.add(subcategory);
+    out.push({ subcategory, existingProductCount: count });
+  }
+  out.sort((a, b) => a.subcategory.localeCompare(b.subcategory));
+  return out;
+}
+
 function normalizeRows(rows) {
-  /** @type {{ id: number | null; category: string; variants: string[]; productType: Record<string, string[]>; existingProductCount: number }[]} */
+  /** @type {{ id: number | null; category: string; variants: string[]; productType: Record<string, string[]>; existingProductCount: number; subcategories: { subcategory: string; existingProductCount: number }[] }[]} */
   const normalized = [];
 
   for (const row of rows) {
@@ -62,6 +79,7 @@ function normalizeRows(rows) {
       variants: (row?.variants),
       productType,
       existingProductCount: Number(row?.existing_product_count ?? 0) || 0,
+      subcategories: normalizeSubcategoryRows(row?.subcategories),
     });
   }
 
@@ -138,7 +156,7 @@ export const fetchCategories = createAsyncThunk('categories/fetchAll', async () 
 const categoriesSlice = createSlice({
   name: 'categories',
   initialState: {
-    /** @type {{ id: number | null; category: string; variants: string[]; productType: Record<string, string[]>; existingProductCount: number }[]} */
+    /** @type {{ id: number | null; category: string; variants: string[]; productType: Record<string, string[]>; existingProductCount: number; subcategories: { subcategory: string; existingProductCount: number }[] }[]} */
     categories: [],
     /** @type {{ value: string; label: string; productTypes: string }[]} */
     options: [],

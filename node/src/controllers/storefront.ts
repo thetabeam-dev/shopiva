@@ -84,9 +84,18 @@ export async function GetStorefrontProductsController(req: Request, res: Respons
 
 export async function GetStorefrontHomeProductsController(req: Request, res: Response): Promise<void> {
   try {
-    const limit = Number(req.query.limit ?? 40);
+    const limit = Number(req.query.limit ?? 20);
     const offset = Number(req.query.offset ?? 0);
-    const data = await GetStorefrontHomeProductsService(limit, offset);
+    const category = String(req.query.category ?? "").trim();
+    const subcategory = String(
+      req.query.subcategory ?? req.query.subCategory ?? "",
+    ).trim();
+    const data = await GetStorefrontHomeProductsService(
+      limit,
+      offset,
+      category,
+      subcategory,
+    );
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

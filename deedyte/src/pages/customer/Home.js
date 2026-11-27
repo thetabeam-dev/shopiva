@@ -66,7 +66,7 @@ function formatCategoryLabel(category) {
 }
 
 const BANNER_W = Dimensions.get('window').width - 32;
-const PAGE_SIZE = 40;
+const PAGE_SIZE = 20;
 
 function mapHomeProduct(product) {
   const price = Number(product.minPrice ?? product.price) || 0;
@@ -85,6 +85,11 @@ function mapHomeProduct(product) {
     comparePrice: compare > price ? compare : 0,
     sold: Number(product.sold ?? product.soldCount ?? 0) || 0,
     category: String(product?.category ?? '').trim().toLowerCase(),
+    subcategory: String(
+      product?.subcategory ?? product?.subCategory ?? '',
+    )
+      .trim()
+      .toLowerCase(),
     hasVariants: Boolean(product?.hasVariants),
     featured: Boolean(product.is_featured ?? product.isFeatured ?? product.featured),
     shop,
@@ -143,6 +148,7 @@ export default function HomeScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [bannerIndex, setBannerIndex] = useState(0);
   const [wallet, setWallet] = useState(null);
   const [walletRefreshing, setWalletRefreshing] = useState(false);
@@ -155,29 +161,60 @@ export default function HomeScreen() {
   const categories = useMemo(() => {
     const seen = new Set();
     const names = [];
-    arrivals.forEach(item => {
-      const label = String(item?.category ?? '').trim().toLowerCase();
+    const push = (raw, productCount = null) => {
+      if (productCount != null && Number(productCount) <= 0) return;
+      const label = String(raw ?? '').trim().toLowerCase();
       const key = categoryKey(label);
       if (!key || seen.has(key)) return;
       seen.add(key);
-      const row = categoryRows.find(entry => categoryKey(entry?.category) === key);
-      names.push(String(row?.category ?? label).trim().toLowerCase());
-    });
+      names.push(label);
+    };
+    // Prefer catalog rows that already have published products.
+    categoryRows.forEach(entry =>
+      push(entry?.category, entry?.existingProductCount ?? entry?.existing_product_count),
+    );
+    if (!names.length) {
+      arrivals.forEach(item => push(item?.category, 1));
+    }
     return names;
   }, [arrivals, categoryRows]);
 
-  useEffect(() => {
-    if (selectedCategory === 'all') return;
-    const wanted = categoryKey(selectedCategory);
-    const stillListed = categories.some(item => categoryKey(item) === wanted);
-    if (!stillListed) setSelectedCategory('all');
-  }, [categories, selectedCategory]);
+  const activeCategoryParam =
+    selectedCategory === 'all' ? '' : categoryKey(selectedCategory);
+  const activeSubcategoryParam =
+    selectedCategory === 'all' || selectedSubcategory === 'all'
+      ? ''
+      : categoryKey(selectedSubcategory);
+
+  const subcategories = useMemo(() => {
+    if (selectedCategory === 'all') return [];
+    const row = categoryRows.find(
+      entry => categoryKey(entry?.category) === categoryKey(selectedCategory),
+    );
+    const fromApi = Array.isArray(row?.subcategories) ? row.subcategories : [];
+    const names = [];
+    const seen = new Set();
+    fromApi.forEach(entry => {
+      if ((entry?.existingProductCount ?? 0) <= 0) return;
+      const label = String(entry?.subcategory ?? '').trim().toLowerCase();
+      const key = categoryKey(label);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      names.push(label);
+    });
+    return names;
+  }, [categoryRows, selectedCategory]);
 
   const loadArrivals = useCallback(async ({ refresh = false } = {}) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const data = await getStorefrontHomeProducts({ limit: PAGE_SIZE, offset: 0 });
+      const data = await getStorefrontHomeProducts({
+        limit: PAGE_SIZE,
+        offset: 0,
+        category: activeCategoryParam,
+        subcategory: activeSubcategoryParam,
+      });
       const products = Array.isArray(data?.products) ? data.products : [];
       setArrivals(products.map(mapHomeProduct));
       setHasMore(Boolean(data?.hasMore));
@@ -194,13 +231,18 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [activeCategoryParam, activeSubcategoryParam]);
 
   const loadMoreArrivals = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const data = await getStorefrontHomeProducts({ limit: PAGE_SIZE, offset: nextOffset });
+      const data = await getStorefrontHomeProducts({
+        limit: PAGE_SIZE,
+        offset: nextOffset,
+        category: activeCategoryParam,
+        subcategory: activeSubcategoryParam,
+      });
       const products = Array.isArray(data?.products) ? data.products : [];
       setArrivals(prev => {
         const seen = new Set(prev.map(item => String(item.id)));
@@ -220,7 +262,7 @@ export default function HomeScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loadingMore, nextOffset]);
+  }, [activeCategoryParam, activeSubcategoryParam, hasMore, loadingMore, nextOffset]);
 
   useEffect(() => {
     loadArrivals().catch(() => {});
@@ -268,14 +310,16 @@ export default function HomeScreen() {
   const walletBalance = Number.isFinite(walletKobo) ? walletKobo / 100 : 0;
   const walletAddress = String(wallet?.address ?? '').trim();
 
-  const visibleArrivals = useMemo(() => {
-    if (selectedCategory === 'all') return arrivals;
-    return arrivals.filter(item => categoryKey(item.category) === categoryKey(selectedCategory));
-  }, [arrivals, selectedCategory]);
+  // Arrivals are already filtered server-side when category / subcategory chips are selected.
+  const visibleArrivals = arrivals;
   const visibleRecentlyViewed = useMemo(() => {
     if (selectedCategory === 'all') return recentlyViewed;
-    return recentlyViewed.filter(item => categoryKey(item.category) === categoryKey(selectedCategory));
-  }, [recentlyViewed, selectedCategory]);
+    return recentlyViewed.filter(item => {
+      if (categoryKey(item.category) !== categoryKey(selectedCategory)) return false;
+      if (selectedSubcategory === 'all') return true;
+      return categoryKey(item.subcategory) === categoryKey(selectedSubcategory);
+    });
+  }, [recentlyViewed, selectedCategory, selectedSubcategory]);
 
   const loadCartProducts = useCallback(async () => {
     try {
@@ -314,6 +358,11 @@ export default function HomeScreen() {
             price: Number(product.minPrice ?? product.price) || 0,
             comparePrice: Number(product.maxPrice) || 0,
             category: String(product?.category ?? '').trim().toLowerCase(),
+            subcategory: String(
+              product?.subcategory ?? product?.subCategory ?? '',
+            )
+              .trim()
+              .toLowerCase(),
             hasVariants: Boolean(product?.hasVariants),
             shop: {
               id: shop.id,
@@ -463,7 +512,10 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={item}
               style={styles.chip}
-              onPress={() => setSelectedCategory(item)}
+              onPress={() => {
+                setSelectedCategory(item);
+                setSelectedSubcategory('all');
+              }}
             >
               <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                 {item === 'all' ? 'All' : formatCategoryLabel(item)}
@@ -473,6 +525,36 @@ export default function HomeScreen() {
           );
         })}
       </ScrollView>
+
+      {selectedCategory !== 'all' && subcategories.length > 0 ? (
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.subChipRow}
+          contentContainerStyle={styles.subChips}
+        >
+          {['all', ...subcategories].map(item => {
+            const selected = item === selectedSubcategory;
+            return (
+              <TouchableOpacity
+                key={`sub-${item}`}
+                style={styles.subChip}
+                onPress={() => setSelectedSubcategory(item)}
+              >
+                <Text style={[styles.subChipText, selected && styles.subChipTextSelected]}>
+                  {item === 'all' ? 'All' : formatCategoryLabel(item)}
+                </Text>
+                {selected ? (
+                  <View style={styles.subChipUnderline} />
+                ) : (
+                  <View style={styles.chipUnderlineSpacer} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      ) : null}
 
       <ScrollView
         style={styles.scroll}
@@ -680,7 +762,9 @@ export default function HomeScreen() {
         <Text style={styles.empty}>
           {selectedCategory === 'all'
             ? 'No products yet. Explore shops to see what is in stock.'
-            : `No products in ${formatCategoryLabel(selectedCategory)}.`}
+            : selectedSubcategory !== 'all'
+              ? `No products in ${formatCategoryLabel(selectedCategory)} · ${formatCategoryLabel(selectedSubcategory)}.`
+              : `No products in ${formatCategoryLabel(selectedCategory)}.`}
         </Text>
       ) : null}
       {hasMore ? (
@@ -958,6 +1042,24 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   chipUnderlineSpacer: { marginTop: 6, height: 2 },
+  subChipRow: {
+    height: 40,
+    flexGrow: 0,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EFEFEF',
+  },
+  subChips: { paddingHorizontal: 16, alignItems: 'flex-end', gap: 14 },
+  subChip: { alignItems: 'center', paddingBottom: 4 },
+  subChipText: { fontSize: 14, color: '#9A9A9A' },
+  subChipTextSelected: { color: '#00926E', fontWeight: '700' },
+  subChipUnderline: {
+    marginTop: 5,
+    height: 2,
+    width: '100%',
+    backgroundColor: '#00926E',
+    borderRadius: 1,
+  },
   walletCard: {
     marginTop: 12,
     marginHorizontal: 16,

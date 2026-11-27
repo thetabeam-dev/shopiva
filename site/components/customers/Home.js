@@ -35,7 +35,7 @@ function StarRow({ rating, count }) {
     );
 }
 
-const PAGE_SIZE = 40;
+const PAGE_SIZE = 20;
 
 function productsUrl(offset, categoryKey) {
     const params = new URLSearchParams({

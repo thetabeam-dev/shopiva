@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Number(searchParams.get("limit") ?? 40);
+    const limit = Number(searchParams.get("limit") ?? 20);
     const offset = Number(searchParams.get("offset") ?? 0);
     const category = searchParams.get("category") ?? "";
     const { products, hasMore, nextOffset } = await listHomeProducts({
